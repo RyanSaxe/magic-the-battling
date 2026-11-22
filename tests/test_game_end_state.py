@@ -352,6 +352,46 @@ def test_no_next_opponent_odds_after_the_game_ends(client, start_lobby):
     assert _odds_seen_by(game_id, "Bob") == {"Alice": None}
 
 
+def _build_seen_by(gm: GameManager, game_id: str, viewer: str) -> tuple[list[str], list[str]]:
+    player_id = gm.get_player_id_by_name(game_id, viewer)
+    assert player_id is not None
+    state = gm.get_game_state(game_id, player_id)
+    assert state is not None
+    return [c.id for c in state.self_player.hand], [c.id for c in state.self_player.sideboard]
+
+
+def _loses(name: str) -> Callable[[Battle], str]:
+    return lambda b: b.opponent.name if b.player.name == name else b.player.name
+
+
+def test_an_eliminated_player_still_sees_their_last_build_after_a_reload_and_at_game_end(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
+    gm = ws_module.game_manager
+    alice, bob, carol, dave = game.players
+    dave.poison = 9
+    _play_round(gm, game, game_id, _loses("Dave"))
+    last_build = _build_seen_by(gm, game_id, "Dave")
+    assert all(last_build)
+    carol.poison = 9
+    _play_round(gm, game, game_id, _loses("Carol"))
+
+    bob.poison = 9
+    for p in (alice, bob):
+        gm.handle_draft_done(game, p)
+    _ready_all(gm, game, game_id, [alice, bob])
+    assert not dave.hand
+    assert not dave.sideboard
+
+    gm.persist_all_games()
+    restarted = GameManager()
+    assert restarted.restore_game_from_snapshot(game_id)
+    assert _build_seen_by(restarted, game_id, "Dave") == last_build
+
+    _submit(gm, game, game_id, [alice, bob], "Alice")
+    assert alice.phase == "winner"
+    assert _build_seen_by(gm, game_id, "Dave") == last_build
+
+
 def _give_every_zone_a_card(player: Player, card_factory, upgrade_factory) -> None:
     applied = upgrade_factory(f"{player.name} applied upgrade")
     applied.upgrade_target = player.hand[0] if player.hand else player.sideboard[0]

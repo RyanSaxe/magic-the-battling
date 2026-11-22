@@ -225,6 +225,20 @@ function resolveTarget(docId?: string, tab?: string): ResolvedTarget {
   return { tab: 'guide', guideSection: 'overview' }
 }
 
+function scrollToLinkTarget(list: HTMLElement, anchor?: string) {
+  const section = list.querySelector('.quick-guide-accordion-panel.open')?.parentElement
+  if (!section) {
+    return
+  }
+  const heading = anchor
+    ? Array.from(section.querySelectorAll('h2')).find((h2) => toSlug(h2.textContent ?? '') === anchor)
+    : undefined
+  const target = heading ?? section
+  const top = list.scrollTop + target.getBoundingClientRect().top - list.getBoundingClientRect().top
+  // iOS can keep a scroll past a box's end.
+  list.scrollTop = Math.min(top, list.scrollHeight - list.clientHeight)
+}
+
 function useSequentialAccordion<T extends string | number>(
   initialOpen: T | null,
   stepMs: number,
@@ -322,7 +336,7 @@ function AccordionItem({ id, label, expanded, onToggle, labelClassName, children
         className={`w-full py-3.5 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-l-3 transition-all duration-[400ms] ${
           expanded
             ? 'bg-amber-400/8 border-l-amber-400'
-            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-black/20'
+            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-[var(--stone)]'
         }`}
       >
         <span className={`font-medium text-base flex-1 text-left ${labelClassName ?? 'text-white'}`}>{label}</span>
@@ -561,9 +575,34 @@ export function QuickGuide({
     openTipsSectionImmediate,
   ])
 
+  const listRef = useRef<HTMLDivElement>(null)
+  const [linkJump, setLinkJump] = useState<{ anchor?: string } | null>(null)
+
+  useEffect(() => {
+    const list = listRef.current
+    if (!linkJump || !list) {
+      return
+    }
+    let cancelled = false
+    // A newly shown tab starts opening its section a frame late, and a heading has no fixed place until the
+    // sections opening and closing around it stop moving.
+    const frame = requestAnimationFrame(async () => {
+      const panels = Array.from(list.querySelectorAll('.quick-guide-accordion-panel'))
+      await Promise.allSettled(panels.flatMap((panel) => panel.getAnimations().map((animation) => animation.finished)))
+      if (!cancelled) {
+        scrollToLinkTarget(list, linkJump.anchor)
+      }
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+  }, [linkJump])
+
   const docNav = useMemo(() => ({
     navigate: (docId: string, tab?: string) => {
       applyTarget(docId, tab)
+      setLinkJump({ anchor: tab })
     },
   }), [applyTarget])
 
@@ -575,10 +614,10 @@ export function QuickGuide({
     { value: 'faq', label: 'FAQ' },
   ]
 
-  const cardTypes: { id: CardType; label: string; visible: boolean }[] = [
-    { id: 'cards', label: 'Cards', visible: true },
-    { id: 'upgrades', label: 'Upgrades', visible: useUpgrades !== false },
-    { id: 'vanguards', label: 'Vanguards', visible: !!useVanguards },
+  const cardTypes: SegmentOption<CardType>[] = [
+    { value: 'cards', label: 'Cards' },
+    ...(useUpgrades !== false ? [{ value: 'upgrades', label: 'Upgrades' } as const] : []),
+    ...(useVanguards ? [{ value: 'vanguards', label: 'Vanguards' } as const] : []),
   ]
 
   useEffect(() => {
@@ -620,7 +659,7 @@ export function QuickGuide({
 
         {activeTab === 'guide' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="guide-overview"
                 label="Overview"
@@ -680,7 +719,7 @@ export function QuickGuide({
 
         {activeTab === 'controls' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
                 label="General"
@@ -715,7 +754,7 @@ export function QuickGuide({
 
         {activeTab === 'tips' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
                 label="General"
@@ -756,21 +795,13 @@ export function QuickGuide({
 
         {activeTab === 'browse' && gameId && (
           <div className="flex flex-col flex-1 min-h-0 px-4 pt-3">
-            <div className="flex gap-2 mb-3 shrink-0">
-              {cardTypes.filter((t) => t.visible).map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setCardType(t.id)}
-                  className={`rounded-full px-3 py-1 text-sm transition-all ${
-                    t.id === cardType
-                      ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/60'
-                      : 'text-[var(--ivory-muted)] hover:text-[var(--ivory)]'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedFilter
+              label="Card list"
+              options={cardTypes}
+              value={cardType}
+              onChange={setCardType}
+              className="mb-2 shrink-0 self-start"
+            />
             <CardsView
               gameId={gameId}
               which={cardType === 'vanguards' ? 'cards' : cardType}
@@ -787,7 +818,7 @@ export function QuickGuide({
 
         {activeTab === 'faq' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               {faqEntries.length > 0 ? (
                 faqEntries.map((entry, index) => (
                   <AccordionItem
@@ -813,7 +844,7 @@ export function QuickGuide({
           </div>
         )}
 
-        <div className="shrink-0 px-4 py-3.5 border-t border-[rgba(212,175,55,0.45)] bg-black/30">
+        <div className="shrink-0 px-4 py-3.5 border-t gold-divider">
           <div className="flex items-center justify-between gap-3">
             <a
               href={DISCORD_INVITE_URL}

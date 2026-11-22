@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type RefObject } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getShareGame } from '../api/client'
 import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '../types'
@@ -19,6 +19,7 @@ import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
 import { useHotkeys } from '../hooks/useHotkeys'
 import { getSidebarPlayerOrder } from '../utils/playerPlacement'
 import { AppHeader, HomeButton } from '../components/common/AppHeader'
+import { BoardBackdrop } from '../components/common/BoardBackdrop'
 import { BottomBar } from '../components/common/FrameBar'
 import { PageFrame } from '../components/common/PageFrame'
 import { SidePanel } from '../components/common/SidePanel'
@@ -26,6 +27,7 @@ import { SurfaceCard } from '../components/common/SurfaceCard'
 import { BusyNotice, StatusNotice } from '../components/common/StatusNotice'
 import { NoticeFrame } from '../components/common/NoticeFrame'
 import { type AppError, unknownToAppError } from '../utils/appError'
+import { POPOVER_CHROME } from '../components/common/styles'
 
 interface RoundOption {
   label: string
@@ -46,24 +48,31 @@ function getLatestRoundValue(rounds: SharePlayerSnapshot[]): string {
   return latest ? getShareRoundValue(latest) : ''
 }
 
+function scrollToCenter(option: HTMLButtonElement | null) {
+  option?.scrollIntoView({ block: 'center' })
+}
+
 function RoundPopover({
   options,
   selectedRound,
+  anchorRef,
   onSelect,
   onClose,
 }: {
   options: RoundOption[]
   selectedRound: string
+  /** Holds the popover and its button, which toggles it on the click. */
+  anchorRef: RefObject<HTMLDivElement | null>
   onSelect: (value: string) => void
   onClose: () => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
+      const target = e.target as Node
+      if (anchorRef.current?.contains(target) || backdropRef.current?.contains(target)) return
+      onClose()
     }
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -74,30 +83,31 @@ function RoundPopover({
       document.removeEventListener('mousedown', handleClick)
       document.removeEventListener('keydown', handleKey)
     }
-  }, [onClose])
+  }, [anchorRef, onClose])
 
   return (
+    <>
+    <BoardBackdrop ref={backdropRef} onTap={onClose} />
     <div
-      ref={ref}
-      className="absolute bottom-full mb-4 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[300px] overflow-y-auto"
+      className={`absolute bottom-full mb-4 left-2 z-50 ${POPOVER_CHROME} p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[calc(100dvh-2*var(--frame-bar-height)-1rem)] overflow-y-auto`}
     >
       {options.map((opt) => (
         <button
           key={opt.value}
+          ref={opt.value === selectedRound ? scrollToCenter : undefined}
           onClick={() => {
             onSelect(opt.value)
             onClose()
           }}
-          className={`text-sm py-1.5 px-3 rounded text-left transition-colors ${
-            opt.value === selectedRound
-              ? 'bg-amber-600/80 text-white'
-              : 'menu-item text-[var(--ivory-muted)]'
+          className={`menu-item text-sm py-1.5 px-3 rounded text-left transition-colors ${
+            opt.value === selectedRound ? 'text-[var(--gold-pale)]' : 'text-[var(--ivory-muted)]'
           }`}
         >
           {opt.label}
         </button>
       ))}
     </div>
+    </>
   )
 }
 
@@ -121,6 +131,7 @@ export function ShareGame() {
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [roundPopoverOpen, setRoundPopoverOpen] = useState(false)
+  const roundAnchorRef = useRef<HTMLDivElement>(null)
   const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
   const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
   const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
@@ -348,7 +359,7 @@ export function ShareGame() {
           <BottomBar
             ref={bottomBarRef}
             secondary={
-              <div className="relative">
+              <div ref={roundAnchorRef} className="relative">
                 <button
                   className="btn btn-secondary"
                   disabled={roundOptions.length === 0}
@@ -358,6 +369,7 @@ export function ShareGame() {
                 </button>
                 {roundPopoverOpen && roundOptions.length > 0 && (
                   <RoundPopover
+                    anchorRef={roundAnchorRef}
                     options={roundOptions}
                     selectedRound={effectiveSelectedRound}
                     onSelect={setSelectedRound}

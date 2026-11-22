@@ -1,4 +1,13 @@
-import type { LastResult, Phase } from "../types"
+import type { LastResult, Phase, PlayerView } from "../types"
+
+const ACTIVITY_WORDS: Partial<Record<Phase, string>> = {
+  draft: "Drafting",
+  build: "Building",
+  battle: "Fighting",
+  reward: "Wrap-Up",
+  awaiting_elimination: "Waiting",
+  winner: "Winner",
+}
 
 export function getOrdinal(n: number): string {
   const suffixes = ['th', 'st', 'nd', 'rd']
@@ -13,16 +22,21 @@ export function getLastResultWord(result: LastResult): string {
   return "Drew"
 }
 
-export function getPlayerPhaseStatusLabel(phase: Phase, buildReady: boolean): string {
-  if (phase === "build" && buildReady) return "ready"
-  if (phase === "reward") return "end"
-  if (phase === "battle") return "fight"
-  return phase
+/** What a player still in the game is doing, or nothing once the game is over for them. */
+export function getPlayerActivity({ phase, build_ready }: Pick<PlayerView, "phase" | "build_ready">): string | undefined {
+  return phase === "build" && build_ready ? "Ready" : ACTIVITY_WORDS[phase]
+}
+
+const HAS_ZONE = /(?:Z|[+-]\d\d:\d\d)$/
+
+/** The server stores UTC and sends some times without a zone, which Date.parse would read as the player's own. */
+export function parseServerTime(isoTime: string): number {
+  return Date.parse(HAS_ZONE.test(isoTime) ? isoTime : `${isoTime}Z`)
 }
 
 /** How long ago a moment was, in the rough terms a player needs: "just now", "4 min ago", "2 h ago", "3 days ago". */
 export function formatTimeSince(isoTime: string, now: number = Date.now()): string {
-  const minutes = Math.floor((now - Date.parse(isoTime)) / 60_000)
+  const minutes = Math.floor((now - parseServerTime(isoTime)) / 60_000)
   if (minutes < 1) return 'just now'
   if (minutes < 60) return `${minutes} min ago`
   const hours = Math.floor(minutes / 60)

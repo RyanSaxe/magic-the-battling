@@ -224,4 +224,46 @@ describe('Play: starting a Goldfish game', () => {
 
     expect(getRememberedSeat('game-1')).toBeNull()
   })
+
+  it('starts with the fewer opponents picked when puppet data is short', async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    const serveLobby = async (gameId: string, puppetCount: number) => {
+      const socket = FakeWebSocket.latest()
+      act(() => {
+        socket.serverOpen()
+        socket.serverMessage({
+          type: 'lobby_state',
+          payload: {
+            game_id: gameId,
+            players: [],
+            can_start: false,
+            start_status: 'open',
+            start_error: null,
+            cube_loading_status: 'ready',
+            cube_loading_error: null,
+            puppet_count: puppetCount,
+            available_puppet_count: 1,
+          },
+        })
+      })
+      await settle()
+      return socket
+    }
+
+    await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+    await settle()
+    await serveLobby('game-1', 3)
+    await act(async () => screen.getByRole('button', { name: '1' }).click())
+    await act(async () => screen.getByRole('button', { name: 'Start' }).click())
+    await settle()
+    const socket = await serveLobby('game-2', 1)
+
+    expect(screen.queryByText('Not enough puppet data')).toBeNull()
+    expect(socket.sent.map((data) => JSON.parse(data).action)).toContain('set_ready')
+  })
 })

@@ -5,7 +5,19 @@
 # share_preview.py.
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -134,6 +146,14 @@ class User(Base):
     follows = relationship("BattlerFollow", back_populates="user", cascade="all, delete-orphan")
 
 
+# Usernames and emails keep the case people typed, but two accounts can't differ only by case. init_db adds these
+# to databases made before them.
+LOWERCASE_UNIQUE_USER_INDEXES = (
+    Index("ix_users_username_lower", func.lower(User.username), unique=True),
+    Index("ix_users_email_lower", func.lower(User.email), unique=True),
+)
+
+
 class UserBattler(Base):
     __tablename__ = "user_battlers"
 
@@ -157,6 +177,8 @@ class UserBattler(Base):
     __table_args__ = (
         Index("ix_user_battlers_user_id", "user_id"),
         Index("ix_user_battlers_cube_id", "cube_id"),
+        # Without AUTOINCREMENT SQLite gives the next preset one more than the highest id left, so deleted ids return.
+        {"sqlite_autoincrement": True},
     )
 
 

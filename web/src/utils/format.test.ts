@@ -1,24 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { formatTimeSince, getPlayerPhaseStatusLabel } from "./format"
-
-describe("getPlayerPhaseStatusLabel", () => {
-  it("shows ready for build-ready players", () => {
-    expect(getPlayerPhaseStatusLabel("build", true)).toBe("ready")
-  })
-
-  it("shows end instead of reward", () => {
-    expect(getPlayerPhaseStatusLabel("reward", false)).toBe("end")
-  })
-
-  it("shows fight instead of battle", () => {
-    expect(getPlayerPhaseStatusLabel("battle", false)).toBe("fight")
-  })
-
-  it("falls back to the raw phase for other states", () => {
-    expect(getPlayerPhaseStatusLabel("draft", false)).toBe("draft")
-  })
-})
+import { formatTimeSince } from "./format"
 
 describe('formatTimeSince', () => {
   const now = Date.parse('2026-11-21T12:00:00Z')

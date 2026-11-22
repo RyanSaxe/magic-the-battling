@@ -1,11 +1,11 @@
-import { useNavigate } from 'react-router-dom'
 import type { ResumableSeat } from '../../hooks/useResumableGames'
+import { useResumeSeat } from '../../hooks/useResumeSeat'
 import { resumeDetail, resumeHeadline } from '../../utils/accountFormat'
 import { SurfaceCard } from '../common/SurfaceCard'
 
-/** The lobby or game this browser can go back to, at the top of the dashboard. */
+/** The lobby or game this browser or its account can go back to, at the top of the dashboard. */
 export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
-  const navigate = useNavigate()
+  const resume = useResumeSeat()
   const inGame = seat.kind === 'game'
   return (
     <SurfaceCard
@@ -32,14 +32,14 @@ export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
             {resumeHeadline(seat)}
           </div>
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="truncate text-[15px] leading-5 font-semibold text-amber-50">{seat.cubeName ?? seat.cubeId}</span>
-            <span className="text-xs text-amber-100/60">{resumeDetail(seat)}</span>
+            <span className="truncate text-[15px] leading-5 font-semibold text-[var(--ivory)]">{seat.cubeName ?? seat.cubeId}</span>
+            <span className="text-xs text-[var(--ivory-muted)]">{resumeDetail(seat)}</span>
           </div>
         </div>
       </div>
       <button
         type="button"
-        onClick={() => navigate(`/game/${seat.gameId}/${inGame ? 'play' : 'lobby'}`)}
+        onClick={() => resume(seat)}
         className="btn btn-primary w-full shrink-0 px-4 py-2 font-semibold sm:w-auto"
       >
         {inGame ? 'Resume Game →' : 'Return to Lobby →'}

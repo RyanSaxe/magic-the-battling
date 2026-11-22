@@ -29,6 +29,7 @@ import {
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 import { DIALOG_BACKDROP, POPOVER_CHROME } from "../components/common/styles";
+import { copyText } from "../utils/clipboard";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 const PUPPET_HELP: RulesPanelTarget = { docId: "faq", tab: "why-are-my-opponents-cards-face-up" };
@@ -117,10 +118,12 @@ export function Lobby() {
     addToast(`Voice connection to ${peerName} failed.`, "warning")
   }, [addToast])
 
-  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
+  const voiceName = lobbyState?.voice_chat_enabled ? selfName : null
+  const voiceChat = useVoiceChat(send, peerNames, voiceName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
 
   const [copied, setCopied] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
+  const [guideMinimized, setGuideMinimized] = useState(false);
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
     getDefaultNewPlayerPreference(),
   );
@@ -252,13 +255,23 @@ export function Lobby() {
     submitBattler();
   };
 
+  const openGuide = (target?: RulesPanelTarget) => {
+    // Without a page, a Guide already open keeps its place.
+    if (target || !showRulesPanel) setRulesPanelTarget(target);
+    setGuideMinimized(false);
+    setShowRulesPanel(true);
+  };
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
-      setRulesPanelTarget(undefined);
-      setShowRulesPanel(true);
+      if (showRulesPanel) {
+        setShowRulesPanel(false);
+        return;
+      }
+      openGuide();
     },
   };
-  if (lobbyState && currentPlayer && !showRulesPanel) {
+  const guideTakesKeys = showRulesPanel && !guideMinimized;
+  if (lobbyState && currentPlayer && !guideTakesKeys) {
     const isHost = currentPlayer.is_host;
     lobbyHotkeyMap["r"] = toggleReady;
     if (isConstructed) {
@@ -275,7 +288,7 @@ export function Lobby() {
       }
     };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !showRulesPanel);
+  useHotkeys(lobbyHotkeyMap, !!session && !guideTakesKeys);
 
   useEffect(() => {
     if (gameState) {
@@ -307,18 +320,7 @@ export function Lobby() {
 
   const copyJoinCode = async () => {
     if (!lobbyState?.join_code) return;
-    try {
-      await navigator.clipboard.writeText(lobbyState.join_code);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = lobbyState.join_code;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
+    await copyText(lobbyState.join_code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -327,10 +329,7 @@ export function Lobby() {
     <AppHeader
       helpers={
         <GuideButton
-          onClick={() => {
-            setRulesPanelTarget(undefined);
-            setShowRulesPanel(true);
-          }}
+          onClick={() => openGuide()}
         />
       }
       home={<HomeButton />}
@@ -340,6 +339,8 @@ export function Lobby() {
   const rulesPanel = showRulesPanel && (
     <RulesPanel
       onClose={() => setShowRulesPanel(false)}
+      minimized={guideMinimized}
+      onMinimizedChange={setGuideMinimized}
       initialDocId={rulesPanelTarget?.docId}
       initialTab={rulesPanelTarget?.tab}
       gameId={gameId}
@@ -420,11 +421,6 @@ export function Lobby() {
   const copyIsNext = isHost && !needsDeck && openSeats > 0;
   const startWaits = !lobbyState.can_start;
   const startReason = startWaits ? startBlocker(lobbyState, openSeats, needsDeck) : "";
-
-  const openGuide = (target: RulesPanelTarget) => {
-    setRulesPanelTarget(target);
-    setShowRulesPanel(true);
-  };
 
   return (
     <>
@@ -579,6 +575,8 @@ export function Lobby() {
       {showRulesPanel && (
         <RulesPanel
           onClose={() => setShowRulesPanel(false)}
+          minimized={guideMinimized}
+          onMinimizedChange={setGuideMinimized}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           gameId={gameId}

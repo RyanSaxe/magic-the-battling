@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../contexts'
 import { unknownToAppError } from '../../utils/appError'
 import { joinLobbyByCode } from '../../utils/joinLobby'
+import { FIELD_SURFACE } from '../common/styles'
 
 /** A join code field that takes the signed-in player straight into the lobby. */
 export function JoinCodeBox({ playerName, className }: { playerName: string; className?: string }) {
@@ -27,7 +28,7 @@ export function JoinCodeBox({ playerName, className }: { playerName: string; cla
   return (
     <form
       onSubmit={submit}
-      className={`flex h-9 items-center rounded-md border border-black/40 bg-black/40 pl-2.5 pr-0.5 focus-within:ring-2 focus-within:ring-[var(--color-gold-bright)] ${className ?? ''}`}
+      className={`flex h-9 items-center rounded-md ${FIELD_SURFACE} pl-2.5 pr-0.5 focus-within:ring-2 focus-within:ring-[var(--color-gold-bright)] ${className ?? ''}`}
     >
       <input
         type="text"

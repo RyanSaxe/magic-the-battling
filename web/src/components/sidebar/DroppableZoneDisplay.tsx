@@ -41,6 +41,7 @@ export function ZoneModal({
   onCardHover,
   onCardHoverEnd,
   onCardClick,
+  onCardContextMenu,
   selectedCardId,
   forceFaceDown = false,
   tone = 'default',
@@ -61,6 +62,7 @@ export function ZoneModal({
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
   onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
+  onCardContextMenu?: (e: React.MouseEvent, card: CardType, zone: ZoneName) => void
   selectedCardId?: string
   forceFaceDown?: boolean
   tone?: 'default' | 'battle'
@@ -105,6 +107,7 @@ export function ZoneModal({
               onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
               selected={selectedCardId === card.id}
               onClick={allowCardInteraction && onCardClick ? () => onCardClick(card, zone, zoneOwner) : undefined}
+              onContextMenu={allowCardInteraction && onCardContextMenu ? (e) => onCardContextMenu(e, card, zone) : undefined}
               faceDown={forceFaceDown}
               canPeekFaceDown={!forceFaceDown}
               upgraded={upgradedCardIds?.has(card.id)}

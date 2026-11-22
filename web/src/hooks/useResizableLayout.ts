@@ -6,6 +6,7 @@ import {
   type CardLayoutResult,
   type ContainerSize,
 } from "./useCardLayout";
+import { useLayoutDrag } from "./useLayoutDrag";
 import { useZoneDividers, type DividerCallbacks } from "./useZoneDividers";
 import type {
   ZoneConstraints,
@@ -162,9 +163,10 @@ export function useResizableLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allZoneIdsKey]);
 
+  const layout = useLayoutDrag(constraints, onConstraintsChange);
   const [containerRef, dims, containerSize, zoneFrames, renderedConstraints] = useCardLayout({
     ...layoutConfig,
-    constraints,
+    constraints: layout.constraints,
   });
 
   const measureInitialConstraints = useCallback(() => {
@@ -193,7 +195,8 @@ export function useResizableLayout({
     allowHorizontalResize,
     measureInitialConstraints,
     renderedConstraints,
-    constraints,
+    constraints: layout.constraints,
+    drag: layout.drag,
     onConstraintsChange,
     onConstraintsClear,
   });

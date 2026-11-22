@@ -39,6 +39,7 @@ from mtb.models.game import (
     PendingRevealAnimation,
     Player,
     Puppet,
+    ReturnedBuild,
     StaticOpponent,
     Zones,
     create_game,
@@ -50,7 +51,7 @@ from mtb.models.game import (
 )
 from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
-from mtb.phases.battle import get_pairing_probabilities
+from mtb.phases.battle import get_furthest_round, get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
     eliminate_player,
@@ -359,7 +360,7 @@ def _running_seat_in_snapshot(
     )
 
 
-def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> ResumableGame:
+def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame, *, holds_token: bool) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -368,11 +369,13 @@ def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> Resumabl
         play_mode=pending.play_mode,
         use_upgrades=pending.use_upgrades,
         player_count=len(pending.player_names) + pending.puppet_count,
-        can_close=pending.accepts_changes,
+        can_close=holds_token and pending.accepts_changes,
     )
 
 
-def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None) -> ResumableGame:
+def _resumable_game_seat(
+    seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None, *, holds_token: bool
+) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -382,11 +385,15 @@ def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active
         play_mode=running.config.play_mode,
         use_upgrades=running.config.use_upgrades,
         player_count=running.player_count,
-        can_close=running.can_close,
+        can_close=holds_token and running.can_close,
         stage=running.stage,
         round=running.round,
         poison=running.poison,
     )
+
+
+def _lobbies_then_latest_game(game: ResumableGame) -> tuple[bool, datetime]:
+    return game.kind == "lobby", _utc_or_default(game.last_active_at, datetime.min.replace(tzinfo=UTC))
 
 
 def _with_cube_metadata(session: Session, games: list[ResumableGame]) -> list[ResumableGame]:
@@ -1253,6 +1260,12 @@ class GameManager:
             battler = pending.battler
             if battler is None:
                 raise LobbyStartFailedError("The cube isn't loaded")
+            needed = draft.cards_needed_for_first_draft(config, len(pending.player_names))
+            if len(battler.cards) < needed:
+                raise LobbyStartFailedError(
+                    f"This cube has {len(battler.cards)} playable cards and needs at least {needed} "
+                    "to give everyone a pack."
+                )
             set_battler(game, _copy_for_dealing(battler))
             target_elo = battler.elo or 1200.0
         else:
@@ -1910,11 +1923,22 @@ class GameManager:
             return not is_player_connected(game_id, player_id)
         return True
 
-    def find_resumable_seats(self, seats: list[ResumableSeat]) -> list[ResumableGame]:
-        """The seats a browser can still return to, given the tokens it holds. Never restores a snapshot."""
-        stored_game_ids = [seat.game_id for seat in seats if seat.game_id not in self._pending_games]
+    def find_resumable_seats(self, seats: list[ResumableSeat], *, user_id: str | None = None) -> list[ResumableGame]:
+        """The seats a caller can still return to: those its browser holds tokens for, and those its account took.
+
+        One seat per game, the browser's first. A login alone can't close a seat, so only a token sets can_close.
+        Never restores a snapshot."""
         session = db.SessionLocal()
         try:
+            account_seats = self._account_seats(session, user_id) if user_id else set()
+            seats = [
+                *seats,
+                *(
+                    ResumableSeat(game_id=game_id, player_name=name, seat_token="")
+                    for game_id, name in sorted(account_seats)
+                ),
+            ]
+            stored_game_ids = [seat.game_id for seat in seats if seat.game_id not in self._pending_games]
             stored_hashes = {
                 (cast(str, row.game_id), cast(str, row.player_name)): cast(str | None, row.seat_token_hash)
                 for row in session.query(GamePlayerRecord).filter(
@@ -1939,14 +1963,21 @@ class GameManager:
             }
 
             resumable: list[ResumableGame] = []
+            listed_game_ids: set[str] = set()
             for seat in seats:
+                if seat.game_id in listed_game_ids:
+                    continue
+                key = (seat.game_id, seat.player_name)
                 pending = self._pending_games.get(seat.game_id)
                 if pending is not None and not pending.is_started:
-                    if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
-                        resumable.append(_resumable_lobby_seat(seat, pending))
+                    holds_token = seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name))
+                    if holds_token or key in account_seats:
+                        resumable.append(_resumable_lobby_seat(seat, pending, holds_token=holds_token))
+                        listed_game_ids.add(seat.game_id)
                     continue
 
-                if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
+                holds_token = seat_token_matches(seat.seat_token, stored_hashes.get(key))
+                if not holds_token and key not in account_seats:
                     continue
                 game = self._active_games.get(seat.game_id)
                 if game is not None:
@@ -1964,11 +1995,37 @@ class GameManager:
                     continue
                 if running is None or running.phase in FINISHED_PLAYER_PHASES:
                     continue
-                resumable.append(_resumable_game_seat(seat, running, last_active_at))
+                resumable.append(_resumable_game_seat(seat, running, last_active_at, holds_token=holds_token))
+                listed_game_ids.add(seat.game_id)
 
+            if user_id:
+                # Each device saw different seats last, so an account's list goes by the games' own activity.
+                resumable.sort(key=_lobbies_then_latest_game, reverse=True)
             return _with_cube_metadata(session, resumable)
         finally:
             session.close()
+
+    def _account_seats(self, session: Session, user_id: str) -> set[tuple[str, str]]:
+        # This runs off the event loop, so it reads copies of the dicts that games are added to and removed from.
+        lobby_seats = {
+            (game_id, name)
+            for game_id, pending in list(self._pending_games.items())
+            if not pending.is_started
+            for player_id, name in zip(pending.player_ids, pending.player_names, strict=False)
+            if pending.player_user_ids.get(player_id) == user_id
+        }
+        # game_players has no index on user_id, so only games still in play are searched, by their id.
+        game_ids = set(self._active_games.copy())
+        game_ids.update(cast(str, row.game_id) for row in session.query(ActiveGameSnapshot.game_id))
+        game_seats = {
+            (cast(str, row.game_id), cast(str, row.player_name))
+            for row in session.query(GamePlayerRecord.game_id, GamePlayerRecord.player_name).filter(
+                GamePlayerRecord.game_id.in_(game_ids),
+                GamePlayerRecord.user_id == user_id,
+                GamePlayerRecord.is_puppet.is_(False),
+            )
+        }
+        return lobby_seats | game_seats
 
     def issue_lobby_seat_token(self, game_id: str, player_name: str) -> str:
         """Give the named lobby seat a fresh token, replacing any earlier one."""
@@ -2528,6 +2585,7 @@ class GameManager:
         all_players.extend(
             self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_puppet_name) for fp in game.puppets
         )
+        shown_build = player.returned_build or player
 
         state = GameStateResponse(
             game_id=game_id,
@@ -2555,8 +2613,8 @@ class GameManager:
                 chosen_basics=player.chosen_basics,
                 most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
                 last_result=self._get_last_result(player),
-                hand=cards_to_refs(player.hand),
-                sideboard=cards_to_refs(player.sideboard),
+                hand=cards_to_refs(shown_build.hand),
+                sideboard=cards_to_refs(shown_build.sideboard),
                 command_zone=cards_to_refs(player.command_zone),
                 current_pack=cards_to_refs(current_pack) if current_pack is not None else None,
                 last_battle_result=last_battle_result_to_view(player.last_battle_result),
@@ -2693,6 +2751,9 @@ class GameManager:
         most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+        # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
+        # round, or a player who is behind would see a hand early.
+        table_snapshot = fake.get_opponent_for_round(*get_furthest_round(viewer.game))
 
         if viewer.in_sudden_death:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
@@ -2714,10 +2775,10 @@ class GameManager:
 
         last_result = self._get_fake_player_last_result(fake)
 
-        if snapshot:
+        if snapshot and table_snapshot:
             return PlayerView(
                 name=fake.name,
-                treasures=snapshot.treasures,
+                treasures=table_snapshot.treasures,
                 poison=fake.poison,
                 phase="battle",
                 round=viewer.round,
@@ -3251,6 +3312,9 @@ class GameManager:
 
         for player in game.players:
             if player.phase == "eliminated" and player.name != ghost_name and player.battler is not None:
+                # Every later round passes here again, with the player's zones already empty.
+                if player.hand or player.sideboard:
+                    player.returned_build = ReturnedBuild(hand=player.hand, sideboard=player.sideboard)
                 player.battler.cards.extend(player.hand)
                 player.battler.cards.extend(player.sideboard)
                 # Clear to prevent double-returning

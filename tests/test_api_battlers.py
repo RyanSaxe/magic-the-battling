@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 from sqlalchemy import event
 
@@ -106,14 +107,6 @@ def _add_builds(game_id: str, player_name: str, builds: list[tuple[int | None, s
 
 def _day(day: int) -> datetime:
     return datetime(2026, 11, day, 12, tzinfo=UTC)
-
-
-@pytest.fixture(autouse=True)
-def offline_cubecobra(monkeypatch):
-    def _no_network(url: str):
-        raise LookupError(url)
-
-    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _no_network)
 
 
 @pytest.fixture
@@ -227,6 +220,37 @@ class TestPresetStats:
         assert preset["my_game_count"] == 0
         assert updated["my_game_count"] == 1
         assert updated["cube_name"] == "Vintage Cube"
+
+
+def _cubecobra_answers(monkeypatch, status: int) -> None:
+    def _get_json(url: str):
+        request = httpx.Request("GET", url)
+        raise httpx.HTTPStatusError("CubeCobra", request=request, response=httpx.Response(status, request=request))
+
+    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _get_json)
+
+
+class TestPresetCube:
+    def test_saves_a_pasted_cubecobra_link_as_its_cube_id(self, client, vintage_cube, kestrel):
+        link = client.post("/api/battlers", json={"cube_id": "https://cubecobra.com/cube/list/vintage?view=table"})
+        other_site = client.post("/api/battlers", json={"cube_id": "https://example.com/cube/list/vintage"})
+
+        assert link.status_code == 200
+        assert link.json()["cube_id"] == "vintage"
+        assert other_site.status_code == 422
+        assert other_site.json()["detail"] == "Enter a CubeCobra cube ID, or paste a link to the cube on CubeCobra."
+
+    def test_refuses_a_cube_cubecobra_has_no_record_of(self, client, kestrel, monkeypatch):
+        _cubecobra_answers(monkeypatch, 404)
+
+        response = client.post("/api/battlers", json={"cube_id": "thepaupercueb"})
+
+        assert response.status_code == 404
+        assert response.json() == {
+            "code": "CUBE_NOT_FOUND",
+            "detail": "CubeCobra has no cube with the ID 'thepaupercueb'.",
+        }
+        assert client.get("/api/battlers").json()["battlers"] == []
 
 
 class TestPresetOrder:
@@ -404,6 +428,36 @@ class TestCubeSummary:
         summary = client.get("/api/battlers/cube/slow").json()
 
         assert (summary["cube_name"], held_during_fetch) == ("Slow Cube", [0])
+
+
+@pytest.mark.usefixtures("kestrel")
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("GET", "/api/battlers/cube/slow/games", None),
+        ("GET", "/api/battlers/{preset_id}/games", None),
+        ("POST", "/api/battlers", {"cube_id": "slow"}),
+        ("POST", "/api/battlers/follow", {"cube_id": "slow"}),
+    ],
+    ids=["cube-games", "preset-games", "save-preset", "follow"],
+)
+def test_waits_on_cubecobra_without_a_database_connection(client, monkeypatch, method, path, body):
+    preset = _save_preset(client, cube_id="slow")
+    engine = database.SessionLocal().get_bind()
+    held = []
+    event.listen(engine, "checkout", lambda *_: held.append(True))
+    event.listen(engine, "checkin", lambda *_: held.pop())
+    held_during_fetch = []
+
+    def slow_cubecobra(url: str) -> dict:
+        held_during_fetch.append(len(held))
+        return {"name": "Slow Cube"}
+
+    monkeypatch.setattr("mtb.utils.json_helpers.get_json", slow_cubecobra)
+
+    response = client.request(method, path.format(preset_id=preset["id"]), json=body)
+
+    assert (response.json()["cube_name"], set(held_during_fetch)) == ("Slow Cube", {0})
 
 
 def _add_cube_name(cube_id: str, name: str) -> None:

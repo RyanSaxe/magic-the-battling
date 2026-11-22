@@ -93,7 +93,7 @@ export function Register() {
       center
       contentClassName="items-center"
     >
-      <SurfaceCard as="form" onSubmit={handleSubmit}>
+      <SurfaceCard as="form" onSubmit={handleSubmit} onChange={() => setError('')}>
         <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>
 
         {error && (

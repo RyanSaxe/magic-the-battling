@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Recent Games beside cube cards on a wide dashboard. Anywhere else, a game tile is already shorter than the short sizing. */
+@custom-variant beside-cubes {
+  @media (width >= 80rem) {
+    &:where([data-beside-cubes] *) {
+      @slot;
+    }
+  }
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -47,10 +56,8 @@
   --ivory-muted: #b8aea3;
   --ivory-faint: #94897f;
 
-  /* A player who's ready, on walnut */
-  --ready-text: #86efac;
-
-  /* A lost fight and last place, on walnut */
+  /* A won fight and being ready, then a lost fight and last place, on walnut */
+  --win-text: #86efac;
   --loss-text: #f2b4aa;
 
   /* Quiet text on the felt: muted ivory a step lighter, so it holds 4.5:1 on the felt's lightest centre */
@@ -152,7 +159,7 @@ body {
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.4) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--walnut-track) inset;
   -webkit-text-fill-color: white;
   caret-color: white;
   transition: background-color 5000s ease-in-out 0s;
@@ -161,12 +168,23 @@ input:-webkit-autofill:focus {
 /* Walnut-themed scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1c1714 transparent;
+  scrollbar-color: var(--stone-light) transparent;
+}
+
+/*
+ * Chrome and Safari ignore ::-webkit-scrollbar while either property above is set, and those rules alone can make a
+ * bar 4px. Bars that overlay the page keep the properties, as iOS takes the colour only from them.
+ */
+@supports selector(::-webkit-scrollbar) {
+  :where([data-scrollbars="classic"], [data-scrollbars="classic"] *) {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -174,12 +192,8 @@ input:-webkit-autofill:focus {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--chrome);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #2a2320;
+  background: var(--stone-light);
+  border-radius: 2px;
 }
 
 /* Game table background - classic felt */
@@ -423,7 +437,7 @@ input:-webkit-autofill:focus {
     --tag-fill: #441e1a;
     --tag-rim: #843b34;
     --tag-rim-quiet: #5e2f29;
-    --tag-text: #f2b4aa;
+    --tag-text: var(--loss-text);
     --tag-dot: var(--mana-red);
   }
 
@@ -431,7 +445,7 @@ input:-webkit-autofill:focus {
     --tag-fill: #153721;
     --tag-rim: #23703f;
     --tag-rim-quiet: #1e4a2b;
-    --tag-text: var(--ready-text);
+    --tag-text: var(--win-text);
     --tag-dot: #22c55e;
   }
 }
@@ -536,7 +550,8 @@ input:-webkit-autofill:focus {
   background-color: #332a28;
 }
 
-.menu-submenu .menu-item {
+.menu-submenu > .menu-item,
+.menu-submenu-grid {
   padding-left: 26px;
   background-image: linear-gradient(to right,
       transparent 12px,
@@ -566,10 +581,16 @@ input:-webkit-autofill:focus {
   z-index: 45;
 }
 
-/* Even empty, this layer slowed every click by up to a second in WebKit on Linux, so it shows only with a panel in
-   it. */
+/* Even empty, this layer made one measured click, a dialog's submit, about 0.8s slower in WebKit on Linux, so it
+   shows only with a panel in it. */
 .side-panel-frame:empty {
   display: none;
+}
+
+/* A backdrop alone in this layer made WebKit on Linux repaint the board for seconds as a popover opened, so then
+   the layer composites by itself. Not with a panel in it: a fixed dialog inside would be placed against the frame. */
+.side-panel-frame:has(> .board-backdrop:only-child) {
+  will-change: transform;
 }
 
 /* Beneath every panel in the frame, and above the board. */
@@ -854,6 +875,8 @@ input:-webkit-autofill:focus {
 .mobile-life-bar {
   background: var(--chrome-modal);
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+  /* Keeps the life buttons' tap areas inside the bar, clear of the top bar above and the opponent's hand below. */
+  overflow: hidden;
 }
 
 .mobile-life-chip {
@@ -1615,7 +1638,7 @@ input:-webkit-autofill:focus {
   }
 
   .seat-ready {
-    color: var(--ready-text);
+    color: var(--win-text);
   }
 
   .seat-add {
@@ -2152,7 +2175,6 @@ input:-webkit-autofill:focus {
 .setup-field input:-webkit-autofill,
 .setup-field input:-webkit-autofill:hover,
 .setup-field input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px var(--walnut-track) inset;
   -webkit-text-fill-color: var(--ivory);
 }
 
@@ -2846,6 +2868,71 @@ input:-webkit-autofill:focus {
   box-shadow: none;
 }
 
+/* The controls over a Build card are sized against the card, so they shrink with one too narrow to hold them. */
+.card-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  container-type: size;
+  pointer-events: none;
+}
+
+/* Upgrade, Apply and Set Companion. Full size from an 85px card up, with padding that stays light on the smallest one. */
+.card-pill {
+  position: absolute;
+  bottom: 8.5cqh;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0.5em 1em;
+  font-size: min(0.75rem, 14.1cqw);
+  line-height: 1.3333;
+  white-space: nowrap;
+}
+
+/* A companion's card stacks two pills, so both are tighter, and Upgrade clears the one below. */
+.card-pill-raised {
+  bottom: calc(4cqh + min(0.75rem, 14.1cqw) * 1.8333 + max(2px, 1.5cqh));
+  padding: 0.25em 0.8em;
+}
+
+.card-pill-companion {
+  bottom: 4cqh;
+  padding: 0.25em 0.65em;
+  letter-spacing: normal;
+}
+
+/* The purple of the companion's ring, deep enough for ivory text. */
+.card-pill-companion.is-set {
+  background: #6b21a8;
+  color: var(--ivory);
+}
+
+.card-pill-companion.is-set:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.card-pill-companion .label-long {
+  display: none;
+}
+
+/* Without the tighter tracking, "Companion" leaves a 45px card. */
+@container (max-width: 84px) {
+  .card-pill-companion {
+    padding-inline: 0.38em;
+    letter-spacing: -0.045em;
+  }
+}
+
+@container (min-width: 110px) {
+  .card-pill-companion .label-long {
+    display: inline;
+  }
+
+  .card-pill-companion .label-short {
+    display: none;
+  }
+}
+
 /* Drag overlay */
 .drag-overlay {
   cursor: grabbing;
@@ -2901,7 +2988,7 @@ input:-webkit-autofill:focus {
 
 .hero-tagline {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--ivory-muted);
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -2922,6 +3009,14 @@ input:-webkit-autofill:focus {
   animation: gentle-glow 3s ease-in-out infinite;
   /* Adds the glow to the button's own shadow. Replacing it would flatten the raise, or hold it while pressed. */
   animation-composition: add;
+}
+
+/* Paused part way, rather than switched off, so the glow still shows over the button's raise. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-gentle-glow {
+    animation-delay: -0.75s;
+    animation-play-state: paused;
+  }
 }
 
 .mic-level-bar {
@@ -3443,7 +3538,7 @@ input:-webkit-autofill:focus {
 
 .callout-content {
   font-size: 13px;
-  color: #d1d5db;
+  color: var(--ivory-soft);
 }
 
 .callout-content p {
@@ -3725,12 +3820,6 @@ input:-webkit-autofill:focus {
 .quick-guide-accordion-panel-inner {
   overflow: hidden;
   min-height: 0;
-  background: rgba(0, 0, 0, 0.12);
-  box-shadow:
-    inset 0 3px 6px rgba(0, 0, 0, 0.22),
-    inset 0 1px 2px rgba(0, 0, 0, 0.16),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.2),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.14);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3897,7 +3986,6 @@ input:-webkit-autofill:focus {
    the card goes flat and dark once its player is out. */
 .player-card {
   --player-card-rank-width: 2.25rem;
-  --player-card-win: #86efac;
   position: relative;
 }
 
@@ -3938,7 +4026,7 @@ input:-webkit-autofill:focus {
 
 .player-card.is-out .player-card-button {
   border-color: rgba(212, 175, 55, 0.22);
-  background: #2a2320;
+  background: var(--zone-label-bg);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
@@ -4018,7 +4106,7 @@ input:-webkit-autofill:focus {
 }
 
 .player-card-result-win {
-  color: var(--player-card-win);
+  color: var(--win-text);
 }
 
 .player-card-result-loss {
@@ -4029,12 +4117,20 @@ input:-webkit-autofill:focus {
   color: var(--ivory-muted);
 }
 
-/* Poison and treasure keep one width, so the label after them starts at the same place on every card */
+/* Poison and treasure keep one width, 34px and a 2px gap, so the label after them starts at the same place on every
+   card. They grow to it from their contents, so a crowded line takes their spare room before it shortens the label,
+   and the odds keep the card's padding. */
+.player-card-line:last-child {
+  gap: 2px;
+}
+
 .player-card-stat {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  min-width: 32px;
+  flex: 1 0 auto;
+  min-width: max-content;
+  max-width: 34px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -4045,6 +4141,9 @@ input:-webkit-autofill:focus {
 }
 
 .player-card-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -4084,5 +4183,261 @@ input:-webkit-autofill:focus {
 @media (orientation: landscape) and (max-height: 499px) {
   .rotate-prompt {
     display: flex;
+  }
+}
+
+/* Scouting's Overview: the player card's standings, opened up, with hairlines rather than boxes */
+.scouting-overview {
+  gap: 0.75rem;
+}
+
+.scouting-standings {
+  --scouting-hairline: 1px solid rgba(212, 175, 55, 0.22);
+  container-type: inline-size;
+  flex-shrink: 0;
+  color: var(--ivory);
+}
+
+.scouting-standing {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  padding: 2px 0 12px;
+}
+
+.scouting-standings .scouting-rank {
+  background: none;
+}
+
+.scouting-standings .scouting-rank .standings-rank-number {
+  font-size: 34px;
+}
+
+.scouting-standings .scouting-rank .standings-rank-suffix {
+  font-size: 10px;
+}
+
+.scouting-standings.is-self .scouting-rank .standings-rank-number {
+  color: var(--color-gold-bright);
+}
+
+.scouting-state {
+  min-width: 0;
+  padding: 4px 0 4px 14px;
+}
+
+.scouting-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.scouting-state-title.is-ready {
+  color: var(--win-text);
+}
+
+.scouting-state-title.is-out {
+  color: var(--loss-text);
+}
+
+.scouting-state-detail {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ivory-muted);
+}
+
+.scouting-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 12px 0;
+  border-top: var(--scouting-hairline);
+}
+
+.scouting-cell {
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.scouting-cell + .scouting-cell {
+  border-left: var(--scouting-hairline);
+  padding-left: 14px;
+}
+
+.scouting-token-count {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scouting-token {
+  height: 66px;
+  border-radius: var(--card-border-radius);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Both counts share a line box, so their labels line up with and without the /10 */
+.scouting-count {
+  display: flex;
+  align-items: baseline;
+  height: 32px;
+  font-family: 'Cinzel', serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 32px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scouting-out-of {
+  margin-left: 2px;
+  font-size: 14px;
+  color: var(--ivory-key);
+}
+
+.scouting-key {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ivory-muted);
+}
+
+.scouting-value {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+.scouting-note {
+  margin-left: 5px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ivory-muted);
+}
+
+.scouting-none {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ivory-muted);
+}
+
+/* Beside the list the panel leaves the Overview about 250px */
+@container (max-width: 260px) {
+  .scouting-standing {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .scouting-state {
+    padding-left: 12px;
+  }
+
+  .scouting-state-detail {
+    text-wrap: balance;
+  }
+
+  .scouting-cell {
+    padding-left: 0;
+  }
+
+  .scouting-cell + .scouting-cell {
+    padding-left: 10px;
+  }
+
+  .scouting-token-count {
+    gap: 7px;
+  }
+
+  .scouting-token {
+    height: 52px;
+  }
+
+  .scouting-count {
+    font-size: 24px;
+  }
+
+  .scouting-out-of {
+    font-size: 12px;
+  }
+
+  .scouting-note {
+    display: block;
+    margin-left: 0;
+    line-height: 16px;
+  }
+
+  .scouting-key {
+    letter-spacing: 0.07em;
+  }
+}
+
+@media (max-width: 639px) and (max-height: 700px) {
+  .scouting-standing {
+    padding: 0 0 8px;
+  }
+
+  .scouting-standings .scouting-rank .standings-rank-number {
+    font-size: 28px;
+  }
+
+  .scouting-state {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .scouting-pair {
+    padding: 8px 0;
+  }
+
+  .scouting-token {
+    height: 52px;
+  }
+
+  .scouting-count {
+    height: 28px;
+    font-size: 24px;
+    line-height: 28px;
+  }
+
+  .scouting-value {
+    margin-top: 1px;
+  }
+}
+
+/* The shortest phone, where Sudden Death's banner leaves the upgrades the least height */
+@media (max-width: 639px) and (max-height: 600px) {
+  .scouting-overview {
+    gap: 6px;
+  }
+
+  .scouting-standing {
+    padding-bottom: 6px;
+  }
+
+  .scouting-standings .scouting-rank .standings-rank-number {
+    font-size: 24px;
+  }
+
+  .scouting-state-title {
+    line-height: 20px;
+  }
+
+  .scouting-pair {
+    padding: 5px 0;
+  }
+
+  .scouting-token {
+    height: 40px;
+  }
+
+  .scouting-count {
+    height: 24px;
+    font-size: 22px;
+    line-height: 24px;
+  }
+
+  .scouting-value {
+    line-height: 20px;
   }
 }

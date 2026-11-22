@@ -95,11 +95,22 @@ def apply_poison(winner: Player, loser: Player) -> int:
 
 def award_random_card(game: Game, player: Player) -> Card | None:
     battler = player.battler or game.battler
-    if battler is None or not battler.cards:
+    if battler is None:
+        return None
+    # The first player to continue packs the cube, so packs not yet dealt hold most of what's left to draw from.
+    packs = game.draft_state.undealt_packs(player) if game.draft_state else []
+    piles = [battler.cards, *packs]
+    if not any(piles):
         return None
 
-    card = random.choice(battler.cards)
-    battler.cards.remove(card)
+    index = random.choices(range(len(piles)), weights=[len(pile) for pile in piles])[0]
+    card = piles[index].pop(random.randrange(len(piles[index])))
+    if index > 0:
+        # A pack is never dealt short: a loose card fills the gap, and with none the rest of the pack becomes loose.
+        if battler.cards:
+            piles[index].append(battler.cards.pop(random.randrange(len(battler.cards))))
+        else:
+            battler.cards.extend(packs.pop(index - 1))
     player.sideboard.append(card)
     return card
 

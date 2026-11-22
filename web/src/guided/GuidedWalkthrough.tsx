@@ -6,10 +6,11 @@ import type {
   GuidedWalkthroughContext,
 } from "./types";
 import { buildGuideDefinition } from "./content";
-import { useGuidePositioning, type SpotlightRect } from "./useGuidePositioning";
+import { resolveTarget, useGuidePositioning, type SpotlightRect } from "./useGuidePositioning";
 import { GuideOverlay } from "./GuideOverlay";
 import { GuideTooltip } from "./GuideTooltip";
 import { planRequestTransition, type AnimPhase } from "./walkthroughPhase";
+import { enterPressesControl } from "../utils/enterKey";
 
 const MORPH_EASING = "cubic-bezier(0.22,1,0.36,1)";
 
@@ -61,6 +62,7 @@ export function GuidedWalkthrough({
   onBackStep,
 }: GuidedWalkthroughProps) {
   const measureCardRef = useRef<HTMLDivElement>(null);
+  const walkthroughRef = useRef<HTMLDivElement>(null);
   const [animPhase, setAnimPhase] = useState<AnimPhase>("entering");
   const [displayState, setDisplayState] = useState<DisplayState | null>(null);
   const [pendingState, setPendingState] = useState<DisplayState | null>(null);
@@ -172,6 +174,15 @@ export function GuidedWalkthrough({
 
       if (!handled) return;
       if (!isCurrentStepDisplayed) return;
+      const root = rootRef.current;
+      const spotlighted = root && step?.allowTargetInteraction
+        ? resolveTarget(root, step.targetId, resolvedTargetSelector)
+        : null;
+      if (enterPressesControl(event, walkthroughRef.current, spotlighted)) {
+        // A dialog can be open under the guide, and its Enter would confirm.
+        event.stopImmediatePropagation();
+        return;
+      }
 
       event.preventDefault();
       event.stopPropagation();
@@ -188,7 +199,7 @@ export function GuidedWalkthrough({
 
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
-  }, [finishGuide, isCurrentStepDisplayed, onAdvanceStep, onBackStep, stepIndex]);
+  }, [finishGuide, isCurrentStepDisplayed, onAdvanceStep, onBackStep, resolvedTargetSelector, rootRef, step, stepIndex]);
 
   const layout = useGuidePositioning(
     rootRef,
@@ -461,7 +472,7 @@ export function GuidedWalkthrough({
   if (!step) return null;
 
   return (
-    <div className="absolute inset-0 z-80" style={{ pointerEvents: "none" }} aria-live="polite">
+    <div ref={walkthroughRef} className="absolute inset-0 z-80" style={{ pointerEvents: "none" }} aria-live="polite">
       <GuideTooltip
         ref={measureCardRef}
         step={step}

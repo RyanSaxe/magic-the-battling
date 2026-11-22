@@ -20,9 +20,10 @@ import { SpectateRequestModal } from "../components/SpectateRequestModal";
 import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, RevealAnimation, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
-import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
+import { BattlePhase, type BattleCardMenu, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar, type FightSidebarView, type Scouting } from "../components/sidebar";
+import { CopyWatchLink } from "../components/sidebar/CopyWatchLink";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
@@ -34,6 +35,7 @@ import { GuideProvider } from "../guided/GuideContext";
 import { useGuideContext } from "../guided/guideState";
 import { buildGuideDefinition } from "../guided/content";
 import { getOrdinal } from "../utils/format";
+import { canHover } from "../utils/inputMode";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
 import { FaceDownProvider } from "../contexts/FaceDownContext";
@@ -55,6 +57,7 @@ import { SIDE_PANEL_HEADER_HEIGHT, SidePanel, SidePanelFrame } from "../componen
 import { SidePanelHostContext } from "../components/common/sidePanelHost";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { ZoneDivider } from "../components/common/ZoneDivider";
+import { useCardMiddleTap } from "../hooks/useCardMiddleTap";
 import { useHotkeys } from "../hooks/useHotkeys";
 import {
   comparePlayersForSidebar,
@@ -100,9 +103,10 @@ import {
 } from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
+  guideShowing,
   isDrawerOpen,
   isZonePanelOpen,
-  reduceGameSurface,
+  reduceGameBoard,
   type GameSurface,
   type GameSurfaceKind,
   type PanelZone,
@@ -115,7 +119,7 @@ import {
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
-import { DIALOG_BACKDROP, LINK, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
+import { DIALOG_BACKDROP, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
 
 // Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
 const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
@@ -808,6 +812,7 @@ function GameGuideLayer({
 }
 
 function GameContent() {
+  useCardMiddleTap();
   const { gameId = "" } = useParams<{ gameId: string }>();
   const [searchParams] = useSearchParams();
   const isSpectateMode = searchParams.get("spectate") === "true";
@@ -829,17 +834,20 @@ function GameContent() {
 
   const sizes = useViewportCardSizes();
   const shellMode = useGameShellMode();
-  const [openSurface, dispatchSurface] = useReducer(reduceGameSurface, null);
+  const [{ open: openSurface, selectedCard: battleSelectedCard }, dispatchBoard] = useReducer(reduceGameBoard, {
+    open: null,
+    selectedCard: null,
+  });
   const sidebarOpen = isDrawerOpen(openSurface);
   const setSidebarOpen = useCallback((open: boolean) => {
-    dispatchSurface(open ? { type: "open", surface: { kind: "players" } } : { type: "close", kind: "players" });
+    dispatchBoard(open ? { type: "open", surface: { kind: "players" } } : { type: "close", kind: "players" });
   }, []);
   const scouting = useMemo<Scouting | null>(
     () => (openSurface?.kind === "scouting" ? { player: openSurface.player, tab: openSurface.tab } : null),
     [openSurface],
   );
   const setScouting = useCallback((player: string | null, tab: ScoutingTab = "seen") => {
-    dispatchSurface(player ? { type: "scout", player, tab } : { type: "close", kind: "scouting" });
+    dispatchBoard(player ? { type: "scout", player, tab } : { type: "close", kind: "scouting" });
   }, []);
   const [fightSidebarView, setFightSidebarView] = useState<FightSidebarView>("fight");
   const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
@@ -982,12 +990,16 @@ function GameContent() {
   const [selectedPoolCardId, setSelectedPoolCardId] = useState<string | null>(null);
 
   // Lifted state from Battle phase
-  const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
+  const setBattleSelectedCard = useCallback(
+    (card: BattleSelectedCard | null) => dispatchBoard({ type: "select", card }),
+    [],
+  );
+  const [battleCardMenu, setBattleCardMenu] = useState<BattleCardMenu | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
   const actionMenuOpen = openSurface?.kind === "actions";
   const showSubmitHandPopover = openSurface?.kind === "submitHand";
   const showSubmitResultPopover = openSurface?.kind === "submitResult";
-  const closeSurface = useCallback((kind: GameSurfaceKind) => dispatchSurface({ type: "close", kind }), []);
+  const closeSurface = useCallback((kind: GameSurfaceKind) => dispatchBoard({ type: "close", kind }), []);
   const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(null);
   const [pendingPostRevealSubmit, setPendingPostRevealSubmit] = useState<string | null>(null);
   const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
@@ -1061,18 +1073,26 @@ function GameContent() {
     if (gameState?.self_player.phase !== 'battle' && battleSelectedCard !== null) {
       setBattleSelectedCard(null);
     }
+    if (gameState?.self_player.phase !== 'battle' && battleCardMenu !== null) {
+      setBattleCardMenu(null);
+    }
   }
 
   useEffect(() => {
     queueMicrotask(() => {
-      dispatchSurface({ type: "phaseChanged", phase: selfPhase });
+      dispatchBoard({ type: "phaseChanged", phase: selfPhase });
       setFightSidebarView("fight");
       if (selfPhase !== "battle") setIsChangingResult(false);
     });
   }, [selfPhase]);
 
-  const rulesPanel = openSurface?.kind === "guide" ? openSurface : null;
+  const rulesPanel = guideShowing(openSurface) ?? null;
   const rulesPanelOpen = rulesPanel !== null;
+  const guideMinimized = !!rulesPanel?.minimized;
+  const setGuideMinimized = useCallback(
+    (minimized: boolean) => dispatchBoard({ type: "guideMinimized", minimized }),
+    [],
+  );
   const shareOpen = openSurface?.kind === "share";
 
   // Hover tracking for hotkeys
@@ -1120,10 +1140,18 @@ function GameContent() {
     queueMicrotask(() => setHoveredCard(card));
   }, [currentBattle]);
 
+  const moveBattleCard = useCallback<typeof actions.battleMove>(
+    (cardId, ...move) => {
+      actions.battleMove(cardId, ...move);
+      dispatchBoard({ type: "cardMoved", cardId });
+    },
+    [actions],
+  );
+
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: gameState?.self_player?.phase ?? "draft",
-    battleMove: actions.battleMove,
+    battleMove: moveBattleCard,
   });
 
   const handleYourLifeChange = (life: number) => {
@@ -1136,23 +1164,23 @@ function GameContent() {
     actions.battleUpdateLife("opponent", life);
   };
 
+  const watchUrl = new URL("?spectate=true", window.location.href).toString();
+
   const handleSpectateNewTab = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("spectate", "true");
     // noopener keeps the player's per-tab session out of the watching tab, and ?spectate=true stays in its URL,
     // so reloading that tab can never take the player's seat.
-    window.open(url.toString(), "_blank", "noopener");
+    window.open(watchUrl, "_blank", "noopener");
   };
 
   // Changing a submitted result is given up whenever a menu, panel or window other than its choices opens.
   const openGameSurface = useCallback((surface: GameSurface) => {
     if (surface.kind !== "submitResult") setIsChangingResult(false);
-    dispatchSurface({ type: "open", surface });
+    dispatchBoard({ type: "open", surface });
   }, []);
 
   const closeGameplayOverlays = useCallback((except?: GameSurfaceKind) => {
     if (except !== "submitResult") setIsChangingResult(false);
-    dispatchSurface({ type: "closeOverlays", except });
+    dispatchBoard({ type: "closeOverlays", except });
   }, []);
 
   useEffect(() => {
@@ -1341,7 +1369,7 @@ function GameContent() {
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   // A zone panel sits beside the board rather than over it, so the Fight's hotkeys keep working while one is open.
   const modalOpen =
-    rulesPanelOpen ||
+    (rulesPanelOpen && !guideMinimized) ||
     showUpgradesModal ||
     actionMenuOpen ||
     shareOpen ||
@@ -1477,7 +1505,7 @@ function GameContent() {
           };
           const moveHotkeys = buildCardMoveHotkeys({
             hoveredCard,
-            moveCard: (card, toZone) => actions.battleMove(card.id, card.zone, toZone, card.owner, card.owner),
+            moveCard: (card, toZone) => moveBattleCard(card.id, card.zone, toZone, card.owner, card.owner),
             clearHoveredCard: () => setHoveredCard(null),
           });
           for (const [key, action] of Object.entries(moveHotkeys)) {
@@ -1912,7 +1940,7 @@ function GameContent() {
             </button>
           )}
           <button
-            onClick={openActionMenu}
+            onClick={actionMenuOpen ? () => closeSurface("actions") : openActionMenu}
             className="btn btn-secondary"
             data-guide-target="battle-actions"
           >
@@ -2080,6 +2108,17 @@ function GameContent() {
     }
   }
 
+  const sideboardContextMenu = (card: CardType, owner: ZoneOwner) =>
+    canHover
+      ? (e: React.MouseEvent) =>
+          setBattleCardMenu({
+            card,
+            zone: 'sideboard',
+            position: { x: e.clientX, y: e.clientY },
+            isOpponent: owner === 'opponent',
+          })
+      : undefined
+
   const allFaceDownIds = (() => {
     if (!battleViewForDisplay) return new Set<string>()
     const ids = new Set<string>()
@@ -2137,6 +2176,7 @@ function GameContent() {
         onScout={setScouting}
         onStopScouting={() => setScouting(null)}
         renderMicToggle={renderMicToggle}
+        watchLink={!isSpectator && (!isEndPhase || canSpectate) ? <CopyWatchLink url={watchUrl} /> : undefined}
       />
     );
     if (!usesOverlaySidebar) return <FrameSidebar>{sidebar}</FrameSidebar>;
@@ -2164,7 +2204,7 @@ function GameContent() {
       <div className="game-table h-dvh overflow-hidden flex flex-col">
         {!isConnected && (
           <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
-            <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+            <div className={`${POPOVER_CHROME} px-5 py-3 flex items-center gap-3`}>
               <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -2215,6 +2255,7 @@ function GameContent() {
                   suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
                   useUpgrades={gameState.use_upgrades}
                   onOpenRules={openRulesPanel}
+                  onStepClick={() => closeSurface("actions")}
                   title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
                 />
               </>
@@ -2309,6 +2350,8 @@ function GameContent() {
                       isMobile={sizes.isMobile}
                       selectedCard={battleSelectedCard}
                       onSelectedCardChange={setBattleSelectedCard}
+                      cardMenu={battleCardMenu}
+                      onCardMenuChange={setBattleCardMenu}
                       onCardHover={handleCardHover}
                       onOpponentCardHover={handleOpponentCardHover}
                       onCardHoverEnd={handleCardHoverEnd}
@@ -2354,6 +2397,7 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'player' })}
+                        onContextMenu={sideboardContextMenu(card, 'player')}
                         upgraded={battleUpgradedCardIds.has(card.id)}
                         appliedUpgrades={battleUpgradesByCardId.get(card.id)}
                         hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
@@ -2388,6 +2432,7 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'opponent' })}
+                        onContextMenu={sideboardContextMenu(card, 'opponent')}
                         upgraded={opponentBattleUpgradedCardIds.has(card.id)}
                         appliedUpgrades={opponentBattleUpgradesByCardId.get(card.id)}
                       />
@@ -2450,7 +2495,7 @@ function GameContent() {
                       Waiting until all fights are complete to determine if you
                       will compete in sudden death to stay alive.
                     </p>
-                    <div className="bg-black/40 rounded-lg p-4 text-left">
+                    <div className="border-t gold-divider p-4 text-left">
                       <h3 className="text-amber-400 font-medium mb-2">
                         Sudden Death Rules
                       </h3>
@@ -2633,6 +2678,9 @@ function GameContent() {
       {rulesPanel && (
         <RulesPanel
           onClose={() => closeSurface("guide")}
+          minimized={guideMinimized}
+          onMinimizedChange={setGuideMinimized}
+          behindPanel={openSurface?.kind !== "guide"}
           initialDocId={rulesPanel.target?.docId}
           initialTab={rulesPanel.target?.tab}
           gameId={gameId}

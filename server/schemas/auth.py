@@ -1,8 +1,10 @@
 import re
 
 from pydantic import BaseModel, field_validator
+from pydantic_core import PydanticCustomError
 
 from mtb.models.types import PlayMode, normalize_play_mode
+from mtb.utils.cubecobra import cube_id_from_input
 
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 
@@ -57,6 +59,17 @@ class UserBattlerCreate(BaseModel):
     target_player_count: int = 4
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
+
+    @field_validator("cube_id")
+    @classmethod
+    def _cube_id_from_link(cls, value: str) -> str:
+        try:
+            return cube_id_from_input(value)
+        except ValueError as error:
+            # A custom error keeps pydantic's "Value error, " prefix out of the message the player sees.
+            raise PydanticCustomError(
+                "cube_link", "Enter a CubeCobra cube ID, or paste a link to the cube on CubeCobra."
+            ) from error
 
     @field_validator("play_mode", mode="before")
     @classmethod

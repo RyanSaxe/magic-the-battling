@@ -1,4 +1,4 @@
-import { useCallback, useReducer } from "react";
+import { useCallback, useMemo, useReducer } from "react";
 import type { ZoneConstraints } from "./computeConstrainedLayout";
 
 const STORAGE_PREFIX = "mtb_zone_constraints:v2:";
@@ -54,7 +54,7 @@ interface PersistedConstraintStore {
   bands: Record<string, PersistedConstraintEntry[]>;
 }
 
-export interface UsePersistedConstraintsResult {
+export interface UseSavedLayoutResult {
   constraints: ZoneConstraints | null;
   setConstraints: (c: ZoneConstraints) => void;
   clearConstraints: () => void;
@@ -168,10 +168,10 @@ export function resetConstraintHistoryFrom(
  * band. Until the board has been measured there is no band, and the layout
  * is the automatic one.
  */
-export function usePersistedConstraints(
+export function useSavedLayout(
   location: PersistedConstraintLocation | null,
   board: BoardSize | null,
-): UsePersistedConstraintsResult {
+): UseSavedLayoutResult {
   const [revision, bumpRevision] = useReducer((count: number) => count + 1, 0);
 
   const scopeKey = location?.scopeKey ?? null;
@@ -179,17 +179,19 @@ export function usePersistedConstraints(
   const round = location?.round ?? 0;
   const band = board && board.width > 0 && board.height > 0 ? boardSizeBand(board) : null;
 
-  void revision;
-
-  const resolution: PersistedConstraintResolution = scopeKey && band
-    ? resolveConstraintHistory(loadEntries(scopeKey, band), stage, round)
-    : {
-        constraints: null,
-        source: "dynamic",
-        canReset: false,
-        originStage: null,
-        originRound: null,
-      };
+  // Storage is read when the phase, round or band changes, or after this hook writes, not on every render.
+  const resolution: PersistedConstraintResolution = useMemo(() => {
+    void revision;
+    return scopeKey && band
+      ? resolveConstraintHistory(loadEntries(scopeKey, band), stage, round)
+      : {
+          constraints: null,
+          source: "dynamic",
+          canReset: false,
+          originStage: null,
+          originRound: null,
+        };
+  }, [scopeKey, band, stage, round, revision]);
 
   const setConstraints = useCallback(
     (constraints: ZoneConstraints) => {

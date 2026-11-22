@@ -188,10 +188,16 @@ export function Card({
   const detectsDoubleTap = !canHover && !disabled && !!onDoubleClick
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     interactiveOnTouchEnd?.(e)
-    if ((e.target as HTMLElement).closest('button')) return
     const tap = registerTap(lastTapAtRef.current, e.timeStamp)
+    const onButton = !!(e.target as HTMLElement).closest('button')
+    if (onButton && !tap.isDoubleTap) return
     lastTapAtRef.current = tap.lastTapAt
-    if (tap.isDoubleTap) onDoubleClick?.()
+    if (!tap.isDoubleTap) return
+    // The first tap reveals the card's magnifier, and WebKit moves a tap's click onto the
+    // nearest button, so the second tap clicks the card itself.
+    e.preventDefault()
+    e.currentTarget.click()
+    onDoubleClick?.()
   }
 
   return (
@@ -308,7 +314,7 @@ export function Card({
           </button>
         )}
         {counters && Object.keys(counters).length > 0 && (
-          <div className={`absolute left-1 flex gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
+          <div className={`pointer-events-none absolute left-1 flex flex-wrap-reverse gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
             {Object.entries(counters).map(([type, count]) => (
               <div
                 key={type}

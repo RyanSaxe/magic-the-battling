@@ -104,7 +104,11 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
   return failures
 }
 
-/** Waits until the board and its zones stop moving, as the header and sidebar settle after the first paint. */
+/**
+ * Waits until the board and its zones stop moving, as the header and sidebar settle after the first paint. The app
+ * lays out again only when a frame delivers ResizeObserver, and WebKit on Linux can go seconds between frames, so
+ * boxes that haven't moved count only once a frame has run.
+ */
 async function waitForStableLayout(page: Page) {
   const snapshot = () => page.evaluate((zoneSelector) =>
     JSON.stringify(Array.from(document.querySelectorAll(`main .zone-divider-bg, ${zoneSelector}`))
@@ -112,8 +116,9 @@ async function waitForStableLayout(page: Page) {
       .map((rect) => [rect.x, rect.y, rect.width, rect.height])), ZONE_SELECTOR)
   let previous = await snapshot()
   for (let stableFor = 0, samples = 0; stableFor < 3; samples++) {
-    if (samples === 50) throw new Error('the board kept moving for 5 seconds')
+    if (samples === 50) throw new Error('the board kept moving for 50 frames')
     await page.waitForTimeout(100)
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve))))
     const current = await snapshot()
     stableFor = current === previous ? stableFor + 1 : 0
     previous = current
