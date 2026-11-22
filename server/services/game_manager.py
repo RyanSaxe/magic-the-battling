@@ -59,6 +59,7 @@ from mtb.phases.elimination import (
     eliminate_puppet,
     get_live_players,
     get_live_puppets,
+    get_same_round_exits,
     get_sudden_death_fighters,
     get_would_be_dead,
     get_would_be_dead_puppets,
@@ -1382,9 +1383,14 @@ class GameManager:
             self._write_final_state(db, game_id, participant)
         db.commit()
 
+    def _persist_exit(self, db: Session | None, game_id: str | None, game: Game, participant: Player | Puppet) -> None:
+        # Going out can move the places of everyone out in the same round.
+        for out in get_same_round_exits(game, participant):
+            self._persist_player_placement(db, game_id, out)
+
     def _eliminate_dead_puppets(self, game: Game, game_id: str | None, db: Session | None) -> None:
         for puppet in process_puppet_eliminations(game):
-            self._persist_player_placement(db, game_id, puppet)
+            self._persist_exit(db, game_id, game, puppet)
 
     def _write_final_state(self, db: Session, game_id: str, participant: Player | Puppet) -> bool:
         history = (
@@ -3693,8 +3699,8 @@ class GameManager:
             player.phase = "build"
             return None
 
-        player.in_sudden_death = False
-        fake_player.in_sudden_death = False
+        player.in_sudden_death = player_at_lethal
+        fake_player.in_sudden_death = bot_at_lethal
 
         if player_at_lethal:
             self._set_static_battle_resolution(
@@ -3723,7 +3729,7 @@ class GameManager:
                 poison_taken=poison_taken,
             )
             eliminate_player(game, player, player.round, player.stage)
-            self._persist_player_placement(db, game_id, player)
+            self._persist_exit(db, game_id, game, player)
             self._eliminate_dead_puppets(game, game_id, db)
             winner, is_game_over = check_game_over(game)
             if is_game_over:
@@ -4214,9 +4220,9 @@ class GameManager:
                 opponent.phase = "build"
                 return None
 
-            # Exactly one died — clear flags and end game
-            player.in_sudden_death = False
-            opponent.in_sudden_death = False
+            # Exactly one died — end game
+            player.in_sudden_death = player_at_lethal
+            opponent.in_sudden_death = opponent_at_lethal
 
             if player_at_lethal:
                 self._set_pvp_battle_resolution(
@@ -4467,8 +4473,8 @@ class GameManager:
                 opponent.phase = "build"
                 return None
 
-            player.in_sudden_death = False
-            opponent.in_sudden_death = False
+            player.in_sudden_death = player_at_lethal
+            opponent.in_sudden_death = opponent_at_lethal
 
         if player_at_lethal and opponent_at_lethal:
             self._set_pvp_battle_resolution(
@@ -4774,8 +4780,9 @@ class GameManager:
         """Resolve sudden death between two puppets by randomly eliminating one."""
         loser = random.choice(bots)
         winner_puppet = bots[0] if loser is bots[1] else bots[1]
+        loser.in_sudden_death = True
         eliminate_puppet(game, loser)
-        self._persist_player_placement(db, game_id, loser)
+        self._persist_exit(db, game_id, game, loser)
         winner_puppet.poison = game.config.poison_to_lose - 1
         winner, is_game_over = check_game_over(game)
         if is_game_over:
@@ -4798,10 +4805,10 @@ class GameManager:
         if not needs_sudden_death(game):
             for p in get_would_be_dead(game):
                 eliminate_player(game, p, p.round, p.stage)
-                self._persist_player_placement(db, game_id, p)
+                self._persist_exit(db, game_id, game, p)
             for puppet in get_would_be_dead_puppets(game):
                 eliminate_puppet(game, puppet)
-                self._persist_player_placement(db, game_id, puppet)
+                self._persist_exit(db, game_id, game, puppet)
 
             self._eliminate_dead_puppets(game, game_id, db)
             winner, is_game_over = check_game_over(game)
@@ -4820,11 +4827,11 @@ class GameManager:
         for p in get_would_be_dead(game):
             if p.name not in fighter_names:
                 eliminate_player(game, p, p.round, p.stage)
-                self._persist_player_placement(db, game_id, p)
+                self._persist_exit(db, game_id, game, p)
         for puppet in get_would_be_dead_puppets(game):
             if puppet.name not in fighter_names:
                 eliminate_puppet(game, puppet)
-                self._persist_player_placement(db, game_id, puppet)
+                self._persist_exit(db, game_id, game, puppet)
 
         humans = [f for f in (f1, f2) if isinstance(f, Player)]
         puppets = [f for f in (f1, f2) if isinstance(f, Puppet)]
