@@ -36,7 +36,9 @@ async function openGame(page: Page, baseURL: string, state: ScreenState) {
   return sent
 }
 
-const sidePanel = (page: Page, title: string) => page.getByRole('region', { name: title, exact: true })
+/** The open panel with this title. A panel turns inert the moment it closes, and leaves once it has slid out. */
+const sidePanel = (page: Page, title: string) =>
+  page.getByRole('region', { name: title, exact: true }).and(page.locator(':not([inert])'))
 
 const PANELS: Panel[] = [
   {
@@ -85,9 +87,12 @@ const PANELS: Panel[] = [
   },
 ]
 
-/** Waits for the panel to finish sliding in. */
+/**
+ * Ends the panel's slide, so it can be measured where it comes to rest. A slide starts and ends only on a frame, and
+ * WebKit on Linux, as CI runs it, can draw a game page once in several seconds.
+ */
 async function settled(panel: Locator) {
-  await expect.poll(() => panel.evaluate((element) => getComputedStyle(element).transform)).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/)
+  await panel.evaluate((element) => element.getAnimations().forEach((animation) => animation.finish()))
 }
 
 /** The panel's box once it has slid in, and whether the panel shows anywhere along either bar. */
@@ -264,7 +269,10 @@ test.describe('a phone', () => {
     await page.mouse.down()
     await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2 + 30, { steps: 5 })
     // Slid fully past the frame's right gold edge, which clips it.
-    await expect.poll(async () => (await graveyard.boundingBox())?.x ?? 0, 'the panel\'s left edge').toBeGreaterThanOrEqual(390 - 4 - SEAM)
+    await expect.poll(async () => {
+      await settled(graveyard)
+      return (await graveyard.boundingBox())?.x ?? 0
+    }, 'the panel\'s left edge').toBeGreaterThanOrEqual(390 - 4 - SEAM)
 
     const hand = (await page.locator('[data-guide-target="battle-hand"]').boundingBox())!
     await page.mouse.move(hand.x + hand.width / 2, hand.y + hand.height / 2, { steps: 10 })
