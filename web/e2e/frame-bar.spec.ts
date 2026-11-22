@@ -1,5 +1,5 @@
 import type { Page, WebSocketRoute } from '@playwright/test'
-import { PAGES, expect, openPage, serveGame, test } from './helpers'
+import { PAGES, expect, openPage, serveGame, serveSpectating, test } from './helpers'
 import { GAME_ID, gameBootstrap, type ScreenState } from './gameStates'
 
 const BAR_HEIGHT = 42
@@ -318,6 +318,30 @@ for (const { name, viewport, isMobile } of LINE_SCREENS) {
           }
         }
       }
+    })
+  })
+}
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    test("a spectator sees the watched player's bottom bar but can't use it", async ({ page, baseURL }) => {
+      await serveSpectating('approved')(page, baseURL!)
+      await page.goto(`/game/${GAME_ID}/play?spectate=true`, { waitUntil: 'domcontentloaded' })
+      // The bar is inert, which also hides it from the accessibility tree, so it's found by tag and text.
+      const bar = page.locator('footer')
+      const submitHand = bar.getByText('Submit Hand')
+      await page.locator('main').waitFor()
+      await expect(submitHand, "the watched player's Submit Hand in the bottom bar").toBeVisible()
+
+      const barBox = (await bar.boundingBox())!
+      expect.soft(barBox.height, 'bottom bar height').toBe(BAR_HEIGHT)
+      expect.soft(barBox.y, 'bottom bar top edge').toBe(viewport.height - BAR_HEIGHT)
+
+      const button = (await submitHand.boundingBox())!
+      await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2)
+      await expect(page.locator('[data-guide-target="build-submit-popover"]'), 'Play and Draw stay closed').toHaveCount(0)
     })
   })
 }
