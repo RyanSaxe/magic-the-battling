@@ -9,6 +9,7 @@ import {
   FaMessage,
   FaLink,
 } from 'react-icons/fa6'
+import { copyText } from '../utils/clipboard'
 
 interface ShareModalProps {
   url: string
@@ -85,18 +86,7 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
   )
 
   const handleCopyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = url
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-    }
+    await copyText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [url])

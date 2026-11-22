@@ -20,6 +20,7 @@ import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar, type FightSidebarView, type Scouting } from "../components/sidebar";
+import { CopyWatchLink } from "../components/sidebar/CopyWatchLink";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
@@ -1123,12 +1124,12 @@ function GameContent() {
     actions.battleUpdateLife("opponent", life);
   };
 
+  const watchUrl = new URL("?spectate=true", window.location.href).toString();
+
   const handleSpectateNewTab = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("spectate", "true");
     // noopener keeps the player's per-tab session out of the watching tab, and ?spectate=true stays in its URL,
     // so reloading that tab can never take the player's seat.
-    window.open(url.toString(), "_blank", "noopener");
+    window.open(watchUrl, "_blank", "noopener");
   };
 
   // Changing a submitted result is given up whenever a menu, panel or window other than its choices opens.
@@ -2128,6 +2129,7 @@ function GameContent() {
         onScout={setScouting}
         onStopScouting={() => setScouting(null)}
         renderMicToggle={renderMicToggle}
+        watchLink={!isSpectator && (!isEndPhase || canSpectate) ? <CopyWatchLink url={watchUrl} /> : undefined}
       />
     );
     if (!usesOverlaySidebar) return <FrameSidebar>{sidebar}</FrameSidebar>;

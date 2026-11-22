@@ -26,6 +26,7 @@ import {
 import { DIALOG_BACKDROP, LINK, TEXT_INPUT } from "../components/common/styles";
 import { Tag } from "../components/common/Tag";
 import { PuppetIcon } from "../components/icons";
+import { copyText } from "../utils/clipboard";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
@@ -504,18 +505,7 @@ export function Lobby() {
 
   const copyJoinCode = async () => {
     if (!lobbyState?.join_code) return;
-    try {
-      await navigator.clipboard.writeText(lobbyState.join_code);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = lobbyState.join_code;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
+    await copyText(lobbyState.join_code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
