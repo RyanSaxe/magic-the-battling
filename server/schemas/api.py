@@ -215,6 +215,7 @@ class PlayerView(BaseModel):
 
 class SelfPlayerView(PlayerView):
     hand: list[CardRef]
+    hand_slots: list[str | None]
     sideboard: list[CardRef]
     command_zone: list[CardRef] = Field(default_factory=list)
     current_pack: list[CardRef] | None = None
@@ -322,6 +323,7 @@ class BuildMoveAction(BaseModel):
     card_id: str
     source: BuildSource
     destination: BuildSource
+    slot: int | None = None
 
 
 class BuildSubmitAction(BaseModel):

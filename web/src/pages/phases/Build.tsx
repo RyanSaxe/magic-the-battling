@@ -30,6 +30,7 @@ interface BuildPhaseProps {
       cardId: string,
       source: BuildSource,
       destination: BuildSource,
+      slot?: number,
     ) => void;
     buildSwap: (
       cardAId: string,
@@ -57,35 +58,6 @@ interface BuildPhaseProps {
   onQuickApplyUpgrade?: (upgradeId: string) => void;
   isMobile?: boolean;
   showDesktopUpgradeRail?: boolean;
-}
-
-function syncHandSlots(
-  prevSlots: (CardType | null)[],
-  hand: CardType[],
-  maxHandSize: number,
-): (CardType | null)[] {
-  const handIds = new Set(hand.map((c) => c.id));
-  const idToCard = new Map(hand.map((c) => [c.id, c]));
-  const newSlots: (CardType | null)[] = new Array(maxHandSize).fill(null);
-
-  // Keep existing slot assignments for cards still in hand
-  for (let i = 0; i < Math.min(prevSlots.length, maxHandSize); i++) {
-    const prev = prevSlots[i];
-    if (prev && handIds.has(prev.id)) {
-      newSlots[i] = idToCard.get(prev.id)!;
-      handIds.delete(prev.id);
-    }
-  }
-
-  // Place any unslotted hand cards at first empty slot
-  for (const id of handIds) {
-    const emptyIdx = newSlots.indexOf(null);
-    if (emptyIdx !== -1) {
-      newSlots[emptyIdx] = idToCard.get(id)!;
-    }
-  }
-
-  return newSlots;
 }
 
 export function BuildPhase({
@@ -117,31 +89,17 @@ export function BuildPhase({
       setSelection(null);
     }
   }, []);
-  const [slotOrder, setSlotOrder] = useState<(string | null)[]>([]);
-
   const handSlots = useMemo(() => {
-    const result = syncHandSlots(
-      slotOrder.map((id) =>
-        id ? (self_player.hand.find((c) => c.id === id) ?? null) : null,
-      ),
-      self_player.hand,
-      maxHandSize,
-    );
-    return result;
-  }, [slotOrder, self_player.hand, maxHandSize]);
+    const handById = new Map(self_player.hand.map((card) => [card.id, card]));
+    return Array.from({ length: maxHandSize }, (_, slot) => {
+      const id = self_player.hand_slots[slot];
+      return id ? (handById.get(id) ?? null) : null;
+    });
+  }, [self_player.hand, self_player.hand_slots, maxHandSize]);
 
   useEffect(() => {
     onHandSlotsChange?.(handSlots.map((c) => c?.id ?? null));
   }, [handSlots, onHandSlotsChange]);
-
-  const setSlotCard = useCallback((index: number, card: CardType) => {
-    setSlotOrder((prev) => {
-      const next = [...prev];
-      while (next.length <= index) next.push(null);
-      next[index] = card.id;
-      return next;
-    });
-  }, []);
 
   const clearPendingHandAdds = useCallback(() => {
     pendingHandAddsRef.current = 0;
@@ -226,8 +184,7 @@ export function BuildPhase({
         setSelection(null);
         return;
       }
-      setSlotCard(slotIndex, card);
-      actions.buildMove(selection.cardId, "sideboard", "hand");
+      actions.buildMove(selection.cardId, "sideboard", "hand", slotIndex);
       setSelection(null);
     } else if (
       selection?.type === "empty" &&
@@ -239,15 +196,11 @@ export function BuildPhase({
     }
   };
 
-  const handleHandCardClick = (card: CardType, slotIndex: number) => {
+  const handleHandCardClick = (card: CardType) => {
     if (locked) return;
     if (selection?.type === "card" && selection.cardId === card.id) {
       setSelection(null);
     } else if (selection?.type === "card" && selection.zone === "sideboard") {
-      const sideboardCard = self_player.sideboard.find(
-        (c) => c.id === selection.cardId,
-      );
-      if (sideboardCard) setSlotCard(slotIndex, sideboardCard);
       actions.buildSwap(card.id, "hand", selection.cardId, "sideboard");
       setSelection(null);
     } else {
@@ -260,10 +213,6 @@ export function BuildPhase({
     if (selection?.type === "card" && selection.cardId === card.id) {
       setSelection(null);
     } else if (selection?.type === "card" && selection.zone === "hand") {
-      const handSlotIndex = handSlots.findIndex(
-        (c) => c?.id === selection.cardId,
-      );
-      if (handSlotIndex !== -1) setSlotCard(handSlotIndex, card);
       actions.buildSwap(selection.cardId, "hand", card.id, "sideboard");
       setSelection(null);
     } else if (selection?.type === "empty") {
@@ -271,8 +220,7 @@ export function BuildPhase({
         setSelection(null);
         return;
       }
-      setSlotCard(selection.slotIndex, card);
-      actions.buildMove(card.id, "sideboard", "hand");
+      actions.buildMove(card.id, "sideboard", "hand", selection.slotIndex);
       setSelection(null);
     } else {
       setSelection({ type: "card", cardId: card.id, zone: "sideboard" });
@@ -380,7 +328,7 @@ export function BuildPhase({
         >
           <Card
             card={card}
-            onClick={() => handleHandCardClick(card, i)}
+            onClick={() => handleHandCardClick(card)}
             selected={isCardSelected(card.id)}
             dimensions={handDims}
             upgraded={upgradedCardIds.has(card.id)}

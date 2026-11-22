@@ -39,6 +39,7 @@ function makeSelfPlayer(overrides: Partial<SelfPlayerView>): SelfPlayerView {
   return {
     ...makePlayer({ name: "Alice" }),
     hand: [],
+    hand_slots: [],
     sideboard: [],
     command_zone: [],
     current_pack: null,

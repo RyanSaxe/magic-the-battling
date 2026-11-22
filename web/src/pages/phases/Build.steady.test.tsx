@@ -38,6 +38,7 @@ it('keeps the sizes Build opened at while the hand fills and after coming back',
     self_player: {
       ...opened.self_player,
       hand: pool.slice(0, 3),
+      hand_slots: pool.slice(0, 3).map((card) => card.id),
       sideboard: pool.slice(3),
     },
   }
