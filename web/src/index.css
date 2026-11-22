@@ -1323,6 +1323,8 @@ input:-webkit-autofill:focus {
 
 .animate-gentle-glow {
   animation: gentle-glow 3s ease-in-out infinite;
+  /* Adds the glow to the button's own shadow. Replacing it would flatten the raise, or hold it while pressed. */
+  animation-composition: add;
 }
 
 .mic-level-bar {
