@@ -231,7 +231,7 @@ function PlayerSelectionModal({
   spectateOnly?: boolean;
 }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<GameStatusResponse | null>(null);
   const [statusError, setStatusError] = useState<AppError | null>(null);
   const [statusAttempt, setStatusAttempt] = useState(0);
@@ -380,7 +380,7 @@ function PlayerSelectionModal({
     );
   }
 
-  if (!status) {
+  if (!status || authLoading) {
     return (
       <NoticeFrame>
         <BusyNotice label="Loading game..." />
