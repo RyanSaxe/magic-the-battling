@@ -478,7 +478,7 @@ function PlayerSelectionModal({
 
         {selectedPlayer && (
           <div className="space-y-4">
-            <p className="text-[var(--ivory-muted)] text-center">
+            <p className="text-[var(--ivory-muted)] text-center break-words">
               Request to watch <strong>{selectedPlayer}</strong>'s game
             </p>
             <div>
