@@ -2178,6 +2178,7 @@ function GameContent() {
                   suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
                   useUpgrades={gameState.use_upgrades}
                   onOpenRules={openRulesPanel}
+                  onStepClick={() => closeSurface("actions")}
                   title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
                 />
               </>
