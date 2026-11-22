@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SidePanelHostContext } from "./sidePanelHost";
+import { SubmitPopover } from "./SubmitPopover";
 import { shouldCloseSubmitPopoverOnOutsideClick } from "./submitPopoverState";
 
 describe("shouldCloseSubmitPopoverOnOutsideClick", () => {
@@ -32,5 +36,30 @@ describe("shouldCloseSubmitPopoverOnOutsideClick", () => {
       clickedInsidePopover: false,
       clickedIgnoredElement: true,
     })).toBe(false);
+  });
+});
+
+describe("SubmitPopover", () => {
+  afterEach(() => {
+    cleanup();
+    document.body.replaceChildren();
+  });
+
+  it("takes the whole tap that closes it over the board, so nothing underneath gets the click", () => {
+    const boardCover = document.body.appendChild(document.createElement("div"));
+    const onClose = vi.fn();
+    render(
+      <SidePanelHostContext.Provider value={boardCover}>
+        <SubmitPopover options={[]} onClose={onClose} />
+      </SidePanelHostContext.Provider>,
+    );
+
+    const tapTarget = boardCover.firstElementChild;
+    expect(tapTarget).not.toBeNull();
+    fireEvent.pointerDown(tapTarget!);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(tapTarget!);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
