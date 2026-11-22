@@ -609,6 +609,21 @@ export function Play() {
   const soloLoading =
     soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
 
+  const inactiveCard = (
+    mode: ActiveMode,
+    icon: React.ReactNode,
+    label: string,
+  ) => (
+    <button
+      onClick={() => setActiveMode(mode)}
+      className="shrink-0 bg-black/35 rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/30 transition-colors"
+    >
+      {icon}
+      <span className="text-white font-medium text-sm">{label}</span>
+      <span className="ml-auto text-[var(--ivory-muted)] text-xs">▶</span>
+    </button>
+  );
+
   if (soloLoading) {
     return (
       <LoadingScreen
@@ -629,21 +644,6 @@ export function Play() {
       />
     );
   }
-
-  const inactiveCard = (
-    mode: ActiveMode,
-    icon: React.ReactNode,
-    label: string,
-  ) => (
-    <button
-      onClick={() => setActiveMode(mode)}
-      className="shrink-0 bg-black/35 rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/30 transition-colors"
-    >
-      {icon}
-      <span className="text-white font-medium text-sm">{label}</span>
-      <span className="ml-auto text-[var(--ivory-muted)] text-xs">▶</span>
-    </button>
-  );
 
   return (
     <>

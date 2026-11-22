@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom'
 import type { PlayMode } from '../../types'
 
 export type LoadingStep = 'Load cube' | 'Load deck' | 'Deal cards' | 'Open board' | 'Open lobby'
@@ -21,3 +22,8 @@ export function newLobbySteps(playMode: PlayMode): LoadingStep[] {
 }
 
 export const START_STEPS: LoadingStep[] = ['Deal cards', 'Open board']
+
+/** The steps the page before handed on, or `otherwise` on a page opened by a link or a reload. */
+export function useHandedOnSteps(otherwise: LoadingStep[]): LoadingStep[] {
+  return (useLocation().state as LoadingRouteState | null)?.loadingSteps ?? otherwise
+}

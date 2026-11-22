@@ -1,10 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useReducer, type ReactNode } from "react";
-import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
 import { LoadingScreen } from "../components/common/LoadingScreen";
-import { type LoadingRouteState, START_STEPS } from "../components/common/loadingSteps";
+import { START_STEPS, useHandedOnSteps } from "../components/common/loadingSteps";
 import { Banner } from "../components/common/Banner";
 import { FrameFelt, FrameSidebar } from "../components/common/PageFrame";
 import { GuideButton, HomeButton } from "../components/common/AppHeader";
@@ -856,7 +856,7 @@ function GameContent() {
   }, []);
 
   const navigate = useNavigate();
-  const loadingSteps = (useLocation().state as LoadingRouteState | null)?.loadingSteps ?? START_STEPS;
+  const loadingSteps = useHandedOnSteps(START_STEPS);
   const { status, gameState, isConnected, send, actions, spectateRequests, serverNotice } = useGame(
     gameId || null,
     watching ? watching.sessionId : isSpectateMode ? null : session?.sessionId ?? null,

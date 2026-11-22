@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
@@ -12,7 +12,7 @@ import { useToast } from "../contexts";
 import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
 import { LoadingScreen } from "../components/common/LoadingScreen";
-import { type LoadingRouteState, START_STEPS } from "../components/common/loadingSteps";
+import { type LoadingRouteState, START_STEPS, useHandedOnSteps } from "../components/common/loadingSteps";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { SpectateRequestModal } from "../components/SpectateRequestModal";
@@ -273,7 +273,7 @@ function VoiceChatSwitch({
 export function Lobby() {
   const { gameId = "" } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
-  const openingSteps = (useLocation().state as LoadingRouteState | null)?.loadingSteps ?? ["Open lobby" as const];
+  const openingSteps = useHandedOnSteps(["Open lobby"]);
   const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId);
   const session = seat.kind === "held" ? seat.session : null;
   const { addToast } = useToast();
