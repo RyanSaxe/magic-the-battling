@@ -8,7 +8,7 @@ interface Hint extends InputText {
 }
 
 export const GAME_HINTS: Hint[] = [
-  { text: "Press ? to get help for the current phase", touch: "Tap ? at the top right for help with this phase" },
+  { text: "Press ? to get help for the current phase", touch: "Tap ? at the top right for help with this phase", gameOnly: true },
   { text: "A draw is treated as a loss for both players" },
   { text: "In Draft, press R to reroll your pack", touch: "In Draft, tap Roll at the bottom left for a new pack" },
   { text: "You can upgrade a card every 3 rounds" },

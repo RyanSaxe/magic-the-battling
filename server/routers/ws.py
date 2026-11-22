@@ -707,7 +707,7 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
         if success:
             await connection_manager.broadcast_lobby_state(game_id)
         else:
-            await connection_manager.send_error(websocket, error or "Failed to clear battler")
+            await connection_manager.send_error(websocket, error or "Failed to clear your deck")
         return True
 
     if action == "add_puppet":

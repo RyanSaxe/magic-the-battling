@@ -95,6 +95,21 @@ def test_higher_poison_player_goes_first():
     assert b.coin_flip_name == bob.name
 
 
+def test_puppet_falls_back_to_the_latest_earlier_round_past_stage_9():
+    puppet = Puppet(
+        name="Bot1",
+        player_history_id=1,
+        snapshots={key: StaticOpponent(name=key, hand=[], chosen_basics=[]) for key in ("3_1", "9_3", "10_1", "10_2")},
+    )
+
+    after_last = puppet.get_opponent_for_round(10, 3)
+    between = puppet.get_opponent_for_round(5, 2)
+
+    assert after_last is not None
+    assert between is not None
+    assert (after_last.name, between.name) == ("10_2", "3_1")
+
+
 def test_higher_poison_bot_goes_first(card_factory):
     game = create_game(["Alice"], num_players=1)
     alice = game.players[0]

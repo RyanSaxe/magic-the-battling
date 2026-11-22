@@ -96,7 +96,7 @@ def test_build_battler_rejects_source_conspiracies_and_vanguards(monkeypatch, ca
 
     monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
-    with pytest.raises(ValueError, match="battler-defined Conspiracy and Vanguard cards are not supported"):
+    with pytest.raises(ValueError, match="its own Conspiracy and Vanguard cards are not supported"):
         build_battler()
 
 
