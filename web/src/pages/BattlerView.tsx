@@ -15,7 +15,7 @@ import type { UserBattler, PlayMode } from '../types'
 import { countLabel, cubeTitle, modeLabel, winRate } from '../utils/accountFormat'
 import { AppError, unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
-import { OPTION_BOX, TEXT_INPUT } from '../components/common/styles'
+import { FIELD_LABEL, OPTION_BOX, TEXT_INPUT } from '../components/common/styles'
 import { Dialog } from '../components/common/Dialog'
 
 export function BattlerView() {
@@ -187,7 +187,7 @@ function SettingsModal({
 
       <div className="space-y-3">
         <div>
-          <label className="block text-white text-sm mb-1">Display Name</label>
+          <label className={FIELD_LABEL}>Display Name</label>
           <input
             type="text"
             value={displayName}
@@ -205,7 +205,7 @@ function SettingsModal({
             className="w-4 h-4"
           />
           <span className="text-white text-sm">Constructed</span>
-          <span className="text-amber-200/45 text-xs">— bring your own deck</span>
+          <span className="text-[var(--ivory-muted)] text-xs">— bring your own deck</span>
         </label>
 
         <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/authState'
 import { unknownToAppError } from '../../utils/appError'
 import { joinLobbyByCode } from '../../utils/joinLobby'
-import { TEXT_INPUT } from '../common/styles'
+import { FIELD_LABEL, TEXT_INPUT } from '../common/styles'
 import { Dialog } from '../common/Dialog'
 
 interface JoinGameModalProps {
@@ -63,7 +63,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
 
       <div className="space-y-3">
         <div>
-          <label className="block text-white text-sm mb-1">Your Name</label>
+          <label className={FIELD_LABEL}>Your Name</label>
           <input
             type="text"
             value={playerName}
@@ -76,7 +76,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
         </div>
 
         <div>
-          <label className="block text-white text-sm mb-1">Join Code</label>
+          <label className={FIELD_LABEL}>Join Code</label>
           <input
             type="text"
             value={joinCode}

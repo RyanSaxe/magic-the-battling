@@ -16,7 +16,7 @@ export function DefaultOpponentsField({
 }) {
   return (
     <div className={`${OPTION_BOX} p-3`}>
-      <label className="block text-amber-100/70 text-sm mb-2">{label}</label>
+      <label className="block text-[var(--ivory-muted)] text-sm mb-2">{label}</label>
       <SegmentedFilter
         label={label}
         options={OPPONENT_OPTIONS}

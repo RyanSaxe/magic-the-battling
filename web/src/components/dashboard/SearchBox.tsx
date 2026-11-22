@@ -33,7 +33,7 @@ export function SearchBox({
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-amber-100/60 hover:bg-white/10 hover:text-white"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-[var(--ivory-muted)] hover:bg-white/10 hover:text-white"
         >
           ✕
         </button>

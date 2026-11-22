@@ -7,7 +7,7 @@ import type { LobbyState } from '../../types'
 import { type AppError, getAppErrorMessage, unknownToAppError } from '../../utils/appError'
 import { getRememberedSeat } from '../../utils/deviceIdentity'
 import { BusyNotice, StatusNotice } from '../common/StatusNotice'
-import { TEXT_INPUT } from '../common/styles'
+import { FIELD_LABEL, TEXT_INPUT } from '../common/styles'
 
 /** What a lobby link shows a tab that has no live seat in the lobby, by the state of its seat. */
 export function LobbySeatNotice({
@@ -218,7 +218,7 @@ function JoinLobbyNotice({
         {occupied} of {lobby.target_player_count} players · code{' '}
         <span className="font-mono text-amber-400">{lobby.join_code}</span>
       </p>
-      <label htmlFor="lobby-join-name" className="block text-white text-sm mb-1 mt-4">
+      <label htmlFor="lobby-join-name" className={`${FIELD_LABEL} mt-4`}>
         Your Name
       </label>
       <input

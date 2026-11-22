@@ -62,7 +62,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="btn btn-secondary h-8 w-8 !p-0 flex items-center justify-center text-amber-100/70"
+        className="btn btn-secondary h-8 w-8 !p-0 flex items-center justify-center text-[var(--ivory-muted)]"
       >
         ⋯
       </button>
@@ -83,7 +83,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
                 item.onSelect()
               }}
               className={`menu-item w-full text-left px-4 py-2 text-sm transition-colors disabled:opacity-50 ${
-                item.danger ? 'menu-item-destructive' : 'text-amber-100/85'
+                item.danger ? 'menu-item-destructive' : 'text-[var(--ivory-soft)]'
               }`}
             >
               {item.label}

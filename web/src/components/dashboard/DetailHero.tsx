@@ -53,8 +53,8 @@ export function DetailHero({ imageUri, badge, title, links, details, actions, pl
             <CubeBadge tone={badge.tone}>
               {badge.label}
             </CubeBadge>
-            <h1 className="mt-2 font-['Cinzel',serif] text-2xl font-bold leading-tight text-amber-50 drop-shadow-md">{title}</h1>
-            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-amber-100/85">{links}</div>
+            <h1 className="mt-2 font-['Cinzel',serif] text-2xl font-bold leading-tight text-[var(--ivory)] drop-shadow-md">{title}</h1>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-[var(--ivory-soft)]">{links}</div>
             {details && details.length > 0 && <HeroDetails details={details} className="mt-3" />}
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 [&>*]:flex-auto md:[&>*]:flex-none">
@@ -85,15 +85,15 @@ export function DetailHero({ imageUri, badge, title, links, details, actions, pl
       <dl className="grid grid-cols-2 gap-px border-t gold-divider bg-[var(--stone)] md:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="modal-chrome px-4 py-2.5">
-            <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100/60">{stat.label}</dt>
-            <dd className="mt-0.5 text-base font-semibold tabular-nums text-amber-50">
+            <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ivory-muted)]">{stat.label}</dt>
+            <dd className="mt-0.5 text-base font-semibold tabular-nums text-[var(--ivory)]">
               {stat.value}
-              {stat.detail && <span className="ml-1.5 text-xs font-normal text-amber-100/60">{stat.detail}</span>}
+              {stat.detail && <span className="ml-1.5 text-xs font-normal text-[var(--ivory-muted)]">{stat.detail}</span>}
             </dd>
           </div>
         ))}
       </dl>
-      {caption && <p className="border-t gold-divider px-4 py-1.5 text-[11px] leading-4 text-amber-100/60">{caption}</p>}
+      {caption && <p className="border-t gold-divider px-4 py-1.5 text-[11px] leading-4 text-[var(--ivory-muted)]">{caption}</p>}
     </SurfaceCard>
   )
 }
