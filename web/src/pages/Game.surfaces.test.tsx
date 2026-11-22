@@ -26,7 +26,7 @@ vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: null, loading:
 
 const find = (selector: string) => document.querySelector<HTMLElement>(selector)!
 
-async function openGameOnPhone(bootstrap: ReturnType<typeof gameBootstrap>) {
+async function openGame(bootstrap: ReturnType<typeof gameBootstrap>) {
   render(
     <MemoryRouter initialEntries={[`/game/${GAME_ID}/play`]}>
       <Routes>
@@ -64,7 +64,7 @@ describe('Game: what is open over the board', () => {
     const bootstrap = gameBootstrap({ phase: 'battle', counts: { hand: 2, lands: 1 } })
     const zones = bootstrap.state.current_battle!.your_zones
     zones.sideboard = [{ ...zones.hand[0], id: 'sideboard-card' }]
-    await openGameOnPhone(bootstrap)
+    await openGame(bootstrap)
 
     const selectInSideboard = () => {
       fireEvent.keyDown(document.body, { key: 's' })
@@ -125,7 +125,7 @@ describe('Game: what is open over the board', () => {
       const at = this.matches('[data-zone="graveyard"][data-zone-owner="player"]') ? 200 : 0
       return { x: at, y: at, left: at, top: at, right: at + 50, bottom: at + 50, width: 50, height: 50 } as DOMRect
     })
-    await openGameOnPhone(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
+    await openGame(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
     const land = find('[data-guide-card-id="your-land-0"]')
     fireEvent.click(land)
 
@@ -147,7 +147,7 @@ describe('Game: what is open over the board', () => {
   })
 
   it('leaves a minimized Guide and its place alone while Players and Scouting open and close', async () => {
-    await openGameOnPhone(gameBootstrap({ phase: 'build', counts: { hand: 2, sideboard: 2 } }))
+    await openGame(gameBootstrap({ phase: 'build', counts: { hand: 2, sideboard: 2 } }))
     fireEvent.click(find('[data-guide-target="guide-button"]'))
     fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
     fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
@@ -163,12 +163,56 @@ describe('Game: what is open over the board', () => {
   })
 
   it('closes a card menu on Escape and leaves the minimized Guide', async () => {
-    await openGameOnPhone(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
+    await openGame(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
     fireEvent.click(find('[data-guide-target="guide-button"]'))
     fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
     fireEvent.contextMenu(find('[data-guide-card-id="your-land-0"]'))
 
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Open guide' })).toBeTruthy()
+  })
+
+  it('leaves a minimized Guide and its place alone while Actions or a pile opens and closes', async () => {
+    await openGame(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
+    fireEvent.click(find('[data-guide-target="guide-button"]'))
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }))
+    expect(screen.getByRole('button', { name: 'Open guide' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('button', { name: 'Pass Turn' })).toBeNull()
+
+    fireEvent.click(find('.battle-side-dropzone[data-zone="exile"][data-zone-owner="player"] > div'))
+    expect(screen.getByRole('button', { name: 'Open guide' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(document.querySelector('.side-panel--open')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open guide' }))
+    expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('opens a minimized Guide from its button and links, and after it was closed minimized', async () => {
+    vi.stubGlobal('innerWidth', 1280)
+    await openGame(gameBootstrap({ phase: 'draft', counts: { pack: 2, sideboard: 2 } }))
+    const guideButton = find('[data-guide-target="guide-button"]')
+    const minimize = () => fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+    fireEvent.click(guideButton)
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+
+    minimize()
+    fireEvent.click(guideButton)
+    expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
+
+    minimize()
+    fireEvent.click(find('[data-guide-target="timeline-phase-draft"]'))
+    fireEvent.click(screen.getByRole('button', { name: 'Controls' }))
+    expect(screen.getByRole('radio', { name: 'Controls' }).getAttribute('aria-checked')).toBe('true')
+
+    minimize()
+    fireEvent.click(screen.getByRole('button', { name: 'Close guide' }))
+    await vi.waitFor(() => expect(document.querySelector('.floating-window')).toBeNull())
+    fireEvent.click(guideButton)
+    expect(screen.getByRole('button', { name: 'Minimize guide' })).toBeTruthy()
   })
 })

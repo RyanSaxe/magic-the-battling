@@ -2678,6 +2678,7 @@ function GameContent() {
       {rulesPanel && (
         <RulesPanel
           onClose={() => closeSurface("guide")}
+          minimized={guideMinimized}
           onMinimizedChange={setGuideMinimized}
           behindPanel={openSurface?.kind !== "guide"}
           initialDocId={rulesPanel.target?.docId}
