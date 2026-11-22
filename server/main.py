@@ -233,5 +233,5 @@ if static_dir.exists():
         return FileResponse(static_dir / "site.webmanifest", media_type="application/manifest+json")
 
     @app.get("/{path:path}")
-    async def spa_fallback(path: str):
-        return FileResponse(static_dir / "index.html")
+    async def spa_fallback(path: str, request: Request):
+        return share_preview.serve_index(request)
