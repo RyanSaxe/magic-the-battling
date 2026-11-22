@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useReducer, type ReactNode } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useReducer, type ReactNode, useSyncExternalStore } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
@@ -165,9 +165,15 @@ function selectDraftGuideOpponent(
 // A seat lost for these reasons has no way back from this tab, so the page offers to watch instead.
 const SEAT_GONE_CODES = new Set(["INVALID_SESSION", "PLAYER_NOT_IN_GAME"]);
 
+function subscribeToOtherTabs(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
 function GameGoneNotice({ gameId }: { gameId: string }) {
   const navigate = useNavigate();
-  const remembered = getRememberedSeat(gameId);
+  // Closing a game ends this tab's connection just before that tab forgets the seat, which has no results to show.
+  const rememberedName = useSyncExternalStore(subscribeToOtherTabs, () => getRememberedSeat(gameId)?.name ?? null);
   const newGame = (
     <button onClick={() => navigate("/play")} className="btn btn-secondary flex-1 py-2">
       New Game
@@ -178,14 +184,14 @@ function GameGoneNotice({ gameId }: { gameId: string }) {
       Home
     </button>
   );
-  if (remembered) {
+  if (rememberedName) {
     return (
       <StatusNotice
         title="This game has ended"
         actions={
           <>
             <button
-              onClick={() => navigate(`/game/${gameId}/share/${encodeURIComponent(remembered.name)}`)}
+              onClick={() => navigate(`/game/${gameId}/share/${encodeURIComponent(rememberedName)}`)}
               className="btn btn-primary w-full py-2"
             >
               See Results
@@ -195,7 +201,7 @@ function GameGoneNotice({ gameId }: { gameId: string }) {
           </>
         }
       >
-        Your final results as {remembered.name} are on the game&apos;s share page.
+        Your final results as {rememberedName} are on the game&apos;s share page.
       </StatusNotice>
     );
   }

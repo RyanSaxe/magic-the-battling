@@ -23,7 +23,7 @@ export interface ResumableSeat {
 
 const SEATS_TO_CHECK = 10
 
-export function useResumableGames(limit: number): ResumableSeat[] {
+export function useResumableGames(limit: number = SEATS_TO_CHECK): ResumableSeat[] {
   const [games, setGames] = useState<ResumableSeat[]>([])
 
   useEffect(() => {

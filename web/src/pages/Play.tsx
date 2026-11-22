@@ -9,7 +9,7 @@ import { InfoIcon } from "../components/icons/InfoIcon";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { PageFrame } from "../components/common/PageFrame";
-import { ResumeGameCard } from "../components/ResumeGame";
+import { ResumeRows } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { getLegendaryName } from "../utils/prefetchName";
@@ -318,7 +318,7 @@ export function Play() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { addToast } = useToast();
-  const resumableGames = useResumableGames(3);
+  const resumableGames = useResumableGames();
 
   const { user } = useAuth();
   const [randomName, setRandomName, nameLoading] = useRandomMtgName();
@@ -626,9 +626,7 @@ export function Play() {
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">
           <div className="flex flex-col">
-            {resumableGames.map((seat) => (
-              <ResumeGameCard key={seat.gameId} seat={seat} />
-            ))}
+            <ResumeRows seats={resumableGames} />
             <div className="mb-4">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <label htmlFor="player-name" className="block text-[var(--ivory-muted)] text-sm">

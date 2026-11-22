@@ -130,6 +130,7 @@ POST_GAME_CLEANUP_SECONDS = 300.0
 ABANDONED_CLEANUP_SECONDS = 86400.0
 FINISHED_PLAYER_PHASES = frozenset({"eliminated", "winner", "game_over"})
 LOBBY_STARTING_MESSAGE = "The game is starting"
+SEAT_SHARED_MESSAGE = "Other players are still in this game, so it can't be closed yet."
 
 
 def _current_task() -> asyncio.Task | None:
@@ -293,6 +294,10 @@ class GameStartQueueFullError(RuntimeError):
 
 class LobbyStartRefusedError(Exception):
     """The lobby can't start yet. Nothing about it changed."""
+
+
+class SeatCloseRefusedError(Exception):
+    """The seat can't end now. Nothing about the game changed."""
 
 
 class LobbyStartFailedError(Exception):
@@ -872,14 +877,7 @@ class GameManager:
             if not stale_ids:
                 return 0
 
-            now = datetime.now(UTC)
-            for record in stale:
-                record.ended_at = now  # ty: ignore[invalid-assignment]
-
-            session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id.in_(stale_ids)).delete(
-                synchronize_session=False
-            )
-            session.commit()
+            self._retire_games(session, stale_ids)
             logger.info("Retired %d stale games older than %dh", len(stale_ids), max_age_hours)
             return len(stale_ids)
         except Exception:
@@ -888,6 +886,16 @@ class GameManager:
             return 0
         finally:
             session.close()
+
+    def _retire_games(self, session: Session, game_ids: set[str]) -> None:
+        """End games nobody will finish. They can't be resumed, and no one in them gets a placement."""
+        session.query(GameRecord).filter(GameRecord.id.in_(game_ids), GameRecord.ended_at.is_(None)).update(
+            {GameRecord.ended_at: datetime.now(UTC)}, synchronize_session=False
+        )
+        session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id.in_(game_ids)).delete(
+            synchronize_session=False
+        )
+        session.commit()
 
     def evict_cold_games(self) -> int:
         cutoff = datetime.now(UTC) - timedelta(minutes=IDLE_EVICT_MINUTES)
@@ -2044,6 +2052,59 @@ class GameManager:
         claimed_token = token_after_claim(seat_token, stored_hash)
         pending.seat_token_hashes[player_name] = hash_seat_token(claimed_token)
         return SeatClaim(player_id=player_id, seat_token=claimed_token)
+
+    def close_seat(self, game_id: str, player_name: str, *, seat_token: str) -> str | None:
+        """End the named seat for good, for a caller holding its token. Returns the player id it had.
+
+        A lobby seat leaves the lobby. A started game is retired, so only a game with no other human can close:
+        with others in it, every round would wait on the seat that left. Raises SeatClaimRefusedError when the
+        caller doesn't hold such a seat, and SeatCloseRefusedError when it can't end now."""
+        pending = self._pending_games.get(game_id)
+        if pending is not None and not pending.is_started:
+            return self._close_lobby_seat(pending, player_name, seat_token=seat_token)
+
+        if game_id not in self._active_games:
+            self.restore_game_from_snapshot(game_id)
+        game = self._active_games.get(game_id)
+        if game is None:
+            raise SeatClaimRefusedError(SeatClaimRefusal.GAME_NOT_FOUND)
+        player = next((p for p in game.players if p.name == player_name), None)
+        if player is None or player.phase in FINISHED_PLAYER_PHASES:
+            raise SeatClaimRefusedError(SeatClaimRefusal.SEAT_NOT_FOUND)
+
+        session = db.SessionLocal()
+        try:
+            record = (
+                session.query(GamePlayerRecord)
+                .filter(
+                    GamePlayerRecord.game_id == game_id,
+                    GamePlayerRecord.player_name == player_name,
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+                .first()
+            )
+            if not seat_token_matches(seat_token, cast(str | None, record.seat_token_hash) if record else None):
+                raise SeatClaimRefusedError(SeatClaimRefusal.TOKEN_REQUIRED)
+            if len(game.players) > 1:
+                raise SeatCloseRefusedError(SEAT_SHARED_MESSAGE)
+
+            player_id = self.get_player_id_by_name(game_id, player_name)
+            self._retire_games(session, {game_id})
+        finally:
+            session.close()
+        self._cleanup_game(game_id)
+        return player_id
+
+    def _close_lobby_seat(self, pending: PendingGame, player_name: str, *, seat_token: str) -> str:
+        if player_name not in pending.player_names:
+            raise SeatClaimRefusedError(SeatClaimRefusal.SEAT_NOT_FOUND)
+        if not seat_token_matches(seat_token, pending.seat_token_hashes.get(player_name)):
+            raise SeatClaimRefusedError(SeatClaimRefusal.TOKEN_REQUIRED)
+        if not pending.accepts_changes:
+            raise SeatCloseRefusedError(LOBBY_STARTING_MESSAGE)
+        player_id = pending.player_ids[pending.player_names.index(player_name)]
+        self._remove_lobby_seat(pending, player_id)
+        return player_id
 
     def remove_player_from_pending(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
