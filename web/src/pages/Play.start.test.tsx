@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
+import { createGame } from '../api/client'
 import { getRememberedSeat } from '../utils/deviceIdentity'
 import { Play } from './Play'
 
@@ -96,6 +97,26 @@ describe('Play: starting a Goldfish game', () => {
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+  })
+
+  it('starts Goldfish once on Enter in the name field', async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    const name = screen.getByPlaceholderText('Enter your name')
+
+    await act(async () => {
+      fireEvent.keyDown(name, { key: 'Enter' })
+    })
+    await act(async () => {
+      fireEvent.keyDown(name, { key: 'Enter' })
+    })
+
+    expect(gamesCreated).toBe(1)
+    expect(createGame).toHaveBeenLastCalledWith('Tester', expect.objectContaining({ puppetCount: 3 }))
   })
 
   it('lets the player start again after a failed start', async () => {

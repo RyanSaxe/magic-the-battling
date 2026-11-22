@@ -595,6 +595,15 @@ export function Play() {
   const soloLoading =
     soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
 
+  const handleNameEnter = () => {
+    if (!nameValid) return;
+    if (activeMode === "friends") {
+      if (!friendsLoading) void handleCreateLobby();
+    } else if (soloPhase === "idle") {
+      void handleStartSolo();
+    }
+  };
+
   const inactiveCard = (
     mode: ActiveMode,
     icon: React.ReactNode,
@@ -649,9 +658,7 @@ export function Play() {
                     type="text"
                     value={nameLoading ? "" : playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && nameValid && handleCreateLobby()
-                    }
+                    onKeyDown={(e) => e.key === "Enter" && handleNameEnter()}
                     disabled={nameLoading}
                     placeholder={nameLoading ? "Generating name..." : "Enter your name"}
                     className={`${TEXT_INPUT} disabled:opacity-50`}
