@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { BoardBackdrop } from "./BoardBackdrop";
 import { shouldCloseSubmitPopoverOnOutsideClick } from "./submitPopoverState";
 
 interface SubmitPopoverOption {
@@ -23,11 +24,12 @@ export function SubmitPopover({
   ignoreOutsideClickSelector,
 }: SubmitPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as Node | null;
-      if (!ref.current || !target) {
+      if (!ref.current || !target || backdropRef.current?.contains(target)) {
         return;
       }
 
@@ -57,6 +59,8 @@ export function SubmitPopover({
   }, [closeOnOutsideClick, ignoreOutsideClickSelector, onClose]);
 
   return (
+    <>
+    {closeOnOutsideClick && <BoardBackdrop ref={backdropRef} onTap={onClose} />}
     <div
       ref={ref}
       className="absolute bottom-full mb-4 right-2 min-w-[120px] z-[95]"
@@ -74,5 +78,6 @@ export function SubmitPopover({
         ))}
       </div>
     </div>
+    </>
   );
 }
