@@ -1,4 +1,3 @@
-import type { GameSummary } from '../types'
 import type { ResumableSeat } from '../hooks/useResumableGames'
 import { formatTimeSince } from './format'
 
@@ -39,12 +38,6 @@ export function formatWhen(isoTime: string, now: number = Date.now()): string {
 export function seatsLabel(humanCount: number, puppetCount: number): string {
   const humans = countLabel(humanCount, 'human')
   return puppetCount > 0 ? `${humans}, ${countLabel(puppetCount, 'puppet')}` : humans
-}
-
-/** "Cube · 1 human, 3 puppets · 2 h ago". */
-export function gameMeta(game: GameSummary, now: number = Date.now()): string {
-  const seats = seatsLabel(game.human_count, game.player_count - game.human_count)
-  return [modeLabel(game.play_mode), seats, formatWhen(game.created_at, now)].join(' · ')
 }
 
 /** "38%", rounded; 0% before the first game. */

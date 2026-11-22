@@ -1,9 +1,16 @@
-import type { Phase } from "../types"
+import type { LastResult, Phase } from "../types"
 
 export function getOrdinal(n: number): string {
   const suffixes = ['th', 'st', 'nd', 'rd']
   const v = n % 100
   return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
+}
+
+/** A player's last fight in one word, the same on their card and in their scouting Overview. */
+export function getLastResultWord(result: LastResult): string {
+  if (result === "win") return "Won"
+  if (result === "loss") return "Lost"
+  return "Drew"
 }
 
 export function getPlayerPhaseStatusLabel(phase: Phase, buildReady: boolean): string {

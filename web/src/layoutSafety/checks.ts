@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { MIN_CARD_WIDTH, type ZoneDims } from "../hooks/cardSizeUtils";
 import {
   MIN_ZONE_CARD,
@@ -12,6 +12,7 @@ import { measureFromPlacement } from "../hooks/useResizableLayout";
 import { useZoneDividers, type DividerCallbacks } from "../hooks/useZoneDividers";
 import { getUpgradeGridDims } from "../utils/upgradeGrid";
 import {
+  battleBoard,
   battleConfig,
   isMobileViewport,
   type BattleCase,
@@ -60,6 +61,11 @@ function renderedDims(zoneCase: ZoneCase, layout: ContainerLayout, zoneId: strin
     : layout.dims[zoneId];
 }
 
+// Testing Library keeps every rendered hook until cleanup, and the sweep renders tens of thousands.
+function releaseRenderedHooks() {
+  cleanup();
+}
+
 function frameText(frame: ZoneFrame) {
   return `${frame.outerWidth}x${frame.outerHeight}`;
 }
@@ -102,7 +108,9 @@ export function checkZoneLayout(
   }
 
   const gap = config.sectionGap ?? 0;
-  const { width: boardW, height: boardH } = layout.containerSize;
+  const boardW = layout.containerSize.width;
+  // The zones fill the board apart from the height the config reserves for other content.
+  const boardH = layout.containerSize.height - (config.fixedHeight ?? 0);
   const stack = (ids: string[]) =>
     ids.reduce((sum, id) => sum + layout.frames[id].outerHeight, 0) + gap * Math.max(0, ids.length - 1);
   const bottomH = Math.max(stack(bottomLeft), bottomRight.length > 0 ? layout.frames[bottomRight[0]].outerHeight : 0);
@@ -159,7 +167,7 @@ export function checkZoneLayout(
     }
   }
 
-  if (!isMobileViewport(viewport)) {
+  if (zoneCase.hasDividers && !isMobileViewport(viewport)) {
     for (const failure of grabEachDivider(zoneCase, layout, saved, board)) fail("grab-moves-layout", failure);
   }
   return failures;
@@ -189,7 +197,7 @@ function grabEachDivider(
 ): string[] {
   const { config } = zoneCase;
   const writes: ZoneConstraints[] = [];
-  const { result, unmount } = renderHook(() =>
+  const { result } = renderHook(() =>
     useZoneDividers({
       containerHeight: rendered.containerSize.height,
       containerWidth: rendered.containerSize.width,
@@ -214,7 +222,7 @@ function grabEachDivider(
     }),
   );
   const callbacks: DividerCallbacks = result.current;
-  unmount();
+  releaseRenderedHooks();
 
   const moved: string[] = [];
   const grabs = DIVIDERS.flatMap((divider) => [
@@ -258,13 +266,13 @@ export function checkBattleLayout(
   viewport: Viewport,
   battleCase: BattleCase,
   isSuddenDeath: boolean,
-  board: Box = viewport.battleBoard,
+  board: Box = battleBoard(viewport, isSuddenDeath),
 ): Failure[] {
   const failures: Failure[] = [];
   const surface = isSuddenDeath ? "battle-sudden-death" : "battle";
   const fail = (check: CheckId, detail: string) =>
     failures.push({ check, surface, viewport: viewport.name, label: battleCase.label, detail });
-  const config = battleConfig(viewport, battleCase, isSuddenDeath);
+  const config = battleConfig(viewport, battleCase);
   const zones = computeBattleZones(board.width, board.height, config);
   // The horizontal padding computeBattleZones subtracts for hands and battlefields.
   const handWidth = board.width - config.zoneColumnWidth - 48;
@@ -321,14 +329,14 @@ function sizesPerMeasurement<T>(
   Object.defineProperty(element, "clientHeight", { value: Math.round(box.height + 2 * padding) });
   document.body.appendChild(element);
   try {
-    const { result, rerender, unmount } = renderHook(useSizing);
+    const { result, rerender } = renderHook(useSizing);
     act(() => result.current[0](element));
     const sizes = [result.current[1]];
     act(() => resize([{ contentRect: box }]));
     sizes.push(result.current[1]);
     rerender();
     sizes.push(result.current[1]);
-    unmount();
+    releaseRenderedHooks();
     return sizes;
   } finally {
     element.remove();
@@ -362,7 +370,7 @@ export function checkZoneMeasurement(viewport: Viewport, zoneCase: ZoneCase, boa
 }
 
 export function checkBattleMeasurement(viewport: Viewport, battleCase: BattleCase, board: Box): Failure[] {
-  const config = battleConfig(viewport, battleCase, false);
+  const config = battleConfig(viewport, battleCase);
   const sizes = sizesPerMeasurement(board, 0, () => useBattleCardSizes(config));
   const changed = describeChanges(sizes, (zones) =>
     `row ${zones.rowHeight.toFixed(2)}px, hand ${zones.playerHand.width}px, lands ${zones.playerLands.width}px`,

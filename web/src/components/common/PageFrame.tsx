@@ -25,6 +25,20 @@ export function FrameSidebar({ children }: { children: ReactNode }) {
   return <div className="frame-sidebar zone-divider-bg shrink-0 flex min-h-0">{children}</div>
 }
 
+/** The felt between the rails: a banner, when there is one, across its full width, over the board and its sidebar. */
+export function FrameFelt({ banner, children }: { banner?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex-1 flex min-h-0 game-surface">
+      <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        {banner}
+        <div className="flex-1 flex min-h-0">{children}</div>
+      </div>
+      <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
+    </div>
+  )
+}
+
 export function PageFrame({
   header,
   children,
@@ -41,9 +55,7 @@ export function PageFrame({
     <div className="game-table h-dvh flex flex-col overflow-hidden">
       {header}
 
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-
+      <FrameFelt>
         <main className="flex-1 min-w-0 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className={`zone-pack flex-1 min-w-0 min-h-0 flex flex-col ${scrollClass} ${centerClass} ${contentClassName}`}>
             {children}
@@ -52,8 +64,7 @@ export function PageFrame({
         </main>
 
         {aside && <FrameSidebar>{aside}</FrameSidebar>}
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-      </div>
+      </FrameFelt>
 
       {footer ?? (
         <BottomBar

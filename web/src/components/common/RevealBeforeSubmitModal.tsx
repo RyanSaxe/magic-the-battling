@@ -3,6 +3,7 @@ import type { Card as CardType } from '../../types'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
 import { useCardLayout } from '../../hooks/useCardLayout'
+import { upgradeListLayoutConfig } from './upgradeModalLayouts'
 
 interface RevealBeforeSubmitModalProps {
   upgrades: CardType[]
@@ -45,12 +46,7 @@ export function RevealBeforeSubmitModal({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose, onRevealAndSubmit, selectedIds])
 
-  const [ref, dims] = useCardLayout({
-    zones: {
-      upgrades: { count: upgrades.length },
-    },
-    layout: { top: ['upgrades'] },
-  })
+  const [ref, dims] = useCardLayout(upgradeListLayoutConfig(upgrades.length))
 
   const upgradeDims = { width: dims.upgrades.width, height: dims.upgrades.height }
 
