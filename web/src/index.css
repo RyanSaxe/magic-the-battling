@@ -4768,6 +4768,16 @@ div.player-card-button:hover {
   filter: brightness(0.68) saturate(0.78);
 }
 
+.board-picture > img.board-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 76px;
+  height: 76px;
+  translate: -50% -50%;
+  filter: saturate(0.5) brightness(0.65);
+}
+
 .board-art.board-picture {
   box-shadow: 0 0 0 1px var(--gold-border-opaque), 0 10px 28px rgba(0, 0, 0, 0.35);
 }
@@ -5037,7 +5047,7 @@ div.player-card-button:hover {
   display: flex;
   flex: none;
   min-width: 0;
-  height: 60px;
+  min-height: 60px;
   overflow: hidden;
   border: 1px solid #5a4d46;
   border-radius: 8px;
@@ -5058,37 +5068,36 @@ div.player-card-button:hover {
   }
 }
 
-.board-game-art {
-  align-self: stretch;
-  flex: none;
-  width: 40px;
-  border-right: 1px solid var(--gold-border-opaque);
+.board-game-open .resume-stage {
+  width: 48px;
+  margin-left: 0;
+  background: linear-gradient(180deg, #3a302c 0%, #2e2623 100%);
 }
 
-.board-game-words {
+.board-game-open .resume-summary {
   display: flex;
-  flex: 1;
   flex-direction: column;
   justify-content: center;
-  min-width: 0;
-  padding: 0 28px 0 8px;
-  color: var(--ivory-muted);
-  font-size: 11px;
-  line-height: 13px;
+  padding: 6px 10px 6px 8px;
 }
 
-.board-game-words b {
+.board-game-open.has-close .resume-summary {
+  padding-right: 28px;
+}
+
+.board-game-open .resume-title {
   margin-bottom: 2px;
-  color: var(--ivory);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 14px;
+  line-height: 15px;
   text-wrap: balance;
 }
 
-.board-game-words b.is-long {
+.board-game.is-long .resume-title {
   font-size: 12px;
-  line-height: 12px;
+  line-height: 13px;
+}
+
+.board-game-open .resume-detail {
+  line-height: 14px;
 }
 
 .board-game-close {
@@ -5143,7 +5152,7 @@ div.player-card-button:hover {
   }
 
   .board-game {
-    height: 54px;
+    min-height: 54px;
   }
 }
 

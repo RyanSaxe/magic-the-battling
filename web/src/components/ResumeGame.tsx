@@ -78,9 +78,18 @@ function SeatSummary({ seat, children }: { seat: ResumableSeat; children: ReactN
   )
 }
 
+function ResumeSeatSummary({ seat }: { seat: ResumableSeat }) {
+  const inLobby = seat.kind === 'lobby'
+  return (
+    <SeatSummary seat={seat}>
+      <SeatFact>{inLobby ? `${seat.playerCount} seated` : countLabel(seat.playerCount, 'player')}</SeatFact>
+      {inLobby ? seat.joinCode && <SeatFact>{seat.joinCode}</SeatFact> : <SinceFact seat={seat} />}
+    </SeatSummary>
+  )
+}
+
 function ResumeButton({ seat }: { seat: ResumableSeat }) {
   const resume = useResumeSeat()
-  const inLobby = seat.kind === 'lobby'
   return (
     <button
       type="button"
@@ -90,10 +99,7 @@ function ResumeButton({ seat }: { seat: ResumableSeat }) {
     >
       <StageColumn seat={seat} />
       <SeatArt seat={seat} />
-      <SeatSummary seat={seat}>
-        <SeatFact>{inLobby ? `${seat.playerCount} seated` : countLabel(seat.playerCount, 'player')}</SeatFact>
-        {inLobby ? seat.joinCode && <SeatFact>{seat.joinCode}</SeatFact> : <SinceFact seat={seat} />}
-      </SeatSummary>
+      <ResumeSeatSummary seat={seat} />
       <span aria-hidden="true" className="resume-chevron">›</span>
     </button>
   )
@@ -122,6 +128,34 @@ function ResumeRow({
         </button>
       ) : (
         hasCloseColumn && <span aria-hidden="true" className={CLOSE_COLUMN} />
+      )}
+    </li>
+  )
+}
+
+/** One row for Board's sidebar: Stage column and facts from the same owner, without a thumbnail or chevron. */
+export function ResumeBoardRow({ seat, onClose }: { seat: ResumableSeat; onClose: (seat: ResumableSeat) => void }) {
+  const resume = useResumeSeat()
+  return (
+    <li className={`board-game ${seatTitle(seat).length > ONE_LINE_TITLE ? 'is-long' : ''}`}>
+      <button
+        type="button"
+        onClick={() => resume(seat)}
+        aria-label={`${actionWord(seat)} ${seatTitle(seat)} as ${seat.playerName}`}
+        className={`board-game-open ${seat.canClose ? 'has-close' : ''}`}
+      >
+        <StageColumn seat={seat} />
+        <ResumeSeatSummary seat={seat} />
+      </button>
+      {seat.canClose && (
+        <button
+          type="button"
+          className="icon-target board-game-close"
+          onClick={() => onClose(seat)}
+          aria-label={`${seat.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(seat)} as ${seat.playerName}`}
+        >
+          <CrossIcon />
+        </button>
       )}
     </li>
   )

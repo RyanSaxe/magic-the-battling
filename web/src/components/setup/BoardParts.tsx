@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { CubeLook } from '../../hooks/useCubeLook'
 import type { ResumableSeat } from '../../hooks/useResumableGames'
-import { useResumeSeat } from '../../hooks/useResumeSeat'
 import type { useVoiceChat } from '../../hooks/useVoiceChat'
 import type { LobbyPlayer, LobbyState, PlayMode } from '../../types'
-import { formatTimeSince } from '../../utils/format'
 import { isVoiceMicBlocked } from '../../utils/voiceChat'
 import { PlayerCard } from '../PlayerCard'
 import { PLAYER_ROW_STACK_CLASS } from '../PlayerList'
+import { ResumeBoardRow } from '../ResumeGame'
+import { BrandMark } from '../common/FrameBar'
 import { SIDE_PANEL_HEADER_HEIGHT } from '../common/SidePanel'
 import { Tag } from '../common/Tag'
 import { CubeArt } from '../dashboard/CubeArt'
@@ -45,7 +45,7 @@ export function BoardArt({ look, empty }: { look: CubeLook | null; empty?: React
   if (look === null) return <div className="board-art board-slot">{empty}</div>
   return (
     <div className="board-art board-picture">
-      {look.imageUri && <CubeArt src={look.imageUri} />}
+      {look.imageUri ? <CubeArt src={look.imageUri} /> : look.name && <BrandMark className="board-mark" />}
     </div>
   )
 }
@@ -254,39 +254,6 @@ export function BoardLobbySeats({
   )
 }
 
-function BoardGameRow({ seat, onClose }: { seat: ResumableSeat; onClose: (seat: ResumableSeat) => void }) {
-  const resume = useResumeSeat()
-  const title = seat.cubeName ?? seat.cubeId
-  const isLobby = seat.kind === 'lobby'
-  return (
-    <li className="board-game">
-      <button type="button" onClick={() => resume(seat)} className="board-game-open">
-        <span className="board-picture board-game-art">{seat.cubeImageUri && <CubeArt src={seat.cubeImageUri} />}</span>
-        <span className="board-game-words">
-          <b className={title.length > 24 ? 'is-long' : ''}>{title}</b>
-          <span>
-            {isLobby ? 'Return' : 'Resume'} as {seat.playerName}
-          </span>
-          <span>
-            {isLobby ? (seat.joinCode ? `Lobby ${seat.joinCode}` : 'Lobby') : `Stage ${seat.stage}-${seat.round}`}
-            {!isLobby && seat.lastActiveAt && ` · ${formatTimeSince(seat.lastActiveAt)}`}
-          </span>
-        </span>
-      </button>
-      {seat.canClose && (
-        <button
-          type="button"
-          className="icon-target board-game-close"
-          onClick={() => onClose(seat)}
-          aria-label={`Close ${title}`}
-        >
-          <CrossIcon />
-        </button>
-      )}
-    </li>
-  )
-}
-
 const SHORT_WINDOW_HEIGHT = 720
 const ROW_STEP_NORMAL = 66
 const ROW_STEP_SHORT = 58
@@ -334,7 +301,7 @@ export function BoardPlayGames({
   const shown = boxHeight === 0 ? 1 : Math.max(1, Math.floor(availableForRows / rowStep))
   const folds = !open && seats.length > shown
   const visibleSeats = folds ? seats.slice(0, shown - 1) : seats
-  const nextSeat = seats[visibleSeats.length]
+  const hiddenCount = seats.length - visibleSeats.length
 
   return (
     <div ref={boxRef} className={`board-games ${open ? 'is-open' : ''} ${headed ? '' : 'is-bare'}`}>
@@ -352,19 +319,21 @@ export function BoardPlayGames({
         <div className="board-rail-games">
           <ul className="board-game-list">
             {visibleSeats.map((seat) => (
-              <BoardGameRow key={seat.gameId} seat={seat} onClose={onClose} />
+              <ResumeBoardRow key={seat.gameId} seat={seat} onClose={onClose} />
             ))}
             {folds && (
               <li className="board-game">
                 <button type="button" className="board-game-open" onClick={onToggle}>
-                  {nextSeat && (
-                    <span className="board-picture board-game-art">
-                      {nextSeat.cubeImageUri && <CubeArt src={nextSeat.cubeImageUri} />}
+                  <span aria-hidden="true" className="resume-stage">
+                    <span className="resume-stage-number">
+                      {visibleSeats.length ? `+${hiddenCount}` : seats.length}
                     </span>
-                  )}
-                  <span className="board-game-words">
-                    <b>{`${seats.length - visibleSeats.length}${visibleSeats.length ? ' more' : ''} games`}</b>
-                    <span>Show all {seats.length}</span>
+                  </span>
+                  <span className="resume-summary">
+                    <span className="resume-title">
+                      {`${hiddenCount}${visibleSeats.length ? ' more' : ''} games`}
+                    </span>
+                    <span className="resume-detail">Show all {seats.length}</span>
                   </span>
                 </button>
               </li>
