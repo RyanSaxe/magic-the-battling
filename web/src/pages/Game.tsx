@@ -427,20 +427,22 @@ function PlayerSelectionModal({
               {humanPlayers.map((player) => (
                 <div
                   key={player.name}
-                  className={`flex items-center justify-between ${OPTION_BOX} p-3`}
+                  className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 ${OPTION_BOX} p-3`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div
-                      className={`w-2 h-2 rounded-full ${
+                      className={`w-2 h-2 shrink-0 rounded-full ${
                         player.is_connected ? "bg-green-500" : "bg-[var(--ivory-faint)]"
                       }`}
                     />
-                    <span className="text-white">{player.name}</span>
-                    <span className="text-[var(--ivory-muted)] text-sm">
-                      ({player.phase})
-                    </span>
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3">
+                      <span className="min-w-0 break-words text-white">{player.name}</span>
+                      <span className="min-w-0 break-words text-[var(--ivory-muted)] text-sm">
+                        ({player.phase})
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="ml-auto flex gap-2 empty:hidden">
                     {player.name === accountSeatName ? (
                       <button
                         onClick={() => onReconnect(player.name)}
@@ -475,7 +477,7 @@ function PlayerSelectionModal({
 
         {selectedPlayer && (
           <div className="space-y-4">
-            <p className="text-[var(--ivory-muted)] text-center">
+            <p className="text-[var(--ivory-muted)] text-center break-words">
               Request to watch <strong>{selectedPlayer}</strong>'s game
             </p>
             <div>
