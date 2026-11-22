@@ -797,6 +797,11 @@ input:-webkit-autofill:focus {
   transform: scale(0.98);
 }
 
+/* A window's text rewraps as it grows back from minimized, and scroll anchoring would move it off the reader's place. */
+.floating-window * {
+  overflow-anchor: none;
+}
+
 /* The bar is darker than the window, so its controls keep the walnut fill of buttons on the bars. */
 .floating-window-bar {
   --btn-secondary-fill: var(--chrome-modal);

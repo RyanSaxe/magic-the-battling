@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react'
 import { Tag } from './Tag'
 
 type ControlIcon = 'minimize' | 'restore' | 'reset' | 'close'
@@ -94,6 +94,14 @@ export function FloatingWindow({
   children,
 }: FloatingWindowProps) {
   const [closing, setClosing] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [openSize, setOpenSize] = useState<{ width: number; height: number }>()
+
+  const minimize = () => {
+    const content = contentRef.current
+    if (content) setOpenSize({ width: content.offsetWidth, height: content.offsetHeight })
+    onMinimize()
+  }
 
   const closeOnceFaded = useEffectEvent(() => onClose())
 
@@ -121,7 +129,7 @@ export function FloatingWindow({
           {collapsed ? (
             <WindowControl icon="restore" label={`Open ${name}`} title="Open" onClick={onRestore} />
           ) : (
-            <WindowControl icon="minimize" label={`Minimize ${name}`} title="Minimize" onClick={onMinimize} />
+            <WindowControl icon="minimize" label={`Minimize ${name}`} title="Minimize" onClick={minimize} />
           )}
           {onReset && !collapsed && (
             <WindowControl icon="reset" label={`Reset ${name} window`} title="Reset" onClick={onReset} />
@@ -129,14 +137,21 @@ export function FloatingWindow({
           <WindowControl icon="close" label={`Close ${name}`} title="Close" onClick={() => setClosing(true)} />
         </div>
       </div>
-      {collapsed ? (
+      {collapsed && (
         <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
           <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">{collapsedCaption}</span>
           <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">{collapsedText}</span>
         </div>
-      ) : (
-        children
       )}
+      {/* Minimized, the content stays laid out at its open size, so it opens again at the same section and scroll. */}
+      <div
+        ref={contentRef}
+        inert={collapsed}
+        className={`flex min-h-0 flex-col ${collapsed ? 'absolute top-0 left-0 w-full opacity-0 pointer-events-none' : 'flex-1'}`}
+        style={collapsed ? openSize : undefined}
+      >
+        {children}
+      </div>
     </div>
   )
 }
