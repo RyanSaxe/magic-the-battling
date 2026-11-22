@@ -104,7 +104,8 @@ import {
 } from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
-  guideShowing,
+  guideKept,
+  isGuideShowing,
   isDrawerOpen,
   isZonePanelOpen,
   reduceGameBoard,
@@ -1004,9 +1005,10 @@ function GameContent() {
   const [isChangingResult, setIsChangingResult] = useState(false);
   const actionMenuOpen = openSurface?.kind === "actions";
   const showSubmitHandPopover = openSurface?.kind === "submitHand";
-  const showSubmitResultPopover = openSurface?.kind === "submitResult";
   const closeSurface = useCallback((kind: GameSurfaceKind) => dispatchBoard({ type: "close", kind }), []);
   const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(null);
+  // A winner's question about unrevealed upgrades takes the choices' place, and cancelling it backs out of them.
+  const showSubmitResultPopover = openSurface?.kind === "submitResult" && pendingBattleResult === null;
   const [pendingPostRevealSubmit, setPendingPostRevealSubmit] = useState<string | null>(null);
   const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
   const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
@@ -1092,9 +1094,10 @@ function GameContent() {
     });
   }, [selfPhase]);
 
-  const rulesPanel = guideShowing(openSurface) ?? null;
-  const rulesPanelOpen = rulesPanel !== null;
+  const rulesPanel = guideKept(openSurface) ?? null;
+  const guideOnScreen = isGuideShowing(openSurface);
   const guideMinimized = !!rulesPanel?.minimized;
+  const guideOpen = guideOnScreen && !guideMinimized;
   const setGuideMinimized = useCallback(
     (minimized: boolean) => dispatchBoard({ type: "guideMinimized", minimized }),
     [],
@@ -1319,7 +1322,6 @@ function GameContent() {
   const handleBattleResultSubmit = useCallback((result: string) => {
     requestGuideCompletion("battle_result_submit", "result-submit");
     setIsChangingResult(false);
-    closeSurface("submitResult");
 
     const isLoss = result !== gameState?.self_player.name && result !== "draw";
     const unrevealed = gameState
@@ -1331,21 +1333,24 @@ function GameContent() {
       return;
     }
 
+    closeGameplayOverlays();
     actions.battleSubmitResult(result);
-  }, [actions, closeSurface, gameState, requestGuideCompletion]);
+  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion]);
 
   const handleRevealAndSubmit = useCallback((upgradeIds: string[]) => {
     upgradeIds.forEach((id) => actions.battleRevealUpgrade(id));
     setPendingPostRevealSubmit(pendingBattleResult);
     setPendingBattleResult(null);
-  }, [actions, pendingBattleResult]);
+    closeGameplayOverlays();
+  }, [actions, closeGameplayOverlays, pendingBattleResult]);
 
   const handleSkipAndSubmit = useCallback(() => {
     if (pendingBattleResult) {
       actions.battleSubmitResult(pendingBattleResult);
     }
     setPendingBattleResult(null);
-  }, [actions, pendingBattleResult]);
+    closeGameplayOverlays();
+  }, [actions, closeGameplayOverlays, pendingBattleResult]);
 
   const handleContinue = useCallback(() => {
     if (!sendPhaseAction("reward_done", () => actions.rewardDone(selectedUpgradeId ?? undefined))) return;
@@ -1375,7 +1380,7 @@ function GameContent() {
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   // A zone panel sits beside the board rather than over it, so the Fight's hotkeys keep working while one is open.
   const modalOpen =
-    (rulesPanelOpen && !guideMinimized) ||
+    guideOpen ||
     showUpgradesModal ||
     actionMenuOpen ||
     shareOpen ||
@@ -1397,11 +1402,11 @@ function GameContent() {
   const hotkeyMap: Record<string, () => void> = (() => {
     const currentPhaseId = gameState?.self_player.phase;
     const map = buildPanelHotkeys({
-      guideOpen: rulesPanelOpen,
+      guideOpen,
       gameplayHotkeysDisabled,
       openGuide: () => {
         openRulesPanel(
-          currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
+          !rulesPanel && currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
             ? { docId: currentPhaseId, tab: 'controls' }
             : undefined,
         );
@@ -2236,7 +2241,8 @@ function GameContent() {
           guideContext={guideContext!}
           isSpectator={isSpectator}
           hasOverlayOpen={
-            rulesPanelOpen ||
+            // A walkthrough closes what it starts over, so it waits for a Guide kept behind Players or Scouting too.
+            (rulesPanel !== null && openSurface?.kind !== "submitResult") ||
             showUpgradesModal ||
             shareOpen ||
             actionMenuOpen ||
@@ -2653,7 +2659,10 @@ function GameContent() {
           upgrades={getUnrevealedAppliedUpgrades(self_player.upgrades)}
           onRevealAndSubmit={handleRevealAndSubmit}
           onSkip={handleSkipAndSubmit}
-          onClose={() => setPendingBattleResult(null)}
+          onClose={() => {
+            setPendingBattleResult(null);
+            closeSurface("submitResult");
+          }}
         />
       )}
       {activeBuildUpgradeAnimation && (
@@ -2682,16 +2691,19 @@ function GameContent() {
         <ShareModal url={shareUrl} shareText={shareText} onClose={() => closeSurface("share")} />
       )}
       {rulesPanel && (
-        <RulesPanel
-          onClose={() => closeSurface("guide")}
-          minimized={guideMinimized}
-          onMinimizedChange={setGuideMinimized}
-          behindPanel={openSurface?.kind !== "guide"}
-          target={rulesPanel.target}
-          gameId={gameId}
-          playerName={gameState?.self_player.name}
-          useUpgrades={gameState.use_upgrades}
-        />
+        // Out of sight, the Guide stays mounted and laid out, so it comes back at the same section and scroll.
+        <div className="contents" style={{ visibility: guideOnScreen ? undefined : "hidden" }}>
+          <RulesPanel
+            onClose={() => closeSurface("guide")}
+            minimized={guideMinimized}
+            onMinimizedChange={setGuideMinimized}
+            behindPanel={openSurface?.kind !== "guide"}
+            target={rulesPanel.target}
+            gameId={gameId}
+            playerName={gameState?.self_player.name}
+            useUpgrades={gameState.use_upgrades}
+          />
+        </div>
       )}
       <RotatePrompt />
       </SidePanelHostContext.Provider>
