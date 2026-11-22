@@ -820,7 +820,9 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
         case "draft_done":
             return game_manager.handle_draft_done(game, player)
         case "build_move":
-            return game_manager.handle_build_move(player, payload["card_id"], payload["source"], payload["destination"])
+            return game_manager.handle_build_move(
+                player, payload["card_id"], payload["source"], payload["destination"], payload.get("slot")
+            )
         case "build_swap":
             return game_manager.handle_build_swap(
                 player,

@@ -262,6 +262,7 @@ export function buildGameSummaryData(
     in_sudden_death: false,
     build_ready: false,
     hand: lastSnap.hand,
+    hand_slots: lastSnap.hand.map((c) => c.id),
     sideboard: lastSnap.sideboard,
     current_pack: null,
     last_battle_result: lastSnap.treasures > 0 ? {

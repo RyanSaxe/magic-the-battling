@@ -196,6 +196,7 @@ class Player(BaseModel):
     name: str
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
     hand: list[Card] = Field(default_factory=list)
+    hand_slots: list[str | None] = Field(default_factory=list)
     sideboard: list[Card] = Field(default_factory=list)
     command_zone: list[Card] = Field(default_factory=list)
     battler: Battler | None = None
@@ -255,6 +256,17 @@ class Player(BaseModel):
     def hand_size(self) -> int:
         return self.game.config.starting_stage + self.vanquishers
 
+    def slotted_hand(self) -> list[str | None]:
+        """The hand by slot. A card with no saved slot, as in an older game, takes the first empty one."""
+        in_hand = {card.id for card in self.hand}
+        slots = [card_id if card_id in in_hand else None for card_id in self.hand_slots[: self.hand_size]]
+        slots += [None] * (self.hand_size - len(slots))
+        empty = [index for index, card_id in enumerate(slots) if card_id is None]
+        unplaced = [card.id for card in self.hand if card.id not in slots]
+        for index, card_id in zip(empty, unplaced, strict=False):
+            slots[index] = card_id
+        return slots
+
     def populate_hand(self) -> None:
         """Restore previous hand cards that are still in the pool."""
         all_cards = self.hand + self.sideboard
@@ -264,6 +276,7 @@ class Player(BaseModel):
         restored_set = set(restored_ids[: self.hand_size])
 
         self.hand = [pool_by_id[cid] for cid in restored_ids[: self.hand_size]]
+        self.hand_slots = []
         self.sideboard = [c for c in all_cards if c.id not in restored_set]
         self.chosen_basics = self.previous_basics.copy()
 
