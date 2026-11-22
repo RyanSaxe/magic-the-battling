@@ -96,6 +96,17 @@ function ZoneActionMenu({
     node.style.top = `${y}px`
   }, [position])
 
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onClose()
+    }
+    // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
+    window.addEventListener('keydown', handleKey, true)
+    return () => window.removeEventListener('keydown', handleKey, true)
+  }, [onClose])
+
   return (
     <>
       <div className="fixed inset-0 z-50" onClick={onClose} />
