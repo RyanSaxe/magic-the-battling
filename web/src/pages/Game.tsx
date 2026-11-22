@@ -27,6 +27,7 @@ import { CopyWatchLink } from "../components/sidebar/CopyWatchLink";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { MicBlockedIndicator, MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
+import { PoisonCard } from "../components/common/PoisonCard";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
@@ -76,7 +77,7 @@ import {
   BUILD_SUBMIT_BUTTON_LABEL,
   DRAFT_DONE_BUTTON_LABEL,
   REWARD_CONTINUE_BUTTON_LABEL,
-  getPhaseDisplayName,
+  getPlayerStateDisplayName,
   type Phase,
 } from "../constants/phases";
 import type {
@@ -124,9 +125,11 @@ import {
 import { getVoicePeerNames, isVoiceMicBlocked } from "../utils/voiceChat";
 import { DIALOG_BACKDROP, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
 
-// Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
-const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
-const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:-5px]";
+// Each area ends at its button's edge beside the life number and reaches outward, so the number takes no taps.
+const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_-_44px)]";
+const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:0px]";
+// A click handler makes the number a tap target of its own. Without one WebKit moves a tap on it to - or +.
+const ignoreLifeNumberTap = () => {};
 
 const NO_BASICS: string[] = [];
 const ignoreBasicsPick = () => {};
@@ -447,7 +450,7 @@ function PlayerSelectionModal({
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3">
                       <span className="min-w-0 break-words text-white">{player.name}</span>
                       <span className="min-w-0 break-words text-[var(--ivory-muted)] text-sm">
-                        ({isTimelinePhase(player.phase) ? getPhaseDisplayName(player.phase) : player.phase})
+                        ({getPlayerStateDisplayName(player.phase)})
                       </span>
                     </div>
                   </div>
@@ -1029,6 +1032,7 @@ function GameContent() {
     nonce: number;
   } | null>(null);
   const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
+  const [deckSeen, setDeckSeen] = useState(false);
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
   const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<Set<string>>(new Set());
@@ -1680,7 +1684,7 @@ function GameContent() {
               </>
             }
           >
-            This game is now open in another tab or window. Only one can play your seat at a time.
+            This game is now open in another tab or on another device. Only one can play your seat at a time.
           </StatusNotice>
         </NoticeFrame>
       );
@@ -1794,6 +1798,10 @@ function GameContent() {
   );
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
+  const isOut = currentPhase === "eliminated" && !displayBattleResolution;
+  const watchesOutPlayer = isSpectator && isOut;
+  const showsOutScreen = isOut && !isSpectator && !deckSeen;
+  const outPlace = `${getOrdinal(selfPlacement)} of ${gameState.players.length}`;
 
   const shareUrl = gameId
     ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(self_player.name)}`
@@ -2241,6 +2249,7 @@ function GameContent() {
           : "Players"
         }
         onClose={() => setSidebarOpen(false)}
+        headerActions={isEndPhase ? undefined : <HomeButton className="side-panel-home sm:hidden" />}
         closeOnBoardTap
       >
         {sidebar}
@@ -2298,22 +2307,37 @@ function GameContent() {
             lead={
               <>
                 <BrandMark className="hidden sm:block mr-2" />
-                <PhaseTimeline
-                  currentPhase={timelinePhase}
-                  stage={self_player.stage}
-                  round={self_player.round}
-                  nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
-                  nextRound={isStageIncreasing ? 1 : self_player.round + 1}
-                  inSuddenDeath={self_player.in_sudden_death}
-                  suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
-                  useUpgrades={gameState.use_upgrades}
-                  onOpenRules={openRulesPanel}
-                  onStepClick={() => closeSurface("actions")}
-                  title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
-                />
+                {isOut ? (
+                  <div className="flex flex-1 min-w-0 items-center gap-2 max-lg:-translate-y-0.5 whitespace-nowrap">
+                    <span className="text-xs sm:text-sm text-[#e2d8cb] font-mono">
+                      {self_player.stage}-{self_player.round}
+                    </span>
+                    <span className="out-title text-[13px] sm:text-[15px]">{isSpectator ? "Out" : "You’re out"}</span>
+                    <span className="min-w-0 truncate text-xs sm:text-sm text-[var(--ivory-muted)]">{outPlace}</span>
+                  </div>
+                ) : (
+                  <PhaseTimeline
+                    currentPhase={timelinePhase}
+                    stage={self_player.stage}
+                    round={self_player.round}
+                    nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
+                    nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+                    inSuddenDeath={self_player.in_sudden_death}
+                    suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
+                    useUpgrades={gameState.use_upgrades}
+                    onOpenRules={openRulesPanel}
+                    onStepClick={() => closeSurface("actions")}
+                    title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
+                  />
+                )}
               </>
             }
-            helpers={<GuideButton onClick={() => openRulesPanel()} className={isEndPhase ? "hidden sm:inline-block" : ""} />}
+            helpers={
+              <GuideButton
+                onClick={() => openRulesPanel()}
+                className={`${isEndPhase ? "hidden sm:inline-block" : ""} ${guideMinimized ? "btn-dot-phone" : ""}`}
+              />
+            }
             home={<HomeButton className={isEndPhase ? "" : "hidden sm:inline-block"} />}
             account={usesOverlaySidebar ? (
               <button
@@ -2358,7 +2382,7 @@ function GameContent() {
                         })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
-                          <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
+                          <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
                         </div>
                       </div>
@@ -2374,7 +2398,7 @@ function GameContent() {
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
                           <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
-                          <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
+                          <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.your_life}</span>
                           <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
                         </div>
                         {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
@@ -2569,9 +2593,21 @@ function GameContent() {
                   </div>
                 </div>
               )}
-              {(currentPhase === "eliminated" ||
-                currentPhase === "winner" ||
-                currentPhase === "game_over") && (
+              {showsOutScreen && (
+                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+                  <div className="out-felt page-center flex-1 min-h-0 overflow-y-auto flex flex-col items-center p-4 text-center">
+                    <h2 className="out-title text-[30px] leading-[1.15]">You’re out</h2>
+                    <p className="mt-2 mb-6 text-[17px] text-[var(--ivory-felt)]">{outPlace}</p>
+                    <div className="shrink-0">
+                      <PoisonCard count={self_player.poison} dimensions={{ width: 120, height: 168 }} />
+                    </div>
+                    <button onClick={() => setDeckSeen(true)} className="btn btn-secondary shrink-0 mt-7">
+                      See your deck
+                    </button>
+                  </div>
+                </div>
+              )}
+              {isEndPhase && !showsOutScreen && (
                 <GameSummary
                   player={self_player}
                   useUpgrades={gameState.use_upgrades}
@@ -2595,7 +2631,8 @@ function GameContent() {
               className="relative z-[46]"
               guideTarget="phase-action-bar"
               // A spectator watches the player's screen, so sees the player's bar without being able to use it.
-              inert={isSpectator}
+              // Once that player is out, the bar holds the spectator's own buttons.
+              inert={isSpectator && !watchesOutPlayer}
               secondary={endOfGame ? (
                 <>
                   <button
@@ -2606,7 +2643,7 @@ function GameContent() {
                   >
                     Review
                   </button>
-                  {canSpectate && (
+                  {canSpectate && !isSpectator && (
                     <button onClick={handleSpectateNewTab} className="btn btn-secondary">
                       Spectate
                     </button>
@@ -2614,12 +2651,20 @@ function GameContent() {
                 </>
               ) : groups?.left}
               main={endOfGame ? (
-                <button
-                  className="btn btn-primary"
-                  onClick={openShareModal}
-                >
-                  Share Game
-                </button>
+                watchesOutPlayer ? (
+                  canSpectate && (
+                    <button className="btn btn-primary" onClick={handleSpectateNewTab}>
+                      Watch Another
+                    </button>
+                  )
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    onClick={openShareModal}
+                  >
+                    Share Game
+                  </button>
+                )
               ) : groups?.right}
             />
           );
@@ -2680,10 +2725,14 @@ function GameContent() {
           upgrades={self_player.upgrades}
           mode={upgradesModalMode}
           targets={[...self_player.hand, ...self_player.sideboard]}
-          onApply={(upgradeId, targetId) => {
-            setPendingBuildUpgradeAnimation({ upgradeId, targetId });
-            actions.buildApplyUpgrade(upgradeId, targetId);
-          }}
+          onApply={
+            isSpectator
+              ? undefined
+              : (upgradeId, targetId) => {
+                  setPendingBuildUpgradeAnimation({ upgradeId, targetId });
+                  actions.buildApplyUpgrade(upgradeId, targetId);
+                }
+          }
           onReveal={(upgradeIds) => {
             upgradeIds.forEach((upgradeId) => {
               actions.battleRevealUpgrade(upgradeId);

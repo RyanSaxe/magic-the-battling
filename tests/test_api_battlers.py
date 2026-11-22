@@ -8,9 +8,12 @@ import httpx
 import pytest
 from sqlalchemy import event
 
+from mtb.utils import json_helpers
 from server.db import database
 from server.db.models import BattleSnapshot, CubeMetadata, GameRecord, PlayerGameHistory
 
+# The autouse offline_cubecobra fixture replaces it.
+_GET_JSON = json_helpers.get_json
 CARD_NAMES = {"bolt": "Lightning Bolt", "oko": "Oko, Thief of Crowns", "crown": "Sprouting Crown"}
 
 
@@ -251,6 +254,72 @@ class TestPresetCube:
             "detail": "CubeCobra has no cube with the ID 'thepaupercueb'.",
         }
         assert client.get("/api/battlers").json()["battlers"] == []
+
+    def test_refuses_what_start_refuses_until_it_is_fixed_on_cubecobra(self, client, kestrel, monkeypatch):
+        def listed(name: str, card_type: str = "Creature", keywords: tuple[str, ...] = ()) -> dict:
+            return {"details": {"name": name, "type": card_type, "keywords": keywords}}
+
+        cards = [listed(f"Card {n}") for n in range(100)]
+        oracle, maniac = listed("Thassa's Oracle"), listed("Laboratory Maniac")
+        rotpriest = listed("Venerated Rotpriest", keywords=("Toxic",))
+        thrummingbird = listed("Thrummingbird", keywords=("Flying", "Proliferate"))
+        more = [thrummingbird, listed("Contagious Vorrac", keywords=("Proliferate",)), rotpriest]
+        refusals = [
+            ([*cards, oracle], "Thassa's Oracle is banned."),
+            ([*cards, rotpriest], "Venerated Rotpriest has Toxic, which is banned."),
+            ([*cards, oracle, maniac], "Thassa's Oracle and Laboratory Maniac are banned."),
+            (
+                [*cards, oracle, maniac, *more],
+                "Thassa's Oracle, Laboratory Maniac, Thrummingbird and 2 others are banned.",
+            ),
+            (cards[:90], "it has 90 playable cards and needs at least 100."),
+            ([], "it has no playable cards."),
+            ([*cards, cards[0]], "it is not singleton because Card 0 appears more than once."),
+            (
+                [*cards, listed("Backup Plan", "Conspiracy")],
+                "its own Conspiracy and Vanguard cards are not supported right now. "
+                "Use the default upgrades and vanguards instead.",
+            ),
+        ]
+        site = {}
+
+        def cubecobra(request: httpx.Request) -> httpx.Response:
+            if "mainboard" not in site:
+                return httpx.Response(503)
+            body = json.dumps({"cards": {"mainboard": site["mainboard"]}})
+            headers = {"etag": str(hash(body))}
+            if request.headers.get("if-none-match") == headers["etag"]:
+                return httpx.Response(304, headers=headers)
+            return httpx.Response(200, headers=headers, content=body)
+
+        service = json_helpers._JsonService()
+        monkeypatch.setattr(service, "_client", httpx.AsyncClient(transport=httpx.MockTransport(cubecobra)))
+        monkeypatch.setattr(json_helpers, "_MIN_INTERVAL", 0)
+        monkeypatch.setattr(json_helpers, "_SERVICE", service)
+        monkeypatch.setattr(json_helpers, "get_json", _GET_JSON)
+
+        def save(play_mode: str = "limited") -> httpx.Response:
+            return client.post("/api/battlers", json={"cube_id": "mine", "play_mode": play_mode})
+
+        try:
+            for mainboard, problem in refusals:
+                site["mainboard"] = mainboard
+                for play_mode, noun in (("limited", "cube"), ("constructed", "deck")):
+                    response = save(play_mode)
+                    assert response.status_code == 422
+                    assert response.json() == {
+                        "code": "INVALID_REQUEST",
+                        "detail": f"This {noun} wasn't saved: {problem}",
+                    }
+            assert client.get("/api/battlers").json()["battlers"] == []
+
+            del site["mainboard"]
+            assert save().status_code == 200  # unchecked, though the refused list is still cached
+
+            site["mainboard"] = cards
+            assert save().status_code == 200
+        finally:
+            service.shutdown()
 
 
 class TestPresetOrder:

@@ -1,13 +1,15 @@
 import hashlib
 import os
 import random
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from typing import NamedTuple
 from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
 from httpx import HTTPStatusError
 
-from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
+from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card, ListedCard
 from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
 from mtb.utils import json_helpers
 from mtb.utils.json_helpers import revalidate_and_get
@@ -20,6 +22,12 @@ MOCK_VANGUARDS_SIZE = 4
 MOCK_COLORS = ("W", "U", "B", "R", "G")
 
 _CARD_EXECUTOR = ThreadPoolExecutor(max_workers=8)
+
+
+class _CubeListEntry(NamedTuple):
+    name: str
+    type_line: str
+    keywords: Sequence[str]
 
 
 def _env_flag_enabled(name: str) -> bool:
@@ -104,17 +112,21 @@ def cube_id_from_input(text: str) -> str:
     raise ValueError(f"not a link to a cube on CubeCobra: {text}")
 
 
-def cube_exists_on_cubecobra(cube_id: str) -> bool:
-    """False when CubeCobra answers that it has no cube with this ID. Other failures to ask it are raised."""
+def get_cube_list(cube_id: str) -> Sequence[ListedCard] | None:
+    """The cube's cards as CubeCobra lists them now, without fetching their tokens from Scryfall.
+
+    None when CubeCobra answers that it has no cube with this ID. Other failures to ask it are raised.
+    """
     if _env_flag_enabled(MOCK_CUBE_DATA_ENV):
-        return True
+        return _mock_cube_data(cube_id)
     try:
-        json_helpers.get_json(cube_json_url(cube_id))
+        data = json_helpers.get_fresh_json(cube_json_url(cube_id))
     except HTTPStatusError as error:
         if error.response.status_code == 404:
-            return False
+            return None
         raise
-    return True
+    listed = [card["details"] for card in data["cards"]["mainboard"]]
+    return [_CubeListEntry(card["name"], card["type"], card.get("keywords", [])) for card in listed]
 
 
 def get_cube_data(cube_id: str) -> list[Card]:

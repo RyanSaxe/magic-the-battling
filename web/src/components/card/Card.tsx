@@ -164,6 +164,12 @@ export function Card({
 
   const glowShadow = glow !== 'none' ? glowColors[glow] : undefined
   const boxShadow = glowShadow || (dragging ? '0 20px 40px rgba(0, 0, 0, 0.5)' : undefined)
+  const showFlipButton = !!card.flip_image_url && !effectiveFaceDown && (isHovered || !!selected)
+  // Under 88px the magnifier and Flip overlap side by side. The Copy badge and Reveal Upgrade need the top and bottom.
+  const stacksButtons = dims.width < 88 && !showCopyBadge && !showRevealHiddenUpgradeButton
+  const countersPosition = showRevealHiddenUpgradeButton
+    ? 'bottom-8'
+    : stacksButtons && showFlipButton ? 'bottom-[22px]' : 'bottom-1'
   const interactiveTransform = [
     interactiveStyle?.transform,
     dragging ? 'scale(1.05)' : '',
@@ -263,9 +269,9 @@ export function Card({
           onError={() => setIsLoading(false)}
           draggable={false}
         />
-        {card.flip_image_url && !effectiveFaceDown && (isHovered || selected) && (
+        {showFlipButton && (
           <button
-            className="absolute top-1 right-1 bg-black/60 rounded px-2 py-0.5 text-white text-xs hover:bg-black/80 transition-colors"
+            className={`absolute ${stacksButtons ? 'inset-x-0.5 bottom-0.5 h-[18px] rounded-[3px] text-[11px]' : 'top-1 right-1 rounded px-2 py-0.5 text-xs'} bg-black/60 text-white hover:bg-black/80 transition-colors`}
             onClick={(e) => {
               e.stopPropagation()
               setShowFlip(!showFlip)
@@ -276,7 +282,7 @@ export function Card({
         )}
         {previewContext && showZoom && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
           <button
-            className={`absolute ${showCopyBadge ? 'top-8' : 'top-1'} left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors`}
+            className={`absolute ${stacksButtons ? 'inset-x-0.5 top-0.5 flex h-[18px] items-center justify-center rounded-[3px]' : `${showCopyBadge ? 'top-8' : 'top-1'} left-1 rounded p-1`} bg-black/60 text-white hover:bg-black/80 transition-colors`}
             onClick={(e) => {
               e.stopPropagation()
               if (card.upgrade_target) {
@@ -288,7 +294,7 @@ export function Card({
             title="Preview card"
           >
             <svg
-              className="w-4 h-4"
+              className={stacksButtons ? 'w-3.5 h-3.5' : 'w-4 h-4'}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -314,7 +320,7 @@ export function Card({
           </button>
         )}
         {counters && Object.keys(counters).length > 0 && (
-          <div className={`pointer-events-none absolute left-1 flex flex-wrap-reverse gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
+          <div className={`pointer-events-none absolute left-1 flex flex-wrap-reverse gap-1 ${countersPosition}`}>
             {Object.entries(counters).map(([type, count]) => (
               <div
                 key={type}

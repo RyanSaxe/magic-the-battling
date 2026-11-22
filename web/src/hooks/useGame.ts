@@ -52,8 +52,8 @@ export function useGame(
     send('draft_done')
   }, [send])
 
-  const buildMove = useCallback((cardId: string, source: BuildSource, destination: BuildSource) => {
-    send('build_move', { card_id: cardId, source, destination })
+  const buildMove = useCallback((cardId: string, source: BuildSource, destination: BuildSource, slot?: number) => {
+    send('build_move', { card_id: cardId, source, destination, slot })
   }, [send])
 
   const buildSwap = useCallback((
