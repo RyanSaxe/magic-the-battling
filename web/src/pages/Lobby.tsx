@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
@@ -11,7 +11,8 @@ import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
 import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
-import { BusyNotice } from "../components/common/StatusNotice";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { type LoadingRouteState, START_STEPS } from "../components/common/loadingSteps";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { SpectateRequestModal } from "../components/SpectateRequestModal";
@@ -272,6 +273,7 @@ function VoiceChatSwitch({
 export function Lobby() {
   const { gameId = "" } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const openingSteps = (useLocation().state as LoadingRouteState | null)?.loadingSteps ?? ["Open lobby" as const];
   const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId);
   const session = seat.kind === "held" ? seat.session : null;
   const { addToast } = useToast();
@@ -477,7 +479,8 @@ export function Lobby() {
 
   useEffect(() => {
     if (gameState) {
-      navigate(`/game/${gameId}/play`);
+      const state: LoadingRouteState = { loadingSteps: START_STEPS };
+      navigate(`/game/${gameId}/play`, { state });
     }
   }, [gameState, gameId, navigate]);
 
@@ -562,12 +565,40 @@ export function Lobby() {
     );
   }
 
+  // The game arrives before the route changes, and takes the lobby's state with it.
+  if (gameState) {
+    return <LoadingScreen steps={START_STEPS} current="Open board" />;
+  }
+
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center contentClassName="items-center">
-          <BusyNotice label="Loading lobby..." />
-        </PageFrame>
+        <LoadingScreen title="Opening lobby" steps={openingSteps} current="Open lobby" />
+        {rulesPanel}
+      </>
+    );
+  }
+
+  const reconnecting = !isConnected && (
+    <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
+      <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+        <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
+      </div>
+    </div>
+  );
+
+  if (isStarting) {
+    return (
+      <>
+        {reconnecting}
+        <LoadingScreen steps={START_STEPS} current="Deal cards" />
+        {spectateRequests[0] && (
+          <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
+        )}
         {rulesPanel}
       </>
     );
@@ -575,17 +606,7 @@ export function Lobby() {
 
   return (
     <>
-      {!isConnected && (
-        <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
-          <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
-            <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
-          </div>
-        </div>
-      )}
+      {reconnecting}
       <PageFrame
         header={header}
         center
@@ -612,13 +633,11 @@ export function Lobby() {
                   ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
                   : null;
               const canDecreasePlayerCap =
-                !isStarting &&
                 previousPlayerCap !== null &&
                 previousPlayerCap >= occupiedSlots;
-              const canIncreasePlayerCap = !isStarting && nextPlayerCap !== null;
+              const canIncreasePlayerCap = nextPlayerCap !== null;
               const availablePuppets = lobbyState.available_puppet_count;
               const canAddPuppet =
-                !isStarting &&
                 availablePuppets !== null &&
                 puppetCount < availablePuppets &&
                 occupiedSlots < playerCap;
@@ -629,31 +648,6 @@ export function Lobby() {
               const canBrowseCards =
                 lobbyState.play_mode === "limited" ||
                 currentPlayer?.battler_status === "ready";
-              const startingLabel = (
-                <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Starting...
-                </span>
-              );
-
               const openGuide = (target?: RulesPanelTarget) => {
                 setRulesPanelTarget(target);
                 setShowRulesPanel(true);
@@ -776,18 +770,18 @@ export function Lobby() {
                             value={battlerIdInput}
                             onChange={(event) => setBattlerIdInput(event.target.value)}
                             onKeyDown={(event) => {
-                              if (event.key === "Enter" && !isBattlerLoading && !isStarting) {
+                              if (event.key === "Enter" && !isBattlerLoading) {
                                 submitBattler();
                               }
                             }}
                             placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
-                            disabled={isBattlerLoading || isStarting}
+                            disabled={isBattlerLoading}
                             className={`${TEXT_INPUT} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                         )}
                         <button
                           onClick={handleBattlerButtonClick}
-                          disabled={isBattlerLoading || isStarting}
+                          disabled={isBattlerLoading}
                           className="btn btn-primary btn-dark-border px-4 py-2 shrink-0"
                         >
                           {hasLoadedBattler ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
@@ -922,7 +916,7 @@ export function Lobby() {
                             Host
                           </span>
                         )}
-                        {isHost && !player.is_host && !isStarting && (
+                        {isHost && !player.is_host && (
                           <button
                             onClick={() => actions.kickPlayer(player.player_id)}
                             className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 text-xs"
@@ -978,7 +972,7 @@ export function Lobby() {
                         >
                           Puppet {slot.puppetIndex + 1}
                         </span>
-                        {isHost && !isStarting && (
+                        {isHost && (
                           <button
                             onClick={() => actions.removePuppet()}
                             className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
@@ -1027,7 +1021,7 @@ export function Lobby() {
                     isReady ? "btn-secondary" : "btn-success"
                   }`}
                 >
-                  {isStarting && !isHost ? startingLabel : isReady ? "Unready" : "Ready"}
+                  {isReady ? "Unready" : "Ready"}
                 </button>
 
                 {isHost && (
@@ -1036,7 +1030,7 @@ export function Lobby() {
                     disabled={!lobbyState.can_start || startAwaitingServer}
                     className="btn btn-primary btn-dark-border w-full py-2"
                   >
-                    {isStarting ? startingLabel : "Start Game"}
+                    Start Game
                   </button>
                 )}
               </div>

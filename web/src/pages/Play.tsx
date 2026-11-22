@@ -8,6 +8,8 @@ import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { type LoadingRouteState, goldfishSteps, loadStep, newLobbySteps } from "../components/common/loadingSteps";
 import { PageFrame } from "../components/common/PageFrame";
 import { ResumeGameCard } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
@@ -386,9 +388,10 @@ export function Play() {
 
   useEffect(() => {
     if (gameState?.game_id === pendingGameId && pendingGameId) {
-      navigate(`/game/${pendingGameId}/play`);
+      const state: LoadingRouteState = { loadingSteps: goldfishSteps(playMode) };
+      navigate(`/game/${pendingGameId}/play`, { state });
     }
-  }, [gameState?.game_id, navigate, pendingGameId]);
+  }, [gameState?.game_id, navigate, pendingGameId, playMode]);
 
   useEffect(() => {
     if (
@@ -397,9 +400,10 @@ export function Play() {
       lobbyState?.game_id === pendingGameId &&
       lobbyState.cube_loading_status === "ready"
     ) {
-      navigate(`/game/${pendingGameId}/lobby`);
+      const state: LoadingRouteState = { loadingSteps: newLobbySteps(playMode) };
+      navigate(`/game/${pendingGameId}/lobby`, { state });
     }
-  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId]);
+  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId, playMode]);
 
   useEffect(() => {
     const nextError =
@@ -595,6 +599,27 @@ export function Play() {
   const soloLoading =
     soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
 
+  if (soloLoading) {
+    return (
+      <LoadingScreen
+        steps={goldfishSteps(playMode)}
+        current={soloPhase === "loading" ? loadStep(playMode) : "Deal cards"}
+        onCancel={handleCancelSolo}
+      />
+    );
+  }
+
+  if (friendsLoading) {
+    return (
+      <LoadingScreen
+        title="Opening lobby"
+        steps={newLobbySteps(playMode)}
+        current={loadStep(playMode)}
+        onCancel={handleCancelFriends}
+      />
+    );
+  }
+
   const inactiveCard = (
     mode: ActiveMode,
     icon: React.ReactNode,
@@ -687,21 +712,11 @@ export function Play() {
                     </div>
                     <div className="mt-auto flex gap-2 pt-4">
                       <button
-                        onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-                        disabled={soloLoading ? false : !nameValid}
-                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                        onClick={() => handleStartSolo()}
+                        disabled={!nameValid}
+                        className="play-action-btn flex-1 py-2 flex items-center justify-center gap-2 btn btn-primary"
                       >
-                        {soloLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Start Game"
-                        )}
+                        Start Game
                       </button>
                       <GearButton onClick={() => setShowSoloAdvanced(true)} />
                     </div>
@@ -733,21 +748,11 @@ export function Play() {
                     </div>
                     <div className="mt-auto flex gap-2 pt-4">
                       <button
-                        onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-                        disabled={friendsLoading ? false : !nameValid}
-                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                        onClick={handleCreateLobby}
+                        disabled={!nameValid}
+                        className="play-action-btn flex-1 py-2 flex items-center justify-center gap-2 btn btn-primary"
                       >
-                        {friendsLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Create Lobby"
-                        )}
+                        Create Lobby
                       </button>
                       <GearButton onClick={() => setShowFriendsAdvanced(true)} />
                     </div>
@@ -798,13 +803,6 @@ export function Play() {
           />
           <DefaultOpponentsField label="Opponents" value={opponents} onChange={setOpponents} />
         </AdvancedOptionsModal>
-      )}
-
-      {(soloLoading || friendsLoading) && (
-        <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[1px]"
-          onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
-        />
       )}
 
       {soloPhase === "not-enough-puppets" && (

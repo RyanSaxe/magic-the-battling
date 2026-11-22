@@ -1,8 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useReducer, type ReactNode } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { type LoadingRouteState, START_STEPS } from "../components/common/loadingSteps";
 import { Banner } from "../components/common/Banner";
 import { FrameFelt, FrameSidebar } from "../components/common/PageFrame";
 import { GuideButton, HomeButton } from "../components/common/AppHeader";
@@ -854,6 +856,7 @@ function GameContent() {
   }, []);
 
   const navigate = useNavigate();
+  const loadingSteps = (useLocation().state as LoadingRouteState | null)?.loadingSteps ?? START_STEPS;
   const { status, gameState, isConnected, send, actions, spectateRequests, serverNotice } = useGame(
     gameId || null,
     watching ? watching.sessionId : isSpectateMode ? null : session?.sessionId ?? null,
@@ -1657,11 +1660,7 @@ function GameContent() {
         </NoticeFrame>
       );
     }
-    return (
-      <div className="game-table flex items-center justify-center">
-        <div className="text-white">{isConnected ? 'Loading game...' : 'Connecting...'}</div>
-      </div>
-    );
+    return <LoadingScreen steps={loadingSteps} current="Open board" />;
   }
 
   const currentPhase = gameState.self_player.phase;
