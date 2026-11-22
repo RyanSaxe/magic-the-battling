@@ -1,8 +1,8 @@
 import pytest
 
 from mtb.models.cards import Battler
-from mtb.models.game import Puppet, StaticOpponent, create_game
-from mtb.phases import reward
+from mtb.models.game import Puppet, StaticOpponent, create_game, set_battler
+from mtb.phases import draft, reward
 
 
 def test_is_stage_increasing():
@@ -74,6 +74,31 @@ def test_award_random_card(card_factory):
     assert card in player.sideboard
     assert card not in game.battler.cards
     assert len(game.battler.cards) == 4
+
+
+def test_second_to_finish_gets_a_card_when_every_undealt_card_is_packed(card_factory):
+    game = create_game(["Riley", "Sam"], num_players=2)
+    riley, sam = game.players
+    pools = 2 * game.config.starting_pool_size
+    cards = [card_factory(f"c{i}") for i in range(pools + 1 + 5 * game.config.pack_size)]
+    set_battler(game, Battler(cards=cards.copy(), upgrades=[], vanguards=[]))
+    riley.phase = sam.phase = "reward"
+
+    reward.start_rewards_single(game, riley, sam.name, won=True, poison_dealt=1, poison_taken=0)
+    reward.end_for_player(game, riley)
+    draft.start(game)
+    riley_pack = draft.deal_pack_to_player(game, riley).copy()
+    reward.start_rewards_single(game, sam, riley.name, won=False, poison_dealt=0, poison_taken=1)
+
+    assert sam.last_battle_result is not None
+    assert sam.last_battle_result.card_gained in sam.sideboard
+    state = game.get_draft_state()
+    assert state.current_packs == {riley.name: riley_pack}
+    assert all(len(pack) == game.config.pack_size for pack in state.packs)
+    assert game.battler is not None
+    held = [card for player in game.players for card in [*player.hand, *player.sideboard]]
+    packed = [card for pack in [*state.packs, riley_pack] for card in pack]
+    assert sorted(card.id for card in [*game.battler.cards, *held, *packed]) == sorted(card.id for card in cards)
 
 
 def test_pick_upgrade(upgrade_factory):

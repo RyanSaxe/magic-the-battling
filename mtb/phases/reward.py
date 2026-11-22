@@ -95,7 +95,12 @@ def apply_poison(winner: Player, loser: Player) -> int:
 
 def award_random_card(game: Game, player: Player) -> Card | None:
     battler = player.battler or game.battler
-    if battler is None or not battler.cards:
+    if battler is None:
+        return None
+    if not battler.cards and game.draft_state is not None and game.draft_state.packs:
+        # The first player to continue packs the cube, which can leave no loose card for those still in their fight.
+        battler.cards.extend(game.draft_state.packs.pop())
+    if not battler.cards:
         return None
 
     card = random.choice(battler.cards)
