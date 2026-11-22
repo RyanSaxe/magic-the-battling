@@ -49,7 +49,7 @@ The best source for in-person logistics is the [CubeCobra Primer](https://cubeco
 
 ## Can I build my own Cube?
 
-Of course! If you click Change cube on the Play page, you can provide a CubeCobra ID for your custom cube to play with. For advice on how to build your own cube, refer to the end of the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer#advice-for-building-your-own).
+Of course! If you click Change settings on the Play page, you can provide a CubeCobra ID for your custom cube to play with. For advice on how to build your own cube, refer to the end of the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer#advice-for-building-your-own).
 
 ## Are any cards banned?
 

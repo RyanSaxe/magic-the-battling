@@ -210,7 +210,7 @@ export function Play() {
   const restoreStripFocusRef = useRef(false);
   const isBoard = useBoardDesktop();
   const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
-  // The banner follows the ID when Change cube closes, rather than asking the server about each key typed.
+  // The banner follows the ID when Change settings closes, rather than asking the server about each key typed.
   const [bannerCubeId, setBannerCubeId] = useState(() => cubeId.trim());
   const [useUpgrades, setUseUpgrades] = useState(() => searchParams.get("useUpgrades") !== "false");
   const [playMode, setPlayMode] = useState<PlayMode>(() => (searchParams.get("playMode") === "constructed" ? "constructed" : "limited"));
@@ -605,7 +605,7 @@ export function Play() {
       }}
       className="btn btn-secondary btn-pill"
     >
-      {view !== "setup" ? "Back" : playMode === "constructed" ? "Change deck" : "Change cube"}
+      {view !== "setup" ? "Back" : "Change settings"}
     </button>
   );
 
