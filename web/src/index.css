@@ -797,6 +797,16 @@ input:-webkit-autofill:focus {
   transform: scale(0.98);
 }
 
+/* Its rule stops short of the window's edges, at the content's padding. */
+.floating-window-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 16px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(212, 175, 55, 0.26);
+}
+
 /* A window's text rewraps as it grows back from minimized, and scroll anchoring would move it off the reader's place. */
 .floating-window * {
   overflow-anchor: none;

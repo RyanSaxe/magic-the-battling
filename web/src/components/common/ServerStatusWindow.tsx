@@ -522,6 +522,7 @@ export function ServerStatusWindow({
           onMinimize={handleCollapse}
           onRestore={handleRestore}
           onClose={handleDismiss}
+          closeLabel="Dismiss"
           collapsedCaption="Current notice"
           collapsedText={collapsedLabel}
           instant={!!interaction}
@@ -534,7 +535,7 @@ export function ServerStatusWindow({
         >
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             <div className="px-4 py-4 overflow-y-auto">
-              <h2 className="text-base font-semibold text-amber-200">{heading}</h2>
+              <h2 className="text-base font-semibold text-[var(--ivory)]">{heading}</h2>
               <div className="mt-3">{body}</div>
             </div>
           </div>
@@ -561,6 +562,7 @@ export function ServerStatusWindow({
         onMinimize={handleCollapse}
         onRestore={handleRestore}
         onClose={handleDismiss}
+        closeLabel="Dismiss"
         collapsedCaption="Current notice"
         collapsedText={collapsedLabel}
         instant={!!interaction}
@@ -574,7 +576,7 @@ export function ServerStatusWindow({
       >
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="px-4 py-4 overflow-y-auto">
-            <h2 className="text-lg font-semibold text-amber-200">{heading}</h2>
+            <h2 className="text-lg font-semibold text-[var(--ivory)]">{heading}</h2>
             <div className="mt-3">{body}</div>
           </div>
         </div>

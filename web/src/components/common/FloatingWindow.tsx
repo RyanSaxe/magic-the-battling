@@ -62,6 +62,8 @@ interface FloatingWindowProps {
   /** Puts the window back at its default place and size. */
   onReset?: () => void
   onClose: () => void
+  /** Labels a second Close under the content, such as Dismiss. */
+  closeLabel?: string
   /** While the window is dragged or resized it follows the pointer at once instead of easing. */
   instant: boolean
   style: CSSProperties
@@ -88,6 +90,7 @@ export function FloatingWindow({
   onRestore,
   onReset,
   onClose,
+  closeLabel,
   instant,
   style,
   ref,
@@ -151,6 +154,13 @@ export function FloatingWindow({
         style={collapsed ? openSize : undefined}
       >
         {children}
+        {closeLabel && (
+          <div className="floating-window-footer">
+            <button type="button" className="btn btn-secondary text-xs" onClick={() => setClosing(true)}>
+              {closeLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
