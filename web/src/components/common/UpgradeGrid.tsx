@@ -11,6 +11,8 @@ interface UpgradeGridProps {
   fallbackDims: ZoneDims;
   frame?: ZoneFrame | null;
   renderOverlay?: (upgrade: CardType) => ReactNode;
+  selectedId?: string | null;
+  onSelect?: (upgradeId: string) => void;
 }
 
 export function UpgradeGrid({
@@ -18,6 +20,8 @@ export function UpgradeGrid({
   fallbackDims,
   frame,
   renderOverlay,
+  selectedId,
+  onSelect,
 }: UpgradeGridProps) {
   const dims = getUpgradeGridDims(upgrades.length, frame, fallbackDims);
 
@@ -31,6 +35,8 @@ export function UpgradeGrid({
           <UpgradeStack
             upgrade={upgrade}
             dimensions={{ width: dims.width, height: dims.height }}
+            selected={selectedId === upgrade.id}
+            onClick={onSelect && (() => onSelect(upgrade.id))}
           />
           {renderOverlay?.(upgrade)}
         </div>

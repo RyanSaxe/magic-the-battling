@@ -125,6 +125,12 @@ describe('share row helpers', () => {
     expect(getSharePlayerRowBadge(alice, 'Bob', '4_2')).toBe('alive')
     expect(getSharePlayerRowBadge(bob, 'Alice', '4_2')).toBe('alive')
   })
+
+  it('keeps a player who is out marked out once picked', () => {
+    const [, bob] = makeShareData().players
+
+    expect(getSharePlayerRowBadge(bob, 'Bob', '4_3')).toBe('dead')
+  })
 })
 
 function makeFinishedShareData(): ShareGameResponse {

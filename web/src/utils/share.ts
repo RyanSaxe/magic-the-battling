@@ -154,11 +154,11 @@ export function getSharePlayerRowBadge(
   selectedPlayer: string,
   selectedRound: string,
 ): SharePlayerRowBadge {
-  if (player.name === selectedPlayer) return 'viewing'
-  if (player.final_treasures !== null && getRoundTiming(player, selectedRound) !== 'before') {
-    return player.final_placement === 1 ? 'alive' : 'dead'
-  }
-  return playedShareRound(player, selectedRound) ? 'alive' : 'dead'
+  const isOut = player.final_treasures !== null && getRoundTiming(player, selectedRound) !== 'before'
+    ? player.final_placement !== 1
+    : !playedShareRound(player, selectedRound)
+  if (isOut) return 'dead'
+  return player.name === selectedPlayer ? 'viewing' : 'alive'
 }
 
 export function buildSharePlayerViews(
