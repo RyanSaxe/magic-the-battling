@@ -77,7 +77,7 @@ import {
   BUILD_SUBMIT_BUTTON_LABEL,
   DRAFT_DONE_BUTTON_LABEL,
   REWARD_CONTINUE_BUTTON_LABEL,
-  getPhaseDisplayName,
+  getPlayerStateDisplayName,
   type Phase,
 } from "../constants/phases";
 import type {
@@ -450,7 +450,7 @@ function PlayerSelectionModal({
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3">
                       <span className="min-w-0 break-words text-white">{player.name}</span>
                       <span className="min-w-0 break-words text-[var(--ivory-muted)] text-sm">
-                        ({isTimelinePhase(player.phase) ? getPhaseDisplayName(player.phase) : player.phase})
+                        ({getPlayerStateDisplayName(player.phase)})
                       </span>
                     </div>
                   </div>
@@ -2701,10 +2701,14 @@ function GameContent() {
           upgrades={self_player.upgrades}
           mode={upgradesModalMode}
           targets={[...self_player.hand, ...self_player.sideboard]}
-          onApply={(upgradeId, targetId) => {
-            setPendingBuildUpgradeAnimation({ upgradeId, targetId });
-            actions.buildApplyUpgrade(upgradeId, targetId);
-          }}
+          onApply={
+            isSpectator
+              ? undefined
+              : (upgradeId, targetId) => {
+                  setPendingBuildUpgradeAnimation({ upgradeId, targetId });
+                  actions.buildApplyUpgrade(upgradeId, targetId);
+                }
+          }
           onReveal={(upgradeIds) => {
             upgradeIds.forEach((upgradeId) => {
               actions.battleRevealUpgrade(upgradeId);

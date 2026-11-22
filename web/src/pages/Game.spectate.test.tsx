@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { gameBootstrap } from '../../e2e/gameStates'
-import { cancelSpectateRequest } from '../api/client'
+import { cancelSpectateRequest, getGameStatus } from '../api/client'
 import { BASIC_LANDS } from '../constants/assets'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
@@ -36,6 +36,7 @@ vi.mock('../api/client', async (importOriginal) => ({
   cancelSpectateRequest: vi.fn(async () => ({ status: 'cancelled' })),
 }))
 const cancelRequest = vi.mocked(cancelSpectateRequest)
+const fetchGameStatus = vi.mocked(getGameStatus)
 vi.mock('../contexts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../contexts')>()),
   useToast: () => ({ addToast: () => {} }),
@@ -152,6 +153,33 @@ describe('Game: watching a player build', () => {
     })
     expect(shownLands()).toEqual(['Mountain', 'Island', 'Plains'])
   })
+
+  it('opens Apply Upgrade only to look', async () => {
+    // The window shows its cards once it has a height, and jsdom has none.
+    const measured = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 300, height: 20 } as DOMRect)
+    onTestFinished(() => measured.mockRestore())
+    const { catalog, state } = gameBootstrap({ phase: 'build', counts: { hand: 1, upgrades: 1 } })
+    saveTabSpectate('game-1', { target: 'Alice', requestId: 'request-1', sessionId: 'spectator-session' })
+    renderGame()
+    await settle()
+    act(() => FakeWebSocket.latest().serverOpen())
+    await act(async () => {
+      FakeWebSocket.latest().serverMessage({ type: 'game_bootstrap', payload: { catalog, state } })
+    })
+
+    fireEvent.click(document.querySelector('button[aria-label^="Upgrade "]')!)
+    const cards = screen.getByText('Permanently').closest('.modal-chrome')!.querySelectorAll<HTMLElement>('.card')
+    expect(cards).toHaveLength(2)
+    for (const card of cards) {
+      expect(card.classList.contains('selected')).toBe(false)
+      fireEvent.click(card)
+      expect(card.classList.contains('selected')).toBe(false)
+      const zoom = document.querySelector<HTMLElement>('[data-card-preview-modal]')
+      expect(zoom).not.toBeNull()
+      fireEvent.click(zoom!)
+    }
+    expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull()
+  })
 })
 
 describe("Game: watching a player's Round Wrap-Up", () => {
@@ -209,5 +237,29 @@ describe('Game: opening a game link', () => {
 
     expect(screen.queryByText('Watch a game')).toBeNull()
     expect(screen.getByText('Loading game...')).toBeTruthy()
+  })
+
+  it('shows player-facing state names in Watch a game', async () => {
+    auth.loading = false
+    fetchGameStatus.mockResolvedValueOnce({
+      game_id: 'game-1',
+      phase: 'mixed',
+      is_started: true,
+      auto_approve_spectators: false,
+      players: [
+        { name: 'Ada', is_connected: true, is_puppet: false, phase: 'lobby' },
+        { name: 'Bea', is_connected: true, is_puppet: false, phase: 'awaiting_elimination' },
+        { name: 'Cal', is_connected: false, is_puppet: false, phase: 'eliminated' },
+        { name: 'Dee', is_connected: true, is_puppet: false, phase: 'winner' },
+        { name: 'Eli', is_connected: false, is_puppet: false, phase: 'game_over' },
+        { name: 'Fay', is_connected: true, is_puppet: false, phase: 'battle' },
+      ],
+    })
+    renderGame()
+    await settle()
+
+    for (const label of ['(Lobby)', '(Waiting)', '(Out)', '(Winner)', '(Game Over)', '(Fight)']) {
+      expect(screen.getByText(label)).toBeTruthy()
+    }
   })
 })
