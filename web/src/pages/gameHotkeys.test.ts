@@ -8,19 +8,26 @@ import {
   type HoveredBattleCard,
 } from "./gameHotkeys";
 
-function createPanels(initial: { guideOpen?: boolean; menuOpen?: boolean; otherModalOpen?: boolean }) {
+function createPanels(initial: {
+  guideOpen?: boolean;
+  menuOpen?: boolean;
+  upgradesOpen?: boolean;
+  otherModalOpen?: boolean;
+}) {
   const panels = {
     guideOpen: initial.guideOpen ?? false,
     menuOpen: initial.menuOpen ?? false,
+    upgradesOpen: initial.upgradesOpen ?? false,
     otherModalOpen: initial.otherModalOpen ?? false,
   };
   const press = (key: string) => {
     const hotkeys = buildPanelHotkeys({
       guideOpen: panels.guideOpen,
-      gameplayHotkeysDisabled: panels.guideOpen || panels.menuOpen || panels.otherModalOpen,
+      gameplayHotkeysDisabled: panels.guideOpen || panels.menuOpen || panels.upgradesOpen || panels.otherModalOpen,
       openGuide: () => { panels.guideOpen = true; },
       closeGuide: () => { panels.guideOpen = false; },
       closeMenu: panels.menuOpen ? () => { panels.menuOpen = false; } : null,
+      closeUpgrades: panels.upgradesOpen ? { key: "u", close: () => { panels.upgradesOpen = false; } } : null,
     });
     hotkeys[hotkeyFor(key)]?.();
   };
@@ -44,6 +51,14 @@ describe("buildPanelHotkeys", () => {
     press("?");
 
     expect(panels.guideOpen).toBe(false);
+  });
+
+  it("closes the Upgrades window with the key that opened it", () => {
+    const { panels, press } = createPanels({ upgradesOpen: true });
+
+    press("u");
+
+    expect(panels.upgradesOpen).toBe(false);
   });
 
   it("closes the Actions menu with Escape", () => {

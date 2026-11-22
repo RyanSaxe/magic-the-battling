@@ -1,6 +1,6 @@
 import type { Locator, Page, WebSocketRoute } from '@playwright/test'
 import { PAGES, expect, openPage, serveGame, test } from './helpers'
-import { GAME_ID, type ScreenState } from './gameStates'
+import { GAME_ID, gameBootstrap, type ScreenState } from './gameStates'
 
 const FIGHT: ScreenState = {
   phase: 'battle',
@@ -252,6 +252,48 @@ test.describe('one panel at a time', () => {
       await expect(drawer.getByRole('spinbutton')).toHaveCount(0)
       await expect(drawer).toBeVisible()
     })
+  })
+})
+
+test.describe('an empty pile', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('opens its panel with a note, from the board or its hotkey', async ({ page, baseURL }) => {
+    await openGame(page, baseURL!, { ...FIGHT, counts: { ...FIGHT.counts, exile: 0 } })
+
+    await page.keyboard.press('e')
+    await expect(sidePanel(page, 'Exile')).toContainText('Exile is empty')
+    await page.locator('.battle-side-column-opponent .battle-side-cell').filter({ hasText: 'Graveyard' }).click()
+    await expect(sidePanel(page, "Bob's Graveyard")).toContainText("Bob's Graveyard is empty")
+  })
+
+  test("the library's panel says so once its last card is drawn", async ({ page, baseURL }) => {
+    let server: WebSocketRoute | undefined
+    const lastCard = { ...FIGHT, counts: { ...FIGHT.counts, library: 1 } }
+    await serveGame(page, baseURL!, lastCard, { onSocket: (ws) => { server = ws } })
+    await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+    await page.getByRole('contentinfo').waitFor()
+    await page.locator('.battle-side-column-player .battle-side-cell').filter({ hasText: 'Library' }).click()
+    const library = sidePanel(page, 'Library')
+    await expect(library.locator('.card')).toHaveCount(1)
+
+    const drawn = { ...FIGHT, counts: { ...FIGHT.counts, library: 0 } }
+    server!.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(drawn) }))
+    await expect(library).toContainText('Library is empty')
+  })
+})
+
+test.describe('the Upgrades window', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('U opens it and U again closes it', async ({ page, baseURL }) => {
+    await openGame(page, baseURL!, { phase: 'draft', counts: { pack: 5, sideboard: 4, upgrades: 2 } })
+    const heading = page.getByRole('heading', { name: 'Upgrades', exact: true })
+
+    await page.keyboard.press('u')
+    await expect(heading).toBeVisible()
+    await page.keyboard.press('u')
+    await expect(heading).toHaveCount(0)
   })
 })
 
