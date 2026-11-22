@@ -237,14 +237,28 @@ const BANNERS = [
   {
     banner: 'Sudden Death in Build',
     open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['build in Sudden Death']),
-    title: 'Sudden Death',
+    words: ['Sudden Death', 'Loser is eliminated'],
+    tone: 'sudden-death',
   },
   {
     banner: 'Sudden Death in a Fight',
     open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['fight in Sudden Death']),
-    title: 'Sudden Death',
+    words: ['Sudden Death', 'Loser is eliminated'],
+    tone: 'sudden-death',
   },
-  { banner: 'watching a player', open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES.fight), title: 'Watching Alice' },
+  {
+    banner: 'watching a player',
+    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES.fight),
+    words: ['Watching Alice'],
+    tone: 'gold',
+  },
+  {
+    // A spectator learns both whose game it is and that it's Sudden Death.
+    banner: 'watching a player in Sudden Death',
+    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES['fight in Sudden Death']),
+    words: ['Watching Alice', 'Sudden Death'],
+    tone: 'sudden-death',
+  },
 ]
 
 async function playGame(page: Page, baseURL: string, state: ScreenState) {
@@ -256,10 +270,12 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
   test.describe(name, () => {
     test.use({ viewport, isMobile, hasTouch: isMobile })
 
-    for (const { banner, open, title } of BANNERS) {
+    for (const { banner, open, words, tone } of BANNERS) {
       test(`the ${banner} banner spans the felt between the rails, over the board and the sidebar`, async ({ page, baseURL }) => {
         await open(page, baseURL!)
-        await expect(page.locator('[data-banner]')).toContainText(title)
+        const bannerElement = page.locator('[data-banner]')
+        for (const word of words) await expect.soft(bannerElement).toContainText(word)
+        await expect.soft(bannerElement, 'banner tone').toHaveAttribute('data-banner', tone)
         const { bannerBox, boardTop, sidebarTop } = await page.evaluate(() => {
           const box = (selector: string) => {
             const rect = document.querySelector(selector)?.getBoundingClientRect()
