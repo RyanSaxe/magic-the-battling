@@ -471,6 +471,7 @@ export function useGuidePositioning(
 
     let animationFrameId: number | null = null;
     let stableFrameCount = 0;
+    let mutatedSinceMeasured = false;
     let lastSignature: string | null = null;
     let active = true;
     let hasAttemptedInitialScroll = false;
@@ -576,6 +577,8 @@ export function useGuidePositioning(
         return;
       }
 
+      const mutated = mutatedSinceMeasured;
+      mutatedSinceMeasured = false;
       const measurement = measureLayout();
       syncObservedElements(measurement.observedElements);
 
@@ -602,7 +605,10 @@ export function useGuidePositioning(
         stableFrameCount = 1;
       }
 
-      if (stableFrameCount < LAYOUT_STABILITY_FRAMES) {
+      // A mutation can start a transition that hasn't moved in its first frame, so it takes one more frame. It can't
+      // restart the count, or an animation that writes every frame would keep the guide from ever settling.
+      const framesNeeded = mutated ? LAYOUT_STABILITY_FRAMES + 1 : LAYOUT_STABILITY_FRAMES;
+      if (stableFrameCount < framesNeeded) {
         scheduleUpdate();
         return;
       }
@@ -610,6 +616,7 @@ export function useGuidePositioning(
       setState((current) => (
         samePositionState(current, measurement.state) ? current : measurement.state
       ));
+      if (mutated) scheduleUpdate();
     };
 
     const scheduleUpdate = () => {
@@ -627,7 +634,7 @@ export function useGuidePositioning(
     resizeObserver.observe(card);
 
     const mutationObserver = new MutationObserver(() => {
-      stableFrameCount = 0;
+      mutatedSinceMeasured = true;
       scheduleUpdate();
     });
     mutationObserver.observe(document.body, {
