@@ -228,7 +228,7 @@ def create_battler(
     db.add(battler)
     db.commit()
     db.refresh(battler)
-    database.save_cube_metadata(request.cube_id)
+    _save_cube_metadata(db, request.cube_id)
     [resp] = _battler_responses(db, str(user.id), [battler])
     return resp
 
@@ -270,10 +270,18 @@ def delete_battler(
 GAMES_PAGE_SIZE = 20
 
 
+def _save_cube_metadata(db: Session, cube_id: str) -> None:
+    """Closes the session first, so a slow CubeCobra doesn't hold one of the pool's few connections.
+
+    Closing detaches what the session loaded, and its next query takes a connection again."""
+    db.close()
+    database.save_cube_metadata(cube_id)
+
+
 def _load_cube_metadata(db: Session, cube_id: str) -> CubeMetadata | None:
     meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
     if meta is None:
-        database.save_cube_metadata(cube_id)
+        _save_cube_metadata(db, cube_id)
         meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
     return meta
 
@@ -316,6 +324,7 @@ def _query_cube_games(
     player_user_id: str | None = None,
 ) -> dict:
     """A page of a cube's finished games. With player_user_id, only that player's games, each shown by their seat."""
+    meta = _load_cube_metadata(db, cube_id)
     base_filter = [
         GameRecord.cube_id == cube_id,
         GameRecord.ended_at.isnot(None),
@@ -333,7 +342,6 @@ def _query_cube_games(
     has_more = len(games) > GAMES_PAGE_SIZE
     games = games[:GAMES_PAGE_SIZE]
 
-    meta = _load_cube_metadata(db, cube_id)
     cube_name = str(meta.name) if meta and meta.name else None
     cube_image_uri = str(meta.image_uri) if meta and meta.image_uri else None
 
@@ -402,21 +410,13 @@ def list_cube_games(
     return _query_cube_games(db, cube_id, play_mode=play_mode, use_upgrades=use_upgrades, offset=offset)
 
 
-def _save_unnamed_cube(cube_id: str) -> None:
-    """Runs before the route's sessions open, so a slow CubeCobra doesn't hold one of the pool's few connections."""
-    with database.SessionLocal() as db:
-        named = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first() is not None
-    if not named:
-        database.save_cube_metadata(cube_id)
-
-
-@router.get("/cube/{cube_id}", dependencies=[Depends(_save_unnamed_cube)])
+@router.get("/cube/{cube_id}")
 def get_cube_summary(
     cube_id: str,
     current_user: User | None = Depends(get_optional_user),
     db: Session = Depends(_get_db),
 ) -> CubeSummaryResponse:
-    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
+    meta = _load_cube_metadata(db, cube_id)
     follow = None
     if current_user is not None:
         follow = (
@@ -677,7 +677,7 @@ def follow_cube(
     db.add(follow)
     db.commit()
     db.refresh(follow)
-    database.save_cube_metadata(request.cube_id)
+    _save_cube_metadata(db, request.cube_id)
     meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == request.cube_id).first()
     return FollowedBattlerResponse(
         id=cast(int, follow.id),
