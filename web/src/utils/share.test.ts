@@ -145,7 +145,7 @@ function makeFinishedShareData(): ShareGameResponse {
 }
 
 describe('share rows after the final battle', () => {
-  it('shows each round\'s own numbers, and how a player\'s game ended only in the rounds after it', () => {
+  it('shows each round\'s own numbers until a player\'s game has ended, as a finished game\'s last step does', () => {
     const data = makeFinishedShareData()
 
     const atBobsLastRound = buildSharePlayerViews(data, '4_2')
@@ -154,7 +154,15 @@ describe('share rows after the final battle', () => {
 
     const atTheFinalRound = buildSharePlayerViews(data, '4_3')
     expect(atTheFinalRound.find((p) => p.name === 'Bob')).toMatchObject({ poison: 12, treasures: 5 })
-    expect(atTheFinalRound.find((p) => p.name === 'Alice')).toMatchObject({ poison: 6, treasures: 3 })
+    expect(atTheFinalRound.find((p) => p.name === 'Alice')).toMatchObject({ poison: 7, treasures: 3 })
+
+    data.owner_name = 'Bob'
+    const atBobsLastStep = buildSharePlayerViews(data, '4_2')
+    expect(atBobsLastStep.find((p) => p.name === 'Bob')).toMatchObject({ poison: 12, treasures: 5 })
+    expect(atBobsLastStep.find((p) => p.name === 'Alice')).toMatchObject({ poison: 4, treasures: 2 })
+
+    data.in_progress = true
+    expect(buildSharePlayerViews(data, '4_2').find((p) => p.name === 'Bob')).toMatchObject({ poison: 9, treasures: 6 })
   })
 
   it('ranks a past round as it stood, and the latest by where each player finished', () => {
