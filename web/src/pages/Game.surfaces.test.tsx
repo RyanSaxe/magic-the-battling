@@ -60,7 +60,7 @@ describe('Game: what is open over the board', () => {
     vi.restoreAllMocks()
   })
 
-  it('forgets a card selected in a panel when that panel closes, and still moves one tapped while it is open', async () => {
+  it('forgets a card selected in a panel once the panel is gone, and still moves it from the panel or Actions', async () => {
     const bootstrap = gameBootstrap({ phase: 'battle', counts: { hand: 2, lands: 1 } })
     const zones = bootstrap.state.current_battle!.your_zones
     zones.sideboard = [{ ...zones.hand[0], id: 'sideboard-card' }]
@@ -73,16 +73,34 @@ describe('Game: what is open over the board', () => {
     const tapFelt = () => fireEvent.click(find('[data-zone="battlefield"][data-zone-owner="player"]'))
     const moves = () => FakeWebSocket.latest().sent.filter((message) => message.includes('"battle_move"')).length
 
-    const closes = {
+    const pressEscape = () => fireEvent.keyDown(document.body, { key: 'Escape' })
+    const openActions = () => fireEvent.click(screen.getByRole('button', { name: 'Actions' }))
+    const ways = {
       '×': () => fireEvent.click(screen.getByRole('button', { name: 'Close Your Sideboard' })),
-      Escape: () => fireEvent.keyDown(document.body, { key: 'Escape' }),
+      Escape: pressEscape,
       'its key': () => fireEvent.keyDown(document.body, { key: 's' }),
+      'the Guide': () => {
+        fireEvent.click(find('[data-guide-target="guide-button"]'))
+        pressEscape()
+      },
+      'Submit Result': () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Submit Result' }))
+        pressEscape()
+      },
+      "another pile's key": () => {
+        fireEvent.keyDown(document.body, { key: 'e' })
+        pressEscape()
+      },
+      'Actions, dismissed': () => {
+        openActions()
+        pressEscape()
+      },
       '☰': () => fireEvent.click(find('[data-guide-target="sidebar-toggle"]')),
     }
     const movedAfter: string[] = []
-    for (const [how, close] of Object.entries(closes)) {
+    for (const [how, leavePanel] of Object.entries(ways)) {
       selectInSideboard()
-      close()
+      leavePanel()
       const before = moves()
       tapFelt()
       if (moves() > before) movedAfter.push(how)
@@ -92,6 +110,13 @@ describe('Game: what is open over the board', () => {
     selectInSideboard()
     tapFelt()
     expect(moves()).toBe(1)
+
+    // The card is out of sight in Actions, and still the one Move To moves.
+    fireEvent.click(find('[data-guide-card-id="sideboard-card"]'))
+    openActions()
+    fireEvent.click(screen.getByRole('button', { name: /^Move To/ }))
+    fireEvent.click(find('.menu-submenu button'))
+    expect(moves()).toBe(2)
   })
 
   it('forgets a selected card once it is dragged to another zone', async () => {

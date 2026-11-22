@@ -2,7 +2,9 @@ import type { RulesPanelTarget } from "../components/RulesPanel";
 import type { ZoneOwner } from "../dnd/types";
 import type { BattleSelectedCard } from "./phases/Battle";
 
-export type PanelZone = "sideboard" | "graveyard" | "exile" | "library";
+/** The zones whose cards are only in sight, and selectable, in a panel. */
+const PANEL_ZONES = ["sideboard", "graveyard", "exile", "library"] as const;
+export type PanelZone = (typeof PANEL_ZONES)[number];
 export type UpgradesWindowMode = "auto" | "view" | "reveal";
 export type ScoutingTab = "seen" | "overview";
 
@@ -144,14 +146,15 @@ export function reduceGameBoard(board: GameBoard, event: GameBoardEvent): GameBo
   }
   const open = reduceGameSurface(board.open, event);
   if (open === board.open) return board;
-  return { open, selectedCard: closesSelectedCardsPanel(board, open) ? null : board.selectedCard };
+  return { open, selectedCard: keepsSelectedCard(board, open) ? board.selectedCard : null };
 }
 
-function closesSelectedCardsPanel({ open, selectedCard }: GameBoard, next: GameSurface | null): boolean {
-  if (open?.kind !== "zone" || !selectedCard) return false;
-  // Actions takes the panel's place and still acts on the card, so only closing it or opening the player list counts.
-  if (next && !isDrawerOpen(next)) return false;
-  return open.zone === selectedCard.zone && open.owner === selectedCard.owner;
+function keepsSelectedCard({ open, selectedCard }: GameBoard, next: GameSurface | null): boolean {
+  if (!selectedCard || !PANEL_ZONES.some((zone) => zone === selectedCard.zone)) return true;
+  // Out of sight, a panel's card stays selected only for Actions to act on, or to move into a panel Actions opens.
+  if (next?.kind === "actions") return true;
+  if (next?.kind !== "zone") return false;
+  return open?.kind === "actions" || (next.zone === selectedCard.zone && next.owner === selectedCard.owner);
 }
 
 /** The player list is showing in the drawer, with or without a scouting panel beside it. */
