@@ -2,11 +2,13 @@ import type { ResumableSeat } from '../../hooks/useResumableGames'
 import { useResumeSeat } from '../../hooks/useResumeSeat'
 import { resumeDetail, resumeHeadline } from '../../utils/accountFormat'
 import { SurfaceCard } from '../common/SurfaceCard'
+import { CrossIcon } from '../icons/CrossIcon'
 
 /** The lobby or game this browser or its account can go back to, at the top of the dashboard. */
-export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
+export function ResumeBanner({ seat, onClose }: { seat: ResumableSeat; onClose?: (seat: ResumableSeat) => void }) {
   const resume = useResumeSeat()
   const inGame = seat.kind === 'game'
+  const title = seat.cubeName ?? seat.cubeId
   return (
     <SurfaceCard
       as="section"
@@ -32,18 +34,30 @@ export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
             {resumeHeadline(seat)}
           </div>
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="truncate text-[14px] leading-5 font-semibold text-[var(--ivory)]">{seat.cubeName ?? seat.cubeId}</span>
+            <span className="truncate text-[14px] leading-5 font-semibold text-[var(--ivory)]">{title}</span>
             <span className="text-xs text-[var(--ivory-muted)]">{resumeDetail(seat)}</span>
           </div>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={() => resume(seat)}
-        className="btn btn-primary w-full shrink-0 px-4 py-2 font-semibold sm:w-auto"
-      >
-        {inGame ? 'Resume Game →' : 'Return to Lobby →'}
-      </button>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => resume(seat)}
+          className="btn btn-primary flex-1 px-4 py-2 font-semibold sm:flex-none"
+        >
+          {inGame ? 'Resume Game →' : 'Return to Lobby →'}
+        </button>
+        {seat.canClose && onClose && (
+          <button
+            type="button"
+            onClick={() => onClose(seat)}
+            aria-label={`${inGame ? 'Close' : 'Leave'} ${title} as ${seat.playerName}`}
+            className="icon-target -mr-2"
+          >
+            <CrossIcon />
+          </button>
+        )}
+      </div>
     </SurfaceCard>
   )
 }

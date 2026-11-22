@@ -5,6 +5,7 @@ import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { JoinGameModal } from '../components/home/JoinGameModal'
+import { CloseSeatDialog } from '../components/ResumeGame'
 import { AddCubeModal } from '../components/dashboard/AddCubeModal'
 import { CubeTile } from '../components/dashboard/CubeTile'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
@@ -17,7 +18,7 @@ import { Count, NoticeTile, PlayIcon, SectionCounts, SectionLink, SectionTitle, 
 import { SegmentedFilter } from '../components/dashboard/SegmentedFilter'
 import { deleteBattler, getBattlers, getFollowing, getMyGames, unfollowCube } from '../api/client'
 import { useFirstLoad } from '../hooks/useFirstLoad'
-import { useResumableGames } from '../hooks/useResumableGames'
+import { useResumableGames, type ResumableSeat } from '../hooks/useResumableGames'
 import type { GameSummary } from '../types'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 import { countLabel, cubeTitle, formatWhen, upgradesLabel } from '../utils/accountFormat'
@@ -77,7 +78,10 @@ export function Dashboard() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
-  const [resumable] = useResumableGames(1)
+  const resumableGames = useResumableGames()
+  const [closedSeatIds, setClosedSeatIds] = useState<string[]>([])
+  const [closingSeat, setClosingSeat] = useState<ResumableSeat | null>(null)
+  const resumable = resumableGames.find((seat) => !closedSeatIds.includes(seat.gameId))
 
   const libraryLoad = useFirstLoad(loadLibrary, !!user)
   const myGamesLoad = useFirstLoad(loadMyGames, !!user)
@@ -147,7 +151,7 @@ export function Dashboard() {
   return (
     <>
       <DashboardFrame header={<AppHeader account={<UserMenuButton />} />}>
-        {resumable && <ResumeBanner seat={resumable} />}
+        {resumable && <ResumeBanner seat={resumable} onClose={setClosingSeat} />}
 
         <SurfaceCard
           as="section"
@@ -299,6 +303,16 @@ export function Dashboard() {
         />
       )}
       {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+      {closingSeat && (
+        <CloseSeatDialog
+          seat={closingSeat}
+          onKeep={() => setClosingSeat(null)}
+          onClosed={() => {
+            setClosedSeatIds((ids) => [...ids, closingSeat.gameId])
+            setClosingSeat(null)
+          }}
+        />
+      )}
       {confirmingDelete && (
         <DeletePresetDialog
           title={cubeTitle(confirmingDelete.preset)}
