@@ -239,7 +239,7 @@ export function getAppErrorMessage(
       case 'INVALID_CREDENTIALS':
         return 'Incorrect username or password.'
       case 'BATTLER_NOT_FOUND':
-        return 'That battler no longer exists.'
+        return 'That preset no longer exists.'
       case 'CUBE_NOT_FOUND':
         return error.detail ?? 'CubeCobra has no cube with that ID.'
       case 'ALREADY_FOLLOWING':

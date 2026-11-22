@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { BattleView, Card as CardType } from "../../types";
 import type { VoiceChatState } from "../../hooks/useVoiceChat";
 import { UpgradeStack } from "./UpgradeStack";
@@ -7,6 +7,8 @@ import { getRevealedAppliedUpgrades } from "../../utils/upgrades";
 import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
 
 interface BattleSidebarContentProps {
+  /** Shown at the top of the opponent's lane, above their upgrades. */
+  header?: ReactNode;
   currentBattle: BattleView;
   selfUpgrades: CardType[];
   yourLife: number;
@@ -315,6 +317,7 @@ function ControlsPanel({
 }
 
 export function BattleSidebarContent({
+  header,
   currentBattle,
   selfUpgrades,
   yourLife,
@@ -342,6 +345,9 @@ export function BattleSidebarContent({
   const hasMeasuredLayout = topSectionHeight != null && middleLaneHeight != null;
   const hasOpponentActions = !!canManipulateOpponent && !!(onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn)
   const hasPlayerActions = !!(onCreateTreasure || onUntapAll || onPassTurn)
+  const opponentLaneRows = [header ? "auto" : null, "minmax(0,1fr)", hasOpponentActions ? "auto" : null]
+    .filter(Boolean)
+    .join(" ")
 
   if (hasMeasuredLayout) {
     const totalTopSectionHeight = topSectionHeight + overlayTopInset
@@ -358,9 +364,10 @@ export function BattleSidebarContent({
             className="grid h-full min-h-0 px-3 pt-3 pb-3"
             style={{
               gap: SECTION_GUTTER,
-              gridTemplateRows: hasOpponentActions ? "minmax(0,1fr) auto" : "minmax(0,1fr)",
+              gridTemplateRows: opponentLaneRows,
             }}
           >
+            {header}
             <div className="min-h-0">
               <PlayerSection
                 upgrades={opponent_zones.upgrades}
@@ -445,9 +452,10 @@ export function BattleSidebarContent({
           className="grid h-full min-h-0 px-3 pt-3 pb-3"
           style={{
             gap: SECTION_GUTTER,
-            gridTemplateRows: hasOpponentActions ? "minmax(0,1fr) auto" : "minmax(0,1fr)",
+            gridTemplateRows: opponentLaneRows,
           }}
         >
+          {header}
           <div className="min-h-0">
             <PlayerSection
               upgrades={opponent_zones.upgrades}

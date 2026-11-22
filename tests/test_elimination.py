@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from conftest import setup_battle_ready
 
 from mtb.models.cards import Battler, Card
-from mtb.models.game import BattleSnapshotData, DraftState, Puppet, StaticOpponent, create_game
+from mtb.models.game import BattleSnapshotData, DraftState, LastBattleResult, Puppet, StaticOpponent, create_game
 from mtb.phases import battle, elimination, reward
 from server.db.models import PlayerGameHistory
 from server.services.game_manager import GameManager
@@ -684,6 +684,33 @@ class TestEliminationFlow:
 
 class TestFinaleVsBot:
     """Tests for finale scenarios against bots."""
+
+    def test_the_puppet_that_loses_the_final_shows_that_it_lost(self):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        bot = Puppet(name="BotPlayer", player_history_id=1, poison=game.config.poison_to_lose - 1)
+        bot.last_battle_result = LastBattleResult(opponent_name="Carol", winner_name=bot.name)
+        game.puppets.append(bot)
+        snapshot = BattleSnapshotData(
+            hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
+            vanguard=None,
+            basic_lands=["Forest", "Swamp", "Mountain"],
+            applied_upgrades=[],
+            treasures=1,
+        )
+        setup_battle_ready(alice)
+        battle.start(game, alice, StaticOpponent.from_snapshot(snapshot, bot.name, 1))
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager._player_to_game["pid_alice"] = "test"
+        manager._player_id_to_name["pid_alice"] = alice.name
+
+        assert manager.handle_battle_submit_result(game, alice, alice.name, game_id="test")
+
+        state = manager.get_game_state("test", "pid_alice")
+        assert state is not None
+        assert state.self_player.phase == "winner"
+        assert next(p for p in state.players if p.name == bot.name).last_result == "loss"
 
     def test_finale_vs_bot_player_wins_bot_not_eliminated(self):
         """In finale vs bot, if player wins but bot isn't at lethal, game continues."""

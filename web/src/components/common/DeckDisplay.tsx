@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo } from 'react'
 import type { Card as CardType } from '../../types'
 import type { ZoneConstraints } from '../../hooks/computeConstrainedLayout'
 import { Card } from '../card'
-import { ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { BasicLandCard } from './BasicLandCard'
 import { CardGrid } from './CardGrid'
@@ -12,8 +11,8 @@ import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
 import { badgeCls } from './ZoneLabel'
 import { UpgradeGrid } from './UpgradeGrid'
+import { deckLayoutConfig } from './deckLayout'
 import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
-import { getUpgradeZoneLayoutBounds } from '../../utils/upgradeGrid'
 
 export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
@@ -124,21 +123,15 @@ export function DeckDisplay({
   const clearConstraints = resizeState?.clearConstraints ?? clearLocalConstraints
   const showResetControl = enableResize && !!activeConstraints && !!resetControl
 
-  const layoutConfig = useMemo(() => {
-    return {
-      zones: {
-        hand: { count: handCount },
-        battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
-        sideboard: { count: sideboardCount },
-        commandZone: {
-          count: commandZoneCount,
-          ...getUpgradeZoneLayoutBounds(commandZoneCount),
-        },
-      },
-      layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
-      ...ZONE_LAYOUT_PADDING,
-    }
-  }, [battlefieldCount, commandZoneCount, handCount, sideboardCount])
+  const layoutConfig = useMemo(
+    () => deckLayoutConfig({
+      handCount,
+      battlefieldCount,
+      sideboardCount,
+      upgradeCount: commandZoneCount,
+    }),
+    [battlefieldCount, commandZoneCount, handCount, sideboardCount],
+  )
 
   const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({

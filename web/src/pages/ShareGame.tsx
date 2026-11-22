@@ -21,6 +21,7 @@ import { getSidebarPlayerOrder } from '../utils/playerPlacement'
 import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { BottomBar } from '../components/common/FrameBar'
 import { PageFrame } from '../components/common/PageFrame'
+import { SidePanel } from '../components/common/SidePanel'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { BusyNotice, StatusNotice } from '../components/common/StatusNotice'
 import { NoticeFrame } from '../components/common/NoticeFrame'
@@ -178,6 +179,7 @@ export function ShareGame() {
   useHotkeys(shareHotkeys, true)
 
   const handleCloseRoundPopover = useCallback(() => setRoundPopoverOpen(false), [])
+  const closeSidebar = useCallback(() => setSidebarOpen(false), [])
 
   if (loading) {
     return (
@@ -386,31 +388,14 @@ export function ShareGame() {
         }
       >
         {renderContent()}
+        {usesOverlaySidebar && (
+          <SidePanel open={overlaySidebarOpen} title="Players" onClose={closeSidebar} closeOnBoardTap>
+            <div className="overflow-y-auto flex-1 pt-3">
+              {renderSidebarContent()}
+            </div>
+          </SidePanel>
+        )}
       </PageFrame>
-      {usesOverlaySidebar && (
-        <>
-          {overlaySidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/50 z-40"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-          <div
-            className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${
-              overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'
-            }`}
-          >
-            <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
-              <div className="px-3 py-2 text-sm font-medium text-[var(--ivory-muted)]">
-                Players
-              </div>
-              <div className="overflow-y-auto flex-1">
-                {renderSidebarContent()}
-              </div>
-            </aside>
-          </div>
-        </>
-      )}
       {previewCard && (
         <CardPreviewModal
           card={previewCard}
