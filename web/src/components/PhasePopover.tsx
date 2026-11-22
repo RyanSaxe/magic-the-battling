@@ -37,17 +37,8 @@ export function PhasePopover({
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
     window.addEventListener('keydown', handleEscape)
-    window.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      window.removeEventListener('keydown', handleEscape)
-      window.removeEventListener('mousedown', handleClickOutside)
-    }
+    return () => window.removeEventListener('keydown', handleEscape)
   }, [onClose])
 
   const positionPopover = useCallback(() => {
@@ -82,6 +73,10 @@ export function PhasePopover({
   useLayoutEffect(positionPopover, [positionPopover])
 
   return createPortal(
+    <>
+    {/* Covers the bars as well as the board, and waits for the click: closing on the press would uncover Roll or a
+        card in time to take the tap's click. */}
+    {!isClosing && <div className="fixed inset-0 z-[83]" aria-hidden="true" onClick={onClose} />}
     <div
       ref={popoverRef}
       style={{
@@ -135,7 +130,8 @@ export function PhasePopover({
           </p>
         </div>
       </div>
-    </div>,
+    </div>
+    </>,
     document.body,
   )
 }

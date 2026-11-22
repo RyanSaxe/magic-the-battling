@@ -233,10 +233,18 @@ export function PhaseTimeline({
   const isEnd = !isGamePhase(currentPhase);
   const timelinePhases = getTimelinePhases(inSuddenDeath && !isEnd);
   const endsInWinner = inSuddenDeath && suddenDeathDecidesGame && !isEnd;
+  const popoverShowing = popoverPhase !== null && !isPopoverClosing;
 
   return (
     <>
-      <div ref={stepsRowRef} className={`flex items-center flex-1 min-w-0 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}>
+      <div
+        ref={stepsRowRef}
+        // Over the popover's cover, so a tap on another step still switches to it.
+        className={`flex items-center flex-1 min-w-0 ${stepsOverflow ? "phase-timeline-scroll" : ""} ${popoverShowing ? "relative z-[84]" : ""}`}
+        onClick={(event) => {
+          if (popoverShowing && !(event.target as Element).closest("button")) handleClosePopover();
+        }}
+      >
         <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <span
             className="text-xs sm:text-sm text-[#e2d8cb] font-mono"
