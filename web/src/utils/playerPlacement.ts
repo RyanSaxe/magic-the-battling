@@ -43,3 +43,13 @@ export function getSidebarPlacementRank(
 
   return index >= 0 ? index + 1 : players.length;
 }
+
+/** Every player sharing the bottom rank is last, unless every player shares it, as before anyone takes poison. */
+export function isSidebarLastPlace(
+  player: PlayerView,
+  players: PlayerView[],
+): boolean {
+  const ranks = players.map((candidate) => getSidebarPlacementRank(candidate, players));
+  const lastRank = Math.max(...ranks);
+  return lastRank > 1 && getSidebarPlacementRank(player, players) === lastRank;
+}

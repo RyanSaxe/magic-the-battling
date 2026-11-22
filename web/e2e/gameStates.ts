@@ -11,7 +11,7 @@ import type {
 } from '../src/types'
 
 export const GAME_ID = 'game-layout'
-export const PLAYER_NAME = 'Alice'
+const PLAYER_NAME = 'Alice'
 const OPPONENT_NAME = 'Bob'
 type CardKind = 'spell' | 'land' | 'upgrade'
 
@@ -138,38 +138,33 @@ function emptyZones(): CompactZones {
 }
 
 /** Card counts on the screen under test. Zones a phase does not show are ignored. */
-export interface Counts {
+interface Counts {
   pack?: number
   hand?: number
   handSize?: number
   sideboard?: number
   upgrades?: number
-  rewardUpgrades?: number
   lands?: number
   nonlands?: number
   opponentHand?: number
-  opponentLands?: number
-  opponentNonlands?: number
 }
 
-export type GamePhase = 'draft' | 'build' | 'battle' | 'reward' | 'eliminated' | 'game_over'
+type GamePhase = 'draft' | 'build' | 'battle' | 'reward'
 
 export interface ScreenState {
   phase: GamePhase
   counts: Counts
-  stageEnd?: boolean
-  suddenDeath?: boolean
 }
 
-function battleView(counts: Counts, suddenDeath: boolean): CompactBattleView {
+function battleView(counts: Counts): CompactBattleView {
   const yours = emptyZones()
   yours.hand = cards('battle-hand', counts.hand ?? 0)
   yours.battlefield = [...cards('your-land', counts.lands ?? 0, 'land'), ...cards('your-creature', counts.nonlands ?? 0)]
   yours.library = cards('your-library', 20)
   const theirs = emptyZones()
   theirs.battlefield = [
-    ...cards('their-land', counts.opponentLands ?? counts.lands ?? 0, 'land', 1),
-    ...cards('their-creature', counts.opponentNonlands ?? counts.nonlands ?? 0, 'spell', 7),
+    ...cards('their-land', counts.lands ?? 0, 'land', 1),
+    ...cards('their-creature', counts.nonlands ?? 0, 'spell', 7),
   ]
   theirs.library = cards('their-library', 20)
   return {
@@ -186,30 +181,23 @@ function battleView(counts: Counts, suddenDeath: boolean): CompactBattleView {
     opponent_hand_revealed: false,
     your_life: 20,
     opponent_life: 20,
-    is_sudden_death: suddenDeath,
+    is_sudden_death: false,
     opponent_full_sideboard: [],
     can_manipulate_opponent: false,
     pending_reveal_animations: [],
   }
 }
 
-export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = false }: ScreenState): GameBootstrap {
+export function gameBootstrap({ phase, counts }: ScreenState): GameBootstrap {
   const handSize = counts.handSize ?? 4
   const hand = cards('hand', Math.min(counts.hand ?? 0, handSize))
   const sideboard = cards('pool', counts.sideboard ?? 0, 'spell', 3)
-  // The game goes on without an eliminated player, so the others are still building and can be watched.
-  const othersPhase: Phase = phase === 'eliminated' ? 'build' : phase
-  const placements: Record<string, number> =
-    phase === 'game_over' ? { Alice: 2, Bob: 1, Carol: 3, Dave: 4 } : phase === 'eliminated' ? { Alice: 4 } : {}
   const self: CompactSelfPlayerView = {
     ...playerView(PLAYER_NAME, phase, {
       hand_size: handSize,
       hand_count: hand.length,
       sideboard_count: sideboard.length,
       upgrades: cards('upgrade', counts.upgrades ?? 0, 'upgrade'),
-      is_stage_increasing: stageEnd,
-      in_sudden_death: suddenDeath,
-      placement: placements[PLAYER_NAME] ?? 0,
     }),
     hand,
     sideboard,
@@ -235,13 +223,13 @@ export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = f
     starting_life: 20,
     players: [
       self,
-      playerView(OPPONENT_NAME, othersPhase, { placement: placements[OPPONENT_NAME] ?? 0 }),
-      playerView('Carol', othersPhase, { placement: placements.Carol ?? 0 }),
-      playerView('Dave', othersPhase, { is_puppet: true, placement: placements.Dave ?? 0 }),
+      playerView(OPPONENT_NAME, phase),
+      playerView('Carol', phase),
+      playerView('Dave', phase, { is_puppet: true }),
     ],
     self_player: self,
-    available_upgrades: phase === 'reward' && stageEnd ? cards('offer', counts.rewardUpgrades ?? 3, 'upgrade') : [],
-    current_battle: phase === 'battle' ? battleView(counts, suddenDeath) : null,
+    available_upgrades: [],
+    current_battle: phase === 'battle' ? battleView(counts) : null,
     battle_resolution: null,
     use_upgrades: true,
     voice_chat_enabled: false,

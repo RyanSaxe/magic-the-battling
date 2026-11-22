@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AddCubeModal } from '../components/dashboard/AddCubeModal'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
-import { HomeHeader } from '../components/dashboard/HomeHeader'
 import { DetailHero, HeroLink, type HeroAction } from '../components/dashboard/DetailHero'
 import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
 import { Breadcrumb, NoticeTile, SectionTitle } from '../components/dashboard/Section'
@@ -61,18 +60,18 @@ export function CubeView() {
     user && summary
       ? [
           {
-            label: summary.is_following ? '✓ Following' : '+ Follow',
+            label: summary.is_following ? '✓ Following' : 'Follow',
             onClick: toggleFollow,
             disabled: changingFollow,
             pressed: summary.is_following,
           },
-          { label: '+ Save Preset', onClick: () => setShowSaveModal(true) },
+          { label: 'Save', onClick: () => setShowSaveModal(true) },
         ]
       : []
 
   return (
     <>
-      <DashboardFrame header={<HomeHeader newGame />}>
+      <DashboardFrame>
         {user && <Breadcrumb to="/dashboard/discover" label="Discover Cubes" current={title} />}
         <DetailHero
           imageUri={summary?.cube_image_uri}
@@ -87,7 +86,7 @@ export function CubeView() {
             </HeroLink>
           </>}
           actions={actions}
-          play={{ label: 'Play Cube', onClick: () => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`) }}
+          play={{ label: 'Play', onClick: () => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`) }}
           stats={[
             { label: 'Games Played', value: summary?.game_count ?? '—' },
             { label: 'Players', value: summary?.human_player_count ?? '—' },

@@ -8,20 +8,26 @@ import {
   type HoveredBattleCard,
 } from "./gameHotkeys";
 
-function createPanels(initial: { guideOpen?: boolean; sidebarDrawerOpen?: boolean; otherModalOpen?: boolean }) {
+function createPanels(initial: {
+  guideOpen?: boolean;
+  menuOpen?: boolean;
+  upgradesOpen?: boolean;
+  otherModalOpen?: boolean;
+}) {
   const panels = {
     guideOpen: initial.guideOpen ?? false,
-    sidebarDrawerOpen: initial.sidebarDrawerOpen ?? false,
+    menuOpen: initial.menuOpen ?? false,
+    upgradesOpen: initial.upgradesOpen ?? false,
     otherModalOpen: initial.otherModalOpen ?? false,
   };
   const press = (key: string) => {
     const hotkeys = buildPanelHotkeys({
       guideOpen: panels.guideOpen,
-      sidebarDrawerOpen: panels.sidebarDrawerOpen,
-      gameplayHotkeysDisabled: panels.guideOpen || panels.otherModalOpen,
+      gameplayHotkeysDisabled: panels.guideOpen || panels.menuOpen || panels.upgradesOpen || panels.otherModalOpen,
       openGuide: () => { panels.guideOpen = true; },
       closeGuide: () => { panels.guideOpen = false; },
-      closeSidebarDrawer: () => { panels.sidebarDrawerOpen = false; },
+      closeMenu: panels.menuOpen ? () => { panels.menuOpen = false; } : null,
+      closeUpgrades: panels.upgradesOpen ? { key: "u", close: () => { panels.upgradesOpen = false; } } : null,
     });
     hotkeys[hotkeyFor(key)]?.();
   };
@@ -47,22 +53,28 @@ describe("buildPanelHotkeys", () => {
     expect(panels.guideOpen).toBe(false);
   });
 
-  it("closes the sidebar drawer with Escape", () => {
-    const { panels, press } = createPanels({ sidebarDrawerOpen: true });
+  it("closes the Upgrades window with the key that opened it", () => {
+    const { panels, press } = createPanels({ upgradesOpen: true });
+
+    press("u");
+
+    expect(panels.upgradesOpen).toBe(false);
+  });
+
+  it("closes the Actions menu with Escape", () => {
+    const { panels, press } = createPanels({ menuOpen: true });
 
     press("Escape");
 
-    expect(panels.sidebarDrawerOpen).toBe(false);
+    expect(panels.menuOpen).toBe(false);
   });
 
-  it("keeps the sidebar drawer open when Escape is closing a modal or the guide", () => {
-    const overModal = createPanels({ sidebarDrawerOpen: true, otherModalOpen: true });
-    overModal.press("Escape");
-    expect(overModal.panels.sidebarDrawerOpen).toBe(true);
+  it("does not open the guide over the Actions menu", () => {
+    const { panels, press } = createPanels({ menuOpen: true });
 
-    const overGuide = createPanels({ sidebarDrawerOpen: true, guideOpen: true });
-    overGuide.press("Escape");
-    expect(overGuide.panels.sidebarDrawerOpen).toBe(true);
+    press("?");
+
+    expect(panels.guideOpen).toBe(false);
   });
 });
 

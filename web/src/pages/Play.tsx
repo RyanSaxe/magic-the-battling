@@ -622,7 +622,7 @@ export function Play() {
           home={<HomeButton />}
         />}
         center
-        hints
+        hints="play"
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">
           <div className="flex flex-col">

@@ -79,6 +79,8 @@ interface BottomBarProps {
   main?: ReactNode
   className?: string
   guideTarget?: string
+  /** Shows the buttons without letting anyone use or focus them, as a spectator sees the player's bar. */
+  inert?: boolean
   ref?: Ref<HTMLElement>
 }
 
@@ -88,10 +90,11 @@ export function BottomBar({
   main,
   className = '',
   guideTarget,
+  inert = false,
   ref,
 }: BottomBarProps) {
   return (
-    <footer ref={ref} className={`frame-bar shrink-0 frame-chrome frame-bar-pad ${className}`}>
+    <footer ref={ref} inert={inert} className={`frame-bar shrink-0 frame-chrome frame-bar-pad ${className}`}>
       <div
         className="h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2"
         data-guide-target={guideTarget}
