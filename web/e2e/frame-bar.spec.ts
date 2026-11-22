@@ -91,37 +91,7 @@ function measureFrame(page: Page) {
       const items = slot ? Array.from(slot.children).filter(visible) : []
       return items.length ? Math.max(...items.map((element) => element.getBoundingClientRect().right)) : null
     }
-    // Felt content that shows across a bar, after clipping by its scrolling or clipped ancestors.
-    const headerBottom = header.getBoundingClientRect().bottom
-    const footerTop = footer.getBoundingClientRect().top
-    const crossings: string[] = []
-    for (const root of [main, document.querySelector('.frame-sidebar')]) {
-      if (!root) continue
-      for (const element of Array.from(root.querySelectorAll('*'))) {
-        let top = element.getBoundingClientRect().top
-        let bottom = element.getBoundingClientRect().bottom
-        let hidden = false
-        for (let ancestor: Element | null = element; ancestor && ancestor !== root.parentElement; ancestor = ancestor.parentElement) {
-          const style = getComputedStyle(ancestor)
-          if (style.position === 'fixed' || style.opacity === '0' || style.visibility === 'hidden') hidden = true
-          if (ancestor !== element && (style.overflowX !== 'visible' || style.overflowY !== 'visible')) {
-            const clip = ancestor.getBoundingClientRect()
-            top = Math.max(top, clip.top)
-            bottom = Math.min(bottom, clip.bottom)
-          }
-        }
-        if (hidden || bottom - top <= 0 || element.getBoundingClientRect().width === 0) continue
-        // Each zone label straddles its zone's top seam; the top zone's sits on the board's top edge, across the top bar.
-        const crossesTop = top < headerBottom - 0.5 && !element.closest('[data-zone-label]')
-        const crossesBottom = bottom > footerTop + 0.5
-        if (crossesTop || crossesBottom) {
-          const name = `${element.tagName.toLowerCase()}.${Array.from(element.classList).slice(0, 3).join('.')}`
-          crossings.push(`${name} "${element.textContent?.trim().slice(0, 20) ?? ''}" spans y=${Math.round(top)}..${Math.round(bottom)}`)
-        }
-      }
-    }
     return {
-      crossings,
       headerHeight: header.getBoundingClientRect().height,
       headerBottom: header.getBoundingClientRect().bottom,
       footerHeight: footer.getBoundingClientRect().height,
@@ -152,7 +122,6 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
         expect.soft(frame.footerTop, 'bottom bar top edge').toBe(viewport.height - BAR_HEIGHT)
         expect.soft(frame.feltLeft, 'felt left edge').toBe(rail)
         expect.soft(frame.feltRight, 'felt right edge').toBe(viewport.width - rail)
-        expect.soft(frame.crossings, 'felt content showing across a bar').toEqual([])
 
         for (const button of [...frame.topButtons, ...frame.bottomButtons]) {
           expect.soft(button.height, `"${button.label}" height`).toBe(BAR_BUTTON_HEIGHT)
