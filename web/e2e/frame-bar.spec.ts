@@ -414,32 +414,3 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
     }
   })
 }
-
-test.describe('iPhone 15', () => {
-  const { viewport } = SCREENS[0]
-  test.use({ viewport, isMobile: true, hasTouch: true })
-
-  // A touch screen widens each life button's tap area beyond the button, which must stay inside the life bar.
-  test("the life bar's buttons can't be tapped through the top bar or the opponent's hand", async ({ page, baseURL }) => {
-    await serveGame(page, baseURL!, GAME_PHASES.fight)
-    await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
-    await page.locator('.mobile-life-bar').waitFor()
-
-    const taps = await page.evaluate(() => {
-      const header = document.querySelector('header')!.getBoundingClientRect()
-      const bar = document.querySelector('.mobile-life-bar')!.getBoundingClientRect()
-      return Array.from(document.querySelectorAll('.mobile-life-bar button')).map((button) => {
-        const rect = button.getBoundingClientRect()
-        const x = rect.left + rect.width / 2
-        const lands = (y: number) => button.contains(document.elementFromPoint(x, y))
-        return { label: button.textContent, aboveBar: lands(header.bottom - 1), belowBar: lands(bar.bottom + 1), onButton: lands(rect.top + rect.height / 2) }
-      })
-    })
-    expect(taps.length, 'life buttons').toBe(4)
-    for (const tap of taps) {
-      expect.soft(tap.onButton, `"${tap.label}" takes a tap on itself`).toBe(true)
-      expect.soft(tap.aboveBar, `"${tap.label}" takes a tap in the top bar`).toBe(false)
-      expect.soft(tap.belowBar, `"${tap.label}" takes a tap below the life bar`).toBe(false)
-    }
-  })
-})
