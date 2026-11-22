@@ -84,6 +84,8 @@ export function ActionMenu({
   }, [])
 
   const isYourTurn = battle.current_turn_name === playerName
+  // A puppet can't press Pass, so the player facing it passes for it, as the sidebar and P already do.
+  const canPassTurn = isYourTurn || battle.can_manipulate_opponent
 
   const handleAction = (action: CardStateAction, data?: Record<string, unknown>) => {
     if (!selectedCard) return
@@ -365,7 +367,7 @@ export function ActionMenu({
         <MenuItem
           label="Pass Turn"
           onClick={() => handleGeneralAction(onPassTurn)}
-          disabled={!isYourTurn}
+          disabled={!canPassTurn}
         />
 
       </div>
