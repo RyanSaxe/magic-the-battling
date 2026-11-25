@@ -4,14 +4,17 @@ from contextlib import closing
 
 import pytest
 
+from scripts.fly_activity_report import format_human_report, summarize_logs
 from server.perf.load_harness import (
     GameResult,
     HarnessConfig,
     cap_overrides_for,
     choose_timeout_seconds,
+    main,
     parse_args,
     parse_hot_sweep,
     parse_sweep,
+    print_summary,
     rss_window_dict,
     seed_puppet_histories,
     summarize_run,
@@ -403,3 +406,57 @@ def test_seed_puppet_histories_backfills_when_existing_histories_miss_target_elo
         target_elo=1000.0,
     )
     assert seeded_again == 0
+
+
+def test_main_logs_validation_error_to_stderr_not_stdout(capsys, caplog):
+    exit_code = main(["--games", "0"])
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "error: --games must be positive" in caplog.text
+
+
+def test_print_summary_writes_structured_output_to_stdout(capsys):
+    cfg = parse_args(["--games", "1"])
+    summary = summarize_run(
+        label="stdout-check",
+        cfg=cfg,
+        games=1,
+        concurrency=1,
+        idle_hot_games=0,
+        timeout_per_game_sec=60.0,
+        wall_time_sec=1.0,
+        results=[GameResult(index=0, success=True, duration_sec=1.0, final_phase="winner")],
+        server_rss_mb=None,
+        server_rss_window_mb=None,
+        preload_server_status=None,
+        preload_rss_window_mb=None,
+    )
+    print_summary(summary)
+    captured = capsys.readouterr()
+    assert "=== stdout-check ===" in captured.out
+    assert "completed=1 succeeded=1 failed=0" in captured.out
+    assert captured.err == ""
+
+
+def test_fly_activity_report_compatibility_and_formatting():
+    summary = summarize_logs(
+        [{"timestamp": "2026-01-01T00:00:00Z", "level": "info", "message": "Game started: abc"}],
+        source="fly",
+        source_note="buffer note",
+    )
+    text = format_human_report(
+        {
+            "app": "magic-the-battling",
+            "generated_utc": "2026-01-01T00:00:00Z",
+            "inputs": {"hours": 24},
+            "status": {"Hostname": "app.fly.dev", "Status": "running", "Version": 1, "PlatformVersion": "machines"},
+            "machines": [],
+            "checks_summary": {"total": 1, "status_counts": {"passing": 1}},
+            "logs": {"requested_source": "fly", "primary_source": "fly", "summaries": {"fly": summary}},
+            "risk_signals": ["No explicit error/exception lines were detected in fetched logs."],
+        }
+    )
+    assert "Fly Activity Report | app=magic-the-battling" in text
+    assert "Fly Buffer Log Summary" in text
+    assert summary["event_counts"] == {"game_started": 1}

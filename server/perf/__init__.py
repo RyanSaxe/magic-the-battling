@@ -1,1 +1,1 @@
-"""Performance tooling package for load and stress tests."""
+"""Load-testing and performance harness package for Pitfight."""

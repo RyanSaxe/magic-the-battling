@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
+"""Rewrite old snapshot JSON into the current compact storage format."""
+
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
 
-from server.db.snapshot_migration import backup_db, default_db_path, migrate_snapshot_storage
+from server.db.snapshot_migration import SnapshotMigrationResult, backup_db, default_db_path, migrate_snapshot_storage
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_db_path(explicit: str | None) -> Path:
@@ -22,7 +27,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description=(
             "Rewrite old snapshot JSON into the current compact storage format. "
             "For deploy-safe backup + maintenance, use scripts/maintain_db.py."
-        )
+        ),
     )
     parser.add_argument("--db-path", default=None, help="SQLite DB path (defaults to DATABASE_PATH or ./data/mtb.db)")
     parser.add_argument(
@@ -43,43 +48,50 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _format_result(db_path: Path, result: SnapshotMigrationResult, *, mode: str) -> str:
+    lines = [
+        f"mode: {mode}",
+        f"db: {db_path}",
+        "",
+        "active_game_snapshots:",
+        f"  scanned: {result.active_game_snapshots.scanned}",
+        f"  migrated: {result.active_game_snapshots.migrated}",
+        f"  already_current: {result.active_game_snapshots.already_current}",
+        f"  failed: {result.active_game_snapshots.failed}",
+        "battle_snapshots:",
+        f"  scanned: {result.battle_snapshots.scanned}",
+        f"  migrated: {result.battle_snapshots.migrated}",
+        f"  already_current: {result.battle_snapshots.already_current}",
+        f"  failed: {result.battle_snapshots.failed}",
+        "",
+        f"total scanned: {result.total_scanned}",
+        f"total migrated: {result.total_migrated}",
+        f"total already_current: {result.total_already_current}",
+        f"total failed: {result.total_failed}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
     args = parse_args(argv)
     db_path = _resolve_db_path(args.db_path)
 
     if not db_path.exists():
-        print(f"error: database not found at {db_path}", file=sys.stderr)
+        logger.error("error: database not found at %s", db_path)
         return 1
 
     if args.backup and not args.apply:
-        print("error: --backup only makes sense with --apply", file=sys.stderr)
+        logger.error("error: --backup only makes sense with --apply")
         return 1
 
     if args.backup:
         backup_path = Path(args.backup_path).expanduser().resolve() if args.backup_path else None
         created = backup_db(db_path, backup_path)
-        print(f"backup created: {created}")
+        logger.info("backup created: %s", created)
 
     result = migrate_snapshot_storage(db_path, apply=args.apply)
-    mode = "apply" if args.apply else "dry-run"
-    print(f"mode: {mode}")
-    print(f"db: {db_path}")
-    print()
-    print("active_game_snapshots:")
-    print(f"  scanned: {result.active_game_snapshots.scanned}")
-    print(f"  migrated: {result.active_game_snapshots.migrated}")
-    print(f"  already_current: {result.active_game_snapshots.already_current}")
-    print(f"  failed: {result.active_game_snapshots.failed}")
-    print("battle_snapshots:")
-    print(f"  scanned: {result.battle_snapshots.scanned}")
-    print(f"  migrated: {result.battle_snapshots.migrated}")
-    print(f"  already_current: {result.battle_snapshots.already_current}")
-    print(f"  failed: {result.battle_snapshots.failed}")
-    print()
-    print(f"total scanned: {result.total_scanned}")
-    print(f"total migrated: {result.total_migrated}")
-    print(f"total already_current: {result.total_already_current}")
-    print(f"total failed: {result.total_failed}")
+    sys.stdout.write(_format_result(db_path, result, mode="apply" if args.apply else "dry-run"))
 
     return 0 if result.total_failed == 0 else 2
 
