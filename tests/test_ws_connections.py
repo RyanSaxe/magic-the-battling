@@ -8,6 +8,7 @@ import pytest
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 import server.routers.ws as ws_module
+from server.services.connection_manager import SEAT_MOVED_CLOSE_CODE
 
 
 def _player_url(game_id: str, credentials: dict) -> str:
@@ -20,7 +21,7 @@ def _is_connected(client, game_id: str, name: str) -> bool:
 
 
 def _unloads_once_idle(monkeypatch, game_id: str) -> bool:
-    monkeypatch.setattr("server.services.game_manager.IDLE_EVICT_MINUTES", 0)
+    monkeypatch.setattr("server.services.game.snapshot_store.IDLE_EVICT_MINUTES", 0)
     ws_module.game_manager.evict_cold_games()
     return ws_module.game_manager.get_game(game_id) is None
 
@@ -79,7 +80,7 @@ def test_a_replaced_socket_that_is_slow_to_close_does_not_delay_the_new_one(
     close = WebSocket.close
 
     async def close_once_allowed(websocket, code=1000, reason=None):
-        if code == ws_module.SEAT_MOVED_CLOSE_CODE:
+        if code == SEAT_MOVED_CLOSE_CODE:
             await asyncio.to_thread(old_socket_may_close.wait)
         await close(websocket, code, reason)
 

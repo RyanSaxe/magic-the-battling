@@ -6,7 +6,7 @@ import pytest
 
 import server.db.database as db_module
 import server.routers.ws as ws_module
-import server.services.game_manager as gm_module
+import server.services.game.lobby_service as lobby_service_module
 from mtb.models.cards import Battler
 from server.runtime_config import MAX_GAME_STARTS_IN_FLIGHT
 from server.services.game_manager import BattlerReady, GameManager, LobbyStage, LobbyStartFailedError
@@ -74,8 +74,8 @@ def test_a_refused_start_leaves_the_lobby_open_and_tells_the_host(client, game_w
 def test_a_start_that_fails_reopens_the_lobby_for_everyone_and_can_be_tried_again(
     client, game_with_players, ws_receive_json_until, monkeypatch
 ):
-    real_create_game = gm_module.create_game
-    monkeypatch.setattr(gm_module, "create_game", lambda *args, **kwargs: 1 / 0)
+    real_create_game = lobby_service_module.create_game
+    monkeypatch.setattr(lobby_service_module, "create_game", lambda *args, **kwargs: 1 / 0)
     with _socket(client, game_with_players, "alice") as ws_alice, _socket(client, game_with_players, "bob") as ws_bob:
         _ready_both(ws_alice, ws_bob, ws_receive_json_until)
         ws_alice.send_json({"action": "start_game", "payload": {}})
@@ -91,7 +91,7 @@ def test_a_start_that_fails_reopens_the_lobby_for_everyone_and_can_be_tried_agai
         assert [lobby["start_error"] for lobby in failed] == ["Failed to start game"] * 2
         assert all(lobby["is_started"] is False for lobby in failed)
 
-        monkeypatch.setattr(gm_module, "create_game", real_create_game)
+        monkeypatch.setattr(lobby_service_module, "create_game", real_create_game)
         ws_alice.send_json({"action": "start_game", "payload": {}})
         ws_receive_json_until(ws_bob, lambda m: m["type"] == "game_state", description="Bob's game state")
 
@@ -140,7 +140,7 @@ def test_players_who_left_during_a_failed_start_are_not_ready_when_the_lobby_reo
     manager.attach_connected_player_ids(lambda _game_id: {"pid-alice"})
     pending = _two_player_lobby(manager)
     _ready_everyone(manager, pending)
-    monkeypatch.setattr(gm_module, "create_game", lambda *args, **kwargs: 1 / 0)
+    monkeypatch.setattr(lobby_service_module, "create_game", lambda *args, **kwargs: 1 / 0)
 
     with pytest.raises(LobbyStartFailedError):
         asyncio.run(manager.start_lobby(pending.game_id, "pid-alice", None, on_change=_no_broadcast))

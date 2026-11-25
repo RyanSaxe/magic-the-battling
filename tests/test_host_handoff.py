@@ -11,7 +11,7 @@ GRACE_SECONDS = 0.05
 
 @pytest.fixture
 def short_grace(monkeypatch):
-    monkeypatch.setattr("server.services.game_manager.HOST_HANDOFF_GRACE_SECONDS", GRACE_SECONDS)
+    monkeypatch.setattr("server.services.game.lobby_service.HOST_HANDOFF_GRACE_SECONDS", GRACE_SECONDS)
 
 
 def _lobby(client, names: list[str]) -> tuple[str, dict[str, dict]]:
@@ -71,7 +71,7 @@ def test_a_host_away_past_the_grace_hands_off_to_the_earliest_joined_connected_p
 
 
 def test_a_host_back_within_the_grace_keeps_the_role(client, monkeypatch, ws_receive_json):
-    monkeypatch.setattr("server.services.game_manager.HOST_HANDOFF_GRACE_SECONDS", 0.5)
+    monkeypatch.setattr("server.services.game.lobby_service.HOST_HANDOFF_GRACE_SECONDS", 0.5)
     game_id, seats = _lobby(client, ["Anya", "Boris"])
 
     with _connect(client, game_id, seats["Boris"]) as boris:

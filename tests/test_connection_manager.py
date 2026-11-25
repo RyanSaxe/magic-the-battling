@@ -8,10 +8,10 @@ from typing import cast
 import pytest
 from fastapi import WebSocket
 
-import server.routers.ws as ws_module
 from server import compression
-from server.routers.ws import ConnectionManager
 from server.runtime_config import MAX_WS_CONNECTIONS
+from server.services.connection_manager import ConnectionManager
+from server.services.game_manager import GameManager
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class TestDisconnectRaceCondition:
     """Regression: stale WS1 disconnect must not evict newer WS2."""
 
     def test_stale_disconnect_does_not_remove_newer_connection(self):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         old_ws = cast(WebSocket, _FakeWebSocket())
         new_ws = cast(WebSocket, _FakeWebSocket())
 
@@ -56,7 +56,7 @@ class TestDisconnectRaceCondition:
         assert cm._connections["game1"]["player1"] is new_ws
 
     def test_matching_disconnect_removes_connection(self):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         ws = cast(WebSocket, _FakeWebSocket())
 
         cm._connections["game1"]["player1"] = ws
@@ -66,7 +66,7 @@ class TestDisconnectRaceCondition:
         assert "player1" not in cm._connections.get("game1", {})
 
     def test_disconnect_cleans_up_empty_game(self):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         ws = cast(WebSocket, _FakeWebSocket())
 
         cm._connections["game1"]["player1"] = ws
@@ -79,7 +79,7 @@ class TestDisconnectRaceCondition:
 class TestConnectionCapacity:
     @pytest.mark.anyio
     async def test_connect_capacity_reject_clears_pending_connection(self, monkeypatch):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         ws = _FakeWebSocket()
 
         cm.reserve_connection("game1", "player1")
@@ -90,7 +90,7 @@ class TestConnectionCapacity:
         assert "player1" not in cm._pending_connections["game1"]
 
     def test_clear_stale_pending_connection_only_removes_pending(self):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         cm.reserve_connection("game1", "player1")
 
         assert cm.clear_stale_pending_connection("game1", "player1") is True
@@ -106,8 +106,9 @@ class TestSpectateMessages:
     @pytest.mark.anyio
     async def test_request_lists_reach_the_player_in_the_order_the_queue_changed(self, monkeypatch):
         queue = [SimpleNamespace(request_id="r1", spectator_name="Carol")]
-        monkeypatch.setattr(ws_module.game_manager, "get_player_id_by_name", lambda _game, _name: "p1")
-        monkeypatch.setattr(ws_module.game_manager, "pending_spectate_requests", lambda _game, _name: list(queue))
+        manager = GameManager()
+        monkeypatch.setattr(manager, "get_player_id_by_name", lambda _game, _name: "p1")
+        monkeypatch.setattr(manager, "pending_spectate_requests", lambda _game, _name: list(queue))
         monkeypatch.setattr(compression, "WS_COMPRESSION_ENABLED", True)
         real_compress = gzip.compress
         compressed = []
@@ -119,7 +120,7 @@ class TestSpectateMessages:
             return real_compress(raw)
 
         monkeypatch.setattr(compression.gzip, "compress", compress_first_slowly)
-        cm = ConnectionManager()
+        cm = ConnectionManager(manager)
         player = _FakeWebSocket()
         cm._connections["game1"]["p1"] = cast(WebSocket, player)
 
@@ -135,8 +136,9 @@ class TestSpectateMessages:
     @pytest.mark.anyio
     async def test_a_spectator_accepted_after_its_game_was_dropped_is_closed(self, monkeypatch):
         loaded = {"game1": True}
-        monkeypatch.setattr(ws_module, "_game_is_loaded", lambda game_id: loaded.get(game_id, False))
-        cm = ConnectionManager()
+        manager = GameManager()
+        monkeypatch.setattr(manager, "is_loaded", lambda game_id: loaded.get(game_id, False))
+        cm = ConnectionManager(manager)
         spectator = _FakeWebSocket()
         spectator.accept_gate.clear()
 
@@ -153,21 +155,21 @@ class TestSpectateMessages:
 
 class TestConnectionManagerPendingConnections:
     def test_reserve_connection_marks_player_as_connected(self):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         assert not cm.is_player_connected("game1", "player1")
 
         cm.reserve_connection("game1", "player1")
         assert cm.is_player_connected("game1", "player1")
 
     def test_reserved_player_not_included_in_active_connected_ids(self):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         cm.reserve_connection("game1", "player1")
 
         connected_ids = cm.get_connected_player_ids("game1")
         assert "player1" not in connected_ids
 
     def test_disconnect_clears_pending_connection(self):
-        cm = ConnectionManager()
+        cm = ConnectionManager(GameManager())
         cm.reserve_connection("game1", "player1")
         assert cm.is_player_connected("game1", "player1")
 

@@ -5,7 +5,6 @@ from time import monotonic, sleep
 import pytest
 
 import server.routers.games as games_module
-import server.services.game_manager as gm_module
 from mtb.models.game import BattleSnapshotData
 from server.db import database
 from server.db.models import BattleSnapshot, CubeMetadata, GameRecord, PlayerGameHistory
@@ -388,7 +387,7 @@ def test_share_hides_a_game_evicted_from_memory_while_still_being_played(
     client, start_lobby, ws_receive_json_until, monkeypatch
 ):
     game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until)
-    monkeypatch.setattr(gm_module, "IDLE_EVICT_MINUTES", 0)
+    monkeypatch.setattr("server.services.game.snapshot_store.IDLE_EVICT_MINUTES", 0)
     # The test client can return before the server has handled the last disconnect, so retry
     # eviction the way the background loop does until the game is idle.
     deadline = monotonic() + 1.0

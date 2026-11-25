@@ -5,7 +5,6 @@ from starlette.websockets import WebSocketDisconnect
 
 import server.db.database as db_module
 import server.routers.ws as ws_module
-import server.services.game_manager as gm_module
 from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID
 from server.db.models import GameRecord
 
@@ -350,7 +349,7 @@ class TestGameWebSocket:
     ):
         game_id = game_with_players["game_id"]
         start_lobby(game_id, game_with_players["alice"]["session_id"])
-        monkeypatch.setattr(gm_module, "IDLE_EVICT_MINUTES", 0)
+        monkeypatch.setattr("server.services.game.snapshot_store.IDLE_EVICT_MINUTES", 0)
 
         assert ws_module.game_manager.evict_cold_games() == 1
 
