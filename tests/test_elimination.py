@@ -711,7 +711,9 @@ class TestFinaleVsBot:
         manager = GameManager()
         manager._active_games["test"] = game
 
-        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, game_id="test", db=None)
+        end_result = manager._handle_post_battle_static(
+            game, alice, static_opp, result, was_sudden_death=False, game_id="test", db=None
+        )
 
         # Bot took damage but not eliminated (started at 5, took ~1-2 damage)
         assert bot.poison > 5
@@ -755,7 +757,9 @@ class TestFinaleVsBot:
         manager._active_games["test"] = game
 
         # Simulate poison already applied, recheck with both at lethal
-        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, game_id="test", db=None)
+        end_result = manager._handle_post_battle_static(
+            game, alice, static_opp, result, was_sudden_death=False, game_id="test", db=None
+        )
 
         # Should trigger sudden death
         assert end_result == "sudden_death"
@@ -799,7 +803,7 @@ class TestDrawWithOneSurvivor:
         alice.poison = 10  # At lethal
         bob.poison = 5  # Not at lethal
 
-        manager._handle_post_battle_pvp(game, alice, bob, result, False, game_id="test", db=None)
+        manager._handle_post_battle_pvp(game, alice, bob, result, was_sudden_death=False, game_id="test", db=None)
 
         # Alice goes to awaiting_elimination first, then gets eliminated since 2 survivors remain
         # (bob + charlie means no sudden death needed)
@@ -837,7 +841,9 @@ class TestSuddenDeathRegressions:
         manager = GameManager()
         manager._active_games["test"] = game
 
-        end_result = manager._handle_post_battle_pvp(game, alice, bob, result, False, game_id="test", db=None)
+        end_result = manager._handle_post_battle_pvp(
+            game, alice, bob, result, was_sudden_death=False, game_id="test", db=None
+        )
 
         assert end_result == "sudden_death"
         assert alice.phase == "build"
@@ -940,7 +946,9 @@ class TestSuddenDeathRegressions:
         manager = GameManager()
         manager._active_games["test"] = game
 
-        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, True, game_id="test", db=None)
+        end_result = manager._handle_post_battle_static(
+            game, alice, static_opp, result, was_sudden_death=True, game_id="test", db=None
+        )
 
         assert end_result is None
         assert alice.phase == "build"
@@ -979,7 +987,9 @@ class TestSuddenDeathRegressions:
         manager = GameManager()
         manager._active_games["test"] = game
 
-        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, game_id="test", db=None)
+        end_result = manager._handle_post_battle_static(
+            game, alice, static_opp, result, was_sudden_death=False, game_id="test", db=None
+        )
 
         assert end_result is None
         assert alice.phase == "reward"

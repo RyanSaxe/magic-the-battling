@@ -669,8 +669,8 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                     game,
                     player,
                     payload["basics"],
-                    game_id,
-                    db_session,
+                    game_id=game_id,
+                    db=db_session,
                     play_draw_preference=payload.get("play_draw_preference", "play"),
                     hand_order=payload.get("hand_order"),
                 )
@@ -689,10 +689,10 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                 game,
                 player,
                 payload["card_id"],
-                payload["from_zone"],
-                payload["to_zone"],
-                payload.get("from_owner", "player"),
-                payload.get("to_owner", "player"),
+                from_zone=payload["from_zone"],
+                to_zone=payload["to_zone"],
+                from_owner=payload.get("from_owner", "player"),
+                to_owner=payload.get("to_owner", "player"),
             )
         case "battle_reveal_upgrade":
             return game_manager.handle_battle_reveal_upgrade(game, player, payload["upgrade_id"])

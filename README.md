@@ -1,109 +1,52 @@
 # Crucible
 
-An online application for playing [Crucible](https://cubecobra.com/cube/overview/auto), a Magic: The Gathering format that combines drafting with elimination-style battles.
+An online multiplayer application for [Crucible](https://cubecobra.com/cube/overview/auto), a Magic: The Gathering autobattler format combining booster drafting with elimination-style battles. Draft from shared cubes or play constructed decks, attach upgrades and vanguards, battle live opponents or historical puppets, and fight to be the last player standing.
 
-## Community
+Join the [Discord](https://discord.gg/MKMacp9JUf) to find games, report issues, and discuss the format.
 
-Join the [Discord](https://discord.gg/MKMacp9JUf) to find games, give feedback, and chat about the format.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/architecture-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/architecture-light.svg">
+  <img alt="Crucible architecture" src="assets/architecture-light.svg">
+</picture>
 
-## Tech Stack
+## Stack
 
-- **Backend**: Python, FastAPI, SQLite
-- **Frontend**: React, TypeScript, Vite
-- **Deployment**: Fly.io, Docker
+- **Game engine and server**: Python 3.12+, FastAPI, WebSockets (gzip-compressed), SQLite (WAL mode), Playwright (share previews)
+- **Web client**: React 19, TypeScript, Vite, Tailwind CSS, `@dnd-kit`
+- **Deployment**: Docker on [Fly.io](https://fly.io) with persistent `/data` storage and zero-surprise drain deploys
 
-## Development
+## Quick start
 
 ```sh
-# install backend dependencies
-uv sync
+# 1. Install backend and frontend dependencies
+uv sync --group dev
+cd web && npm ci && cd ..
 
-# install frontend dependencies
-cd web && npm ci
-
-# run the dev server (backend + frontend)
+# 2. Run backend (:8000) and Vite frontend (:3000)
 uv run dev
 
-# run backend only, serving built frontend from web/dist (deployment-like)
+# Or build web/dist and serve everything from FastAPI on :8000
 uv run dev --build
-
-# optional: compare variants on custom ports using a temporary DB copy
-uv run dev --build --backend-port 8100 --db-copy
-uv run dev --backend-port 8200 --frontend-port 3200 --db-copy
 ```
 
-Open:
-- `http://localhost:3000` for `uv run dev`
-- `http://localhost:8000` for `uv run dev --build`
+Open `http://localhost:3000` (with `uv run dev`) or `http://localhost:8000` (with `uv run dev --build`). Auto-generated OpenAPI docs are served at `http://localhost:8000/docs`.
 
-## Testing
+## Run checks
 
 ```sh
-# backend
+# Backend tests, lint, and type check
 uv run pytest
+uvx ruff check . && uvx ruff format --check . && uvx ty check
 
-# frontend
-cd web && npm test
+# Frontend lint, type check, tests, and production build
+cd web && npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-## API Docs
+## Documentation
 
-Start the dev server and visit [`/docs`](http://localhost:8000/docs) for the auto-generated OpenAPI reference.
-
-## Deployment
-
-Deployed to [Fly.io](https://fly.io) via Docker — see `fly.toml` and `Dockerfile`.
-
-On container startup, deploys now run `scripts/maintain_db.py --apply` against `/data/mtb.db` before booting the server. If pending DB maintenance exists, the script preserves the previous database as `/data/mtb.db.bak` and then applies the migration to the live DB path.
-
-### PR Labels
-
-Labels on the merged PR control deploy behavior and release creation.
-
-**Deploy delay** (`deploy:*`) — controls how long players are warned before the server restarts.
-Both workflows support the same labels but have different defaults:
-
-| Label | Dev default | Prod default | Use case |
-|-------|-------------|--------------|----------|
-| *(none)* | 0 min | 15 min | Normal deploys |
-| `deploy:quick` | 0 min | 0 min | Hotfixes, config changes |
-| `deploy:default` | 15 min | 15 min | Explicit standard delay |
-| `deploy:long` | 1 hour | 1 hour | Large updates during peak hours |
-
-**Release** (`release:*`) — triggers a tagged GitHub release after successful deploy:
-
-| Label | Effect |
-|-------|--------|
-| *(none)* | No release created |
-| `release:patch` | Bump patch version (e.g. v1.0.0 → v1.0.1) |
-| `release:minor` | Bump minor version (e.g. v1.0.0 → v1.1.0) |
-| `release:major` | Bump major version (e.g. v1.0.0 → v2.0.0) |
-
-Labels can be combined — e.g. `deploy:quick` + `release:patch` for an urgent bugfix release.
-
-## Fly Operations Report
-
-Use the report script to inspect game activity, memory signals, and recent log events.
-
-```sh
-# default app + last 24h
-uv run python scripts/fly_activity_report.py
-
-# custom app/window
-uv run python scripts/fly_activity_report.py --app magic-the-battling --hours 48
-
-# choose log source (fly, file, both)
-uv run python scripts/fly_activity_report.py --log-source both
-
-# target a specific machine/region
-uv run python scripts/fly_activity_report.py --machine 17817246a66798 --region ewr
-
-# JSON output for automation
-uv run python scripts/fly_activity_report.py --json
-```
-
-Notes:
-- `fly logs --no-tail` only returns Fly's current log buffer, not full historical logs.
-- The script can read persistent machine logs from `/data/logs/server.jsonl` with `--log-source file` or `--log-source both`.
-- Persistent log files appear after deploying a build that includes the observability logging changes.
-- The script combines log output with DB-backed metrics from `/data/mtb.db` for a fuller activity report.
+- [Documentation index](docs/README.md): map of all guides, concepts, and references
+- [Local setup](docs/getting-started/local-setup.md): dev server flags, isolated `--db-copy` runs, and local CI checks
+- [Architecture](docs/concepts/architecture.md): phase machine, puppets and ghosts, hot/cold game lifecycle, and internal vs user-facing naming
+- [Deployment and operations](docs/guides/deployment-and-ops.md): Fly.io deploys, drain and release PR labels, startup DB maintenance, and activity reports
+- [Configuration and API](docs/reference/configuration-and-api.md): environment variables, REST route groups, and WebSocket actions
