@@ -1,0 +1,147 @@
+name: check
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+      - run: uv sync --locked
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/prek
+          key: prek-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      # Web: the oxfmt and oxlint hooks run from web/node_modules.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+
+      # Shell: install pinned shfmt plus shellcheck for prek.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: shfmt@3.14.1
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - run: uvx prek@0.5.11 run --all-files --show-diff-on-failure
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Python
+      - uses: astral-sh/setup-uv@v10.4.0
+      - run: uv run --locked pytest --cov=mtb --cov=server
+
+      # Web
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: npm test
+        working-directory: web
+
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      image: ${{ steps.filter.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'push'
+      - name: Check which parts changed
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          base: ${{ github.ref_name }}
+          filters: |
+            web:
+              - 'web/**'
+            image:
+              - 'server/**'
+              - 'mtb/**'
+              - 'scripts/**'
+              - 'Dockerfile'
+              - 'fly*.toml'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'tests/fixtures/active_game_snapshots/**'
+
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-webkit
+
+      - name: Install WebKit
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps webkit
+
+      - name: Install WebKit system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps webkit
+
+      - name: Run Playwright tests
+        run: npm run test:e2e
+
+  image-boot:
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+
+      - name: Build the server image
+        run: docker build --tag mtb:boot-check .
+
+      - name: Boot the image on an empty volume and on the snapshot fixtures
+        run: uv run --no-project python scripts/check_image_boot.py mtb:boot-check
