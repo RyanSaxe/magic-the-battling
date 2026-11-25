@@ -508,31 +508,36 @@ async def _handle_player_disconnect(game_id: str, player_id: str, websocket: Web
         return
     if not game_manager.holds_seat(game_id, player_id):
         return
-    game_manager.schedule_pending_disconnect(
-        game_id,
-        player_id,
-        on_removed=lambda: connection_manager.broadcast_lobby_state(game_id),
-    )
-    game_manager.note_lobby_player_away(
-        game_id,
-        player_id,
-        on_host_change=lambda: connection_manager.broadcast_lobby_state(game_id),
-    )
+    if game_manager.get_pending_game(game_id) is not None:
+        async with game_manager.get_action_lock(game_id):
+            game_manager.schedule_pending_disconnect(
+                game_id,
+                player_id,
+                on_removed=lambda: connection_manager.broadcast_lobby_state(game_id),
+            )
+            game_manager.note_lobby_player_away(
+                game_id,
+                player_id,
+                on_host_change=lambda: connection_manager.broadcast_lobby_state(game_id),
+            )
     await connection_manager.broadcast_lobby_state(game_id)
 
 
-def _resolve_pending_or_game(game_id: str):
+async def _resolve_pending_or_game(game_id: str):
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
-    if not pending and not game:
-        game_manager.restore_game_from_snapshot(game_id)
+    if not pending and not game and game_manager.has_game(game_id):
+        async with game_manager.get_action_lock(game_id):
+            if not game_manager.get_pending_game(game_id) and not game_manager.get_game(game_id):
+                game_manager.restore_game_from_snapshot(game_id)
+        pending = game_manager.get_pending_game(game_id)
         game = game_manager.get_game(game_id)
     return pending, game
 
 
 async def _connect_player_to_game(websocket: WebSocket, game_id: str, session: Session):
     player_id = session.player_id
-    pending, game = _resolve_pending_or_game(game_id)
+    pending, game = await _resolve_pending_or_game(game_id)
     if not pending and not game:
         connection_manager.disconnect(game_id, player_id, websocket)
         await _reject_websocket(
@@ -574,7 +579,9 @@ async def _connect_player_to_game(websocket: WebSocket, game_id: str, session: S
     connected = await connection_manager.connect(game_id, player_id, websocket)
     if not connected:
         return None
-    game_manager.note_lobby_player_present(game_id, player_id)
+    if pending is not None:
+        async with game_manager.get_action_lock(game_id):
+            game_manager.note_lobby_player_present(game_id, player_id)
     return pending, game
 
 

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -6,7 +7,7 @@ import server.db.database as db
 from mtb.models.cards import Battler, Card
 from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
 from mtb.phases import battle
-from server.db.models import ActiveGameSnapshot, GameRecord, PlayerGameHistory
+from server.db.models import ActiveGameSnapshot, GamePlayerRecord, GameRecord, PlayerGameHistory
 from server.services.game_manager import GameManager
 
 
@@ -185,7 +186,7 @@ class TestRestoreRecovery:
         assert restored.active_battles == []
         assert canonical_alice.phase == "reward"
 
-    def test_get_game_state_recovers_missing_static_battle(self, game_manager):
+    def test_restore_all_snapshots_recovers_missing_static_battle(self, game_manager, test_db):
         game = create_game(["Alice"], num_players=1)
         set_battler(game, self._make_battler())
         alice = game.players[0]
@@ -196,9 +197,23 @@ class TestRestoreRecovery:
         puppet = Puppet(name="Bot", player_history_id=1, snapshots={"3_1": static_opponent})
         game.puppets.append(puppet)
 
-        game_manager._active_games["g1"] = game
-        game_manager._player_to_game["pid_alice"] = "g1"
-        game_manager._player_id_to_name["pid_alice"] = "Alice"
+        now = datetime.now(UTC)
+        with db.SessionLocal() as session:
+            session.add(GameRecord(id="g1"))
+            session.add(GamePlayerRecord(game_id="g1", player_id="pid_alice", player_name="Alice", is_puppet=False))
+            session.add(
+                ActiveGameSnapshot(
+                    game_id="g1",
+                    state_json=game.snapshot_dump_json(),
+                    last_human_activity_at=now,
+                    updated_at=now,
+                )
+            )
+            session.commit()
+
+        restored = asyncio.run(game_manager.restore_all_snapshots())
+        assert restored == 1
+        assert "g1" in game_manager._dirty_games
 
         state = game_manager.get_game_state("g1", "pid_alice")
 

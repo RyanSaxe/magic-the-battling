@@ -1,5 +1,4 @@
 import asyncio
-import hmac
 import json
 import logging
 import random
@@ -11,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any, ClassVar, Protocol, cast
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from httpx import HTTPStatusError, RequestError
 from sqlalchemy import func
@@ -24,7 +23,6 @@ from mtb.models.cards import (
     DEFAULT_UPGRADES_ID,
     DEFAULT_VANGUARD_ID,
     Battler,
-    Card,
     IllegalBattlerError,
     build_battler,
     validate_battler,
@@ -52,7 +50,6 @@ from mtb.models.game import (
 )
 from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
-from mtb.phases.battle import get_furthest_round, get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
     eliminate_player,
@@ -93,26 +90,26 @@ from server.runtime_config import (
 )
 from server.schemas.api import (
     BattlerLoadingStatus,
-    BattleView,
     CubeLoadingStatus,
     GameBootstrapResponse,
     GameStateResponse,
-    LastResult,
+    GameStatusResponse,
     LobbyPlayer,
     LobbyStateResponse,
-    PlayerView,
     ResumableGame,
     ResumableSeat,
-    RevealAnimationView,
-    SelfPlayerView,
+)
+from server.services.game.view_builder import (
+    build_active_game_status,
+    build_game_bootstrap,
+    build_game_state,
+    build_pending_game_status,
+    build_snapshot_game_status,
+    hidden_card_opaque_ids,
 )
 from server.services.game_serialization import (
-    build_catalog_from_game,
-    build_catalog_from_state_refs,
     card_to_ref,
     cards_to_refs,
-    last_battle_result_to_view,
-    zones_to_view,
 )
 from server.services.seat_tokens import (
     SeatClaimRefusal,
@@ -159,34 +156,36 @@ def _utc_or_default(value: datetime | None, default: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def _opaque_card_id(key: bytes, card_id: str) -> str:
-    digest = hmac.digest(key, card_id.encode(), "sha256")
-    return str(UUID(bytes=digest[:16]))
-
-
-def _hidden_card_opaque_ids(b: Battle, zones: Zones) -> dict[str, str]:
-    # Derived from the battle's key, not stored, so every view of the battle shows the same ids
-    # and an action that sends one back resolves whichever view was built last.
-    hidden_ids = {*zones.face_down_card_ids, *(card.id for card in zones.library)}
-    return {card_id: _opaque_card_id(b._opaque_id_key, card_id) for card_id in hidden_ids}
-
-
-def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], opaque_ids: dict[str, str]) -> list[Card]:
-    result = []
-    for card in cards:
-        if card.id in face_down_ids:
-            result.append(Card(id=opaque_ids[card.id], scryfall_id="__scrubbed__", name="", image_url="", type_line=""))
-        else:
-            result.append(card)
-    return result
-
-
-def _remap_id_list(ids: list[str], reverse_map: dict[str, str]) -> list[str]:
-    return [reverse_map.get(real_id, real_id) for real_id in ids]
-
-
-def _remap_id_dict[T](d: dict[str, T], reverse_map: dict[str, str]) -> dict[str, T]:
-    return {reverse_map.get(k, k): v for k, v in d.items()}
+def _extract_snapshot_status(
+    session: Session, game_id: str
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]] | None:
+    row = (
+        session.query(
+            func.coalesce(
+                func.json_extract(ActiveGameSnapshot.state_json, "$.data.config"),
+                func.json_extract(ActiveGameSnapshot.state_json, "$.config"),
+            ).label("config_json"),
+            func.coalesce(
+                func.json_extract(ActiveGameSnapshot.state_json, "$.data.players"),
+                func.json_extract(ActiveGameSnapshot.state_json, "$.players"),
+            ).label("players_json"),
+            func.coalesce(
+                func.json_extract(ActiveGameSnapshot.state_json, "$.data.puppets"),
+                func.json_extract(ActiveGameSnapshot.state_json, "$.data.fake_players"),
+                func.json_extract(ActiveGameSnapshot.state_json, "$.puppets"),
+                func.json_extract(ActiveGameSnapshot.state_json, "$.fake_players"),
+                "[]",
+            ).label("puppets_json"),
+        )
+        .filter(ActiveGameSnapshot.game_id == game_id)
+        .first()
+    )
+    if row is None or row.players_json is None:
+        return None
+    config = json.loads(row.config_json) if row.config_json else {}
+    players = json.loads(row.players_json)
+    puppets = json.loads(row.puppets_json) if row.puppets_json else []
+    return config, players, puppets
 
 
 class SpectateListener(Protocol):
@@ -781,6 +780,31 @@ class GameManager:
             restored += 1
         return restored
 
+    def _restore_snapshot_row(self, session: Session, row: ActiveGameSnapshot) -> bool:
+        snapshot_game_id = cast(str, row.game_id)
+        try:
+            game = restore_game_from_snapshot(cast(str, row.state_json))
+        except Exception as exc:
+            logger.exception("Snapshot does not restore; quarantining game_id=%s", snapshot_game_id)
+            session.add(
+                QuarantinedGameSnapshot(
+                    game_id=snapshot_game_id,
+                    state_json=row.state_json,
+                    last_human_activity_at=row.last_human_activity_at,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            )
+            session.delete(row)
+            return False
+        last_activity = cast(datetime | None, row.last_human_activity_at)
+        self._active_games[snapshot_game_id] = game
+        self._dirty_games.discard(snapshot_game_id)
+        if self._normalize_restored_game(game):
+            self.mark_game_dirty(snapshot_game_id, human_activity=False)
+        self._restore_human_player_mappings(session, snapshot_game_id, game)
+        self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
+        return True
+
     def restore_game_from_snapshot(self, game_id: str) -> bool:
         if game_id in self._active_games:
             return True
@@ -792,6 +816,7 @@ class GameManager:
                 return False
             game = restore_game_from_snapshot(cast(str, row.state_json))
             self._active_games[game_id] = game
+            self._dirty_games.discard(game_id)
             if self._normalize_restored_game(game):
                 self.mark_game_dirty(game_id, human_activity=False)
             restored_mappings = self._restore_human_player_mappings(session, game_id, game)
@@ -799,7 +824,6 @@ class GameManager:
                 logger.warning("No human player mappings restored for game_id=%s", game_id)
             last_activity = cast(datetime | None, row.last_human_activity_at)
             self._last_human_activity[game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-            self._dirty_games.discard(game_id)
             logger.info("Restored active game from snapshot: game_id=%s", game_id)
             return True
         except Exception:
@@ -808,34 +832,16 @@ class GameManager:
         finally:
             session.close()
 
-    def restore_all_snapshots(self) -> int:
+    async def restore_all_snapshots(self) -> int:
         restored = 0
         session = db.SessionLocal()
         try:
             rows = session.query(ActiveGameSnapshot).all()
             for row in rows:
                 snapshot_game_id = cast(str, row.game_id)
-                try:
-                    game = restore_game_from_snapshot(cast(str, row.state_json))
-                except Exception as exc:
-                    logger.exception("Snapshot does not restore; quarantining game_id=%s", snapshot_game_id)
-                    session.add(
-                        QuarantinedGameSnapshot(
-                            game_id=snapshot_game_id,
-                            state_json=row.state_json,
-                            last_human_activity_at=row.last_human_activity_at,
-                            error=f"{type(exc).__name__}: {exc}",
-                        )
-                    )
-                    session.delete(row)
-                    continue
-                last_activity = cast(datetime | None, row.last_human_activity_at)
-                self._active_games[snapshot_game_id] = game
-                if self._normalize_restored_game(game):
-                    self.mark_game_dirty(snapshot_game_id, human_activity=False)
-                self._restore_human_player_mappings(session, snapshot_game_id, game)
-                self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-                restored += 1
+                async with self.get_action_lock(snapshot_game_id):
+                    if self._restore_snapshot_row(session, row):
+                        restored += 1
             session.commit()
         finally:
             session.close()
@@ -1185,7 +1191,12 @@ class GameManager:
             logger.exception("Lobby start failed: game_id=%s", game_id)
         finally:
             if game is None:
-                self._return_lobby_to_open(pending, failure)
+                if self._pending_games.get(game_id) is pending:
+                    async with self.get_action_lock(game_id):
+                        if self._pending_games.get(game_id) is pending:
+                            self._return_lobby_to_open(pending, failure)
+                else:
+                    self._return_lobby_to_open(pending, failure)
 
         if game is None:
             await on_change()
@@ -1216,10 +1227,13 @@ class GameManager:
                     await self._finish_loading_cube(pending)
                 if self._pending_games.get(pending.game_id) is not pending:
                     raise LobbyStartFailedError("The lobby closed while it was starting")
-                allowed, reason = self.can_accept_loaded_game()
-                if not allowed:
-                    raise LobbyStartFailedError(reason)
-                return self._create_started_game(pending, db)
+                async with self.get_action_lock(pending.game_id):
+                    if self._pending_games.get(pending.game_id) is not pending:
+                        raise LobbyStartFailedError("The lobby closed while it was starting")
+                    allowed, reason = self.can_accept_loaded_game()
+                    if not allowed:
+                        raise LobbyStartFailedError(reason)
+                    return self._create_started_game(pending, db)
         except GameStartQueueFullError as exc:
             raise LobbyStartFailedError(str(exc)) from exc
 
@@ -1415,7 +1429,8 @@ class GameManager:
 
         async def cleanup_after_delay():
             await asyncio.sleep(delay)
-            self._cleanup_game(game_id)
+            async with self.get_action_lock(game_id):
+                self._cleanup_game(game_id)
 
         try:
             loop = asyncio.get_running_loop()
@@ -1498,6 +1513,8 @@ class GameManager:
     ) -> None:
         pending.battler_loading = True
         pending.battler_error = None
+        battler: Battler | None = None
+        error_message: str | None = None
         try:
             async with self._battler_preload_slots:
                 loop = asyncio.get_running_loop()
@@ -1509,12 +1526,19 @@ class GameManager:
                     pending.use_vanguards,
                     pending.play_mode,
                 )
-            pending.battler = battler
         except Exception as e:
             logger.warning("Failed to preload battler %s: %s", pending.cube_id, e)
-            pending.battler_error = self._normalize_battler_error(pending.cube_id, pending.play_mode, e)
+            error_message = self._normalize_battler_error(pending.cube_id, pending.play_mode, e)
         finally:
-            pending.battler_loading = False
+            if self._pending_games.get(pending.game_id) is pending:
+                async with self.get_action_lock(pending.game_id):
+                    if battler is not None:
+                        pending.battler = battler
+                    if error_message is not None:
+                        pending.battler_error = error_message
+                    pending.battler_loading = False
+            else:
+                pending.battler_loading = False
             if on_complete:
                 await on_complete()
 
@@ -1560,9 +1584,11 @@ class GameManager:
             logger.warning("Failed to preload player battler %s: %s", battler_id, e)
             loaded = BattlerFailed(battler_id, self._normalize_battler_error(battler_id, "constructed", e))
 
-        slot = pending.player_battlers.get(player_id)
-        if isinstance(slot, BattlerLoading) and slot.task is _current_task():
-            self._set_player_battler(pending, player_id, loaded)
+        if self._pending_games.get(pending.game_id) is pending:
+            async with self.get_action_lock(pending.game_id):
+                slot = pending.player_battlers.get(player_id)
+                if isinstance(slot, BattlerLoading) and slot.task is _current_task():
+                    self._set_player_battler(pending, player_id, loaded)
         if on_complete:
             await on_complete()
 
@@ -1912,26 +1938,84 @@ class GameManager:
                 return player
         return None
 
+    def has_game(self, game_id: str) -> bool:
+        if game_id in self._pending_games or game_id in self._active_games:
+            return True
+        session = db.SessionLocal()
+        try:
+            return (
+                session.query(ActiveGameSnapshot.game_id).filter(ActiveGameSnapshot.game_id == game_id).first()
+                is not None
+            )
+        except Exception:
+            return False
+        finally:
+            session.close()
+
+    def get_game_status(
+        self,
+        game_id: str,
+        *,
+        connected_player_ids: Collection[str] = (),
+    ) -> GameStatusResponse | None:
+        pending = self._pending_games.get(game_id)
+        if pending is not None:
+            return build_pending_game_status(
+                game_id,
+                player_names=pending.player_names,
+                player_ids=pending.player_ids,
+                is_started=pending.is_started,
+                auto_approve_spectators=pending.auto_approve_spectators,
+                connected_player_ids=connected_player_ids,
+            )
+
+        game = self._active_games.get(game_id)
+        if game is not None:
+            connected_names = {
+                player.name
+                for player in game.players
+                if (pid := self.get_player_id_by_name(game_id, player.name)) is not None and pid in connected_player_ids
+            }
+            return build_active_game_status(game_id, game, connected_player_names=connected_names)
+
+        session = db.SessionLocal()
+        try:
+            snapshot = _extract_snapshot_status(session, game_id)
+        except Exception:
+            return None
+        finally:
+            session.close()
+        if snapshot is None:
+            return None
+        config, players, puppets = snapshot
+        return build_snapshot_game_status(game_id, config=config, players=players, puppets=puppets)
+
     def can_rejoin(
         self,
         game_id: str,
         player_name: str,
         is_player_connected: Callable[[str, str], bool] | None = None,
     ) -> bool:
-        if game_id not in self._active_games:
-            self.restore_game_from_snapshot(game_id)
-
         game = self._active_games.get(game_id)
-        if not game:
-            return False
+        if game is not None:
+            if not any(p.name == player_name for p in game.players):
+                return False
+            player_id = self.get_player_id_by_name(game_id, player_name)
+            if player_id and is_player_connected:
+                return not is_player_connected(game_id, player_id)
+            return True
 
-        if not any(p.name == player_name for p in game.players):
+        session = db.SessionLocal()
+        try:
+            snapshot = _extract_snapshot_status(session, game_id)
+        except Exception:
             return False
-
-        player_id = self.get_player_id_by_name(game_id, player_name)
-        if player_id and is_player_connected:
-            return not is_player_connected(game_id, player_id)
-        return True
+        finally:
+            session.close()
+        if snapshot is None:
+            return False
+        _, players, _ = snapshot
+        return any(player.get("name") == player_name for player in players)
 
     def find_resumable_seats(self, seats: list[ResumableSeat], *, user_id: str | None = None) -> list[ResumableGame]:
         """The seats a caller can still return to: those its browser holds tokens for, and those its account took.
@@ -2233,7 +2317,10 @@ class GameManager:
 
         async def remove_after_delay():
             await asyncio.sleep(delay)
-            removed = self.remove_player_from_pending(game_id, player_id)
+            removed = False
+            if game_id in self._pending_games:
+                async with self.get_action_lock(game_id):
+                    removed = self.remove_player_from_pending(game_id, player_id)
             self._pending_disconnect_tasks.pop(key, None)
             if removed and on_removed:
                 await on_removed()
@@ -2280,7 +2367,12 @@ class GameManager:
         async def hand_off_after_grace() -> None:
             await asyncio.sleep(HOST_HANDOFF_GRACE_SECONDS)
             self._host_handoff_tasks.pop(game_id, None)
-            if pending.host_away_since is not None and self._hand_off_host(pending):
+            changed = False
+            if self._pending_games.get(game_id) is pending:
+                async with self.get_action_lock(game_id):
+                    if pending.host_away_since is not None and self._hand_off_host(pending):
+                        changed = True
+            if changed:
                 await on_host_change()
 
         try:
@@ -2584,279 +2676,18 @@ class GameManager:
         if not player:
             return None
 
-        if (
-            player.phase == "battle"
-            and not self._player_in_active_battle(game, player.name)
-            and self._recover_missing_active_battles(game) > 0
-        ):
-            self.mark_game_dirty(game_id, human_activity=False)
-
-        phase = self._determine_game_phase(game)
-
-        current_pack = None
-        if game.draft_state and player.name in game.draft_state.current_packs:
-            current_pack = game.draft_state.current_packs[player.name]
-
-        current_battle = None
-        for b in game.active_battles:
-            if player.name in (b.player.name, b.opponent.name):
-                current_battle = self._make_battle_view(b, player, game)
-                break
-
-        probabilities = self._get_pairing_probabilities(game, player)
-        most_recent_ghost_name = game.most_recent_ghost.name if game.most_recent_ghost else None
-        most_recent_ghost_puppet_name = game.most_recent_ghost_puppet.name if game.most_recent_ghost_puppet else None
-
-        all_players = [self._make_player_view(p, player, probabilities, most_recent_ghost_name) for p in game.players]
-        all_players.extend(
-            self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_puppet_name) for fp in game.puppets
-        )
-        shown_build = player.returned_build or player
-
-        state = GameStateResponse(
-            game_id=game_id,
-            phase=phase,
-            starting_life=game.config.starting_life,
-            use_upgrades=game.config.use_upgrades,
-            voice_chat_enabled=game.config.voice_chat_enabled,
-            players=all_players,
-            self_player=SelfPlayerView(
-                name=player.name,
-                treasures=player.treasures,
-                poison=player.poison,
-                phase=player.phase,
-                round=player.round,
-                stage=player.stage,
-                vanquishers=player.vanquishers,
-                is_ghost=(player.phase == "eliminated"),
-                time_of_death=None,
-                hand_count=len(player.hand),
-                sideboard_count=len(player.sideboard),
-                hand_size=player.hand_size,
-                is_stage_increasing=reward.is_stage_increasing(player),
-                upgrades=cards_to_refs(player.upgrades),
-                vanguard=card_to_ref(player.vanguard),
-                chosen_basics=player.chosen_basics,
-                most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
-                last_result=self._get_last_result(player),
-                hand=cards_to_refs(shown_build.hand),
-                hand_slots=player.slotted_hand(),
-                sideboard=cards_to_refs(shown_build.sideboard),
-                command_zone=cards_to_refs(player.command_zone),
-                current_pack=cards_to_refs(current_pack) if current_pack is not None else None,
-                last_battle_result=last_battle_result_to_view(player.last_battle_result),
-                build_ready=player.build_ready,
-                in_sudden_death=player.in_sudden_death,
-                placement=player.placement,
-            ),
-            available_upgrades=cards_to_refs(game.available_upgrades),
-            current_battle=current_battle,
-            battle_resolution=player.battle_resolution,
-            cube_id=game.config.cube_id,
-            play_mode=game.config.play_mode,
-        )
-        state.catalog_delta = build_catalog_from_state_refs(state)
-        return state
+        return build_game_state(game, player, game_id=game_id)
 
     def get_game_bootstrap(self, game_id: str, player_id: str) -> GameBootstrapResponse | None:
         game = self._active_games.get(game_id)
         if game is None:
             return None
 
-        state = self.get_game_state(game_id, player_id)
-        if state is None:
+        player = self.get_player(game, player_id)
+        if player is None:
             return None
 
-        return GameBootstrapResponse(
-            catalog=build_catalog_from_game(game),
-            state=state,
-        )
-
-    def _determine_game_phase(self, game: Game) -> str:
-        phases = {p.phase for p in game.players if p.phase != "eliminated"}
-        if len(phases) == 1:
-            return phases.pop()
-        if "battle" in phases:
-            return "battle"
-        if "reward" in phases:
-            return "reward"
-        if "awaiting_elimination" in phases:
-            return "awaiting_elimination"
-        if "build" in phases:
-            return "build"
-        if "draft" in phases:
-            return "draft"
-        return "unknown"
-
-    def _get_pairing_probabilities(self, game: Game, player: Player) -> dict[str, float] | None:
-        """Get pairing probabilities, with 100% for sudden death opponents.
-
-        None means the player has no next battle, so there are no odds to show.
-        """
-        if player.phase in ("eliminated", "winner", "game_over"):
-            return None
-        if player.in_sudden_death:
-            other_sd_player = self._find_sudden_death_opponent(game, player)
-            if other_sd_player:
-                return {other_sd_player.name: 1.0}
-            for fp in game.puppets:
-                if fp.in_sudden_death and not fp.is_eliminated:
-                    return {fp.name: 1.0}
-            return {}
-
-        return get_pairing_probabilities(game, player)
-
-    def _get_last_result(self, player: Player) -> LastResult | None:
-        result = player.last_battle_result
-        if result is None:
-            return None
-        if result.is_draw:
-            return "draw"
-        if result.winner_name != player.name:
-            return "loss"
-        return "win"
-
-    def _get_fake_player_last_result(self, fake: Puppet) -> LastResult | None:
-        result = fake.last_battle_result
-        if result is None:
-            return None
-        if result.is_draw:
-            return "draw"
-        if result.winner_name != fake.name:
-            return "loss"
-        return "win"
-
-    def _public_visible_upgrades(self, upgrades: list[Card]) -> list[Card]:
-        return [upgrade for upgrade in upgrades if reward.is_revealed_applied_upgrade(upgrade)]
-
-    def _make_player_view(
-        self,
-        player: Player,
-        viewer: Player,
-        probabilities: dict[str, float] | None,
-        most_recent_ghost_name: str | None = None,
-    ) -> PlayerView:
-        is_eliminated = player.phase == "eliminated"
-        visible_upgrades = (
-            player.upgrades if player.name == viewer.name else self._public_visible_upgrades(player.upgrades)
-        )
-        visible_basics = player.chosen_basics if player.name == viewer.name or player.phase != "build" else []
-        return PlayerView(
-            name=player.name,
-            treasures=player.treasures,
-            poison=player.poison,
-            phase=player.phase,
-            round=player.round,
-            stage=player.stage,
-            vanquishers=player.vanquishers,
-            is_ghost=is_eliminated,
-            is_puppet=False,
-            time_of_death=None,
-            hand_count=len(player.hand),
-            sideboard_count=len(player.sideboard),
-            hand_size=player.hand_size,
-            is_stage_increasing=reward.is_stage_increasing(player),
-            upgrades=cards_to_refs(visible_upgrades),
-            vanguard=card_to_ref(player.vanguard),
-            chosen_basics=visible_basics,
-            most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
-            last_result=self._get_last_result(player),
-            pairing_probability=None if probabilities is None else probabilities.get(player.name, 0.0),
-            is_most_recent_ghost=player.name == most_recent_ghost_name,
-            full_sideboard=cards_to_refs(player.sideboard) if is_eliminated else [],
-            command_zone=cards_to_refs(player.command_zone),
-            placement=player.placement,
-            in_sudden_death=player.in_sudden_death,
-            build_ready=player.build_ready,
-        )
-
-    def _make_fake_player_view(
-        self,
-        fake: Puppet,
-        viewer: Player,
-        probabilities: dict[str, float] | None,
-        most_recent_ghost_puppet_name: str | None = None,
-    ) -> PlayerView:
-        snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-        # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
-        # round, or a player who is behind would see a hand early. Both stop at the round a puppet went out.
-        table_snapshot = fake.get_opponent_for_round(*get_furthest_round(viewer.game))
-
-        if viewer.in_sudden_death:
-            revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
-            prior_upgrades = snapshot.upgrades if snapshot else []
-        else:
-            if viewer.phase == "reward":
-                prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-            elif viewer.round > 1:
-                prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
-            elif viewer.stage > 3:
-                prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
-            else:
-                prior_snapshot = None
-
-            prior_hand = prior_snapshot.hand if prior_snapshot else []
-            prior_command_zone = prior_snapshot.command_zone if prior_snapshot else []
-            revealed_cards = prior_hand + prior_command_zone
-            prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
-
-        last_result = self._get_fake_player_last_result(fake)
-
-        if snapshot and table_snapshot:
-            return PlayerView(
-                name=fake.name,
-                treasures=table_snapshot.treasures,
-                poison=fake.poison,
-                phase="battle",
-                round=viewer.round,
-                stage=viewer.stage,
-                vanquishers=0,
-                is_ghost=fake.is_eliminated,
-                is_puppet=True,
-                time_of_death=None,
-                hand_count=len(snapshot.hand),
-                sideboard_count=len(snapshot.sideboard),
-                hand_size=len(snapshot.hand),
-                is_stage_increasing=False,
-                upgrades=cards_to_refs(prior_upgrades),
-                vanguard=card_to_ref(snapshot.vanguard),
-                chosen_basics=snapshot.chosen_basics,
-                most_recently_revealed_cards=cards_to_refs(revealed_cards),
-                last_result=last_result,
-                pairing_probability=None if probabilities is None else probabilities.get(fake.name, 0.0),
-                is_most_recent_ghost=fake.name == most_recent_ghost_puppet_name,
-                full_sideboard=cards_to_refs(snapshot.sideboard),
-                command_zone=cards_to_refs(snapshot.command_zone),
-                placement=fake.placement,
-                in_sudden_death=fake.in_sudden_death,
-            )
-        return PlayerView(
-            name=fake.name,
-            treasures=0,
-            poison=0,
-            phase="battle",
-            round=viewer.round,
-            stage=viewer.stage,
-            vanquishers=0,
-            is_ghost=fake.is_eliminated,
-            is_puppet=True,
-            time_of_death=None,
-            hand_count=0,
-            sideboard_count=0,
-            hand_size=0,
-            is_stage_increasing=False,
-            upgrades=[],
-            vanguard=None,
-            chosen_basics=[],
-            most_recently_revealed_cards=[],
-            last_result=last_result,
-            pairing_probability=None if probabilities is None else probabilities.get(fake.name, 0.0),
-            is_most_recent_ghost=fake.name == most_recent_ghost_puppet_name,
-            full_sideboard=[],
-            command_zone=[],
-            placement=fake.placement,
-            in_sudden_death=fake.in_sudden_death,
-        )
+        return build_game_bootstrap(game, player, game_id=game_id)
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:
         """Get poison for an opponent, looking up Puppet for StaticOpponents."""
@@ -3052,104 +2883,6 @@ class GameManager:
                 use_upgrades=use_upgrades,
                 poison_to_lose=poison_to_lose,
             ),
-        )
-
-    def _make_battle_view(self, b: Battle, player: Player, game: Game) -> BattleView:
-        is_player = b.player.name == player.name
-        your_zones = b.player_zones if is_player else b.opponent_zones
-        opponent_zones = b.opponent_zones if is_player else b.player_zones
-        opponent_name = b.opponent.name if is_player else b.player.name
-
-        opponent_obj = b.opponent if is_player else b.player
-        hand_revealed = isinstance(opponent_obj, StaticOpponent) and opponent_obj.hand_revealed
-        is_pvp = not isinstance(opponent_obj, StaticOpponent)
-        face_down_ids = set(opponent_zones.face_down_card_ids)
-
-        if is_pvp and face_down_ids:
-            reverse_map = _hidden_card_opaque_ids(b, opponent_zones)
-            scrubbed_bf = _scrub_face_down_cards(opponent_zones.battlefield, face_down_ids, reverse_map)
-            scrubbed_gy = _scrub_face_down_cards(opponent_zones.graveyard, face_down_ids, reverse_map)
-            scrubbed_exile = _scrub_face_down_cards(opponent_zones.exile, face_down_ids, reverse_map)
-            scrubbed_cz = _scrub_face_down_cards(opponent_zones.command_zone, face_down_ids, reverse_map)
-            scrubbed_library = _scrub_face_down_cards(
-                opponent_zones.library,
-                {card.id for card in opponent_zones.library},
-                reverse_map,
-            )
-            scrubbed_tokens = _scrub_face_down_cards(opponent_zones.spawned_tokens, face_down_ids, reverse_map)
-            scrubbed_face_down_ids = _remap_id_list(opponent_zones.face_down_card_ids, reverse_map)
-            scrubbed_tapped_ids = _remap_id_list(opponent_zones.tapped_card_ids, reverse_map)
-            scrubbed_flipped_ids = _remap_id_list(opponent_zones.flipped_card_ids, reverse_map)
-            scrubbed_counters = _remap_id_dict(opponent_zones.counters, reverse_map)
-            scrubbed_attachments = {
-                reverse_map.get(k, k): [reverse_map.get(v, v) for v in vs]
-                for k, vs in opponent_zones.attachments.items()
-            }
-        else:
-            scrubbed_bf = opponent_zones.battlefield
-            scrubbed_gy = opponent_zones.graveyard
-            scrubbed_exile = opponent_zones.exile
-            scrubbed_cz = opponent_zones.command_zone
-            scrubbed_library = opponent_zones.library
-            scrubbed_tokens = opponent_zones.spawned_tokens
-            scrubbed_face_down_ids = opponent_zones.face_down_card_ids
-            scrubbed_tapped_ids = opponent_zones.tapped_card_ids
-            scrubbed_flipped_ids = opponent_zones.flipped_card_ids
-            scrubbed_counters = opponent_zones.counters
-            scrubbed_attachments = opponent_zones.attachments
-
-        hidden_opponent = Zones(
-            battlefield=scrubbed_bf,
-            graveyard=scrubbed_gy,
-            exile=scrubbed_exile,
-            hand=opponent_zones.hand if hand_revealed else [],
-            sideboard=[],
-            upgrades=self._public_visible_upgrades(opponent_zones.upgrades),
-            command_zone=scrubbed_cz,
-            library=scrubbed_library,
-            treasures=opponent_zones.treasures,
-            submitted_cards=[],
-            tapped_card_ids=scrubbed_tapped_ids,
-            flipped_card_ids=scrubbed_flipped_ids,
-            face_down_card_ids=scrubbed_face_down_ids,
-            counters=scrubbed_counters,
-            attachments=scrubbed_attachments,
-            spawned_tokens=scrubbed_tokens,
-        )
-
-        your_poison = b.player.poison if is_player else self._get_opponent_poison(b.opponent, game)
-        opponent_poison = self._get_opponent_poison(b.opponent, game) if is_player else b.player.poison
-        your_life = b.player_life if is_player else b.opponent_life
-        opponent_life = b.opponent_life if is_player else b.player_life
-
-        full_sideboard = opponent_zones.sideboard if isinstance(opponent_obj, StaticOpponent) else []
-
-        return BattleView(
-            opponent_name=opponent_name,
-            coin_flip_name=b.coin_flip_name,
-            on_the_play_name=b.on_the_play_name,
-            current_turn_name=b.current_turn_name,
-            your_zones=zones_to_view(your_zones),
-            opponent_zones=zones_to_view(hidden_opponent),
-            opponent_hand_count=len(opponent_zones.hand),
-            result_submissions=b.result_submissions,
-            your_poison=your_poison,
-            opponent_poison=opponent_poison,
-            opponent_hand_revealed=hand_revealed,
-            your_life=your_life,
-            opponent_life=opponent_life,
-            is_sudden_death=b.is_sudden_death,
-            opponent_full_sideboard=cards_to_refs(full_sideboard),
-            can_manipulate_opponent=isinstance(opponent_obj, StaticOpponent),
-            pending_reveal_animations=[
-                RevealAnimationView(
-                    animation_id=anim.animation_id,
-                    upgrade=cards_to_refs([anim.upgrade])[0],
-                    target=cards_to_refs([anim.target])[0],
-                    player_name=anim.player_name,
-                )
-                for anim in b.pending_reveal_animations
-            ],
         )
 
     def handle_draft_swap(
@@ -3434,7 +3167,7 @@ class GameManager:
 
     def _resolve_opaque_card_id(self, b: Battle, player: Player, card_id: str) -> str:
         opponent_zones = self._get_zones_for_owner(b, player, "opponent")
-        real_ids = {opaque: real for real, opaque in _hidden_card_opaque_ids(b, opponent_zones).items()}
+        real_ids = {opaque: real for real, opaque in hidden_card_opaque_ids(b, opponent_zones).items()}
         return real_ids.get(card_id, card_id)
 
     def _track_revealed_card(self, b: Battle, card, from_zones: Zones, to_zone: ZoneName) -> None:

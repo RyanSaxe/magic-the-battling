@@ -3,6 +3,7 @@ from conftest import setup_battle_ready
 
 from mtb.models.game import StaticOpponent, create_game
 from mtb.phases import battle, reward
+from server.services.game.view_builder import build_battle_view
 from server.services.game_manager import GameManager
 
 
@@ -166,7 +167,7 @@ class TestFaceDownScrubbing:
         battle.move_zone(b, bob, creature, "hand", "battlefield")
         battle.update_card_state(b, bob, "face_down", creature.id)
 
-        view = game_manager._make_battle_view(b, alice, game)
+        view = build_battle_view(b, alice, game=game)
 
         face_down_bf = [c for c in view.opponent_zones.battlefield if c.id in view.opponent_zones.face_down_card_ids]
         assert len(face_down_bf) == 1
@@ -188,7 +189,7 @@ class TestFaceDownScrubbing:
         battle.move_zone(b, bob, creature, "hand", "battlefield")
         battle.update_card_state(b, bob, "face_down", creature.id)
 
-        view = game_manager._make_battle_view(b, alice, game)
+        view = build_battle_view(b, alice, game=game)
 
         all_bf_ids = {c.id for c in view.opponent_zones.battlefield}
         assert creature.id not in all_bf_ids
@@ -207,7 +208,7 @@ class TestFaceDownScrubbing:
         battle.move_zone(b, bob, creature, "hand", "battlefield")
         battle.update_card_state(b, bob, "face_down", creature.id)
 
-        view = game_manager._make_battle_view(b, alice, game)
+        view = build_battle_view(b, alice, game=game)
 
         opaque_id = view.opponent_zones.face_down_card_ids[0]
         assert opaque_id != creature.id
@@ -262,9 +263,9 @@ class TestFaceDownScrubbing:
         battle.move_zone(b, bob, first, "hand", "library")
         battle.move_zone(b, bob, second, "hand", "library")
 
-        ids_before = {c.id for c in game_manager._make_battle_view(b, alice, game).opponent_zones.library}
+        ids_before = {c.id for c in build_battle_view(b, alice, game=game).opponent_zones.library}
         assert game_manager.handle_battle_update_card_state(game, bob, "shuffle_library", "")
-        ids_after = {c.id for c in game_manager._make_battle_view(b, alice, game).opponent_zones.library}
+        ids_after = {c.id for c in build_battle_view(b, alice, game=game).opponent_zones.library}
 
         assert ids_before.isdisjoint(ids_after)
 
@@ -285,7 +286,7 @@ class TestFaceDownScrubbing:
         battle.move_zone(b, static_opp, creature, "hand", "battlefield")
         battle.update_card_state(b, alice, "face_down", creature.id)
 
-        view = game_manager._make_battle_view(b, alice, game)
+        view = build_battle_view(b, alice, game=game)
 
         face_down_bf = [c for c in view.opponent_zones.battlefield if c.id in view.opponent_zones.face_down_card_ids]
         assert len(face_down_bf) == 1
@@ -305,7 +306,7 @@ class TestFaceDownScrubbing:
         battle_state = battle.start(game, alice, static_opp)
         battle_state.opponent_zones.library = [card_factory("LibCard")]
 
-        battle_view = game_manager._make_battle_view(battle_state, alice, game)
+        battle_view = build_battle_view(battle_state, alice, game=game)
 
         assert len(battle_view.opponent_zones.library) == 1
 
@@ -322,7 +323,7 @@ class TestFaceDownScrubbing:
         )
 
         b = battle.start(game, alice, static_opp)
-        view = game_manager._make_battle_view(b, alice, game)
+        view = build_battle_view(b, alice, game=game)
         assert view.can_manipulate_opponent is True
 
     def test_can_manipulate_opponent_false_for_pvp(self, game_manager):
@@ -333,7 +334,7 @@ class TestFaceDownScrubbing:
         setup_battle_ready(bob)
 
         b = battle.start(game, alice, bob)
-        view = game_manager._make_battle_view(b, alice, game)
+        view = build_battle_view(b, alice, game=game)
         assert view.can_manipulate_opponent is False
 
     def test_pvp_scrubbing_remaps_tapped_and_counters(self, game_manager, card_factory):
@@ -352,7 +353,7 @@ class TestFaceDownScrubbing:
         battle.update_card_state(b, bob, "tap", creature.id)
         battle.update_card_state(b, bob, "counter", creature.id, {"counter_type": "+1/+1", "delta": 1})
 
-        view = game_manager._make_battle_view(b, alice, game)
+        view = build_battle_view(b, alice, game=game)
 
         assert creature.id not in view.opponent_zones.tapped_card_ids
         assert creature.id not in view.opponent_zones.counters
