@@ -1,0 +1,779 @@
+@layer components {
+  /* The felt takes just the room left, and only the seats scroll in it, so the buttons under them hold still */
+  .lobby-felt {
+    flex: 1 1 0;
+    justify-content: flex-start;
+    min-height: 264px;
+    padding: 2px 10px 6px;
+  }
+
+  .lobby-summary {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    height: 20px;
+    color: var(--ivory-felt);
+    white-space: nowrap;
+  }
+
+  .lobby-summary b {
+    color: var(--ivory);
+    font-weight: 600;
+  }
+
+  .lobby-spectating {
+    color: var(--ivory);
+  }
+
+  .lobby-spectating::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin: 0 5px 1px 9px;
+    border-radius: 50%;
+    background: var(--color-gold-bright);
+  }
+
+  /* On narrow phones Open Spectating takes the seated count's place */
+  @media (width < 390px) {
+    .setup-page:has(.lobby-deck) .lobby-summary:has(.lobby-spectating) b {
+      display: none;
+    }
+  }
+
+  @media (width < 360px) {
+    .lobby-summary:has(.lobby-spectating) b {
+      display: none;
+    }
+  }
+
+  .lobby-deck {
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+
+  .lobby-seats {
+    display: grid;
+    flex: 0 1 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: max-content;
+    align-content: start;
+    gap: 4px 6px;
+    min-height: 96px;
+    margin-top: 2px;
+    overflow-y: auto;
+  }
+
+  .seat {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 50px;
+    padding-left: 9px;
+    border-radius: 8px;
+  }
+
+  .seat-taken {
+    border: 1px solid #5a4d46;
+    background: linear-gradient(180deg, #453a36, var(--chrome-modal));
+    box-shadow:
+      0 1px 0 #0000004d,
+      inset 0 1px 0 #ffecb51a;
+  }
+
+  .seat-taken.is-self {
+    border-color: #8a7536;
+  }
+
+  .seat-open {
+    border: 1px dashed #74917a;
+  }
+
+  .seat-text {
+    flex: 1;
+    min-width: 0;
+    padding-right: 4px;
+    text-align: left;
+  }
+
+  .seat-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 14px;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  .seat-status {
+    margin-top: 2px;
+    font-size: 9.5px;
+    line-height: 12px;
+    letter-spacing: 0.08em;
+  }
+
+  .seat-open .seat-name {
+    color: var(--ivory-felt);
+    font-weight: 500;
+  }
+
+  .seat-open .seat-status {
+    color: var(--ivory-felt);
+    font-weight: 600;
+  }
+
+  .lobby-felt .seat-name.is-long-name {
+    font-size: 10px;
+    line-height: 10.5px;
+  }
+
+  .seat:has(.is-long-name) .seat-status {
+    margin-top: 0;
+    line-height: 11px;
+  }
+
+  /* A long name runs under the transparent part of the next icon's target */
+  .seat:has(.is-long-name) > .seat-text {
+    padding-right: 0;
+  }
+
+  .seat:has(.is-long-name) > .seat-text + .icon-target {
+    margin-left: -12px;
+  }
+
+  .seat-add + .icon-target {
+    position: relative;
+  }
+
+  .seat-add:has(+ .icon-target) {
+    padding-right: 0;
+  }
+
+  /* The whole seat adds a puppet except ?'s own 44px, the blank beyond it too */
+  .seat-add:has(+ .icon-target)::before {
+    right: -88px;
+  }
+
+  .seat-add:has(+ .icon-target) .seat-status {
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+
+  @media (width < 375px) {
+    /* Open seat stays on one line beside ?, so its caption has room for two */
+    .lobby-felt .seat-add:has(+ .icon-target) .seat-name {
+      font-size: 11px;
+      line-height: 13px;
+      white-space: nowrap;
+    }
+
+    .seat-add:has(+ .icon-target) .seat-status {
+      margin-top: 1px;
+      line-height: 11px;
+    }
+  }
+
+  .seat-ready {
+    color: var(--win-text);
+  }
+
+  .seat-add {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    align-self: stretch;
+  }
+
+  /* Out to the seat's edges, which the 44px targets share */
+  .seat-add::before {
+    content: "";
+    position: absolute;
+    inset: -1px 0 -1px -9px;
+  }
+
+  @media (hover: hover) {
+    .seat-add:hover:not(:disabled) .seat-status {
+      color: var(--color-gold-bright);
+    }
+  }
+
+  .seat-add:disabled {
+    cursor: default;
+  }
+
+  .seat-add:disabled .seat-status {
+    color: var(--ivory-faint);
+  }
+
+  .seat-add:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .seat > button:not(.seat-add) {
+    margin-block: -1px;
+  }
+
+  .is-compact .seat {
+    min-height: 44px;
+  }
+
+  .is-compact .seat-name {
+    font-size: 12px;
+    line-height: 13px;
+  }
+
+  .is-compact .seat-status {
+    margin-top: 1px;
+    line-height: 11px;
+  }
+
+  .lobby-settings {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    margin-top: auto;
+  }
+
+  .lobby-actions {
+    display: grid;
+    flex: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .lobby-actions.is-guest {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (hover: none) {
+    /* iOS zooms the page into a focused field smaller than 16px */
+    .setup-input {
+      font-size: 16px;
+    }
+  }
+
+  @media (width < 640px) {
+    /* The longest names are too small to read over art */
+    .cube-banner:has(.is-longest) .cube-band-image,
+    .cube-banner-title:has(.is-longest) .tag {
+      display: none;
+    }
+
+    .cube-banner-title:has(.is-longest) {
+      max-width: calc(100% - 64px);
+    }
+
+    .cube-banner-top:not(:has(.cube-banner-action))
+      > .cube-banner-title:has(.is-longest) {
+      max-width: 100%;
+    }
+
+    .cube-banner.has-art .cube-banner-name.is-longest {
+      text-shadow: 0 1px 2px #000b;
+    }
+
+    .cube-banner-name.is-longest {
+      font-size: 11px;
+      line-height: 12px;
+    }
+
+    .is-longest .cube-banner-words {
+      -webkit-line-clamp: 4;
+    }
+
+    .resume-shelf .is-long .resume-title {
+      font-size: 12px;
+      line-height: 12px;
+    }
+
+    .resume-shelf .is-long .resume-detail {
+      line-height: 12px;
+    }
+  }
+
+  /* Six characters of code, "Copied!" and the stepper share one row */
+  @media (width < 390px) {
+    .join-code {
+      letter-spacing: 0.04em;
+    }
+
+    .cube-banner-strip,
+    .seat-stepper {
+      gap: 6px;
+    }
+  }
+
+  @media (width < 375px) {
+    .cube-banner-name.is-medium {
+      font-size: 14px;
+      line-height: 16px;
+    }
+
+    .cube-banner-name.is-long {
+      font-size: 14px;
+      line-height: 14px;
+    }
+  }
+
+  @media (width < 360px) {
+    .cube-banner-name.is-longest,
+    .cube-banner-notice {
+      font-size: 10px;
+      line-height: 11px;
+    }
+
+    .is-longest .cube-banner-words {
+      -webkit-line-clamp: 5;
+    }
+
+    /* Guided stacks over its switch, which leaves the name room for 21 characters */
+    .play-felt .setup-row {
+      gap: 2px;
+    }
+
+    .play-felt .setup-row > .setup-field {
+      padding-inline: 8px;
+    }
+
+    .play-felt .setup-setting {
+      gap: 0;
+    }
+
+    .play-felt .setup-setting .switch {
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      min-width: 44px;
+      line-height: 13px;
+    }
+
+    .resume-open.has-close-space {
+      padding-right: 4px;
+    }
+
+    .resume-shelf .is-long .resume-title,
+    .resume-shelf .is-long .resume-detail {
+      line-height: 11px;
+    }
+
+    .seat.is-self .seat-status {
+      letter-spacing: 0.03em;
+    }
+
+    .seat-add::before {
+      left: -5px;
+    }
+
+    .lobby-felt .seat-add:has(+ .icon-target) .seat-name {
+      font-size: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .lobby-felt .seat-open:has(> .seat-add + .icon-target) {
+      padding-left: 4px;
+    }
+
+    .cube-banner-strip {
+      gap: 4px;
+      padding-left: 8px;
+    }
+
+    .seat-stepper {
+      gap: 2px;
+    }
+
+    .join-code-caption {
+      letter-spacing: 0.08em;
+    }
+
+    .join-code {
+      font-size: 24px;
+    }
+
+    .seat-count {
+      width: 40px;
+      font-size: 11px;
+    }
+
+    .resume-open {
+      gap: 7px;
+      padding-left: 8px;
+    }
+
+    .resume-detail {
+      line-height: 13px;
+    }
+
+    .resume-chevron {
+      display: none;
+    }
+
+    /* The stage takes the art's room */
+    .resume-stage {
+      width: 42px;
+      margin-left: -8px;
+    }
+
+    .resume-stage + .resume-art {
+      display: none;
+    }
+
+    .lobby-felt {
+      padding-inline: 6px;
+    }
+
+    .lobby-summary {
+      font-size: 11px;
+    }
+
+    .lobby-seats {
+      column-gap: 4px;
+    }
+
+    .lobby-felt .seat {
+      padding-left: 5px;
+    }
+
+    .seat-text {
+      padding-right: 0;
+    }
+
+    .lobby-felt .seat-name {
+      font-size: 12px;
+      line-height: 13px;
+    }
+
+    .seat:has(.icon-target + .icon-target) .seat-name {
+      font-size: 11px;
+    }
+  }
+
+  /* A phone tall enough keeps eight seats' room, whatever the count */
+  @media (width < 640px) and (min-height: 640px) {
+    .lobby-felt {
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .lobby-felt .lobby-seats {
+      height: 188px;
+      margin-top: 0;
+    }
+
+    .lobby-settings {
+      margin-top: 0;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .setup-felt {
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .play-felt {
+      max-width: 540px;
+      gap: 18px;
+    }
+
+    .setup-pitch {
+      line-height: 19px;
+    }
+
+    .lobby-felt {
+      min-height: 336px;
+      max-width: 660px;
+      gap: 16px;
+      padding-top: 4px;
+    }
+
+    .lobby-felt .lobby-seats {
+      gap: 10px;
+      height: 286px;
+      margin-top: 0;
+    }
+
+    .lobby-felt .seat {
+      min-height: 64px;
+      padding-left: 14px;
+    }
+
+    .seat-add::before {
+      left: -14px;
+    }
+
+    .lobby-felt .seat-name {
+      font-size: 14px;
+      line-height: 18px;
+    }
+
+    .lobby-felt .seat-name.is-long-name {
+      font-size: 13px;
+      line-height: 15px;
+    }
+
+    .lobby-settings {
+      justify-content: center;
+      gap: 32px;
+      margin-top: 0;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .cube-banner {
+      --btn-secondary-fill: var(--stone);
+      --btn-secondary-fill-hover: var(--stone-light);
+      /* Lines the rows up with the felt's 1040px column, past the frame's 84px of rails and edges */
+      --banner-inset: clamp(12px, (100vw - 84px - 1040px) / 2, 78px);
+      grid-template-columns: minmax(0, 1fr) min(598px, 100% - 560px);
+      grid-template-rows: 54px 55px;
+      padding-inline: max(0px, (100% - 1196px) / 2);
+      border-bottom: 1px solid var(--gold-border-opaque);
+    }
+
+    .cube-banner-art {
+      grid-area: 1 / 2 / span 2;
+      background: none;
+      --art-focus: 0.4;
+    }
+
+    .cube-banner.has-art .cube-banner-art {
+      border-left: 1px solid var(--gold-border-opaque);
+    }
+
+    .cube-banner .cube-band-image {
+      filter: brightness(0.68) saturate(0.78);
+    }
+
+    .cube-banner-top {
+      align-items: flex-start;
+      padding: 8px 16px 0 var(--banner-inset);
+    }
+
+    .cube-banner-title {
+      max-width: min(400px, 100% - 80px);
+    }
+
+    .cube-banner-strip {
+      padding: 0 16px 0 var(--banner-inset);
+      border-block: none;
+    }
+
+    .lobby-felt {
+      max-width: 1060px;
+    }
+
+    .lobby-felt .lobby-seats {
+      height: 138px;
+      grid-template-columns: repeat(var(--seat-columns), minmax(0, 1fr));
+    }
+
+    .lobby-actions {
+      align-self: center;
+      width: 532px;
+    }
+
+    .lobby-actions.is-guest {
+      width: 260px;
+    }
+  }
+
+  /* Short tablets and windows take the phones' seats, so Start and Constructed's fourth row of seats stay in view */
+  @media (640px <= width < 1024px) and (height < 742px) {
+    .lobby-felt {
+      gap: 4px;
+      min-height: 280px;
+      padding-block: 2px 6px;
+    }
+
+    .lobby-felt .lobby-seats {
+      gap: 4px 8px;
+      height: 188px;
+    }
+
+    .lobby-felt .seat {
+      min-height: 44px;
+    }
+
+    .lobby-felt .seat-name {
+      font-size: 12px;
+      line-height: 13px;
+    }
+
+    .lobby-felt .seat-status {
+      margin-top: 1px;
+      line-height: 11px;
+    }
+
+    .lobby-felt .seat-name.is-long-name {
+      font-size: 11px;
+      line-height: 11px;
+    }
+  }
+
+  /* A short phone has no room in the felt for the deck's row beside eight seats, so the row lies over the cube's,
+     which names the same deck. CSS alone moves it, so the field keeps its focus when a keyboard shortens the
+     window. */
+  @media (width < 640px) and (height < 640px) {
+    .lobby-deck {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 56px;
+      margin: 0;
+      padding: 0 4px 0 12px;
+      background: var(--art-fade);
+    }
+
+    /* Covered, so out of the tab order too */
+    .setup-page:has(.lobby-deck:not(.is-loaded)) .cube-banner-top {
+      visibility: hidden;
+    }
+
+    .lobby-deck.is-loaded {
+      inset: 12px 72px auto auto;
+      height: 44px;
+      padding: 0;
+      background: none;
+    }
+
+    .lobby-deck.is-loaded > .setup-field,
+    .setup-page:has(.lobby-deck) .cube-banner-notice,
+    .setup-page:has(.lobby-deck) .cube-banner-title .tag,
+    .lobby-away-notice + .lobby-settings {
+      display: none;
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner-action .btn-pill {
+      width: 60px;
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner-title {
+      display: flex;
+      max-width: calc(100% - 136px);
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded)
+      .cube-banner.has-notice:not(:has(.is-longest))
+      .cube-band-image {
+      display: block;
+    }
+
+    .lobby-away-notice {
+      display: flex;
+    }
+  }
+
+  /* Past the block's own 1196px the art has walnut on both sides */
+  @media (min-width: 1281px) {
+    .cube-banner.has-art .cube-banner-art {
+      border-right: 1px solid var(--gold-border-opaque);
+    }
+  }
+
+  @media (width < 1024px) {
+    /* The notice stands on walnut in the art's row */
+    .cube-banner.has-notice .cube-band-image {
+      display: none;
+    }
+
+    /* Over art the name needs a tighter halo, to stay readable on pale cards */
+    .cube-banner.has-art .cube-banner-name {
+      text-shadow:
+        0 1px 1px #000,
+        0 0 2px #000,
+        0 0 3px #000,
+        0 0 6px #000;
+    }
+  }
+
+  /* Home's shelf is one row, so it keeps one size from a phone to a desktop */
+  .home-shelf {
+    flex: none;
+  }
+
+  .home-shelf-row {
+    display: flex;
+    width: 100%;
+    max-width: 720px;
+    min-height: 56px;
+    margin-inline: auto;
+  }
+
+  .home-shelf .resume-open {
+    gap: 10px;
+    padding-right: 12px;
+  }
+
+  .home-shelf .resume-art {
+    width: 36px;
+    height: 36px;
+  }
+
+  .home-shelf .resume-art > img {
+    filter: none;
+  }
+
+  .home-shelf .resume-title {
+    font-size: 14px;
+    line-height: 18px;
+  }
+
+  .home-shelf .resume-detail {
+    color: var(--ivory-soft);
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .home-shelf .resume-chevron {
+    color: var(--color-gold);
+  }
+
+  .home-shelf-more {
+    flex: none;
+    padding-inline: 14px;
+    border-left: 1px solid var(--gold-border-opaque);
+    color: var(--color-gold);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .home-shelf-more:focus-visible {
+    outline-offset: -2px;
+  }
+
+  @media (hover: hover) {
+    .home-shelf-more:hover {
+      background: var(--stone);
+    }
+  }
+
+  @media (width < 420px) {
+    .home-shelf .resume-since {
+      display: none;
+    }
+
+    .home-shelf-more {
+      padding-inline: 10px;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    .cube-banner,
+    .setup-felt,
+    .resume-space {
+      zoom: 1.3;
+    }
+  }
+}
+
+.setup-field input:-webkit-autofill,
+.setup-field input:-webkit-autofill:hover,
+.setup-field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ivory);
+}
