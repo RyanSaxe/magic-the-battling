@@ -60,6 +60,8 @@ interface ZoneLayoutProps {
   overlay?: ReactNode;
 }
 
+type ZoneLayoutContentProps = Omit<ZoneLayoutProps, "containerRef">;
+
 const PASSIVE_DIVIDER_CALLBACKS: DividerDragCallbacks = {
   onDragStart: (): void => {},
   onDrag: (): void => {},
@@ -214,7 +216,7 @@ function resolveLowerRowHandles(
 }
 
 function resolveLowerRowStyles(
-  props: ZoneLayoutProps,
+  props: ZoneLayoutContentProps,
   isControlled: boolean,
 ): {
   battlefieldStyle?: CSSProperties;
@@ -237,7 +239,7 @@ function UpgradesZoneSection({
   upgradesStyle,
   topHandle,
 }: {
-  props: ZoneLayoutProps;
+  props: ZoneLayoutContentProps;
   isMobile: boolean;
   upgradesStyle: CSSProperties;
   topHandle: DividerDragCallbacks | null;
@@ -266,7 +268,7 @@ function UpgradesZoneSection({
 }
 
 interface LowerZonesRowProps {
-  props: ZoneLayoutProps;
+  props: ZoneLayoutContentProps;
   isControlled: boolean;
   isMobile: boolean;
   hasRight: boolean;
@@ -331,7 +333,7 @@ function HandZoneSection({
   props,
   handStyle,
 }: {
-  props: ZoneLayoutProps;
+  props: ZoneLayoutContentProps;
   handStyle?: CSSProperties;
 }): ReactElement | null {
   if (!props.hasHand) return null;
@@ -348,7 +350,10 @@ function HandZoneSection({
   );
 }
 
-export function ZoneLayout(props: ZoneLayoutProps): ReactElement {
+export function ZoneLayout({
+  containerRef,
+  ...props
+}: ZoneLayoutProps): ReactElement {
   const isMobile = Boolean(props.isMobile);
   const hasRight = props.hasBattlefield || props.hasSideboard;
   const hasLower = hasRight || props.hasUpgrades;
@@ -368,7 +373,7 @@ export function ZoneLayout(props: ZoneLayoutProps): ReactElement {
   return (
     <div
       role="presentation"
-      ref={props.containerRef}
+      ref={containerRef}
       className={rootClassName}
       onClick={props.onClick}
       data-guide-target={props.containerTargetId}

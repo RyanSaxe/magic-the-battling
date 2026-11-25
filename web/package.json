@@ -36,6 +36,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.23",
+    "babel-plugin-react-compiler": "^1.0.0",
     "jsdom": "^31.0.1",
     "oxfmt": "0.80.0",
     "oxlint": "1.95.0",

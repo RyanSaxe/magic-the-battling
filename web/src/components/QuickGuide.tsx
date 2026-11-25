@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   type ReactNode,
   type Ref,
   useCallback,
@@ -10,7 +12,6 @@ import {
 import { FaDiscord } from "react-icons/fa6";
 import { DOCS, getPhaseDoc, type DocEntry } from "../docs";
 import { useQuickGuideEffects } from "../hooks/ui/useDialogBehavior";
-import { DocRenderer } from "./DocRenderer";
 import { CardsView } from "./CardsView";
 import {
   getPhaseControlsLabel,
@@ -402,9 +403,25 @@ function buildPhaseGuideContent(doc: DocEntry): string {
   return additional ? `${overview}\n\n${additional}` : overview;
 }
 
+const LazyDocRenderer = lazy(async () => ({
+  default: (await import("./DocRenderer")).DocRenderer,
+}));
+
+function DocMarkdown({ content }: { content: string }): ReactNode {
+  return (
+    <Suspense
+      fallback={
+        <p className="text-sm text-[var(--ivory-muted)]">Loading guide…</p>
+      }
+    >
+      <LazyDocRenderer content={content} />
+    </Suspense>
+  );
+}
+
 function docBody(content: string | undefined, missing: string): ReactNode {
   return content ? (
-    <DocRenderer content={content} />
+    <DocMarkdown content={content} />
   ) : (
     <p className="text-sm">{missing}</p>
   );
@@ -419,7 +436,7 @@ function PhaseControlsContent({ phase }: { phase: Phase }): ReactNode {
   return (
     <div className="space-y-4 text-sm sm:text-base">
       {controlsMarkdown ? (
-        <DocRenderer content={controlsMarkdown} />
+        <DocMarkdown content={controlsMarkdown} />
       ) : (
         <p className="text-sm text-[var(--ivory-muted)]">
           Controls are not defined for this phase yet.
@@ -749,7 +766,7 @@ export function QuickGuide({
   const faqPages = faqEntries.map(({ slug, question, answer }) => ({
     id: slug,
     title: question,
-    body: <DocRenderer content={answer} />,
+    body: <DocMarkdown content={answer} />,
   }));
   const cardTypes = buildCardTypes(useUpgrades, useVanguards);
 
