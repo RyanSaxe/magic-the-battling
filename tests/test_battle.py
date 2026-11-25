@@ -348,7 +348,7 @@ def test_sideboard_to_battlefield_syncs_player_model(card_factory):
     b = battle.start(game, alice, bob)
 
     manager = GameManager()
-    manager.handle_battle_move(game, alice, wish_target.id, "sideboard", "battlefield")
+    manager.handle_battle_move(game, alice, wish_target.id, from_zone="sideboard", to_zone="battlefield")
 
     assert wish_target not in alice.sideboard
     assert wish_target in b.player_zones.battlefield
@@ -818,7 +818,13 @@ class TestOpponentZoneManipulation:
 
         manager = GameManager()
         result = manager.handle_battle_move(
-            game, alice, opp_card.id, "battlefield", "graveyard", from_owner="opponent", to_owner="opponent"
+            game,
+            alice,
+            opp_card.id,
+            from_zone="battlefield",
+            to_zone="graveyard",
+            from_owner="opponent",
+            to_owner="opponent",
         )
 
         assert result
@@ -849,7 +855,13 @@ class TestOpponentZoneManipulation:
 
         manager = GameManager()
         result = manager.handle_battle_move(
-            game, alice, island.id, "battlefield", "graveyard", from_owner="opponent", to_owner="opponent"
+            game,
+            alice,
+            island.id,
+            from_zone="battlefield",
+            to_zone="graveyard",
+            from_owner="opponent",
+            to_owner="opponent",
         )
 
         assert result
@@ -1185,8 +1197,8 @@ def test_token_persists_when_moved_between_battlefields(card_factory):
         game,
         alice,
         token.id,
-        "battlefield",
-        "battlefield",
+        from_zone="battlefield",
+        to_zone="battlefield",
         from_owner="player",
         to_owner="opponent",
     )

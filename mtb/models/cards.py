@@ -1,5 +1,6 @@
 import random
-from typing import Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Required, TypedDict, Unpack
 
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_serializer, model_validator
 
@@ -31,6 +32,32 @@ class Card(BaseModel):
 
     _card_data: CardData | None = PrivateAttr(default=None)
     _tokens_cache: tuple["Card", ...] | None = PrivateAttr(default=None)
+
+    if TYPE_CHECKING:
+
+        class _CardInitKwargs(TypedDict, total=False):
+            id: Required[str]
+            scryfall_id: str
+            upgrade_target: "Card | None"
+            is_revealed: bool
+            original_owner: str | None
+            name: str
+            image_url: str
+            type_line: str
+            flip_image_url: str | None
+            png_url: str | None
+            flip_png_url: str | None
+            elo: float
+            oracle_text: str | None
+            colors: Sequence[str]
+            keywords: Sequence[str]
+            cmc: float
+            life_modifier: int | None
+            hand_modifier: int | None
+            token_scryfall_ids: Sequence[str]
+            tokens: Sequence["Card | dict[str, Any] | str"]
+
+        def __init__(self, **kwargs: Unpack[_CardInitKwargs]) -> None: ...
 
     @model_validator(mode="before")
     @classmethod
