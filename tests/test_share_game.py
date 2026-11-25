@@ -1,7 +1,6 @@
 import json
 from datetime import UTC, datetime
 from time import monotonic, sleep
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -9,17 +8,13 @@ import server.routers.games as games_module
 import server.services.game_manager as gm_module
 from mtb.models.game import BattleSnapshotData
 from server.db import database
-from server.db.models import CubeMetadata, GameRecord, PlayerGameHistory
+from server.db.models import BattleSnapshot, CubeMetadata, GameRecord, PlayerGameHistory
 from server.services.preview import preview_service
 from server.services.share import _build_puppet_snapshots
 
 
-def _make_source_snapshot(stage: int, round_num: int, treasures: int) -> MagicMock:
-    snapshot = MagicMock()
-    snapshot.stage = stage
-    snapshot.round = round_num
-    snapshot.sudden_death_build = None
-    snapshot.full_state_json = BattleSnapshotData(
+def _make_source_snapshot(player_history_id: int, stage: int, round_num: int, treasures: int) -> BattleSnapshot:
+    full_state_json = BattleSnapshotData(
         hand=[],
         vanguard=None,
         basic_lands=["Plains", "Island", "Mountain"],
@@ -31,30 +26,51 @@ def _make_source_snapshot(stage: int, round_num: int, treasures: int) -> MagicMo
         poison=0,
         play_draw_preference=None,
     ).model_dump_json()
-    return snapshot
-
-
-def test_build_puppet_snapshots_reuses_best_prior_source_snapshot():
-    history = MagicMock(spec=PlayerGameHistory)
-    history.source_history_id = 7
-    history.poison_history_json = json.dumps(
-        {
-            "3_1": 1,
-            "3_2": 2,
-            "3_3": 5,
-        }
+    return BattleSnapshot(
+        player_history_id=player_history_id,
+        stage=stage,
+        round=round_num,
+        hand_json="[]",
+        basic_lands_json=json.dumps(["Plains", "Island", "Mountain"]),
+        applied_upgrades_json="[]",
+        treasures=treasures,
+        full_state_json=full_state_json,
     )
 
-    source_history = MagicMock(spec=PlayerGameHistory)
-    source_history.snapshots = [
-        _make_source_snapshot(3, 1, treasures=1),
-        _make_source_snapshot(3, 2, treasures=4),
-    ]
 
-    db = MagicMock()
-    db.query.return_value.options.return_value.filter.return_value.first.return_value = source_history
+def test_build_puppet_snapshots_reuses_best_prior_source_snapshot(test_db):
+    with database.SessionLocal() as db:
+        db.add(GameRecord(id="src-game", cube_id="cube", ended_at=datetime.now(UTC)))
+        db.add(GameRecord(id="puppet-game", cube_id="cube", ended_at=datetime.now(UTC)))
+        source_history = PlayerGameHistory(
+            game_id="src-game",
+            player_name="SourcePlayer",
+            battler_elo=1200,
+            max_stage=3,
+            max_round=2,
+        )
+        db.add(source_history)
+        db.flush()
+        db.add_all(
+            [
+                _make_source_snapshot(source_history.id, 3, 1, treasures=1),  # ty: ignore[invalid-argument-type]
+                _make_source_snapshot(source_history.id, 3, 2, treasures=4),  # ty: ignore[invalid-argument-type]
+            ]
+        )
+        puppet_history = PlayerGameHistory(
+            game_id="puppet-game",
+            player_name="Bot",
+            battler_elo=1200,
+            max_stage=3,
+            max_round=3,
+            is_puppet=True,
+            source_history_id=source_history.id,
+            poison_history_json=json.dumps({"3_1": 1, "3_2": 2, "3_3": 5}),
+        )
+        db.add(puppet_history)
+        db.commit()
 
-    snapshots = _build_puppet_snapshots(history, db)
+        snapshots = _build_puppet_snapshots(puppet_history, db)
 
     assert [(snapshot.stage, snapshot.round) for snapshot in snapshots] == [
         (3, 1),
