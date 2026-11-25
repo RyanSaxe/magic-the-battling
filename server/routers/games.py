@@ -19,7 +19,6 @@ from server.schemas.api import (
     CreateGameResponse,
     GameBootstrapResponse,
     GameCardsResponse,
-    GameStatusPlayer,
     GameStatusResponse,
     JoinGameRequest,
     JoinGameResponse,
@@ -34,6 +33,7 @@ from server.schemas.api import (
     StartGameResponse,
 )
 from server.services.auth import get_optional_user
+from server.services.game.view_builder import build_share_state
 from server.services.game_manager import (
     LOBBY_STARTING_MESSAGE,
     BattlerReady,
@@ -47,7 +47,6 @@ from server.services.game_serialization import catalog_entries_for_cards
 from server.services.ops_manager import ops_manager
 from server.services.seat_tokens import SeatClaimRefusal, SeatClaimRefusedError
 from server.services.session_manager import session_manager
-from server.services.share import build_share_data
 from server.services.spectate_requests import SpectateRequest, TooManySpectateRequestsError
 
 logger = logging.getLogger(__name__)
@@ -407,11 +406,7 @@ async def rejoin_game(
 
     The caller must hold the seat's token or be logged in as the account that took it. The new session's
     socket replaces any socket still open on the seat."""
-    if not (
-        game_manager.get_pending_game(game_id)
-        or game_manager.get_game(game_id)
-        or game_manager.restore_game_from_snapshot(game_id)
-    ):
+    if not game_manager.has_game(game_id):
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     async with game_manager.get_action_lock(game_id):
@@ -447,11 +442,7 @@ async def close_seat(
     A caller logged in as that account can send an empty token."""
     if ops_manager.is_maintenance():
         raise api_error(503, ErrorCode.SERVER_MAINTENANCE, "Server maintenance in progress. Try again shortly.")
-    if not (
-        game_manager.get_pending_game(game_id)
-        or game_manager.get_game(game_id)
-        or game_manager.restore_game_from_snapshot(game_id)
-    ):
+    if not game_manager.has_game(game_id):
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     async with game_manager.get_action_lock(game_id):
@@ -556,71 +547,13 @@ def get_game_state(game_id: str, session_id: str):
 
 @router.get("/{game_id}/status", response_model=GameStatusResponse)
 def get_game_status(game_id: str):
-    pending = game_manager.get_pending_game(game_id)
-    game = game_manager.get_game(game_id)
-    if not pending and not game:
-        game_manager.restore_game_from_snapshot(game_id)
-        game = game_manager.get_game(game_id)
-
-    if not pending and not game:
+    status = game_manager.get_game_status(
+        game_id,
+        connected_player_ids=connection_manager.get_connected_player_ids(game_id),
+    )
+    if status is None:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
-
-    connected_player_ids = connection_manager.get_connected_player_ids(game_id)
-
-    players: list[GameStatusPlayer] = []
-
-    if pending:
-        for i, name in enumerate(pending.player_names):
-            player_id = pending.player_ids[i]
-            players.append(
-                GameStatusPlayer(
-                    name=name,
-                    is_connected=player_id in connected_player_ids,
-                    is_puppet=False,
-                    phase="lobby",
-                )
-            )
-        return GameStatusResponse(
-            game_id=game_id,
-            phase="lobby",
-            is_started=pending.is_started,
-            players=players,
-            auto_approve_spectators=pending.auto_approve_spectators,
-        )
-
-    if game:
-        for player in game.players:
-            player_id = game_manager.get_player_id_by_name(game_id, player.name)
-            players.append(
-                GameStatusPlayer(
-                    name=player.name,
-                    is_connected=player_id in connected_player_ids if player_id else False,
-                    is_puppet=False,
-                    phase=player.phase,
-                )
-            )
-        players.extend(
-            GameStatusPlayer(
-                name=fake.name,
-                is_connected=True,
-                is_puppet=True,
-                phase="battle" if not fake.is_eliminated else "eliminated",
-            )
-            for fake in game.puppets
-        )
-
-        phases = {p.phase for p in game.players if p.phase != "eliminated"}
-        phase = phases.pop() if len(phases) == 1 else "mixed"
-
-        return GameStatusResponse(
-            game_id=game_id,
-            phase=phase,
-            is_started=True,
-            players=players,
-            auto_approve_spectators=game.config.auto_approve_spectators,
-        )
-
-    raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+    return status
 
 
 @router.post("/{game_id}/spectate-request", response_model=SpectateRequestResponse)
@@ -675,4 +608,4 @@ async def cancel_spectate_request(game_id: str, request_id: str):
 
 @router.get("/{game_id}/share/{player_name}", response_model=ShareGameResponse)
 def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)):  # noqa: B008
-    return build_share_data(db, game_id, player_name)
+    return build_share_state(db, game_id, player_name=player_name)

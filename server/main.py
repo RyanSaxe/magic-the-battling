@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     init_db()
     ops_manager.load()
     if RESTORE_ACTIVE_GAME_SNAPSHOTS:
-        game_manager.restore_all_snapshots()
+        await game_manager.restore_all_snapshots()
     else:
         logging.getLogger(__name__).info("Active game snapshot restore disabled by MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS")
     if _preview_disabled():

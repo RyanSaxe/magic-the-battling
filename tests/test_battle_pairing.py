@@ -10,7 +10,7 @@ from conftest import setup_battle_ready
 
 from mtb.models.game import Game, Player, Puppet, StaticOpponent, create_game
 from mtb.phases import battle
-from server.services.game_manager import GameManager
+from server.services.game.view_builder import build_puppet_view
 
 
 class TestPairingProbabilities:
@@ -194,8 +194,7 @@ class TestUnifiedPairingCandidates:
         fake.snapshots["4_1"] = current_snapshot
         game.puppets.append(fake)
 
-        manager = GameManager()
-        player_view = manager._make_fake_player_view(fake, alice, {})
+        player_view = build_puppet_view(fake, alice, probabilities={})
 
         revealed_ids = {card.id for card in player_view.most_recently_revealed_cards}
         assert creature.id in revealed_ids
