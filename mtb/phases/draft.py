@@ -4,6 +4,7 @@ from mtb.models.cards import Card
 from mtb.models.game import Config, DraftState, Game, Player
 from mtb.models.types import CardDestination
 from mtb.phases import build
+from mtb.phases.round_resolution import transition_phase
 
 
 def _get_player_collection(player: Player, destination: CardDestination) -> list[Card]:
@@ -173,7 +174,7 @@ def end_for_player(game: Game, player: Player) -> None:
     if current_pack:
         _get_player_battler(player).cards.extend(current_pack)
 
-    player.phase = "build"
+    transition_phase(player, "build")
     build.populate_hand(player)
 
 

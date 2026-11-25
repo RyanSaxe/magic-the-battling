@@ -44,6 +44,10 @@ def get_same_round_exits(game: Game, participant: Participant) -> list[Participa
     return [p for p in out if _get_round_it_went_out(p) == out_round]
 
 
+def participant_join_order(game: Game) -> dict[int, int]:
+    return {id(participant): idx for idx, participant in enumerate([*game.players, *game.puppets])}
+
+
 def _settle_placement(game: Game, participant: Participant) -> None:
     if participant.in_sudden_death:
         # Sudden Death resets both fighters' poison, so it decides its loser's place, not poison.
@@ -51,11 +55,15 @@ def _settle_placement(game: Game, participant: Participant) -> None:
         return
     exits = sorted(get_same_round_exits(game, participant), key=lambda p: p.placement)
     places = [p.placement for p in exits]
-    for place, out in zip(places, sorted(exits, key=lambda p: p.poison), strict=True):
+    join_index = participant_join_order(game)
+    ranked = sorted(exits, key=lambda p: (p.poison, join_index.get(id(p), 0)))
+    for place, out in zip(places, ranked, strict=True):
         out.placement = place
 
 
 def eliminate_puppet(game: Game, puppet: Puppet) -> None:
+    if puppet.last_played_round is None:
+        puppet.last_played_round = (puppet.stage, puppet.round)
     puppet.is_eliminated = True
     remaining = len(get_live_players(game)) + len(get_live_puppets(game))
     puppet.placement = remaining + 1
