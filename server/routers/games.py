@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from mtb.utils.cubecobra import get_cube_data
+from pitfight.utils.cubecobra import get_cube_data
 from server.db import database
 from server.db.models import User
 from server.errors import ErrorCode, api_error

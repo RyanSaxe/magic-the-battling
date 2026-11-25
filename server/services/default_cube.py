@@ -4,7 +4,7 @@ import logging
 import threading
 from time import perf_counter
 
-from mtb.models.cards import DEFAULT_BATTLER_ID, DEFAULT_UPGRADES_ID, build_battler
+from pitfight.models.cards import DEFAULT_BATTLER_ID, DEFAULT_UPGRADES_ID, build_battler
 
 logger = logging.getLogger(__name__)
 

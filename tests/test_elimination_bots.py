@@ -1,8 +1,8 @@
 from conftest import setup_battle_ready
 
-from mtb.models.cards import Card
-from mtb.models.game import BattleSnapshotData, LastBattleResult, Puppet, StaticOpponent, create_game
-from mtb.phases import battle, elimination, reward
+from pitfight.models.cards import Card
+from pitfight.models.game import BattleSnapshotData, LastBattleResult, Puppet, StaticOpponent, create_game
+from pitfight.phases import battle, elimination, reward
 from server.services.game_manager import GameManager
 
 

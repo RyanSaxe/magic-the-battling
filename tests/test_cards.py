@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 import pytest
 
-from mtb.models.cards import Battler, Card, build_battler, validate_battler, validate_constructed_battler
+from pitfight.models.cards import Battler, Card, build_battler, validate_battler, validate_constructed_battler
 
 
 def test_card_upgrade_links_target(card_factory: Callable[..., Card]) -> None:
@@ -52,7 +52,7 @@ def test_build_battler_loads_upgrades_and_vanguards_from_separate_cubes(
             return list(vanguard_cards)
         return []
 
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
     battler = build_battler("main_cube", upgrades_id="upgrades_cube", vanguards_id="vanguards_cube")
 
@@ -77,7 +77,7 @@ def test_build_battler_preserves_original_cards(
             return list(upgrade_cards)
         return []
 
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
     battler = build_battler("main_cube", upgrades_id="upgrades_cube")
 
@@ -103,14 +103,14 @@ def test_build_battler_rejects_source_conspiracies_and_vanguards(
         _ = identifier
         return list(cards)
 
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
     with pytest.raises(ValueError, match="its own Conspiracy and Vanguard cards are not supported"):
         build_battler()
 
 
 def test_build_battler_raises_when_cube_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", lambda _identifier: [])
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", lambda _identifier: [])
 
     with pytest.raises(ValueError, match="has no playable cards"):
         build_battler()

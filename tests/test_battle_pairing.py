@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.cards import Card
-from mtb.models.game import Game, Player, Puppet, StaticOpponent, create_game
-from mtb.phases import battle
+from pitfight.models.cards import Card
+from pitfight.models.game import Game, Player, Puppet, StaticOpponent, create_game
+from pitfight.phases import battle
 from server.services.game.view_builder import build_puppet_view
 
 
@@ -298,8 +298,8 @@ class TestRoundTable:
 
     def test_round_table_is_the_same_after_a_restart(self) -> None:
         script = """
-from mtb.models.game import create_game
-from mtb.phases import battle
+from pitfight.models.game import create_game
+from pitfight.phases import battle
 
 game = create_game([f"P{i}" for i in range(8)], num_players=8)
 for player in game.players:

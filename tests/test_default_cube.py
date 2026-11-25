@@ -22,7 +22,7 @@ def test_the_server_loads_the_default_cube_without_waiting_for_it_or_needing_it(
         msg = f"no network to load {cube_id}"
         raise ConnectionError(msg)
 
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", unreachable_cubecobra)
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", unreachable_cubecobra)
     monkeypatch.setattr(main_module, "start_loading_default_cube", start_loading_default_cube)
 
     try:

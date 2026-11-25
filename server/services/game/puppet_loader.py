@@ -8,13 +8,13 @@ from sqlalchemy import true as sql_true
 from sqlalchemy.orm import Session, joinedload
 
 import server.db.database as db
-from mtb.models.game import (
+from pitfight.models.game import (
     Game,
     Puppet,
     StaticOpponent,
     restore_snapshot_data,
 )
-from mtb.models.types import PlayMode, normalize_play_mode
+from pitfight.models.types import PlayMode, normalize_play_mode
 from server.db.models import (
     GameRecord,
     PlayerGameHistory,

@@ -2,8 +2,8 @@ from collections.abc import Callable
 
 import pytest
 
-from mtb.models.cards import Card, build_battler
-from mtb.models.game import Game
+from pitfight.models.cards import Card, build_battler
+from pitfight.models.game import Game
 from server.services.game_manager import game_manager
 
 
@@ -21,7 +21,7 @@ def test_build_battler_with_separate_upgrades_cube(
             return list(upgrade_cards)
         return []
 
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
     battler = build_battler("main_cube", upgrades_id="upgrades_cube")
 

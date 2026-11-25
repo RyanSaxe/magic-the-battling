@@ -10,9 +10,9 @@ from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Exists, and_, case, distinct, func, or_
 from sqlalchemy.orm import Session, aliased
 
-from mtb.models.cards import find_problem_before_saving
-from mtb.models.types import normalize_play_mode
-from mtb.utils.cubecobra import get_cube_list
+from pitfight.models.cards import find_problem_before_saving
+from pitfight.models.types import normalize_play_mode
+from pitfight.utils.cubecobra import get_cube_list
 from server.db import database
 from server.db.models import (
     BattlerFollow,

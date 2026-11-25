@@ -2,11 +2,11 @@
 
 import random
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Config, DraftState, Game, Player
-from mtb.models.types import CardDestination
-from mtb.phases import build
-from mtb.phases.round_resolution import transition_phase
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Config, DraftState, Game, Player
+from pitfight.models.types import CardDestination
+from pitfight.phases import build
+from pitfight.phases.round_resolution import transition_phase
 
 
 def _get_player_collection(player: Player, destination: CardDestination) -> list[Card]:

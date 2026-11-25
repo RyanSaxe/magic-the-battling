@@ -6,9 +6,9 @@ import pytest
 from sqlalchemy.orm import Session
 
 import server.db.database as db
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
-from mtb.phases import battle
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
+from pitfight.phases import battle
 from server.db.models import ActiveGameSnapshot, GamePlayerRecord, GameRecord, PlayerGameHistory
 from server.services.game_manager import GameManager
 

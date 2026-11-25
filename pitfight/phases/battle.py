@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from typing import NamedTuple, Protocol
 from uuid import uuid4
 
-from mtb.models.cards import Card
-from mtb.models.game import Battle, Game, LastBattleResult, Player, Puppet, StaticOpponent, Zones
-from mtb.models.types import ZoneName
-from mtb.phases.elimination import get_live_players
+from pitfight.models.cards import Card
+from pitfight.models.game import Battle, Game, LastBattleResult, Player, Puppet, StaticOpponent, Zones
+from pitfight.models.types import ZoneName
+from pitfight.phases.elimination import get_live_players
 
 PairingCandidate = Player | StaticOpponent
 
@@ -170,7 +170,7 @@ def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, *, stage: int, round_nu
     if not snap1 or not snap2:
         return
 
-    from mtb.phases import reward as reward_phase  # noqa: PLC0415 -- deferred circular import
+    from pitfight.phases import reward as reward_phase  # noqa: PLC0415 -- deferred circular import
 
     dmg1 = reward_phase.calculate_damage(snap1, use_upgrades=use_upgrades)
     dmg2 = reward_phase.calculate_damage(snap2, use_upgrades=use_upgrades)

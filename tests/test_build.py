@@ -2,9 +2,9 @@ from collections.abc import Callable
 
 import pytest
 
-from mtb.models.cards import Card
-from mtb.models.game import create_game
-from mtb.phases import build
+from pitfight.models.cards import Card
+from pitfight.models.game import create_game
+from pitfight.phases import build
 
 
 def test_move_card_between_hand_and_sideboard(card_factory: Callable[..., Card]) -> None:

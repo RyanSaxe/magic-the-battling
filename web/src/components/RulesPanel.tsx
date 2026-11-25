@@ -18,6 +18,7 @@ import {
   useViewportSync,
 } from "../hooks/useDomEffects";
 import { QuickGuide } from "./QuickGuide";
+import { readMigratedItem } from "../utils/storage";
 import { FloatingWindow } from "./common/FloatingWindow";
 import {
   DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
@@ -72,8 +73,11 @@ type InteractionState =
     }
   | null;
 
-const WINDOW_STORAGE_KEY = "mtb_rules_panel_window:v2";
-const LEGACY_WINDOW_STORAGE_KEY = "mtb_rules_panel_window:v1";
+const WINDOW_STORAGE_KEY = "pitfight_rules_panel_window:v2";
+const LEGACY_WINDOW_STORAGE_KEYS = [
+  "mtb_rules_panel_window:v2",
+  "mtb_rules_panel_window:v1",
+] as const;
 const MOBILE_PANEL_TOP_GAP_PX = 48;
 const MOBILE_PANEL_BOTTOM_GAP_PX = 24;
 const MOBILE_PANEL_MIN_HEIGHT_PX = 280;
@@ -103,8 +107,11 @@ function loadStoredWindowState(): StoredRulesPanelWindowState | null {
     return null;
   }
   return parseStoredWindowState(
-    window.localStorage.getItem(WINDOW_STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_WINDOW_STORAGE_KEY),
+    readMigratedItem(
+      window.localStorage,
+      WINDOW_STORAGE_KEY,
+      LEGACY_WINDOW_STORAGE_KEYS,
+    ),
   );
 }
 

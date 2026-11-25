@@ -1,10 +1,12 @@
+import { readMigratedItem } from "../utils/storage";
 import type {
   GuidedGuideId,
   GuideProgressState,
   GuideStorageIdentity,
 } from "./types";
 
-const GUIDED_PROGRESS_KEY = "mtb_guided_progress";
+const GUIDED_PROGRESS_KEY = "pitfight_guided_progress";
+const LEGACY_GUIDED_PROGRESS_KEY = "mtb_guided_progress";
 const MAX_TRACKED_SESSIONS = 100;
 
 interface StoredProgressEntry {
@@ -90,7 +92,11 @@ function readProgress(): StoredProgress {
   if (!canUseStorage()) return {};
 
   try {
-    const raw = window.localStorage.getItem(GUIDED_PROGRESS_KEY);
+    const raw = readMigratedItem(
+      window.localStorage,
+      GUIDED_PROGRESS_KEY,
+      LEGACY_GUIDED_PROGRESS_KEY,
+    );
     if (!raw) return {};
 
     const parsed: unknown = JSON.parse(raw);

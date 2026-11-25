@@ -65,7 +65,7 @@ const ACCOUNT_RESUMABLE_GAME: ResumableGame = {
 };
 
 function tellOtherTabs(change: () => void): void {
-  const key = "mtb_game_player_map";
+  const key = "pitfight_game_player_map";
   const oldValue = localStorage.getItem(key);
   change();
   window.dispatchEvent(
@@ -124,13 +124,13 @@ describe("Log Out", () => {
     const openTab = renderHook(() => useGameSeat("account-game"));
     expect(openTab.result.current.seat.kind).toBe("held");
 
-    const before = localStorage.getItem("mtb_game_player_map");
+    const before = localStorage.getItem("pitfight_game_player_map");
     await act(() => auth.result.current.logout());
-    const newValue = localStorage.getItem("mtb_game_player_map");
+    const newValue = localStorage.getItem("pitfight_game_player_map");
     act(() => {
       window.dispatchEvent(
         new StorageEvent("storage", {
-          key: "mtb_game_player_map",
+          key: "pitfight_game_player_map",
           oldValue: before,
           newValue,
         }),

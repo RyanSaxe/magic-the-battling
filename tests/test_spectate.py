@@ -10,7 +10,7 @@ from starlette.websockets import WebSocketDisconnect
 
 import server.db.database as db_module
 import server.routers.games as games_module
-from mtb.phases.elimination import eliminate_player
+from pitfight.phases.elimination import eliminate_player
 from server.runtime_config import SPECTATE_REQUEST_TTL_MINUTES
 
 BASICS = ["Plains", "Island", "Swamp"]

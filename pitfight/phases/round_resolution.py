@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
-from mtb.models.game import (
+from pitfight.models.game import (
     Battle,
     BattleResolution,
     BattleResolutionEvent,
@@ -23,8 +23,8 @@ from mtb.models.game import (
     Puppet,
     StaticOpponent,
 )
-from mtb.phases import battle, reward
-from mtb.phases.elimination import (
+from pitfight.phases import battle, reward
+from pitfight.phases.elimination import (
     Participant,
     check_game_over,
     eliminate_player,
@@ -42,7 +42,7 @@ from mtb.phases.elimination import (
 )
 
 if TYPE_CHECKING:
-    from mtb.models.types import Phase
+    from pitfight.models.types import Phase
 
 ResolutionStatus = Literal["game_over", "sudden_death"]
 

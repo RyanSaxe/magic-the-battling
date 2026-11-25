@@ -1,4 +1,4 @@
-"""Round orchestration: starting each round's fights, applying what mtb.phases.round_resolution decides."""
+"""Round orchestration: starting each round's fights, applying what pitfight.phases.round_resolution decides."""
 
 import json
 import logging
@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from mtb.models.game import (
+from pitfight.models.game import (
     Battle,
     BattleSnapshotData,
     Game,
@@ -16,13 +16,13 @@ from mtb.models.game import (
     StaticOpponent,
     slim_snapshot_dump,
 )
-from mtb.phases import battle, build, draft, reward
-from mtb.phases.elimination import (
+from pitfight.phases import battle, build, draft, reward
+from pitfight.phases.elimination import (
     get_live_players,
     get_live_puppets,
     get_same_round_exits,
 )
-from mtb.phases.round_resolution import (
+from pitfight.phases.round_resolution import (
     RoundResolutionOutcome,
     finalize_game_over,
     resolve_battle,

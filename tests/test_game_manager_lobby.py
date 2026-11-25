@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 import pytest
 
 import server.db.database as db
-from mtb.models.cards import Battler, Card
-from mtb.models.game import BattleSnapshotData, Game, create_game
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import BattleSnapshotData, Game, create_game
 from server.db.models import BattleSnapshot, GameRecord, PlayerGameHistory
 from server.runtime_config import MAX_GAME_START_QUEUE
 from server.services.game_manager import (
@@ -251,7 +251,7 @@ class TestBattlerValidation:
         self, game_manager: GameManager, monkeypatch: pytest.MonkeyPatch, *, card_factory: Callable[..., Card]
     ) -> None:
         monkeypatch.setattr(
-            "mtb.utils.cubecobra.get_cube_data",
+            "pitfight.utils.cubecobra.get_cube_data",
             lambda _cube_id: [card_factory(f"card{i}") for i in range(99)],
         )
 
@@ -262,7 +262,7 @@ class TestBattlerValidation:
         self, game_manager: GameManager, monkeypatch: pytest.MonkeyPatch, *, card_factory: Callable[..., Card]
     ) -> None:
         monkeypatch.setattr(
-            "mtb.utils.cubecobra.get_cube_data",
+            "pitfight.utils.cubecobra.get_cube_data",
             lambda _cube_id: [card_factory(f"card{i}") for i in range(99)] + [card_factory("Unexpected Potential")],
         )
 

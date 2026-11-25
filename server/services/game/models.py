@@ -6,10 +6,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import ClassVar, Protocol
 
-from mtb.models.cards import (
+from pitfight.models.cards import (
     Battler,
 )
-from mtb.models.types import PlayMode
+from pitfight.models.types import PlayMode
 from server.schemas.api import (
     BattlerLoadingStatus,
 )

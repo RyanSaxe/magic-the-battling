@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import server.db.database as db
-from mtb.models.game import restore_game_from_snapshot
+from pitfight.models.game import restore_game_from_snapshot
 from server.db.models import ActiveGameSnapshot, QuarantinedGameSnapshot
 from server.main import app
 

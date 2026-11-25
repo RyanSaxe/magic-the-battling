@@ -1,9 +1,12 @@
 import { hasForgottenSeat, onSeatsForgotten } from "./deviceIdentity";
+import { readMigratedItem, removeStorageKeys } from "./storage";
 
 const LEGACY_SESSION_KEY = "mtb_session";
 const LEGACY_PLAYER_KEY = "mtb_player";
-const SESSION_KEY_PREFIX = "mtb_session:";
-const SPECTATE_KEY_PREFIX = "mtb_spectate:";
+const SESSION_KEY_PREFIX = "pitfight_session:";
+const LEGACY_SESSION_KEY_PREFIX = "mtb_session:";
+const SPECTATE_KEY_PREFIX = "pitfight_spectate:";
+const LEGACY_SPECTATE_KEY_PREFIX = "mtb_spectate:";
 
 /** The connection credential this tab uses for one game. It lives per tab, so each tab connects on its own. */
 export interface TabSession {
@@ -13,6 +16,10 @@ export interface TabSession {
 
 function sessionKey(gameId: string): string {
   return `${SESSION_KEY_PREFIX}${gameId}`;
+}
+
+function legacySessionKey(gameId: string): string {
+  return `${LEGACY_SESSION_KEY_PREFIX}${gameId}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -51,7 +58,13 @@ function adoptLegacySession(gameId: string): TabSession | null {
 
 /** This tab's session for the game, until the browser forgets the seat, which can happen in another tab. */
 export function readTabSession(gameId: string): TabSession | null {
-  const session = parseSession(sessionStorage.getItem(sessionKey(gameId)));
+  const session = parseSession(
+    readMigratedItem(
+      sessionStorage,
+      sessionKey(gameId),
+      legacySessionKey(gameId),
+    ),
+  );
   if (!session) return adoptLegacySession(gameId);
   if (!hasForgottenSeat(gameId)) return session;
   clearTabSession(gameId);
@@ -60,18 +73,31 @@ export function readTabSession(gameId: string): TabSession | null {
 
 export function saveTabSession(gameId: string, session: TabSession): void {
   sessionStorage.setItem(sessionKey(gameId), JSON.stringify(session));
+  removeStorageKeys(sessionStorage, [legacySessionKey(gameId)]);
 }
 
 export function clearTabSession(gameId: string): void {
-  sessionStorage.removeItem(sessionKey(gameId));
+  removeStorageKeys(sessionStorage, [
+    sessionKey(gameId),
+    legacySessionKey(gameId),
+  ]);
+}
+
+function extractSessionGameId(key: string): string | null {
+  if (key.startsWith(SESSION_KEY_PREFIX)) {
+    return key.slice(SESSION_KEY_PREFIX.length);
+  }
+  if (key.startsWith(LEGACY_SESSION_KEY_PREFIX)) {
+    return key.slice(LEGACY_SESSION_KEY_PREFIX.length);
+  }
+  return null;
 }
 
 /** Drops this tab's sessions for seats the browser has forgotten, before anything can remember those games again. */
 export function dropForgottenSessions(): void {
   for (const key of Object.keys(sessionStorage)) {
-    if (!key.startsWith(SESSION_KEY_PREFIX)) continue;
-    const gameId = key.slice(SESSION_KEY_PREFIX.length);
-    if (hasForgottenSeat(gameId)) clearTabSession(gameId);
+    const gameId = extractSessionGameId(key);
+    if (gameId !== null && hasForgottenSeat(gameId)) clearTabSession(gameId);
   }
 }
 
@@ -92,8 +118,16 @@ function spectateKey(gameId: string): string {
   return `${SPECTATE_KEY_PREFIX}${gameId}`;
 }
 
+function legacySpectateKey(gameId: string): string {
+  return `${LEGACY_SPECTATE_KEY_PREFIX}${gameId}`;
+}
+
 export function readTabSpectate(gameId: string): TabSpectate | null {
-  const raw = sessionStorage.getItem(spectateKey(gameId));
+  const raw = readMigratedItem(
+    sessionStorage,
+    spectateKey(gameId),
+    legacySpectateKey(gameId),
+  );
   if (!raw) return null;
   try {
     const value: unknown = JSON.parse(raw);
@@ -116,8 +150,12 @@ export function readTabSpectate(gameId: string): TabSpectate | null {
 
 export function saveTabSpectate(gameId: string, spectate: TabSpectate): void {
   sessionStorage.setItem(spectateKey(gameId), JSON.stringify(spectate));
+  removeStorageKeys(sessionStorage, [legacySpectateKey(gameId)]);
 }
 
 export function clearTabSpectate(gameId: string): void {
-  sessionStorage.removeItem(spectateKey(gameId));
+  removeStorageKeys(sessionStorage, [
+    spectateKey(gameId),
+    legacySpectateKey(gameId),
+  ]);
 }

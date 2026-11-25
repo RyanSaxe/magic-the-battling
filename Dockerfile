@@ -13,7 +13,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy dependency files and package source
 COPY pyproject.toml uv.lock README.md ./
-COPY mtb/ ./mtb/
+COPY pitfight/ ./pitfight/
 COPY web/package.json web/package-lock.json ./web/
 
 # Install Python dependencies

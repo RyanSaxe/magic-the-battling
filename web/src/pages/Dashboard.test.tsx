@@ -222,7 +222,9 @@ it("keeps Dashboard ResumeBanner single-game when only one active game exists", 
     battlers: [],
     has_more: false,
   });
-  vi.mocked(useResumableGames).mockReturnValue([activeSeat("g1", "Crucible")]);
+  vi.mocked(useResumableGames).mockReturnValue([
+    activeSeat("g1", "Pitfight Cube"),
+  ]);
 
   render(
     <MemoryRouter>
@@ -230,10 +232,10 @@ it("keeps Dashboard ResumeBanner single-game when only one active game exists", 
     </MemoryRouter>,
   );
 
-  expect(await screen.findByText("Crucible")).toBeTruthy();
+  expect(await screen.findByText("Pitfight Cube")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Resume Game →" })).toBeTruthy();
   expect(
-    screen.getByRole("button", { name: "Close Crucible as tester" }),
+    screen.getByRole("button", { name: "Close Pitfight Cube as tester" }),
   ).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^See all / })).toBeNull();
 });
@@ -244,7 +246,7 @@ it("opens the In progress modal from Dashboard ResumeBanner when multiple active
     has_more: false,
   });
   vi.mocked(useResumableGames).mockReturnValue([
-    activeSeat("g1", "Crucible"),
+    activeSeat("g1", "Pitfight Cube"),
     activeSeat("g2", "Vintage Cube"),
   ]);
 
@@ -256,16 +258,18 @@ it("opens the In progress modal from Dashboard ResumeBanner when multiple active
 
   const seeAll = await screen.findByRole("button", { name: "See all 2" });
   expect(
-    screen.queryByRole("button", { name: "Close Crucible as tester" }),
+    screen.queryByRole("button", { name: "Close Pitfight Cube as tester" }),
   ).toBeNull();
 
   fireEvent.click(seeAll);
   const modal = screen.getByRole("dialog", { name: "In progress" });
-  expect(within(modal).getByText("Crucible")).toBeTruthy();
+  expect(within(modal).getByText("Pitfight Cube")).toBeTruthy();
   expect(within(modal).getByText("Vintage Cube")).toBeTruthy();
 
   fireEvent.click(
-    within(modal).getByRole("button", { name: "Close Crucible as tester" }),
+    within(modal).getByRole("button", {
+      name: "Close Pitfight Cube as tester",
+    }),
   );
   fireEvent.click(
     within(screen.getByRole("dialog", { name: "Close this game?" })).getByRole(

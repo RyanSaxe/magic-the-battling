@@ -174,7 +174,7 @@ export async function serveGame({
     sessionStorage.setItem("mtb_session", session.sessionId);
     sessionStorage.setItem("mtb_player", session.playerId);
     // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
-    localStorage.setItem("mtb_guided_mode_preference", "0");
+    localStorage.setItem("pitfight_guided_mode_preference", "0");
   }, SESSION);
   await page.routeWebSocket(/\/ws\//, (ws) => {
     ws.send(

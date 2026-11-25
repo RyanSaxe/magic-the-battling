@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from httpx import Response
 
 import server.routers.games as games_module
-from mtb.models.game import BattleSnapshotData
+from pitfight.models.game import BattleSnapshotData
 from server.db import database
 from server.db.models import BattleSnapshot, CubeMetadata, GameRecord, PlayerGameHistory
 from server.services.preview import preview_service
@@ -293,13 +293,13 @@ def cubecobra_cube_json(monkeypatch: pytest.MonkeyPatch) -> None:
             raise LookupError(url)
         return responses[url]
 
-    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _get_json)
+    monkeypatch.setattr("pitfight.utils.json_helpers.get_json", _get_json)
 
 
 def test_cube_games_endpoint_names_a_cube_with_no_games(client: TestClient) -> None:
     db = database.SessionLocal()
     try:
-        db.add(CubeMetadata(cube_id="auto", name="Crucible Starter Cube", image_uri="https://img/auto"))
+        db.add(CubeMetadata(cube_id="auto", name="Pitfight Starter Cube", image_uri="https://img/auto"))
         db.commit()
     finally:
         db.close()
@@ -309,7 +309,7 @@ def test_cube_games_endpoint_names_a_cube_with_no_games(client: TestClient) -> N
     assert response.status_code == 200
     data = response.json()
     assert data["games"] == []
-    assert data["cube_name"] == "Crucible Starter Cube"
+    assert data["cube_name"] == "Pitfight Starter Cube"
     assert data["cube_image_uri"] == "https://img/auto"
 
 

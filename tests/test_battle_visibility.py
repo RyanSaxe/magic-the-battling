@@ -3,9 +3,9 @@ from collections.abc import Callable
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.cards import Card
-from mtb.models.game import Game, StaticOpponent, create_game
-from mtb.phases import battle, reward
+from pitfight.models.cards import Card
+from pitfight.models.game import Game, StaticOpponent, create_game
+from pitfight.phases import battle, reward
 from server.services.game.view_builder import build_battle_view
 from server.services.game_manager import GameManager
 

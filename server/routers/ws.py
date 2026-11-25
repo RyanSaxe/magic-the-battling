@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 import server.db.database as db
-from mtb.models.game import Game, Player
+from pitfight.models.game import Game, Player
 from server.errors import ErrorCode
 from server.observability import OBSERVABILITY_LOGGER_NAME, record_ws_action_latency
 from server.routers.ws_actions import (

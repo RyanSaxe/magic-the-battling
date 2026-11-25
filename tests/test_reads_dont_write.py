@@ -12,15 +12,15 @@ from httpx import Response
 
 import server.db.database as db
 import server.routers.ws as ws_module
-from mtb.models.cards import Battler, Card
-from mtb.models.game import (
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import (
     Puppet,
     StaticOpponent,
     create_game,
     restore_game_from_snapshot,
     set_battler,
 )
-from mtb.phases import battle
+from pitfight.phases import battle
 from server.db.models import ActiveGameSnapshot, GamePlayerRecord, GameRecord, PlayerGameHistory
 from server.services.game.view_builder import build_game_bootstrap, build_game_state
 from server.services.game_manager import GameManager

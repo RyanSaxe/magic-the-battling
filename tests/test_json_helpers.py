@@ -9,7 +9,7 @@ from typing import ClassVar
 
 import pytest
 
-from mtb.utils import json_helpers as json_helpers_module_impl
+from pitfight.utils import json_helpers as json_helpers_module_impl
 
 
 class _JsonHandler(BaseHTTPRequestHandler):

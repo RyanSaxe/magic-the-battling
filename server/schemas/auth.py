@@ -5,8 +5,8 @@ import re
 from pydantic import BaseModel, field_validator
 from pydantic_core import PydanticCustomError
 
-from mtb.models.types import PlayMode, normalize_play_mode
-from mtb.utils.cubecobra import cube_id_from_input
+from pitfight.models.types import PlayMode, normalize_play_mode
+from pitfight.utils.cubecobra import cube_id_from_input
 
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 

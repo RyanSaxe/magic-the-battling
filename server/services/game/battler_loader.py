@@ -9,7 +9,7 @@ from typing import Any
 
 from httpx import HTTPStatusError, RequestError
 
-from mtb.models.cards import (
+from pitfight.models.cards import (
     DEFAULT_UPGRADES_ID,
     DEFAULT_VANGUARD_ID,
     Battler,
@@ -17,7 +17,7 @@ from mtb.models.cards import (
     build_battler,
     validate_battler,
 )
-from mtb.models.types import PlayMode
+from pitfight.models.types import PlayMode
 from server.services.game.models import (
     LOBBY_STARTING_MESSAGE,
     BattlerFailed,

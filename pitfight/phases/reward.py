@@ -3,9 +3,9 @@
 import random
 from uuid import uuid4
 
-from mtb.models.cards import Card
-from mtb.models.game import BattleResolutionEvent, Game, LastBattleResult, Player, StaticOpponent
-from mtb.phases.battle import BattleResult
+from pitfight.models.cards import Card
+from pitfight.models.game import BattleResolutionEvent, Game, LastBattleResult, Player, StaticOpponent
+from pitfight.phases.battle import BattleResult
 
 
 def is_stage_increasing(player: Player) -> bool:

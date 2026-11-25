@@ -215,7 +215,7 @@ function buildState(bob: Partial<CompactPlayerView> = {}): CompactGameState {
 }
 
 beforeEach(() => {
-  installMemoryLocalStorage().setItem("mtb_guided_mode_preference", "0");
+  installMemoryLocalStorage().setItem("pitfight_guided_mode_preference", "0");
   sessionStorage.clear();
   vi.stubGlobal("WebSocket", FakeWebSocket);
   // The board measures itself, and jsdom has no ResizeObserver.

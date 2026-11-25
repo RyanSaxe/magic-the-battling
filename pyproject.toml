@@ -1,5 +1,5 @@
 [project]
-name = "mtb"
+name = "pitfight"
 version = "0.1.0"
 description = "A FastAPI application for the Pitfight MtG format"
 readme = "README.md"

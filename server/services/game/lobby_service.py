@@ -13,18 +13,18 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from mtb.models.cards import (
+from pitfight.models.cards import (
     Battler,
 )
-from mtb.models.game import (
+from pitfight.models.game import (
     Config,
     Game,
     create_game,
     set_battler,
     set_player_battlers,
 )
-from mtb.models.types import PlayMode, normalize_play_mode
-from mtb.phases import draft
+from pitfight.models.types import PlayMode, normalize_play_mode
+from pitfight.phases import draft
 from server.db.models import (
     GameRecord,
 )

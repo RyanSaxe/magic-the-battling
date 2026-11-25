@@ -2,9 +2,9 @@ from collections.abc import Callable
 
 import pytest
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Config, DraftState, Puppet, StaticOpponent, create_game, set_battler
-from mtb.phases import draft, reward
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Config, DraftState, Puppet, StaticOpponent, create_game, set_battler
+from pitfight.phases import draft, reward
 
 
 def test_is_stage_increasing() -> None:

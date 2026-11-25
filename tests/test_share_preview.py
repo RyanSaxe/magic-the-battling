@@ -35,16 +35,16 @@ def _make_share_data(player_name: str = "Alice", placement: int | None = 1) -> S
 _HTML_WITH_STATIC_OG = """\
 <html><head>
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.cruciblemtg.com/" />
+    <meta property="og:url" content="https://pitfight.test/" />
     <meta property="og:title" content="Pitfight" />
     <meta property="og:description" content="A Magic: The Gathering format" />
-    <meta property="og:image" content="https://www.cruciblemtg.com/og-image.png" />
+    <meta property="og:image" content="https://pitfight.test/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Pitfight" />
     <meta name="twitter:description" content="A Magic: The Gathering format" />
-    <meta name="twitter:image" content="https://www.cruciblemtg.com/og-image.png" />
+    <meta name="twitter:image" content="https://pitfight.test/og-image.png" />
 </head></html>"""
 
 
@@ -80,7 +80,7 @@ class TestBuildOgHtml:
         assert "og-image.png" not in html
         assert 'content="Pitfight"' not in html
         assert "A Magic: The Gathering format" not in html
-        assert 'content="https://www.cruciblemtg.com/"' not in html
+        assert 'content="https://pitfight.test/"' not in html
 
     def test_dynamic_tags_present_after_stripping(self) -> None:
         html = _build_og_html(

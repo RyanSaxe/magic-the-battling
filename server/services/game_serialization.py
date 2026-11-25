@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from mtb.models.card_registry import export_registry, get_card_data
-from mtb.models.cards import Battler, Card
-from mtb.phases.battle import BASIC_LAND_IMAGES, TREASURE_TOKEN_IMAGE
+from pitfight.models.card_registry import export_registry, get_card_data
+from pitfight.models.cards import Battler, Card
+from pitfight.phases.battle import BASIC_LAND_IMAGES, TREASURE_TOKEN_IMAGE
 from server.schemas.api import CardCatalogEntry, CardRef, GameStateResponse, LastBattleResultView, ZonesView
 
 if TYPE_CHECKING:
-    from mtb.models.game import Game, LastBattleResult, Zones
+    from pitfight.models.game import Game, LastBattleResult, Zones
 
 _SYNTHETIC_CATALOG_ENTRIES = {
     **{
