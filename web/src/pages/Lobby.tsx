@@ -12,18 +12,31 @@ import type { ResumableSeat } from "../hooks/useResumableGames";
 import { CloseSeatDialog } from "../components/ResumeGame";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
-import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
+import {
+  AppHeader,
+  GuideButton,
+  HomeButton,
+} from "../components/common/AppHeader";
 import { BarLabel } from "../components/common/FrameBar";
 import { PageFrame } from "../components/common/PageFrame";
 import { ZoneLabel } from "../components/common/ZoneLabel";
 import { InfoTip } from "../components/common/InfoTip";
 import { Switch } from "../components/common/Switch";
 import { LoadingScreen } from "../components/common/LoadingScreen";
-import { type LoadingRouteState, START_STEPS, useHandedOnSteps } from "../components/common/loadingSteps";
+import {
+  type LoadingRouteState,
+  START_STEPS,
+  useHandedOnSteps,
+} from "../components/common/loadingSteps";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { LobbySeats } from "../components/lobby/LobbySeats";
 import { RemovePlayerDialog } from "../components/lobby/RemovePlayerDialog";
-import { BoardArt, BoardCubeTitle, BoardDrawerHead, BoardLobbySeats } from "../components/setup/BoardParts";
+import {
+  BoardArt,
+  BoardCubeTitle,
+  BoardDrawerHead,
+  BoardLobbySeats,
+} from "../components/setup/BoardParts";
 import { CubeBanner } from "../components/setup/CubeBanner";
 import { GuidedSwitch } from "../components/setup/GuidedSwitch";
 import { CrossIcon } from "../components/icons/CrossIcon";
@@ -42,41 +55,74 @@ import { copyText } from "../utils/clipboard";
 import { clearTabSession } from "../utils/tabSession";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
-const VOICE_HELP = "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
+const VOICE_HELP =
+  "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
 
 function cubeCobraUrl(battlerId: string) {
   return `https://cubecobra.com/cube/overview/${encodeURIComponent(battlerId)}`;
 }
 
 /** What Start Game is waiting on. The player's own deck comes first, as their next step. */
-function startBlocker(lobby: LobbyState, openSeats: number, needsDeck: boolean): string {
+function startBlocker(
+  lobby: LobbyState,
+  openSeats: number,
+  needsDeck: boolean,
+): string {
   if (needsDeck) return "Submit your deck first";
-  const { players, puppet_count: puppets, available_puppet_count: available } = lobby;
+  const {
+    players,
+    puppet_count: puppets,
+    available_puppet_count: available,
+  } = lobby;
   const notReady = players.filter((player) => !player.is_ready).length;
   const waitingOn = [];
-  if (openSeats > 0) waitingOn.push(`${openSeats} open ${openSeats === 1 ? "seat" : "seats"}`);
+  if (openSeats > 0)
+    waitingOn.push(`${openSeats} open ${openSeats === 1 ? "seat" : "seats"}`);
   if (notReady > 0) waitingOn.push(`${notReady} not ready`);
   if (waitingOn.length > 0) return waitingOn.join(" · ");
-  if (lobby.play_mode === "limited" && lobby.cube_loading_status === "error") return "Couldn't load the cube";
+  if (lobby.play_mode === "limited" && lobby.cube_loading_status === "error")
+    return "Couldn't load the cube";
   if (puppets > 0 && available === null) return "Finding puppets";
-  if (puppets > 0 && available !== null && available < puppets) return "Not enough puppets";
+  if (puppets > 0 && available !== null && available < puppets)
+    return "Not enough puppets";
   return "";
 }
 
-function AwayHostNotice({ name, className }: { name: string; className: string }) {
+function AwayHostNotice({
+  name,
+  className,
+}: {
+  name: string;
+  className: string;
+}) {
   return (
     <p className={`${className} ${name.length > 22 ? "is-long" : ""}`}>
-      <svg aria-hidden className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)]" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+      <svg
+        aria-hidden
+        className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)]"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z"
+          clipRule="evenodd"
+        />
       </svg>
       <span>
-        <b>{name}</b> (host) is away. If they&apos;re not back within a minute, the next player becomes host.
+        <b>{name}</b> (host) is away. If they&apos;re not back within a minute,
+        the next player becomes host.
       </span>
     </p>
   );
 }
 
-function HostChangedNotice({ name, text, onClose, className }: {
+function HostChangedNotice({
+  name,
+  text,
+  onClose,
+  className,
+}: {
   name: string;
   text: string;
   onClose: () => void;
@@ -84,11 +130,21 @@ function HostChangedNotice({ name, text, onClose, className }: {
 }) {
   return (
     <p className={`${className} ${name.length > 22 ? "is-long" : ""}`}>
-      <svg aria-hidden className="h-4 w-4 shrink-0 text-[var(--color-gold)]" viewBox="0 0 20 20" fill="currentColor">
+      <svg
+        aria-hidden
+        className="h-4 w-4 shrink-0 text-[var(--color-gold)]"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
         <path d="M2 6l4 3 4-6 4 6 4-3-1.5 9h-13z" />
       </svg>
       <span className="flex-1">{text}</span>
-      <button type="button" onClick={onClose} aria-label="Dismiss" className="icon-target">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Dismiss"
+        className="icon-target"
+      >
         <CrossIcon />
       </button>
     </p>
@@ -99,16 +155,29 @@ export function Lobby() {
   const { gameId = "" } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const openingSteps = useHandedOnSteps(["Open lobby"]);
-  const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId);
+  const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } =
+    useGameSeat(gameId);
   const session = seat.kind === "held" ? seat.session : null;
   const { addToast } = useToast();
   const [startSentIn, setStartSentIn] = useState<LobbyState | null>(null);
-  const handleServerError = useCallback((error: AppError) => {
-    setStartSentIn(null);
-    addToast(getAppErrorMessage(error, "lobby-action", "That action could not be completed."), "error");
-  }, [addToast]);
+  const handleServerError = useCallback(
+    (error: AppError) => {
+      setStartSentIn(null);
+      addToast(
+        getAppErrorMessage(
+          error,
+          "lobby-action",
+          "That action could not be completed.",
+        ),
+        "error",
+      );
+    },
+    [addToast],
+  );
 
-  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
+  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(
+    null,
+  );
   const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
     voiceSignalRef.current?.(payload);
   }, []);
@@ -130,24 +199,39 @@ export function Lobby() {
   );
 
   const peerNames = useMemo(() => {
-    if (!lobbyState?.voice_chat_enabled || !session) return []
+    if (!lobbyState?.voice_chat_enabled || !session) return [];
     return lobbyState.players
-      .filter(p => p.player_id !== session.playerId)
-      .map(p => p.name)
-  }, [lobbyState, session])
+      .filter((p) => p.player_id !== session.playerId)
+      .map((p) => p.name);
+  }, [lobbyState, session]);
 
-  const selfName = lobbyState?.players.find(p => p.player_id === session?.playerId)?.name ?? null
+  const selfName =
+    lobbyState?.players.find((p) => p.player_id === session?.playerId)?.name ??
+    null;
 
   const handleMicDenied = useCallback(() => {
-    addToast("Microphone access was denied. Voice chat is unavailable.", "warning")
-  }, [addToast])
+    addToast(
+      "Microphone access was denied. Voice chat is unavailable.",
+      "warning",
+    );
+  }, [addToast]);
 
-  const handleRetriesExhausted = useCallback((peerName: string) => {
-    addToast(`Voice connection to ${peerName} failed.`, "warning")
-  }, [addToast])
+  const handleRetriesExhausted = useCallback(
+    (peerName: string) => {
+      addToast(`Voice connection to ${peerName} failed.`, "warning");
+    },
+    [addToast],
+  );
 
-  const voiceName = lobbyState?.voice_chat_enabled ? selfName : null
-  const voiceChat = useVoiceChat(send, peerNames, voiceName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
+  const voiceName = lobbyState?.voice_chat_enabled ? selfName : null;
+  const voiceChat = useVoiceChat(
+    send,
+    peerNames,
+    voiceName,
+    voiceSignalRef,
+    handleMicDenied,
+    handleRetriesExhausted,
+  );
 
   const [copied, setCopied] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
@@ -205,7 +289,8 @@ export function Lobby() {
   const showsDeck = hasLoadedBattler && !editingDeck;
   const isEditingDeck = hasLoadedBattler && editingDeck;
   const deckUnchanged = isEditingDeck && battlerIdInput.trim() === deckId;
-  const summaryBattlerId = (isConstructed ? deckId : lobbyState?.cube_id) ?? null;
+  const summaryBattlerId =
+    (isConstructed ? deckId : lobbyState?.cube_id) ?? null;
   const cubeLook = useCubeLook(summaryBattlerId);
   const readyActionDisabled =
     isStarting ||
@@ -214,7 +299,8 @@ export function Lobby() {
       !currentPlayer.is_ready &&
       battlerStatus !== "ready");
   // The server answers a start with a new lobby state or an error, and either one re-enables the button.
-  const startAwaitingServer = startSentIn !== null && startSentIn === lobbyState;
+  const startAwaitingServer =
+    startSentIn !== null && startSentIn === lobbyState;
 
   const requestStart = () => {
     if (!lobbyState?.can_start || startAwaitingServer) return;
@@ -272,7 +358,10 @@ export function Lobby() {
   const submitBattler = () => {
     const battlerId = battlerIdInput.trim();
     if (!battlerId) {
-      addToast(isConstructed ? "Please enter a deck" : "Please enter a cube ID", "error");
+      addToast(
+        isConstructed ? "Please enter a deck" : "Please enter a cube ID",
+        "error",
+      );
       return;
     }
     setEditingDeck(false);
@@ -341,25 +430,38 @@ export function Lobby() {
   useEffect(() => {
     if (!session) return;
     if (status.kind === "open") connectionOpened(session.sessionId);
-    if (status.kind === "ended") connectionEnded(session.sessionId, status.error);
+    if (status.kind === "ended")
+      connectionEnded(session.sessionId, status.error);
   }, [status, session, connectionOpened, connectionEnded]);
 
   const host = lobbyState?.players.find((p) => p.is_host) ?? null;
   const hostName = host?.name ?? null;
   const awayHost = host && !host.is_connected ? host : null;
-  const previousHost = lobbyState?.players.find((p) => p.player_id === lobbyState.previous_host_id) ?? null;
-  const lostHost = !!previousHost && previousHost.player_id === session?.playerId;
+  const previousHost =
+    lobbyState?.players.find(
+      (p) => p.player_id === lobbyState.previous_host_id,
+    ) ?? null;
+  const lostHost =
+    !!previousHost && previousHost.player_id === session?.playerId;
   const gainedHost = !!previousHost && currentPlayer?.is_host === true;
 
-  const hostPass = previousHost && host ? `${previousHost.player_id}:${host.player_id}` : null;
+  const hostPass =
+    previousHost && host ? `${previousHost.player_id}:${host.player_id}` : null;
   // A later pass can be between the same two players, and they're told again.
-  if (hostPass && closedHostChange && closedHostChange !== hostPass) setClosedHostChange(null);
+  if (hostPass && closedHostChange && closedHostChange !== hostPass)
+    setClosedHostChange(null);
   let hostChange: { name: string; text: string } | null = null;
   if (hostPass !== closedHostChange) {
     if (lostHost && hostName) {
-      hostChange = { name: hostName, text: `You were away, so ${hostName} is the host now.` };
+      hostChange = {
+        name: hostName,
+        text: `You were away, so ${hostName} is the host now.`,
+      };
     } else if (gainedHost && !previousHost.is_connected) {
-      hostChange = { name: previousHost.name, text: `You're the host now. ${previousHost.name} is away.` };
+      hostChange = {
+        name: previousHost.name,
+        text: `You're the host now. ${previousHost.name} is away.`,
+      };
     }
   }
 
@@ -379,12 +481,18 @@ export function Lobby() {
   }, [hostName, selfName, lostHost, gainedHost, addToast]);
 
   const copyJoinLink = async () => {
-    if (!(await copyText(`${window.location.origin}/game/${gameId}/lobby`))) return;
+    if (!(await copyText(`${window.location.origin}/game/${gameId}/lobby`)))
+      return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const canLeaveLobby = seat.kind === "held" && !!gameId && !!lobbyState && !!currentPlayer && !isStarting;
+  const canLeaveLobby =
+    seat.kind === "held" &&
+    !!gameId &&
+    !!lobbyState &&
+    !!currentPlayer &&
+    !isStarting;
   const openLeaveDialog = () => {
     if (!gameId || !lobbyState || !currentPlayer) return;
     setLeavingSeat({
@@ -411,7 +519,11 @@ export function Lobby() {
       helpers={
         <>
           {canLeaveLobby && (
-            <button type="button" onClick={openLeaveDialog} className="btn btn-secondary">
+            <button
+              type="button"
+              onClick={openLeaveDialog}
+              className="btn btn-secondary"
+            >
               <BarLabel desktop="Leave Lobby" phone="Leave" />
             </button>
           )}
@@ -475,14 +587,20 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <LoadingScreen title="Opening lobby" steps={openingSteps} current="Open lobby" />
+        <LoadingScreen
+          title="Opening lobby"
+          steps={openingSteps}
+          current="Open lobby"
+        />
         {rulesPanel}
       </>
     );
   }
 
   const reconnecting = !isConnected && (
-    <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
+    <div
+      className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}
+    >
       <div className={`${POPOVER_CHROME} px-5 py-3 flex items-center gap-3`}>
         <Spinner className="h-4 w-4 shrink-0 text-[var(--color-gold)]" />
         <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
@@ -496,7 +614,10 @@ export function Lobby() {
         {reconnecting}
         <LoadingScreen steps={START_STEPS} current="Deal cards" />
         {spectateRequests[0] && (
-          <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
+          <SpectateRequestModal
+            request={spectateRequests[0]}
+            onRespond={actions.spectateResponse}
+          />
         )}
         {rulesPanel}
       </>
@@ -508,25 +629,39 @@ export function Lobby() {
   const playerCap = lobbyState.target_player_count;
   const occupiedSlots = lobbyState.players.length + lobbyState.puppet_count;
   const openSeats = Math.max(0, playerCap - occupiedSlots);
-  const playerCapIndex = EVEN_PLAYER_CAP_OPTIONS.findIndex((value) => value === playerCap);
-  const previousPlayerCap = playerCapIndex > 0 ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex - 1] : null;
+  const playerCapIndex = EVEN_PLAYER_CAP_OPTIONS.findIndex(
+    (value) => value === playerCap,
+  );
+  const previousPlayerCap =
+    playerCapIndex > 0 ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex - 1] : null;
   const nextPlayerCap =
     playerCapIndex >= 0 && playerCapIndex < EVEN_PLAYER_CAP_OPTIONS.length - 1
       ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
       : null;
-  const canDecreasePlayerCap = isHost && previousPlayerCap !== null && previousPlayerCap >= occupiedSlots;
+  const canDecreasePlayerCap =
+    isHost && previousPlayerCap !== null && previousPlayerCap >= occupiedSlots;
   const canIncreasePlayerCap = isHost && nextPlayerCap !== null;
   const canBrowseCards = !isConstructed || hasLoadedBattler;
   const needsDeck = isConstructed && !!currentPlayer && !hasLoadedBattler;
   // Inviting is the host's next step until the seats are full, unless their own deck comes first.
   const copyIsNext = isHost && !needsDeck && !isEditingDeck && openSeats > 0;
   const startWaits = !lobbyState.can_start;
-  const startReason = startWaits ? startBlocker(lobbyState, openSeats, needsDeck) : "";
+  const startReason = startWaits
+    ? startBlocker(lobbyState, openSeats, needsDeck)
+    : "";
   const hostNotice = (className: string) => {
     if (hostChange) {
-      return <HostChangedNotice {...hostChange} className={className} onClose={() => setClosedHostChange(hostPass)} />;
+      return (
+        <HostChangedNotice
+          {...hostChange}
+          className={className}
+          onClose={() => setClosedHostChange(hostPass)}
+        />
+      );
     }
-    return awayHost && <AwayHostNotice name={awayHost.name} className={className} />;
+    return (
+      awayHost && <AwayHostNotice name={awayHost.name} className={className} />
+    );
   };
   const seatActions = { ...actions, kickPlayer: setRemovingId };
 
@@ -545,7 +680,10 @@ export function Lobby() {
         <span className="setup-caption join-code-caption">Join code</span>
         <span className="join-code">{lobbyState.join_code}</span>
       </div>
-      <button onClick={copyJoinLink} className={`btn btn-pill ${copyIsNext ? "btn-primary" : "btn-secondary"}`}>
+      <button
+        onClick={copyJoinLink}
+        className={`btn btn-pill ${copyIsNext ? "btn-primary" : "btn-secondary"}`}
+      >
         {copied ? "Copied!" : "Copy"}
       </button>
     </>
@@ -555,7 +693,8 @@ export function Lobby() {
       <button
         type="button"
         onClick={() => {
-          if (previousPlayerCap !== null) actions.setTargetPlayerCount(previousPlayerCap);
+          if (previousPlayerCap !== null)
+            actions.setTargetPlayerCount(previousPlayerCap);
         }}
         disabled={!canDecreasePlayerCap}
         aria-label="Decrease player count"
@@ -567,7 +706,8 @@ export function Lobby() {
       <button
         type="button"
         onClick={() => {
-          if (nextPlayerCap !== null) actions.setTargetPlayerCount(nextPlayerCap);
+          if (nextPlayerCap !== null)
+            actions.setTargetPlayerCount(nextPlayerCap);
         }}
         disabled={!canIncreasePlayerCap}
         aria-label="Increase player count"
@@ -579,7 +719,10 @@ export function Lobby() {
   );
   const lobbySettings = (
     <div className="lobby-settings">
-      <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
+      <GuidedSwitch
+        enabled={isGuidedMode}
+        setEnabled={handleGuidedModeToggle}
+      />
       <div className="setup-setting">
         <Switch
           checked={lobbyState.voice_chat_enabled}
@@ -637,7 +780,10 @@ export function Lobby() {
         />
       </label>
       {isEditingDeck && (
-        <button onClick={() => setEditingDeck(false)} className="btn btn-secondary setup-submit">
+        <button
+          onClick={() => setEditingDeck(false)}
+          className="btn btn-secondary setup-submit"
+        >
           Cancel
         </button>
       )}
@@ -663,7 +809,10 @@ export function Lobby() {
           contentClassName="setup-page board-page"
           hints="game"
           aside={
-            <aside aria-label="At the table" className="board-aside frame-chrome is-lobby">
+            <aside
+              aria-label="At the table"
+              className="board-aside frame-chrome is-lobby"
+            >
               <BoardDrawerHead />
               <div className="board-seats">
                 <BoardLobbySeats
@@ -673,7 +822,12 @@ export function Lobby() {
                   selfId={session?.playerId}
                   voiceChat={voiceChat}
                   actions={seatActions}
-                  onPuppetHelp={() => openGuide({ docId: "faq", tab: "why-are-my-opponents-cards-face-up" })}
+                  onPuppetHelp={() =>
+                    openGuide({
+                      docId: "faq",
+                      tab: "why-are-my-opponents-cards-face-up",
+                    })
+                  }
                 />
               </div>
             </aside>
@@ -686,7 +840,9 @@ export function Lobby() {
                 empty={
                   boardNeedsDeckEntry ? (
                     <div className="board-slot-entry">
-                      <div className="setup-row board-deck">{deckEntryFields}</div>
+                      <div className="setup-row board-deck">
+                        {deckEntryFields}
+                      </div>
                     </div>
                   ) : undefined
                 }
@@ -696,7 +852,11 @@ export function Lobby() {
                   <BoardCubeTitle
                     look={isConstructed && !hasLoadedBattler ? null : cubeLook}
                     playMode={lobbyState.play_mode}
-                    href={summaryBattlerId ? cubeCobraUrl(summaryBattlerId) : undefined}
+                    href={
+                      summaryBattlerId
+                        ? cubeCobraUrl(summaryBattlerId)
+                        : undefined
+                    }
                   />
                 )}
                 <p className="board-summary">
@@ -704,8 +864,11 @@ export function Lobby() {
                     {occupiedSlots} of {playerCap} seated
                   </b>
                   <br />
-                  {isConstructed ? "Constructed" : "Limited"} · Upgrades {lobbyState.use_upgrades ? "On" : "Off"}
-                  {lobbyState.auto_approve_spectators && <span className="lobby-spectating">Open Spectating</span>}
+                  {isConstructed ? "Constructed" : "Limited"} · Upgrades{" "}
+                  {lobbyState.use_upgrades ? "On" : "Off"}
+                  {lobbyState.auto_approve_spectators && (
+                    <span className="lobby-spectating">Open Spectating</span>
+                  )}
                 </p>
                 <div className="board-code">{joinCodeBlock}</div>
                 <div className="board-cube-actions">
@@ -736,7 +899,12 @@ export function Lobby() {
           </div>
         </PageFrame>
       ) : (
-        <PageFrame header={header} scroll={false} contentClassName="setup-page" hints="game">
+        <PageFrame
+          header={header}
+          scroll={false}
+          contentClassName="setup-page"
+          hints="game"
+        >
           <CubeBanner
             look={cubeLook}
             playMode={lobbyState.play_mode}
@@ -754,18 +922,25 @@ export function Lobby() {
                 {occupiedSlots} of {playerCap} seated
               </b>
               <span>
-                {isConstructed ? "Constructed" : "Limited"} · Upgrades {lobbyState.use_upgrades ? "On" : "Off"}
-                {lobbyState.auto_approve_spectators && <span className="lobby-spectating">Open Spectating</span>}
+                {isConstructed ? "Constructed" : "Limited"} · Upgrades{" "}
+                {lobbyState.use_upgrades ? "On" : "Off"}
+                {lobbyState.auto_approve_spectators && (
+                  <span className="lobby-spectating">Open Spectating</span>
+                )}
               </span>
             </p>
 
             {isConstructed && currentPlayer && (
-              <div className={`setup-row lobby-deck ${showsDeck ? "is-loaded" : ""}`}>
+              <div
+                className={`setup-row lobby-deck ${showsDeck ? "is-loaded" : ""}`}
+              >
                 {showsDeck ? (
                   <>
                     <div className="setup-field">
                       <span className="setup-caption">Your deck</span>
-                      <span className="setup-value text-[var(--ivory-muted)]">{deckId}</span>
+                      <span className="setup-value text-[var(--ivory-muted)]">
+                        {deckId}
+                      </span>
                     </div>
                     <button
                       onClick={handleBattlerButtonClick}
@@ -789,7 +964,12 @@ export function Lobby() {
               selfId={session?.playerId}
               voiceChat={voiceChat}
               actions={seatActions}
-              onPuppetHelp={() => openGuide({ docId: "faq", tab: "why-are-my-opponents-cards-face-up" })}
+              onPuppetHelp={() =>
+                openGuide({
+                  docId: "faq",
+                  tab: "why-are-my-opponents-cards-face-up",
+                })
+              }
             />
 
             {/* Shown instead of the banner's, where a short phone needs the banner for the deck */}
@@ -812,7 +992,10 @@ export function Lobby() {
       )}
       {leaveDialog}
       {spectateRequests[0] && (
-        <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
+        <SpectateRequestModal
+          request={spectateRequests[0]}
+          onRespond={actions.spectateResponse}
+        />
       )}
       {showRulesPanel && (
         <RulesPanel

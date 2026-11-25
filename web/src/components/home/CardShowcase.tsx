@@ -1,4 +1,10 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { SHOWCASE_STAGES } from "../../constants/showcaseCards";
 import type { Card as CardType } from "../../types";
 import { Card } from "../card/Card";
@@ -293,7 +299,10 @@ export function CardShowcase() {
       ref={containerRef}
       className="w-full max-w-full flex flex-col items-center gap-3 flex-1 min-h-0 justify-center"
     >
-      <p ref={taglineRef} className="shrink-0 text-amber-200/80 text-lg sm:text-xl italic font-medium tracking-wide">
+      <p
+        ref={taglineRef}
+        className="shrink-0 text-amber-200/80 text-lg sm:text-xl italic font-medium tracking-wide"
+      >
         {stage.tagline}
       </p>
 
@@ -328,9 +337,7 @@ export function CardShowcase() {
                     ...(sizes.handGap < 0
                       ? {
                           zIndex:
-                            isTarget && isEnlarged
-                              ? stage.hand.length + 1
-                              : i,
+                            isTarget && isEnlarged ? stage.hand.length + 1 : i,
                         }
                       : undefined),
                   }}

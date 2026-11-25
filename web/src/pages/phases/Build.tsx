@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo, type ComponentProps } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type ComponentProps,
+} from "react";
 import type {
   GameState,
   Card as CardType,
@@ -112,7 +119,11 @@ export function BuildPhase({
   useEffect(() => {
     // Clear optimistic move guards once authoritative state updates arrive.
     clearPendingHandAdds();
-  }, [self_player.hand.length, self_player.sideboard.length, clearPendingHandAdds]);
+  }, [
+    self_player.hand.length,
+    self_player.sideboard.length,
+    clearPendingHandAdds,
+  ]);
 
   useEffect(
     () => () => {
@@ -163,7 +174,9 @@ export function BuildPhase({
   );
   const getAppliedUpgrades = (cardId: string) =>
     appliedUpgrades.filter((u) => u.upgrade_target!.id === cardId);
-  const hasUnappliedUpgrade = self_player.upgrades.some((u) => !u.upgrade_target);
+  const hasUnappliedUpgrade = self_player.upgrades.some(
+    (u) => !u.upgrade_target,
+  );
   const canQuickUpgrade = !locked && hasUnappliedUpgrade && !!onQuickUpgrade;
   const hasDesktopUpgradeRail =
     showDesktopUpgradeRail && self_player.upgrades.length > 0;
@@ -248,13 +261,19 @@ export function BuildPhase({
     upgradeRailCount: hasDesktopUpgradeRail ? self_player.upgrades.length : 0,
   });
 
-  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
-    useResizableLayout({
-      layoutConfig,
-      constraints,
-      onConstraintsChange: setConstraints,
-      onConstraintsClear: clearConstraints,
-    });
+  const {
+    containerRef,
+    dims,
+    containerSize,
+    zoneFrames,
+    zoneRefs,
+    dividerCallbacks,
+  } = useResizableLayout({
+    layoutConfig,
+    constraints,
+    onConstraintsChange: setConstraints,
+    onConstraintsClear: clearConstraints,
+  });
   // A saved layout belongs to a board size band, known once the board is measured.
   if (measuredBoard !== containerSize) setMeasuredBoard(containerSize);
 
@@ -278,13 +297,18 @@ export function BuildPhase({
   const isCardSelected = (cardId: string) =>
     selection?.type === "card" && selection.cardId === cardId;
 
-  const renderQuickUpgradeButton = (card: CardType, hasCompanionButton = false) => {
+  const renderQuickUpgradeButton = (
+    card: CardType,
+    hasCompanionButton = false,
+  ) => {
     if (!canQuickUpgrade) return null;
 
     return (
       <CardPill
         pinned={isCardSelected(card.id)}
-        className={hasCompanionButton ? "card-pill-raised btn-game" : "btn-game"}
+        className={
+          hasCompanionButton ? "card-pill-raised btn-game" : "btn-game"
+        }
         onClick={(e) => {
           e.stopPropagation();
           onQuickUpgrade?.(card.id);
@@ -371,11 +395,17 @@ export function BuildPhase({
         hand: zoneFrames.hand.outerHeight,
         battlefield: zoneFrames.battlefield.outerHeight,
         sideboard: zoneFrames.sideboard.outerHeight,
-        upgrades: hasDesktopUpgradeRail ? zoneFrames.commandZone.outerHeight : undefined,
+        upgrades: hasDesktopUpgradeRail
+          ? zoneFrames.commandZone.outerHeight
+          : undefined,
       }}
-      zoneWidths={hasDesktopUpgradeRail ? {
-        upgrades: zoneFrames.commandZone.outerWidth,
-      } : null}
+      zoneWidths={
+        hasDesktopUpgradeRail
+          ? {
+              upgrades: zoneFrames.commandZone.outerWidth,
+            }
+          : null
+      }
       zoneRefs={{
         hand: zoneRefs.hand,
         battlefield: zoneRefs.battlefield,
@@ -470,7 +500,9 @@ export function BuildPhase({
                     title="Set as companion"
                   >
                     <span className="label-short">Companion</span>
-                    <span className="label-long">{isActiveCompanion ? "✓ Companion" : "Set Companion"}</span>
+                    <span className="label-long">
+                      {isActiveCompanion ? "✓ Companion" : "Set Companion"}
+                    </span>
                   </CardPill>
                 )}
               </div>
@@ -501,16 +533,19 @@ function CardPill({
 }: ComponentProps<"button"> & { pinned?: boolean }) {
   // Read as focus arrives, because a clicked pill also matches :focus-visible once any key is down.
   const [hasKeyboardFocus, setHasKeyboardFocus] = useState(false);
-  const visibility = pinned || hasKeyboardFocus
-    ? "opacity-100 pointer-events-auto"
-    : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
+  const visibility =
+    pinned || hasKeyboardFocus
+      ? "opacity-100 pointer-events-auto"
+      : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
 
   return (
     <div className="card-overlay">
       <button
         type="button"
         className={`card-pill rounded-full font-semibold transition-opacity duration-150 ${visibility} ${className}`}
-        onFocus={(event) => setHasKeyboardFocus(event.currentTarget.matches(":focus-visible"))}
+        onFocus={(event) =>
+          setHasKeyboardFocus(event.currentTarget.matches(":focus-visible"))
+        }
         onBlur={() => setHasKeyboardFocus(false)}
         {...button}
       />

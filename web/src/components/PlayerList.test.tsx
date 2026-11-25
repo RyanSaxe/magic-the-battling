@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { PlayerView } from '../types'
-import { PlayerRow } from './PlayerList'
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { PlayerView } from "../types";
+import { PlayerRow } from "./PlayerList";
 
 function player(overrides: Partial<PlayerView>): PlayerView {
   return {
-    name: 'Bob',
+    name: "Bob",
     treasures: 2,
     poison: 3,
-    phase: 'build',
+    phase: "build",
     round: 2,
     stage: 4,
     vanquishers: 0,
@@ -33,12 +33,15 @@ function player(overrides: Partial<PlayerView>): PlayerView {
     in_sudden_death: false,
     build_ready: false,
     ...overrides,
-  }
+  };
 }
 
-function renderCard(shown: PlayerView, { micToggle }: { micToggle?: React.ReactNode } = {}) {
-  const onClick = vi.fn()
-  const players = [player({ name: 'Alice' }), shown]
+function renderCard(
+  shown: PlayerView,
+  { micToggle }: { micToggle?: React.ReactNode } = {},
+) {
+  const onClick = vi.fn();
+  const players = [player({ name: "Alice" }), shown];
   render(
     <PlayerRow
       player={shown}
@@ -48,29 +51,35 @@ function renderCard(shown: PlayerView, { micToggle }: { micToggle?: React.ReactN
       onClick={onClick}
       micToggle={micToggle}
     />,
-  )
-  return { onClick }
+  );
+  return { onClick };
 }
 
-describe('PlayerRow', () => {
-  afterEach(cleanup)
+describe("PlayerRow", () => {
+  afterEach(cleanup);
 
-  it('keeps the mic outside the card, so neither click does the other', () => {
-    const onMute = vi.fn()
-    const { onClick } = renderCard(player({}), { micToggle: <button type="button" onClick={onMute}>Mute</button> })
+  it("keeps the mic outside the card, so neither click does the other", () => {
+    const onMute = vi.fn();
+    const { onClick } = renderCard(player({}), {
+      micToggle: (
+        <button type="button" onClick={onMute}>
+          Mute
+        </button>
+      ),
+    });
 
-    expect(document.querySelector('button button')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
-    expect(onMute).toHaveBeenCalledOnce()
-    expect(onClick).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: /Bob/ }))
-    expect(onClick).toHaveBeenCalledOnce()
-  })
+    expect(document.querySelector("button button")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Mute" }));
+    expect(onMute).toHaveBeenCalledOnce();
+    expect(onClick).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Bob/ }));
+    expect(onClick).toHaveBeenCalledOnce();
+  });
 
-  it('shows Sudden Death instead of the chance, since the pairing is fixed then', () => {
-    renderCard(player({ in_sudden_death: true, pairing_probability: 1 }))
+  it("shows Sudden Death instead of the chance, since the pairing is fixed then", () => {
+    renderCard(player({ in_sudden_death: true, pairing_probability: 1 }));
 
-    expect(screen.getByTitle('Sudden Death').textContent).toBe('SD')
-    expect(screen.queryByText('100%')).toBeNull()
-  })
-})
+    expect(screen.getByTitle("Sudden Death").textContent).toBe("SD");
+    expect(screen.queryByText("100%")).toBeNull();
+  });
+});

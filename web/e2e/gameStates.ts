@@ -8,39 +8,128 @@ import type {
   CompactZones,
   GameBootstrap,
   Phase,
-} from '../src/types'
+} from "../src/types";
 
-export const GAME_ID = 'game-layout'
-const PLAYER_NAME = 'Alice'
-const OPPONENT_NAME = 'Bob'
-type CardKind = 'spell' | 'land' | 'upgrade'
+export const GAME_ID = "game-layout";
+const PLAYER_NAME = "Alice";
+const OPPONENT_NAME = "Bob";
+type CardKind = "spell" | "land" | "upgrade";
 
 // Real cards, so screenshots taken with real card art look like a game. Nothing waits for their images to load.
 const REAL_CARDS: [CardKind, string, string, string][] = [
-  ['spell', '33672990-4860-4aa6-ac1b-f9da66f5da59', 'Wurmcoil Engine', 'Artifact Creature — Phyrexian Wurm'],
-  ['spell', '3bd78731-949c-464a-826a-92f86d784911', 'Carnage Tyrant', 'Creature — Dinosaur'],
-  ['spell', '82d5ce46-7118-4ede-ba1d-c387e7ce16e7', 'Mantis Rider', 'Creature — Human Monk'],
-  ['spell', '9d914868-9000-4df2-a818-0ef8a7f636ae', 'Goldspan Dragon', 'Creature — Dragon'],
-  ['spell', '451c8a79-1e8a-437d-836f-31155914c551', 'Great Sable Stag', 'Creature — Elk'],
-  ['spell', '820e2f07-f637-4144-b45a-0e1430dcf55e', 'Devoted Druid', 'Creature — Elf Druid'],
-  ['spell', '83b7c93b-06c1-4377-b516-171f6c6a1b9c', 'Dreadhorde Arcanist', 'Creature — Zombie Wizard'],
-  ['spell', 'c4c7cba5-6111-40ce-828a-e811301bb283', 'Lesser Masticore', 'Artifact Creature — Masticore'],
-  ['spell', 'e419cd0b-2449-4cc5-9ead-b9e45e271700', "Phlage, Titan of Fire's Fury", 'Legendary Creature — Elder Giant'],
-  ['spell', '1825a719-1b2a-4af9-9cd2-7cb497cd0317', 'Force of Negation', 'Instant'],
-  ['spell', '30284c06-4477-4dde-8b28-9646324303d5', 'Selesnya Charm', 'Instant'],
-  ['spell', 'f83c7d53-2599-42a9-ae96-a2699c5164cb', 'Crackling Doom', 'Instant'],
-  ['spell', '696d1e25-5c25-4522-b085-90d49fe23a18', 'The Rack', 'Artifact'],
-  ['spell', '48d73cb5-22ac-43df-9c4b-0c860bb80b3e', 'Gravecrawler', 'Creature — Zombie'],
-  ['land', '8ca3c48b-f104-4292-9a4e-2ce87a65893c', 'Mutavault', 'Land'],
-  ['land', 'c7066095-f05a-4f2e-ab9c-47c498608ccb', 'Lavaclaw Reaches', 'Land'],
-  ['land', 'd556d10b-83cc-4736-b269-4ce65aae2837', 'Stirring Wildwood', 'Land'],
-  ['upgrade', '167c6740-0625-4987-8fac-516aab564ca1', 'Immediate Action', 'Conspiracy'],
-  ['upgrade', '57c57a16-328d-4c87-adf0-7af8f3515339', "Muzzio's Preparations", 'Conspiracy'],
-  ['upgrade', '8789ef9e-f68c-4ff0-8621-47678038131b', 'Unexpected Potential', 'Conspiracy'],
-  ['upgrade', '9bb6ece9-2038-4dbc-83aa-01ab4d7980b4', "Brago's Favor", 'Conspiracy'],
-]
+  [
+    "spell",
+    "33672990-4860-4aa6-ac1b-f9da66f5da59",
+    "Wurmcoil Engine",
+    "Artifact Creature — Phyrexian Wurm",
+  ],
+  [
+    "spell",
+    "3bd78731-949c-464a-826a-92f86d784911",
+    "Carnage Tyrant",
+    "Creature — Dinosaur",
+  ],
+  [
+    "spell",
+    "82d5ce46-7118-4ede-ba1d-c387e7ce16e7",
+    "Mantis Rider",
+    "Creature — Human Monk",
+  ],
+  [
+    "spell",
+    "9d914868-9000-4df2-a818-0ef8a7f636ae",
+    "Goldspan Dragon",
+    "Creature — Dragon",
+  ],
+  [
+    "spell",
+    "451c8a79-1e8a-437d-836f-31155914c551",
+    "Great Sable Stag",
+    "Creature — Elk",
+  ],
+  [
+    "spell",
+    "820e2f07-f637-4144-b45a-0e1430dcf55e",
+    "Devoted Druid",
+    "Creature — Elf Druid",
+  ],
+  [
+    "spell",
+    "83b7c93b-06c1-4377-b516-171f6c6a1b9c",
+    "Dreadhorde Arcanist",
+    "Creature — Zombie Wizard",
+  ],
+  [
+    "spell",
+    "c4c7cba5-6111-40ce-828a-e811301bb283",
+    "Lesser Masticore",
+    "Artifact Creature — Masticore",
+  ],
+  [
+    "spell",
+    "e419cd0b-2449-4cc5-9ead-b9e45e271700",
+    "Phlage, Titan of Fire's Fury",
+    "Legendary Creature — Elder Giant",
+  ],
+  [
+    "spell",
+    "1825a719-1b2a-4af9-9cd2-7cb497cd0317",
+    "Force of Negation",
+    "Instant",
+  ],
+  [
+    "spell",
+    "30284c06-4477-4dde-8b28-9646324303d5",
+    "Selesnya Charm",
+    "Instant",
+  ],
+  [
+    "spell",
+    "f83c7d53-2599-42a9-ae96-a2699c5164cb",
+    "Crackling Doom",
+    "Instant",
+  ],
+  ["spell", "696d1e25-5c25-4522-b085-90d49fe23a18", "The Rack", "Artifact"],
+  [
+    "spell",
+    "48d73cb5-22ac-43df-9c4b-0c860bb80b3e",
+    "Gravecrawler",
+    "Creature — Zombie",
+  ],
+  ["land", "8ca3c48b-f104-4292-9a4e-2ce87a65893c", "Mutavault", "Land"],
+  ["land", "c7066095-f05a-4f2e-ab9c-47c498608ccb", "Lavaclaw Reaches", "Land"],
+  ["land", "d556d10b-83cc-4736-b269-4ce65aae2837", "Stirring Wildwood", "Land"],
+  [
+    "upgrade",
+    "167c6740-0625-4987-8fac-516aab564ca1",
+    "Immediate Action",
+    "Conspiracy",
+  ],
+  [
+    "upgrade",
+    "57c57a16-328d-4c87-adf0-7af8f3515339",
+    "Muzzio's Preparations",
+    "Conspiracy",
+  ],
+  [
+    "upgrade",
+    "8789ef9e-f68c-4ff0-8621-47678038131b",
+    "Unexpected Potential",
+    "Conspiracy",
+  ],
+  [
+    "upgrade",
+    "9bb6ece9-2038-4dbc-83aa-01ab4d7980b4",
+    "Brago's Favor",
+    "Conspiracy",
+  ],
+];
 
-function catalogEntry(scryfallId: string, name: string, typeLine: string): CardCatalogEntry {
+function catalogEntry(
+  scryfallId: string,
+  name: string,
+  typeLine: string,
+): CardCatalogEntry {
   return {
     scryfall_id: scryfallId,
     name,
@@ -56,34 +145,48 @@ function catalogEntry(scryfallId: string, name: string, typeLine: string): CardC
     life_modifier: null,
     hand_modifier: null,
     token_scryfall_ids: [],
-    is_upgrade: typeLine === 'Conspiracy',
+    is_upgrade: typeLine === "Conspiracy",
     is_vanguard: false,
     is_companion: false,
-  }
+  };
 }
 
 const CATALOG: Record<string, CardCatalogEntry> = Object.fromEntries(
-  REAL_CARDS.map(([, id, name, typeLine]) => [id, catalogEntry(id, name, typeLine)]),
-)
+  REAL_CARDS.map(([, id, name, typeLine]) => [
+    id,
+    catalogEntry(id, name, typeLine),
+  ]),
+);
 
 const IDS_BY_KIND: Record<CardKind, string[]> = {
-  spell: REAL_CARDS.filter(([kind]) => kind === 'spell').map(([, id]) => id),
-  land: REAL_CARDS.filter(([kind]) => kind === 'land').map(([, id]) => id),
-  upgrade: REAL_CARDS.filter(([kind]) => kind === 'upgrade').map(([, id]) => id),
-}
+  spell: REAL_CARDS.filter(([kind]) => kind === "spell").map(([, id]) => id),
+  land: REAL_CARDS.filter(([kind]) => kind === "land").map(([, id]) => id),
+  upgrade: REAL_CARDS.filter(([kind]) => kind === "upgrade").map(
+    ([, id]) => id,
+  ),
+};
 
 /** `count` cards of one kind, cycling through the real cards so neighbors differ. */
-function cards(prefix: string, count: number, kind: CardKind = 'spell', offset = 0): CardRef[] {
-  const ids = IDS_BY_KIND[kind]
+function cards(
+  prefix: string,
+  count: number,
+  kind: CardKind = "spell",
+  offset = 0,
+): CardRef[] {
+  const ids = IDS_BY_KIND[kind];
   return Array.from({ length: count }, (_, index) => ({
     id: `${prefix}-${index}`,
     scryfall_id: ids[(index + offset) % ids.length],
     upgrade_target_id: null,
     original_owner: null,
-  }))
+  }));
 }
 
-function playerView(name: string, phase: Phase, overrides: Partial<CompactPlayerView> = {}): CompactPlayerView {
+function playerView(
+  name: string,
+  phase: Phase,
+  overrides: Partial<CompactPlayerView> = {},
+): CompactPlayerView {
   return {
     name,
     treasures: 2,
@@ -101,7 +204,7 @@ function playerView(name: string, phase: Phase, overrides: Partial<CompactPlayer
     is_stage_increasing: false,
     upgrades: [],
     vanguard: null,
-    chosen_basics: ['Forest', 'Island', 'Plains'],
+    chosen_basics: ["Forest", "Island", "Plains"],
     most_recently_revealed_cards: [],
     last_result: null,
     pairing_probability: null,
@@ -112,7 +215,7 @@ function playerView(name: string, phase: Phase, overrides: Partial<CompactPlayer
     in_sudden_death: false,
     build_ready: false,
     ...overrides,
-  }
+  };
 }
 
 function emptyZones(): CompactZones {
@@ -134,39 +237,42 @@ function emptyZones(): CompactZones {
     counters: {},
     attachments: {},
     spawned_tokens: [],
-  }
+  };
 }
 
 /** Card counts on the screen under test. Zones a phase does not show are ignored. */
 interface Counts {
-  pack?: number
-  hand?: number
-  handSize?: number
-  sideboard?: number
-  upgrades?: number
-  lands?: number
-  nonlands?: number
-  opponentHand?: number
+  pack?: number;
+  hand?: number;
+  handSize?: number;
+  sideboard?: number;
+  upgrades?: number;
+  lands?: number;
+  nonlands?: number;
+  opponentHand?: number;
 }
 
-type GamePhase = 'draft' | 'build' | 'battle' | 'reward'
+type GamePhase = "draft" | "build" | "battle" | "reward";
 
 export interface ScreenState {
-  phase: GamePhase
-  counts: Counts
+  phase: GamePhase;
+  counts: Counts;
 }
 
 function battleView(counts: Counts): CompactBattleView {
-  const yours = emptyZones()
-  yours.hand = cards('battle-hand', counts.hand ?? 0)
-  yours.battlefield = [...cards('your-land', counts.lands ?? 0, 'land'), ...cards('your-creature', counts.nonlands ?? 0)]
-  yours.library = cards('your-library', 20)
-  const theirs = emptyZones()
+  const yours = emptyZones();
+  yours.hand = cards("battle-hand", counts.hand ?? 0);
+  yours.battlefield = [
+    ...cards("your-land", counts.lands ?? 0, "land"),
+    ...cards("your-creature", counts.nonlands ?? 0),
+  ];
+  yours.library = cards("your-library", 20);
+  const theirs = emptyZones();
   theirs.battlefield = [
-    ...cards('their-land', counts.lands ?? 0, 'land', 1),
-    ...cards('their-creature', counts.nonlands ?? 0, 'spell', 7),
-  ]
-  theirs.library = cards('their-library', 20)
+    ...cards("their-land", counts.lands ?? 0, "land", 1),
+    ...cards("their-creature", counts.nonlands ?? 0, "spell", 7),
+  ];
+  theirs.library = cards("their-library", 20);
   return {
     opponent_name: OPPONENT_NAME,
     coin_flip_name: PLAYER_NAME,
@@ -185,39 +291,41 @@ function battleView(counts: Counts): CompactBattleView {
     opponent_full_sideboard: [],
     can_manipulate_opponent: false,
     pending_reveal_animations: [],
-  }
+  };
 }
 
 export function gameBootstrap({ phase, counts }: ScreenState): GameBootstrap {
-  const handSize = counts.handSize ?? 4
-  const hand = cards('hand', Math.min(counts.hand ?? 0, handSize))
-  const sideboard = cards('pool', counts.sideboard ?? 0, 'spell', 3)
+  const handSize = counts.handSize ?? 4;
+  const hand = cards("hand", Math.min(counts.hand ?? 0, handSize));
+  const sideboard = cards("pool", counts.sideboard ?? 0, "spell", 3);
   const self: CompactSelfPlayerView = {
     ...playerView(PLAYER_NAME, phase, {
       hand_size: handSize,
       hand_count: hand.length,
       sideboard_count: sideboard.length,
-      upgrades: cards('upgrade', counts.upgrades ?? 0, 'upgrade'),
+      upgrades: cards("upgrade", counts.upgrades ?? 0, "upgrade"),
     }),
     hand,
     hand_slots: Array.from({ length: handSize }, (_, i) => hand[i]?.id ?? null),
     sideboard,
     command_zone: [],
-    current_pack: phase === 'draft' ? cards('pack', counts.pack ?? 0, 'spell', 9) : null,
-    last_battle_result: phase === 'reward'
-      ? {
-          opponent_name: OPPONENT_NAME,
-          winner_name: PLAYER_NAME,
-          is_draw: false,
-          poison_dealt: 2,
-          poison_taken: 0,
-          treasures_gained: 1,
-          card_gained: cards('gained', 1, 'spell', 5)[0],
-          vanquisher_gained: false,
-          pre_battle_treasures: 1,
-        }
-      : null,
-  }
+    current_pack:
+      phase === "draft" ? cards("pack", counts.pack ?? 0, "spell", 9) : null,
+    last_battle_result:
+      phase === "reward"
+        ? {
+            opponent_name: OPPONENT_NAME,
+            winner_name: PLAYER_NAME,
+            is_draw: false,
+            poison_dealt: 2,
+            poison_taken: 0,
+            treasures_gained: 1,
+            card_gained: cards("gained", 1, "spell", 5)[0],
+            vanquisher_gained: false,
+            pre_battle_treasures: 1,
+          }
+        : null,
+  };
   const state: CompactGameState = {
     game_id: GAME_ID,
     phase,
@@ -225,18 +333,18 @@ export function gameBootstrap({ phase, counts }: ScreenState): GameBootstrap {
     players: [
       self,
       playerView(OPPONENT_NAME, phase),
-      playerView('Carol', phase),
-      playerView('Dave', phase, { is_puppet: true }),
+      playerView("Carol", phase),
+      playerView("Dave", phase, { is_puppet: true }),
     ],
     self_player: self,
     available_upgrades: [],
-    current_battle: phase === 'battle' ? battleView(counts) : null,
+    current_battle: phase === "battle" ? battleView(counts) : null,
     battle_resolution: null,
     use_upgrades: true,
     voice_chat_enabled: false,
-    cube_id: 'vintage-cube',
-    play_mode: 'limited',
+    cube_id: "vintage-cube",
+    play_mode: "limited",
     catalog_delta: {},
-  }
-  return { catalog: CATALOG, state }
+  };
+  return { catalog: CATALOG, state };
 }

@@ -78,7 +78,8 @@ export function measureFromPlacement(args: {
   const hasFill = !!blFillId;
   const hasBR = !!brId;
 
-  const blOuter = blPrimary.outerHeight + (hasFill ? blFill.outerHeight + sectionGap : 0);
+  const blOuter =
+    blPrimary.outerHeight + (hasFill ? blFill.outerHeight + sectionGap : 0);
   const bottomOuter = Math.max(blOuter, br.outerHeight);
   if (bottomOuter <= 0) return null;
 
@@ -164,10 +165,11 @@ export function useResizableLayout({
   }, [allZoneIdsKey]);
 
   const layout = useLayoutDrag(constraints, onConstraintsChange);
-  const [containerRef, dims, containerSize, zoneFrames, renderedConstraints] = useCardLayout({
-    ...layoutConfig,
-    constraints: layout.constraints,
-  });
+  const [containerRef, dims, containerSize, zoneFrames, renderedConstraints] =
+    useCardLayout({
+      ...layoutConfig,
+      constraints: layout.constraints,
+    });
 
   const measureInitialConstraints = useCallback(() => {
     const measurements: Record<string, ZoneMeasurement | null> = {};

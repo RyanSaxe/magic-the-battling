@@ -3,49 +3,59 @@ import { planRequestTransition } from "./walkthroughPhase";
 
 describe("planRequestTransition", () => {
   it("starts the exit once a shown guide's request is closed", () => {
-    expect(planRequestTransition({
-      animPhase: "idle",
-      requestActive: false,
-      hasDisplayState: true,
-      reducedMotion: false,
-    })).toBe("exit");
+    expect(
+      planRequestTransition({
+        animPhase: "idle",
+        requestActive: false,
+        hasDisplayState: true,
+        reducedMotion: false,
+      }),
+    ).toBe("exit");
   });
 
   it("lets an exit that already started run to the end", () => {
-    expect(planRequestTransition({
-      animPhase: "exiting",
-      requestActive: false,
-      hasDisplayState: true,
-      reducedMotion: false,
-    })).toBeNull();
+    expect(
+      planRequestTransition({
+        animPhase: "exiting",
+        requestActive: false,
+        hasDisplayState: true,
+        reducedMotion: false,
+      }),
+    ).toBeNull();
   });
 
   it("closes without animating when the player prefers reduced motion", () => {
-    expect(planRequestTransition({
-      animPhase: "idle",
-      requestActive: false,
-      hasDisplayState: true,
-      reducedMotion: true,
-    })).toBe("idle");
+    expect(
+      planRequestTransition({
+        animPhase: "idle",
+        requestActive: false,
+        hasDisplayState: true,
+        reducedMotion: true,
+      }),
+    ).toBe("idle");
   });
 
   it("restarts the entry when the next guide's request arrives during the exit", () => {
     // "Got it" on the Play/Draw tip starts its exit; tapping "Play" right after
     // moves to Battle, whose guide is requested before the exiting tip unmounts.
-    expect(planRequestTransition({
-      animPhase: "exiting",
-      requestActive: true,
-      hasDisplayState: true,
-      reducedMotion: false,
-    })).toBe("restart");
+    expect(
+      planRequestTransition({
+        animPhase: "exiting",
+        requestActive: true,
+        hasDisplayState: true,
+        reducedMotion: false,
+      }),
+    ).toBe("restart");
   });
 
   it("leaves a guide alone while its request is active", () => {
-    expect(planRequestTransition({
-      animPhase: "idle",
-      requestActive: true,
-      hasDisplayState: true,
-      reducedMotion: false,
-    })).toBeNull();
+    expect(
+      planRequestTransition({
+        animPhase: "idle",
+        requestActive: true,
+        hasDisplayState: true,
+        reducedMotion: false,
+      }),
+    ).toBeNull();
   });
 });

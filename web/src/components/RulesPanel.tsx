@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { QuickGuide } from './QuickGuide'
-import { FloatingWindow } from './common/FloatingWindow'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { QuickGuide } from "./QuickGuide";
+import { FloatingWindow } from "./common/FloatingWindow";
 import {
   DESKTOP_BREAKPOINT_PX,
   DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
@@ -15,62 +22,64 @@ import {
   serializeStoredWindowState,
   type DesktopWindowState,
   type ViewportBox,
-} from './rulesPanelWindow'
+} from "./rulesPanelWindow";
 
 export interface RulesPanelTarget {
-  docId?: string
-  tab?: string
+  docId?: string;
+  tab?: string;
 }
 
 interface RulesPanelProps {
-  onClose: () => void
+  onClose: () => void;
   /** The page owns this, so opening the Guide restores it, and a minimized one leaves the page's hotkeys on. */
-  minimized: boolean
-  onMinimizedChange: (minimized: boolean) => void
+  minimized: boolean;
+  onMinimizedChange: (minimized: boolean) => void;
   /** A panel is open over the minimized window, so Escape closes that panel and not the Guide. */
-  behindPanel?: boolean
+  behindPanel?: boolean;
   /** A new object each time a link is taken, so the same link again goes back to its page. */
-  target?: RulesPanelTarget
-  gameId?: string
-  playerName?: string
-  useUpgrades?: boolean
-  useVanguards?: boolean
+  target?: RulesPanelTarget;
+  gameId?: string;
+  playerName?: string;
+  useUpgrades?: boolean;
+  useVanguards?: boolean;
 }
 
 type InteractionState =
   | {
-      type: 'drag'
-      startPointerX: number
-      startPointerY: number
-      startX: number
-      startY: number
+      type: "drag";
+      startPointerX: number;
+      startPointerY: number;
+      startX: number;
+      startY: number;
     }
   | {
-      type: 'resize'
-      startPointerX: number
-      startPointerY: number
-      startWidth: number
-      startHeight: number
+      type: "resize";
+      startPointerX: number;
+      startPointerY: number;
+      startWidth: number;
+      startHeight: number;
     }
-  | null
+  | null;
 
-const WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v2'
-const LEGACY_WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v1'
-const MOBILE_PANEL_TOP_GAP_PX = 48
-const MOBILE_PANEL_BOTTOM_GAP_PX = 24
-const MOBILE_PANEL_MIN_HEIGHT_PX = 280
-const MOBILE_PANEL_MAX_WIDTH_PX = 720
-const COLLAPSED_LABEL_FALLBACK = 'Rules'
+const WINDOW_STORAGE_KEY = "mtb_rules_panel_window:v2";
+const LEGACY_WINDOW_STORAGE_KEY = "mtb_rules_panel_window:v1";
+const MOBILE_PANEL_TOP_GAP_PX = 48;
+const MOBILE_PANEL_BOTTOM_GAP_PX = 24;
+const MOBILE_PANEL_MIN_HEIGHT_PX = 280;
+const MOBILE_PANEL_MAX_WIDTH_PX = 720;
+const COLLAPSED_LABEL_FALLBACK = "Rules";
 
 function isDesktopViewport(): boolean {
-  return typeof window !== 'undefined' && window.innerWidth >= DESKTOP_BREAKPOINT_PX
+  return (
+    typeof window !== "undefined" && window.innerWidth >= DESKTOP_BREAKPOINT_PX
+  );
 }
 
 function currentViewportBox(): ViewportBox {
-  if (typeof window === 'undefined') {
-    return { width: 0, height: 0, left: 0, top: 0 }
+  if (typeof window === "undefined") {
+    return { width: 0, height: 0, left: 0, top: 0 };
   }
-  const viewport = window.visualViewport
+  const viewport = window.visualViewport;
   return viewport
     ? {
         width: Math.round(viewport.width),
@@ -83,43 +92,49 @@ function currentViewportBox(): ViewportBox {
         height: window.innerHeight,
         left: 0,
         top: 0,
-      }
+      };
 }
 
-function sameWindowState(a: DesktopWindowState | null, b: DesktopWindowState | null): boolean {
-  return !!a && !!b &&
+function sameWindowState(
+  a: DesktopWindowState | null,
+  b: DesktopWindowState | null,
+): boolean {
+  return (
+    !!a &&
+    !!b &&
     a.width === b.width &&
     a.height === b.height &&
     a.x === b.x &&
     a.y === b.y
+  );
 }
 
 function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
+  return Math.min(Math.max(value, min), max);
 }
 
 function loadStoredWindowState() {
-  if (typeof window === 'undefined') {
-    return null
+  if (typeof window === "undefined") {
+    return null;
   }
   return parseStoredWindowState(
-    window.localStorage.getItem(WINDOW_STORAGE_KEY)
-    ?? window.localStorage.getItem(LEGACY_WINDOW_STORAGE_KEY),
-  )
+    window.localStorage.getItem(WINDOW_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_WINDOW_STORAGE_KEY),
+  );
 }
 
 function resolveInitialDesktopWindowState(): DesktopWindowState | null {
   if (!isDesktopViewport()) {
-    return null
+    return null;
   }
-  const viewport = currentViewportBox()
-  const stored = loadStoredWindowState()
+  const viewport = currentViewportBox();
+  const stored = loadStoredWindowState();
   return clampDesktopWindowForMode(
     stored?.windowState ?? defaultDesktopWindowState(viewport),
     viewport,
     false,
     DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
-  )
+  );
 }
 
 export function RulesPanel({
@@ -133,169 +148,199 @@ export function RulesPanel({
   useUpgrades,
   useVanguards,
 }: RulesPanelProps) {
-  const [visit, setVisit] = useState({ target, count: 0 })
-  if (target !== visit.target) setVisit({ target, count: visit.count + 1 })
-  const [isDesktop, setIsDesktop] = useState(() => isDesktopViewport())
-  const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(() =>
-    resolveInitialDesktopWindowState(),
-  )
-  const [navigationHint, setNavigationHint] = useState(COLLAPSED_LABEL_FALLBACK)
-  const [interaction, setInteraction] = useState<InteractionState>(null)
-  const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(DEFAULT_COLLAPSED_PANEL_HEIGHT_PX)
-  const collapsedPanelRef = useRef<HTMLDivElement | null>(null)
+  const [visit, setVisit] = useState({ target, count: 0 });
+  if (target !== visit.target) setVisit({ target, count: visit.count + 1 });
+  const [isDesktop, setIsDesktop] = useState(() => isDesktopViewport());
+  const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(
+    () => resolveInitialDesktopWindowState(),
+  );
+  const [navigationHint, setNavigationHint] = useState(
+    COLLAPSED_LABEL_FALLBACK,
+  );
+  const [interaction, setInteraction] = useState<InteractionState>(null);
+  const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(
+    DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
+  );
+  const collapsedPanelRef = useRef<HTMLDivElement | null>(null);
 
   const stopInteraction = useCallback(() => {
-    setInteraction(null)
-  }, [])
+    setInteraction(null);
+  }, []);
 
-  const desktopViewport = isDesktop ? currentViewportBox() : null
-  const resolvedDesktopWindow = isDesktop && desktopViewport
-    ? clampDesktopWindowForMode(
-        desktopWindow ?? defaultDesktopWindowState(desktopViewport),
-        desktopViewport,
-        isCollapsed,
-        collapsedPanelHeight,
-      )
-    : null
-  const desktopPanel = resolvedDesktopWindow && desktopViewport
-    ? getDesktopPanelRect(resolvedDesktopWindow, desktopViewport, isCollapsed, collapsedPanelHeight)
-    : null
-  const mobileViewport = !isDesktop ? currentViewportBox() : null
+  const desktopViewport = isDesktop ? currentViewportBox() : null;
+  const resolvedDesktopWindow =
+    isDesktop && desktopViewport
+      ? clampDesktopWindowForMode(
+          desktopWindow ?? defaultDesktopWindowState(desktopViewport),
+          desktopViewport,
+          isCollapsed,
+          collapsedPanelHeight,
+        )
+      : null;
+  const desktopPanel =
+    resolvedDesktopWindow && desktopViewport
+      ? getDesktopPanelRect(
+          resolvedDesktopWindow,
+          desktopViewport,
+          isCollapsed,
+          collapsedPanelHeight,
+        )
+      : null;
+  const mobileViewport = !isDesktop ? currentViewportBox() : null;
 
-  const syncDesktopWindow = useCallback((collapsed: boolean) => {
-    if (!isDesktopViewport()) {
-      return
-    }
-    const viewport = currentViewportBox()
-    setDesktopWindow((previous) => {
-      const fallback = previous ?? loadStoredWindowState()?.windowState ?? defaultDesktopWindowState(viewport)
-      const next = clampDesktopWindowForMode(fallback, viewport, collapsed, collapsedPanelHeight)
-      return sameWindowState(previous, next) ? previous : next
-    })
-  }, [collapsedPanelHeight])
+  const syncDesktopWindow = useCallback(
+    (collapsed: boolean) => {
+      if (!isDesktopViewport()) {
+        return;
+      }
+      const viewport = currentViewportBox();
+      setDesktopWindow((previous) => {
+        const fallback =
+          previous ??
+          loadStoredWindowState()?.windowState ??
+          defaultDesktopWindowState(viewport);
+        const next = clampDesktopWindowForMode(
+          fallback,
+          viewport,
+          collapsed,
+          collapsedPanelHeight,
+        );
+        return sameWindowState(previous, next) ? previous : next;
+      });
+    },
+    [collapsedPanelHeight],
+  );
 
   const handleCollapse = useCallback(() => {
-    stopInteraction()
+    stopInteraction();
     if (isDesktopViewport()) {
-      syncDesktopWindow(true)
+      syncDesktopWindow(true);
     }
-    onMinimizedChange(true)
-  }, [onMinimizedChange, stopInteraction, syncDesktopWindow])
+    onMinimizedChange(true);
+  }, [onMinimizedChange, stopInteraction, syncDesktopWindow]);
 
   const handleRestore = useCallback(() => {
-    stopInteraction()
+    stopInteraction();
     if (isDesktopViewport()) {
-      syncDesktopWindow(false)
+      syncDesktopWindow(false);
     }
-    onMinimizedChange(false)
-  }, [onMinimizedChange, stopInteraction, syncDesktopWindow])
+    onMinimizedChange(false);
+  }, [onMinimizedChange, stopInteraction, syncDesktopWindow]);
 
   const resetWindow = useCallback(() => {
-    stopInteraction()
-    onMinimizedChange(false)
+    stopInteraction();
+    onMinimizedChange(false);
     if (!isDesktopViewport()) {
-      return
+      return;
     }
-    setDesktopWindow(defaultDesktopWindowState(currentViewportBox()))
-  }, [onMinimizedChange, stopInteraction])
+    setDesktopWindow(defaultDesktopWindowState(currentViewportBox()));
+  }, [onMinimizedChange, stopInteraction]);
 
-  const beginDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!desktopPanel) {
-      return
-    }
-    event.preventDefault()
-    setInteraction({
-      type: 'drag',
-      startPointerX: event.clientX,
-      startPointerY: event.clientY,
-      startX: desktopPanel.x,
-      startY: desktopPanel.y,
-    })
-  }, [desktopPanel])
+  const beginDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!desktopPanel) {
+        return;
+      }
+      event.preventDefault();
+      setInteraction({
+        type: "drag",
+        startPointerX: event.clientX,
+        startPointerY: event.clientY,
+        startX: desktopPanel.x,
+        startY: desktopPanel.y,
+      });
+    },
+    [desktopPanel],
+  );
 
-  const beginResize = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!isDesktop || !desktopPanel || isCollapsed) {
-      return
-    }
-    event.preventDefault()
-    event.stopPropagation()
-    setInteraction({
-      type: 'resize',
-      startPointerX: event.clientX,
-      startPointerY: event.clientY,
-      startWidth: desktopPanel.width,
-      startHeight: desktopPanel.height,
-    })
-  }, [desktopPanel, isCollapsed, isDesktop])
+  const beginResize = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!isDesktop || !desktopPanel || isCollapsed) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      setInteraction({
+        type: "resize",
+        startPointerX: event.clientX,
+        startPointerY: event.clientY,
+        startWidth: desktopPanel.width,
+        startHeight: desktopPanel.height,
+      });
+    },
+    [desktopPanel, isCollapsed, isDesktop],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented && !behindPanel) {
-        onClose()
+      if (event.key === "Escape" && !event.defaultPrevented && !behindPanel) {
+        onClose();
       }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [behindPanel, onClose])
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [behindPanel, onClose]);
 
   useEffect(() => {
     const syncViewport = () => {
-      const desktop = isDesktopViewport()
-      setIsDesktop(desktop)
+      const desktop = isDesktopViewport();
+      setIsDesktop(desktop);
       if (!desktop) {
-        stopInteraction()
-        return
+        stopInteraction();
+        return;
       }
-      syncDesktopWindow(isCollapsed)
-    }
+      syncDesktopWindow(isCollapsed);
+    };
 
-    window.addEventListener('resize', syncViewport)
-    window.visualViewport?.addEventListener('resize', syncViewport)
-    window.visualViewport?.addEventListener('scroll', syncViewport)
+    window.addEventListener("resize", syncViewport);
+    window.visualViewport?.addEventListener("resize", syncViewport);
+    window.visualViewport?.addEventListener("scroll", syncViewport);
     return () => {
-      window.removeEventListener('resize', syncViewport)
-      window.visualViewport?.removeEventListener('resize', syncViewport)
-      window.visualViewport?.removeEventListener('scroll', syncViewport)
-    }
-  }, [isCollapsed, stopInteraction, syncDesktopWindow])
+      window.removeEventListener("resize", syncViewport);
+      window.visualViewport?.removeEventListener("resize", syncViewport);
+      window.visualViewport?.removeEventListener("scroll", syncViewport);
+    };
+  }, [isCollapsed, stopInteraction, syncDesktopWindow]);
 
   useLayoutEffect(() => {
     if (!isCollapsed) {
-      return
+      return;
     }
 
-    const node = collapsedPanelRef.current
+    const node = collapsedPanelRef.current;
     if (!node) {
-      return
+      return;
     }
 
     const updateHeight = () => {
       const nextHeight = Math.max(
         DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
         Math.ceil(node.getBoundingClientRect().height),
-      )
-      setCollapsedPanelHeight((previous) => (previous === nextHeight ? previous : nextHeight))
-    }
+      );
+      setCollapsedPanelHeight((previous) =>
+        previous === nextHeight ? previous : nextHeight,
+      );
+    };
 
-    updateHeight()
+    updateHeight();
 
-    if (typeof ResizeObserver === 'undefined') {
-      return
+    if (typeof ResizeObserver === "undefined") {
+      return;
     }
 
     const observer = new ResizeObserver(() => {
-      updateHeight()
-    })
-    observer.observe(node)
+      updateHeight();
+    });
+    observer.observe(node);
 
     return () => {
-      observer.disconnect()
-    }
-  }, [isCollapsed, isDesktop, navigationHint])
+      observer.disconnect();
+    };
+  }, [isCollapsed, isDesktop, navigationHint]);
 
   useEffect(() => {
     if (!desktopWindow) {
-      return
+      return;
     }
     try {
       window.localStorage.setItem(
@@ -304,30 +349,33 @@ export function RulesPanel({
           windowState: desktopWindow,
           isCollapsed,
         }),
-      )
+      );
     } catch {
       // Best effort only.
     }
-  }, [desktopWindow, isCollapsed])
+  }, [desktopWindow, isCollapsed]);
 
   useEffect(() => {
     if (!interaction || !isDesktop) {
-      return
+      return;
     }
 
-    const previousUserSelect = document.body.style.userSelect
-    const previousCursor = document.body.style.cursor
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor = interaction.type === 'drag' ? 'grabbing' : 'se-resize'
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor =
+      interaction.type === "drag" ? "grabbing" : "se-resize";
 
     const handlePointerMove = (event: PointerEvent) => {
       setDesktopWindow((previous) => {
-        const viewport = currentViewportBox()
-        const current = previous ?? defaultDesktopWindowState(viewport)
+        const viewport = currentViewportBox();
+        const current = previous ?? defaultDesktopWindowState(viewport);
 
-        if (interaction.type === 'drag') {
-          const nextX = interaction.startX + (event.clientX - interaction.startPointerX)
-          const nextY = interaction.startY + (event.clientY - interaction.startPointerY)
+        if (interaction.type === "drag") {
+          const nextX =
+            interaction.startX + (event.clientX - interaction.startPointerX);
+          const nextY =
+            interaction.startY + (event.clientY - interaction.startPointerY);
 
           if (isCollapsed) {
             const origin = clampDesktopPanelOrigin(
@@ -335,7 +383,7 @@ export function RulesPanel({
               nextY,
               collapsedPanelSize(viewport, collapsedPanelHeight),
               viewport,
-            )
+            );
             return clampDesktopWindowForMode(
               {
                 ...current,
@@ -344,7 +392,7 @@ export function RulesPanel({
               viewport,
               true,
               collapsedPanelHeight,
-            )
+            );
           }
 
           return clampDesktopWindowState(
@@ -354,11 +402,13 @@ export function RulesPanel({
               y: nextY,
             },
             viewport,
-          )
+          );
         }
 
-        const width = interaction.startWidth + (event.clientX - interaction.startPointerX)
-        const height = interaction.startHeight + (event.clientY - interaction.startPointerY)
+        const width =
+          interaction.startWidth + (event.clientX - interaction.startPointerX);
+        const height =
+          interaction.startHeight + (event.clientY - interaction.startPointerY);
         return clampDesktopWindowState(
           {
             ...current,
@@ -366,42 +416,55 @@ export function RulesPanel({
             height,
           },
           viewport,
-        )
-      })
-    }
+        );
+      });
+    };
 
     const handlePointerUp = () => {
-      setInteraction(null)
-    }
+      setInteraction(null);
+    };
 
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
 
     return () => {
-      document.body.style.userSelect = previousUserSelect
-      document.body.style.cursor = previousCursor
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [collapsedPanelHeight, interaction, isCollapsed, isDesktop])
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [collapsedPanelHeight, interaction, isCollapsed, isDesktop]);
 
   if (!isDesktop) {
     if (!mobileViewport) {
-      return null
+      return null;
     }
 
     const expandedHeight = clamp(
-      mobileViewport.height - MOBILE_PANEL_TOP_GAP_PX - MOBILE_PANEL_BOTTOM_GAP_PX,
+      mobileViewport.height -
+        MOBILE_PANEL_TOP_GAP_PX -
+        MOBILE_PANEL_BOTTOM_GAP_PX,
       MOBILE_PANEL_MIN_HEIGHT_PX,
-      Math.max(MOBILE_PANEL_MIN_HEIGHT_PX, mobileViewport.height - MOBILE_PANEL_BOTTOM_GAP_PX),
-    )
-    const expandedWidth = Math.min(MOBILE_PANEL_MAX_WIDTH_PX, mobileViewport.width - WINDOW_MARGIN_PX * 2)
-    const expandedLeft = mobileViewport.left + Math.round((mobileViewport.width - expandedWidth) / 2)
-    const collapsedLocation = navigationHint || COLLAPSED_LABEL_FALLBACK
+      Math.max(
+        MOBILE_PANEL_MIN_HEIGHT_PX,
+        mobileViewport.height - MOBILE_PANEL_BOTTOM_GAP_PX,
+      ),
+    );
+    const expandedWidth = Math.min(
+      MOBILE_PANEL_MAX_WIDTH_PX,
+      mobileViewport.width - WINDOW_MARGIN_PX * 2,
+    );
+    const expandedLeft =
+      mobileViewport.left +
+      Math.round((mobileViewport.width - expandedWidth) / 2);
+    const collapsedLocation = navigationHint || COLLAPSED_LABEL_FALLBACK;
 
     return (
       // Minimized, a phone's Guide is the dot on its button. It stays laid out, so it opens at the same place.
-      <div className="fixed inset-0 z-50 pointer-events-none" style={{ visibility: isCollapsed ? 'hidden' : undefined }}>
+      <div
+        className="fixed inset-0 z-50 pointer-events-none"
+        style={{ visibility: isCollapsed ? "hidden" : undefined }}
+      >
         <FloatingWindow
           name="guide"
           title="Guide"
@@ -438,14 +501,14 @@ export function RulesPanel({
           </div>
         </FloatingWindow>
       </div>
-    )
+    );
   }
 
   if (!desktopViewport || !desktopPanel) {
-    return null
+    return null;
   }
 
-  const collapsedLocation = navigationHint || COLLAPSED_LABEL_FALLBACK
+  const collapsedLocation = navigationHint || COLLAPSED_LABEL_FALLBACK;
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
@@ -455,7 +518,7 @@ export function RulesPanel({
         title="Guide"
         collapsed={isCollapsed}
         draggable
-        dragging={interaction?.type === 'drag'}
+        dragging={interaction?.type === "drag"}
         onDragStart={beginDrag}
         onMinimize={handleCollapse}
         onRestore={handleRestore}
@@ -497,5 +560,5 @@ export function RulesPanel({
         )}
       </FloatingWindow>
     </div>
-  )
+  );
 }

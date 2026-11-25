@@ -33,7 +33,10 @@ export function canInteractWithBattleCard({
   return !isFaceDown;
 }
 
-export function canUseBattleFaceDownAction(owner: ZoneOwner, canManipulateOpponent: boolean): boolean {
+export function canUseBattleFaceDownAction(
+  owner: ZoneOwner,
+  canManipulateOpponent: boolean,
+): boolean {
   return owner === "player" || canManipulateOpponent;
 }
 
@@ -59,5 +62,9 @@ export function hasBattleResultConflict({
   isResolved,
 }: BattleResultConflictOptions): boolean {
   if (isResolved) return false;
-  return !!mySubmission && !!opponentSubmission && mySubmission !== opponentSubmission;
+  return (
+    !!mySubmission &&
+    !!opponentSubmission &&
+    mySubmission !== opponentSubmission
+  );
 }

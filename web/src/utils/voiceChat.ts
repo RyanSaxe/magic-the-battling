@@ -24,7 +24,10 @@ export function isVoiceMicBlocked(
   voiceOn: boolean,
   state: { isAvailable: boolean; peers: readonly unknown[] },
 ): boolean {
-  if (!voiceOn || state.isAvailable || state.peers.length > 0) return false
+  if (!voiceOn || state.isAvailable || state.peers.length > 0) return false;
   // Plain HTTP has no getUserMedia; don't call the mic blocked where the browser doesn't support it.
-  return typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function'
+  return (
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getUserMedia === "function"
+  );
 }

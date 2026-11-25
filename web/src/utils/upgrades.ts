@@ -19,7 +19,9 @@ export function getRevealedAppliedUpgrades(upgrades: Card[]): Card[] {
 }
 
 export function getUnrevealedAppliedUpgrades(upgrades: Card[]): Card[] {
-  return upgrades.filter((upgrade) => isAppliedUpgrade(upgrade) && upgrade.is_revealed === false);
+  return upgrades.filter(
+    (upgrade) => isAppliedUpgrade(upgrade) && upgrade.is_revealed === false,
+  );
 }
 
 export function getUnappliedUpgrades(upgrades: Card[]): Card[] {
@@ -35,7 +37,10 @@ export function getDisplayedAppliedUpgrades(
     : getRevealedAppliedUpgrades(upgrades);
 }
 
-export function getUpgradeDisplayScope(isOwner: boolean, phase?: string | null): UpgradeDisplayScope {
+export function getUpgradeDisplayScope(
+  isOwner: boolean,
+  phase?: string | null,
+): UpgradeDisplayScope {
   return isOwner && phase !== "battle" ? "all_applied" : "revealed_applied";
 }
 

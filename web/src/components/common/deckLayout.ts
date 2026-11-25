@@ -1,5 +1,8 @@
-import { ZONE_LAYOUT_PADDING, type CardLayoutConfig } from '../../hooks/useCardLayout'
-import { getUpgradeZoneLayoutBounds } from '../../utils/upgradeGrid'
+import {
+  ZONE_LAYOUT_PADDING,
+  type CardLayoutConfig,
+} from "../../hooks/useCardLayout";
+import { getUpgradeZoneLayoutBounds } from "../../utils/upgradeGrid";
 
 export function deckLayoutConfig({
   handCount,
@@ -7,22 +10,26 @@ export function deckLayoutConfig({
   sideboardCount,
   upgradeCount,
 }: {
-  handCount: number
-  battlefieldCount: number
-  sideboardCount: number
-  upgradeCount: number
+  handCount: number;
+  battlefieldCount: number;
+  sideboardCount: number;
+  upgradeCount: number;
 }): CardLayoutConfig {
   return {
     zones: {
       hand: { count: handCount },
-      battlefield: { count: battlefieldCount, priority: 'fill', maxRows: 1 },
+      battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
       sideboard: { count: sideboardCount },
       commandZone: {
         count: upgradeCount,
         ...getUpgradeZoneLayoutBounds(upgradeCount),
       },
     },
-    layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+    layout: {
+      top: ["hand"],
+      bottomLeft: ["battlefield", "sideboard"],
+      bottomRight: ["commandZone"],
+    },
     ...ZONE_LAYOUT_PADDING,
-  }
+  };
 }

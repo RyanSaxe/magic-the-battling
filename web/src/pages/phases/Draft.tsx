@@ -1,43 +1,56 @@
-import { useState, useCallback } from 'react'
-import { Card } from '../../components/card'
-import type { GameState, Card as CardType, CardDestination } from '../../types'
-import { LayoutResetControl } from '../../components/common/LayoutResetControl'
-import { UpgradeGrid } from '../../components/common/UpgradeGrid'
-import { ZoneLayout } from '../../components/common/ZoneLayout'
-import { useSavedLayout, type BoardSize } from '../../hooks/useSavedLayout'
-import { useResizableLayout } from '../../hooks/useResizableLayout'
-import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
-import { draftLayoutConfig } from './phaseLayouts'
+import { useState, useCallback } from "react";
+import { Card } from "../../components/card";
+import type { GameState, Card as CardType, CardDestination } from "../../types";
+import { LayoutResetControl } from "../../components/common/LayoutResetControl";
+import { UpgradeGrid } from "../../components/common/UpgradeGrid";
+import { ZoneLayout } from "../../components/common/ZoneLayout";
+import { useSavedLayout, type BoardSize } from "../../hooks/useSavedLayout";
+import { useResizableLayout } from "../../hooks/useResizableLayout";
+import {
+  TREASURE_TOKEN_IMAGE,
+  POISON_COUNTER_IMAGE,
+} from "../../constants/assets";
+import { draftLayoutConfig } from "./phaseLayouts";
 
 interface DraftPhaseProps {
-  gameState: GameState
+  gameState: GameState;
   actions: {
-    draftSwap: (packCardId: string, playerCardId: string, destination: CardDestination) => void
-    draftRoll: () => void
-    draftDone: () => void
-  }
-  isMobile?: boolean
-  showDesktopUpgradeRail?: boolean
+    draftSwap: (
+      packCardId: string,
+      playerCardId: string,
+      destination: CardDestination,
+    ) => void;
+    draftRoll: () => void;
+    draftDone: () => void;
+  };
+  isMobile?: boolean;
+  showDesktopUpgradeRail?: boolean;
 }
 
-type SelectionZone = 'pack' | 'pool'
+type SelectionZone = "pack" | "pool";
 
 interface CardWithIndex {
-  card: CardType
-  index: number
-  zone: SelectionZone
-  isInHand: boolean
+  card: CardType;
+  index: number;
+  zone: SelectionZone;
+  isInHand: boolean;
 }
 
-export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRail = false }: DraftPhaseProps) {
-  const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
+export function DraftPhase({
+  gameState,
+  actions,
+  isMobile,
+  showDesktopUpgradeRail = false,
+}: DraftPhaseProps) {
+  const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null);
 
-  const { self_player } = gameState
-  const currentPack = self_player.current_pack ?? []
-  const pool = [...self_player.hand, ...self_player.sideboard]
-  const hasDesktopUpgradeRail = showDesktopUpgradeRail && self_player.upgrades.length > 0
+  const { self_player } = gameState;
+  const currentPack = self_player.current_pack ?? [];
+  const pool = [...self_player.hand, ...self_player.sideboard];
+  const hasDesktopUpgradeRail =
+    showDesktopUpgradeRail && self_player.upgrades.length > 0;
 
-  const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null)
+  const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null);
   const {
     constraints,
     setConstraints,
@@ -45,93 +58,107 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     resolution: persistedLayout,
   } = useSavedLayout(
     {
-      scopeKey: 'phase:draft',
+      scopeKey: "phase:draft",
       stage: self_player.stage,
       round: self_player.round,
     },
     measuredBoard,
-  )
+  );
 
   const layoutConfig = draftLayoutConfig({
     packCount: currentPack.length,
     poolCount: pool.length,
     upgradeRailCount: hasDesktopUpgradeRail ? self_player.upgrades.length : 0,
-  })
+  });
 
-  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
-    useResizableLayout({
-      layoutConfig,
-      constraints,
-      onConstraintsChange: setConstraints,
-      onConstraintsClear: clearConstraints,
-      allowHorizontalResize: !isMobile,
-    })
+  const {
+    containerRef,
+    dims,
+    containerSize,
+    zoneFrames,
+    zoneRefs,
+    dividerCallbacks,
+  } = useResizableLayout({
+    layoutConfig,
+    constraints,
+    onConstraintsChange: setConstraints,
+    onConstraintsClear: clearConstraints,
+    allowHorizontalResize: !isMobile,
+  });
   // A saved layout belongs to a board size band, known once the board is measured.
-  if (measuredBoard !== containerSize) setMeasuredBoard(containerSize)
+  if (measuredBoard !== containerSize) setMeasuredBoard(containerSize);
 
-  const packDims = dims.pack
-  const poolDims = dims.pool
-  const upgradesDims = dims.upgrades
-  const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
-  const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
+  const packDims = dims.pack;
+  const poolDims = dims.pool;
+  const upgradesDims = dims.upgrades;
+  const appliedUpgradesList = self_player.upgrades.filter(
+    (u) => u.upgrade_target,
+  );
+  const upgradedCardIds = new Set(
+    appliedUpgradesList.map((u) => u.upgrade_target!.id),
+  );
   const getAppliedUpgrades = (cardId: string) =>
-    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId)
+    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId);
 
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
-    if (!(e.target as HTMLElement).closest('.card')) {
-      setSelectedCard(null)
+    if (!(e.target as HTMLElement).closest(".card")) {
+      setSelectedCard(null);
     }
-  }, [])
+  }, []);
 
   const handleCardClick = useCallback(
     (card: CardType, index: number, zone: SelectionZone, isInHand: boolean) => {
       if (selectedCard?.card.id === card.id) {
-        setSelectedCard(null)
-        return
+        setSelectedCard(null);
+        return;
       }
 
       if (!selectedCard) {
-        setSelectedCard({ card, index, zone, isInHand })
-        return
+        setSelectedCard({ card, index, zone, isInHand });
+        return;
       }
 
       if (selectedCard.zone === zone) {
-        setSelectedCard({ card, index, zone, isInHand })
-        return
+        setSelectedCard({ card, index, zone, isInHand });
+        return;
       }
 
-      const packCard = zone === 'pack' ? card : selectedCard.card
-      const poolCard = zone === 'pool' ? card : selectedCard.card
-      const poolIsInHand = zone === 'pool' ? isInHand : selectedCard.isInHand
-      const destination: CardDestination = poolIsInHand ? 'hand' : 'sideboard'
+      const packCard = zone === "pack" ? card : selectedCard.card;
+      const poolCard = zone === "pool" ? card : selectedCard.card;
+      const poolIsInHand = zone === "pool" ? isInHand : selectedCard.isInHand;
+      const destination: CardDestination = poolIsInHand ? "hand" : "sideboard";
 
-      actions.draftSwap(packCard.id, poolCard.id, destination)
-      setSelectedCard(null)
+      actions.draftSwap(packCard.id, poolCard.id, destination);
+      setSelectedCard(null);
     },
-    [selectedCard, actions]
-  )
+    [selectedCard, actions],
+  );
 
   const packContent = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 min-h-0 overflow-auto">
         {currentPack.length === 0 ? (
           <div className="text-center">
-            <div className="text-[var(--ivory-felt)] text-sm">No pack available</div>
+            <div className="text-[var(--ivory-felt)] text-sm">
+              No pack available
+            </div>
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
-            gap: '6px',
-            justifyContent: 'center',
-            maxWidth: '100%',
-            overflow: 'hidden',
-          }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
+              gap: "6px",
+              justifyContent: "center",
+              maxWidth: "100%",
+              overflow: "hidden",
+            }}
+          >
             {currentPack.map((card, index) => (
               <Card
                 key={card.id}
                 card={card}
-                onClick={() => handleCardClick(card, index, 'pack', false)}
+                onClick={() => handleCardClick(card, index, "pack", false)}
                 selected={selectedCard?.card.id === card.id}
                 dimensions={packDims}
               />
@@ -140,7 +167,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
         )}
       </div>
     </div>
-  )
+  );
 
   const poolContent = (
     <div className="flex h-full min-h-0 flex-col">
@@ -152,33 +179,35 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
             </div>
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
-            gap: '6px',
-            justifyContent: 'center',
-            maxWidth: '100%',
-            overflow: 'hidden',
-          }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
+              gap: "6px",
+              justifyContent: "center",
+              maxWidth: "100%",
+              overflow: "hidden",
+            }}
+          >
             {pool.map((card, index) => {
-              const isInHand = self_player.hand.some((c) => c.id === card.id)
+              const isInHand = self_player.hand.some((c) => c.id === card.id);
               return (
                 <Card
                   key={card.id}
                   card={card}
-                  onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                  onClick={() => handleCardClick(card, index, "pool", isInHand)}
                   selected={selectedCard?.card.id === card.id}
                   dimensions={poolDims}
                   upgraded={upgradedCardIds.has(card.id)}
                   appliedUpgrades={getAppliedUpgrades(card.id)}
                 />
-              )
+              );
             })}
           </div>
         )}
       </div>
     </div>
-  )
+  );
 
   // Anchored to the outer ZoneLayout container (via the `overlay` slot) so the
   // tokens sit at the page's bottom corners regardless of inner zone layout —
@@ -195,7 +224,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
             src={TREASURE_TOKEN_IMAGE}
             alt="Treasure"
             className="h-[56px] sm:h-[84px] block shadow-lg"
-            style={{ borderRadius: 'var(--card-border-radius)' }}
+            style={{ borderRadius: "var(--card-border-radius)" }}
           />
           <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
             {self_player.treasures}
@@ -208,7 +237,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
             src={POISON_COUNTER_IMAGE}
             alt="Poison"
             className="h-[56px] sm:h-[84px] block shadow-lg"
-            style={{ borderRadius: 'var(--card-border-radius)' }}
+            style={{ borderRadius: "var(--card-border-radius)" }}
           />
           <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
             {self_player.poison}
@@ -216,7 +245,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
         </div>
       </div>
     </>
-  )
+  );
 
   return (
     <ZoneLayout
@@ -226,11 +255,17 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       zoneHeights={{
         hand: zoneFrames.pack.outerHeight,
         sideboard: zoneFrames.pool.outerHeight,
-        upgrades: hasDesktopUpgradeRail ? zoneFrames.upgrades.outerHeight : undefined,
+        upgrades: hasDesktopUpgradeRail
+          ? zoneFrames.upgrades.outerHeight
+          : undefined,
       }}
-      zoneWidths={hasDesktopUpgradeRail ? {
-        upgrades: zoneFrames.upgrades.outerWidth,
-      } : null}
+      zoneWidths={
+        hasDesktopUpgradeRail
+          ? {
+              upgrades: zoneFrames.upgrades.outerWidth,
+            }
+          : null
+      }
       zoneRefs={{
         hand: zoneRefs.pack,
         sideboard: zoneRefs.pool,
@@ -246,9 +281,9 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
               currentRound={self_player.round}
               originStage={persistedLayout.originStage}
               originRound={persistedLayout.originRound}
-              isInherited={persistedLayout.source === 'inherited'}
+              isInherited={persistedLayout.source === "inherited"}
               onConfirm={clearConstraints}
-              position={isMobile ? 'bottom-right' : 'top-right'}
+              position={isMobile ? "bottom-right" : "top-right"}
             />
           ) : null}
         </>
@@ -259,8 +294,8 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       hasUpgrades={hasDesktopUpgradeRail}
       dividerCallbacks={dividerCallbacks}
       zoneTargetIds={{
-        hand: 'draft-pack',
-        sideboard: 'draft-pool',
+        hand: "draft-pack",
+        sideboard: "draft-pool",
       }}
       handLabel="Pack"
       handContent={packContent}
@@ -284,5 +319,5 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
         ) : null
       }
     />
-  )
+  );
 }

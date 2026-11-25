@@ -5,15 +5,25 @@ import {
   type PhaseActionServerState,
 } from "./pendingPhaseAction";
 
-const inBuild: PhaseActionServerState = { phase: "build", buildReady: false, connected: true };
+const inBuild: PhaseActionServerState = {
+  phase: "build",
+  buildReady: false,
+  connected: true,
+};
 
 function sentFromBuild() {
-  return reducePhaseAction(initialPhaseActionState(inBuild), { type: "sent", action: "build_ready" });
+  return reducePhaseAction(initialPhaseActionState(inBuild), {
+    type: "sent",
+    action: "build_ready",
+  });
 }
 
 describe("reducePhaseAction", () => {
   it("keeps the action pending when an update leaves this player's phase and ready flag unchanged", () => {
-    const state = reducePhaseAction(sentFromBuild(), { type: "server_state", server: { ...inBuild } });
+    const state = reducePhaseAction(sentFromBuild(), {
+      type: "server_state",
+      server: { ...inBuild },
+    });
 
     expect(state.pending).toEqual({ action: "build_ready" });
   });
@@ -29,7 +39,11 @@ describe("reducePhaseAction", () => {
 
   it("settles the action when the phase changes", () => {
     const sent = reducePhaseAction(
-      initialPhaseActionState({ phase: "reward", buildReady: false, connected: true }),
+      initialPhaseActionState({
+        phase: "reward",
+        buildReady: false,
+        connected: true,
+      }),
       { type: "sent", action: "reward_done" },
     );
     const state = reducePhaseAction(sent, {
@@ -41,7 +55,9 @@ describe("reducePhaseAction", () => {
   });
 
   it("settles the action when the server refuses it", () => {
-    expect(reducePhaseAction(sentFromBuild(), { type: "failed" }).pending).toBeNull();
+    expect(
+      reducePhaseAction(sentFromBuild(), { type: "failed" }).pending,
+    ).toBeNull();
   });
 
   it("settles the action when the connection drops, so it can be sent again", () => {
@@ -54,7 +70,10 @@ describe("reducePhaseAction", () => {
   });
 
   it("ignores a second action while one is pending", () => {
-    const state = reducePhaseAction(sentFromBuild(), { type: "sent", action: "draft_done" });
+    const state = reducePhaseAction(sentFromBuild(), {
+      type: "sent",
+      action: "draft_done",
+    });
 
     expect(state.pending).toEqual({ action: "build_ready" });
   });

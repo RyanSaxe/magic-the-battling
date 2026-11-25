@@ -26,7 +26,11 @@ export function ZoneDivider({
 
   return (
     <div
-      className={isHorizontal ? "zone-divider-line zone-divider-line--horizontal" : "zone-divider-line zone-divider-line--vertical"}
+      className={
+        isHorizontal
+          ? "zone-divider-line zone-divider-line--horizontal"
+          : "zone-divider-line zone-divider-line--vertical"
+      }
       style={{
         position: "relative",
         flexShrink: 0,

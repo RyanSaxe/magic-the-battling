@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect } from "react";
 
-const CLICK_FOLLOWS_TOUCH_MS = 1000
+const CLICK_FOLLOWS_TOUCH_MS = 1000;
 
 function inMiddleThird(point: number, start: number, size: number) {
-  return point >= start + size / 3 && point <= start + (2 * size) / 3
+  return point >= start + size / 3 && point <= start + (2 * size) / 3;
 }
 
 /**
@@ -12,37 +12,41 @@ function inMiddleThird(point: number, start: number, size: number) {
  */
 export function useCardMiddleTap() {
   useEffect(() => {
-    let touch: { x: number; y: number; at: number } | null = null
+    let touch: { x: number; y: number; at: number } | null = null;
 
     const rememberTouch = (event: TouchEvent) => {
       // The touch keeps the finger's position. The click that follows carries the moved one.
-      const { clientX, clientY } = event.changedTouches[0]
-      touch = { x: clientX, y: clientY, at: event.timeStamp }
-    }
+      const { clientX, clientY } = event.changedTouches[0];
+      touch = { x: clientX, y: clientY, at: event.timeStamp };
+    };
 
     const reclaimClick = (event: MouseEvent) => {
-      const tap = touch
-      touch = null
-      if (!tap || event.timeStamp - tap.at > CLICK_FOLLOWS_TOUCH_MS) return
-      if (!(event.target as HTMLElement).closest('button')) return
+      const tap = touch;
+      touch = null;
+      if (!tap || event.timeStamp - tap.at > CLICK_FOLLOWS_TOUCH_MS) return;
+      if (!(event.target as HTMLElement).closest("button")) return;
 
-      const touched = document.elementFromPoint(tap.x, tap.y)
-      if (!touched || touched.closest('button')) return
-      const card = touched.closest<HTMLElement>('.card')
-      if (!card) return
-      const { x, y, width, height } = card.getBoundingClientRect()
-      if (!inMiddleThird(tap.x, x, width) || !inMiddleThird(tap.y, y, height)) return
+      const touched = document.elementFromPoint(tap.x, tap.y);
+      if (!touched || touched.closest("button")) return;
+      const card = touched.closest<HTMLElement>(".card");
+      if (!card) return;
+      const { x, y, width, height } = card.getBoundingClientRect();
+      if (!inMiddleThird(tap.x, x, width) || !inMiddleThird(tap.y, y, height))
+        return;
 
-      event.preventDefault()
-      event.stopPropagation()
-      card.click()
-    }
+      event.preventDefault();
+      event.stopPropagation();
+      card.click();
+    };
 
-    document.addEventListener('touchend', rememberTouch, { capture: true, passive: true })
-    document.addEventListener('click', reclaimClick, true)
+    document.addEventListener("touchend", rememberTouch, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("click", reclaimClick, true);
     return () => {
-      document.removeEventListener('touchend', rememberTouch, true)
-      document.removeEventListener('click', reclaimClick, true)
-    }
-  }, [])
+      document.removeEventListener("touchend", rememberTouch, true);
+      document.removeEventListener("click", reclaimClick, true);
+    };
+  }, []);
 }

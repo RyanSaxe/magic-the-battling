@@ -9,10 +9,7 @@ import {
   ZONE_LAYOUT_PADDING,
   type CardLayoutConfig,
 } from "./useCardLayout";
-import {
-  redistributeSlack,
-  resolveGrowPriority,
-} from "./redistributeSlack";
+import { redistributeSlack, resolveGrowPriority } from "./redistributeSlack";
 
 function runFullPipeline(
   config: CardLayoutConfig,

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import type {
   GuideStepDefinition,
   GuidedGuideId,
@@ -6,7 +14,11 @@ import type {
   GuidedWalkthroughContext,
 } from "./types";
 import { buildGuideDefinition } from "./content";
-import { resolveTarget, useGuidePositioning, type SpotlightRect } from "./useGuidePositioning";
+import {
+  resolveTarget,
+  useGuidePositioning,
+  type SpotlightRect,
+} from "./useGuidePositioning";
 import { GuideOverlay } from "./GuideOverlay";
 import { GuideTooltip } from "./GuideTooltip";
 import { planRequestTransition, type AnimPhase } from "./walkthroughPhase";
@@ -14,7 +26,10 @@ import { enterPressesControl } from "../utils/enterKey";
 
 const MORPH_EASING = "cubic-bezier(0.22,1,0.36,1)";
 
-function spotlightDistance(a: SpotlightRect | null, b: SpotlightRect | null): number {
+function spotlightDistance(
+  a: SpotlightRect | null,
+  b: SpotlightRect | null,
+): number {
   if (!a || !b) return 0;
   const ax = a.x + a.width / 2;
   const ay = a.y + a.height / 2;
@@ -86,8 +101,9 @@ export function GuidedWalkthrough({
   const hasCommittedInitialLayoutRef = useRef(false);
   const phaseTimerRef = useRef<number | null>(null);
   const [reducedMotion] = useState(
-    () => typeof window !== "undefined"
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
 
   const guide = useMemo(
@@ -148,7 +164,11 @@ export function GuidedWalkthrough({
   }, [resolvedTargetSelector, rootRef, step]);
 
   useEffect(() => {
-    if (guide.phase && context.currentPhase && context.currentPhase !== guide.phase) {
+    if (
+      guide.phase &&
+      context.currentPhase &&
+      context.currentPhase !== guide.phase
+    ) {
       finishGuide();
     }
   }, [context.currentPhase, finishGuide, guide.phase]);
@@ -191,14 +211,17 @@ export function GuidedWalkthrough({
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
-      const handled = event.key === "Escape"
-        || event.key === "ArrowRight"
-        || event.key === "Enter"
-        || (event.key === "ArrowLeft" && stepIndex > 0);
+      const handled =
+        event.key === "Escape" ||
+        event.key === "ArrowRight" ||
+        event.key === "Enter" ||
+        (event.key === "ArrowLeft" && stepIndex > 0);
 
       if (!handled) return;
       if (!isCurrentStepDisplayed) return;
-      if (enterPressesControl(event, walkthroughRef.current, getUsableTarget())) {
+      if (
+        enterPressesControl(event, walkthroughRef.current, getUsableTarget())
+      ) {
         // A dialog can be open under the guide, and its Enter would confirm.
         event.stopImmediatePropagation();
         return;
@@ -219,7 +242,14 @@ export function GuidedWalkthrough({
 
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
-  }, [finishGuide, getUsableTarget, isCurrentStepDisplayed, onAdvanceStep, onBackStep, stepIndex]);
+  }, [
+    finishGuide,
+    getUsableTarget,
+    isCurrentStepDisplayed,
+    onAdvanceStep,
+    onBackStep,
+    stepIndex,
+  ]);
 
   const layout = useGuidePositioning(
     rootRef,
@@ -327,9 +357,12 @@ export function GuidedWalkthrough({
         setDisplayState(pendingState);
         setPendingState(null);
         clearPhaseTimer();
-        phaseTimerRef.current = window.setTimeout(() => {
-          setAnimPhase("enter-tooltip");
-        }, morphMs === 0 ? 80 : morphMs);
+        phaseTimerRef.current = window.setTimeout(
+          () => {
+            setAnimPhase("enter-tooltip");
+          },
+          morphMs === 0 ? 80 : morphMs,
+        );
       });
       return () => cancelAnimationFrame(rafId);
     } else if (animPhase === "morph-spot" && !pendingState) {
@@ -355,7 +388,13 @@ export function GuidedWalkthrough({
     }
 
     return () => {};
-  }, [animPhase, clearPhaseTimer, displayState?.layout.spotlight, pendingState, reducedMotion]);
+  }, [
+    animPhase,
+    clearPhaseTimer,
+    displayState?.layout.spotlight,
+    pendingState,
+    reducedMotion,
+  ]);
 
   useEffect(() => {
     return () => clearPhaseTimer();
@@ -363,8 +402,10 @@ export function GuidedWalkthrough({
 
   const morphDuration = useMemo(() => {
     if (!displayState?.layout.spotlight) return 280;
-    if (!pendingState?.layout.spotlight && animPhase !== "morph-spot") return 280;
-    const target = pendingState?.layout.spotlight ?? displayState.layout.spotlight;
+    if (!pendingState?.layout.spotlight && animPhase !== "morph-spot")
+      return 280;
+    const target =
+      pendingState?.layout.spotlight ?? displayState.layout.spotlight;
     const dist = spotlightDistance(displayState.layout.spotlight, target);
     return computeMorphDuration(dist);
   }, [animPhase, displayState, pendingState]);
@@ -392,16 +433,19 @@ export function GuidedWalkthrough({
     const top = displayState?.layout.cardTop ?? 16;
     if (animPhase === "entering" && !reducedMotion) {
       return {
-        left, top,
+        left,
+        top,
         opacity: 1,
-        animation: "guide-tooltip-initial 280ms cubic-bezier(0.0,0,0.2,1) 200ms both",
+        animation:
+          "guide-tooltip-initial 280ms cubic-bezier(0.0,0,0.2,1) 200ms both",
         transition: "none",
       };
     }
 
     if (animPhase === "exit-tooltip" && !reducedMotion) {
       return {
-        left, top,
+        left,
+        top,
         animation: "guide-tooltip-exit 180ms ease-in forwards",
         transition: "none",
       };
@@ -413,22 +457,26 @@ export function GuidedWalkthrough({
 
     if (animPhase === "enter-tooltip" && !reducedMotion) {
       return {
-        left, top,
-        animation: "guide-tooltip-enter 220ms cubic-bezier(0.0,0,0.2,1) forwards",
+        left,
+        top,
+        animation:
+          "guide-tooltip-enter 220ms cubic-bezier(0.0,0,0.2,1) forwards",
         transition: "none",
       };
     }
 
     if (animPhase === "exiting" && !reducedMotion) {
       return {
-        left, top,
+        left,
+        top,
         animation: "guide-tooltip-dismiss 180ms ease-in forwards",
         transition: "none",
       };
     }
 
     return {
-      left, top,
+      left,
+      top,
       opacity: displayState ? 1 : 0,
       transition: "none",
     };
@@ -440,15 +488,22 @@ export function GuidedWalkthrough({
 
     if (animPhase === "entering" && !reducedMotion) {
       return {
-        left: x, top: y, width, height,
-        animation: "guide-spotlight-enter 350ms cubic-bezier(0.22,1,0.36,1) 80ms both",
+        left: x,
+        top: y,
+        width,
+        height,
+        animation:
+          "guide-spotlight-enter 350ms cubic-bezier(0.22,1,0.36,1) 80ms both",
         transition: "none",
       };
     }
 
     if (animPhase === "exiting" && !reducedMotion) {
       return {
-        left: x, top: y, width, height,
+        left: x,
+        top: y,
+        width,
+        height,
         animation: "guide-spotlight-exit 200ms ease-in 60ms forwards",
         transition: "none",
       };
@@ -457,13 +512,22 @@ export function GuidedWalkthrough({
     const morphGlow = animPhase === "morph-spot" && !reducedMotion;
 
     return {
-      left: x, top: y, width, height,
+      left: x,
+      top: y,
+      width,
+      height,
       transition: spotlightTransition,
       animation: morphGlow
         ? `guide-spotlight-morph-glow ${morphDuration}ms ease-in-out`
         : undefined,
     };
-  }, [animPhase, displayState, morphDuration, reducedMotion, spotlightTransition]);
+  }, [
+    animPhase,
+    displayState,
+    morphDuration,
+    reducedMotion,
+    spotlightTransition,
+  ]);
 
   const overlayOpacity = useMemo(() => {
     if (animPhase === "entering") return reducedMotion ? 1 : undefined;
@@ -480,7 +544,8 @@ export function GuidedWalkthrough({
 
   const overlayAnimation = useMemo(() => {
     if (reducedMotion) return undefined;
-    if (animPhase === "entering") return "guide-overlay-enter 400ms ease-out both";
+    if (animPhase === "entering")
+      return "guide-overlay-enter 400ms ease-out both";
     return undefined;
   }, [animPhase, reducedMotion]);
 
@@ -496,13 +561,21 @@ export function GuidedWalkthrough({
     const walkthrough = walkthroughRef.current;
     if (!takesTaps || !root || !walkthrough) return;
     const target = displayState?.stepKey === stepKey ? getUsableTarget() : null;
-    return makeInertExcept(root, target ? [walkthrough, target] : [walkthrough]);
+    return makeInertExcept(
+      root,
+      target ? [walkthrough, target] : [walkthrough],
+    );
   });
 
   if (!step) return null;
 
   return (
-    <div ref={walkthroughRef} className="absolute inset-0 z-80" style={{ pointerEvents: "none" }} aria-live="polite">
+    <div
+      ref={walkthroughRef}
+      className="absolute inset-0 z-80"
+      style={{ pointerEvents: "none" }}
+      aria-live="polite"
+    >
       <GuideTooltip
         ref={measureCardRef}
         step={step}

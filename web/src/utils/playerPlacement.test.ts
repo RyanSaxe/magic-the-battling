@@ -8,9 +8,7 @@ import {
   suddenDeathDecidesGame,
 } from "./playerPlacement";
 
-function makePlayer(
-  overrides: Partial<PlayerView>,
-): PlayerView {
+function makePlayer(overrides: Partial<PlayerView>): PlayerView {
   return {
     name: "player",
     treasures: 0,
@@ -50,11 +48,9 @@ describe("player placement ordering", () => {
       makePlayer({ name: "Bravo", placement: 4 }),
     ];
 
-    expect(getSidebarPlayerOrder(players).map((player) => player.name)).toEqual([
-      "Alpha",
-      "Zulu",
-      "Bravo",
-    ]);
+    expect(getSidebarPlayerOrder(players).map((player) => player.name)).toEqual(
+      ["Alpha", "Zulu", "Bravo"],
+    );
     expect(getSidebarPlacementRank(players[1], players)).toBe(1);
     expect(getSidebarPlacementRank(players[0], players)).toBe(2);
     expect(getSidebarPlacementRank(players[2], players)).toBe(3);
@@ -67,11 +63,9 @@ describe("player placement ordering", () => {
       makePlayer({ name: "Bravo", placement: 4 }),
     ];
 
-    expect([...players].sort(comparePlayersForSidebar).map((player) => player.name)).toEqual([
-      "Charlie",
-      "Alpha",
-      "Bravo",
-    ]);
+    expect(
+      [...players].sort(comparePlayersForSidebar).map((player) => player.name),
+    ).toEqual(["Charlie", "Alpha", "Bravo"]);
   });
 
   it("gives alive players tied on poison the same place", () => {
@@ -83,9 +77,9 @@ describe("player placement ordering", () => {
       makePlayer({ name: "Delta", placement: 5 }),
     ];
 
-    expect(players.map((player) => getSidebarPlacementRank(player, players))).toEqual([
-      1, 1, 3, 3, 5,
-    ]);
+    expect(
+      players.map((player) => getSidebarPlacementRank(player, players)),
+    ).toEqual([1, 1, 3, 3, 5]);
   });
 });
 
@@ -98,13 +92,21 @@ describe("isSidebarLastPlace", () => {
       makePlayer({ name: "Delta", poison: 4 }),
     ];
 
-    expect(players.map((player) => isSidebarLastPlace(player, players))).toEqual([false, false, true, true]);
+    expect(
+      players.map((player) => isSidebarLastPlace(player, players)),
+    ).toEqual([false, false, true, true]);
   });
 
   it("marks no one last while every player is tied", () => {
-    const players = [makePlayer({ name: "Alpha" }), makePlayer({ name: "Bravo" }), makePlayer({ name: "Charlie" })];
+    const players = [
+      makePlayer({ name: "Alpha" }),
+      makePlayer({ name: "Bravo" }),
+      makePlayer({ name: "Charlie" }),
+    ];
 
-    expect(players.map((player) => isSidebarLastPlace(player, players))).toEqual([false, false, false]);
+    expect(
+      players.map((player) => isSidebarLastPlace(player, players)),
+    ).toEqual([false, false, false]);
   });
 });
 

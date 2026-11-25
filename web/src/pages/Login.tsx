@@ -1,35 +1,40 @@
-import { useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { useAuth } from '../contexts/authState'
-import { AppHeader, HomeButton } from '../components/common/AppHeader'
-import { PageFrame } from '../components/common/PageFrame'
-import { SurfaceCard } from '../components/common/SurfaceCard'
-import { unknownToAppError } from '../utils/appError'
-import { FIELD_ERROR, FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
+import { useState } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useAuth } from "../contexts/authState";
+import { AppHeader, HomeButton } from "../components/common/AppHeader";
+import { PageFrame } from "../components/common/PageFrame";
+import { SurfaceCard } from "../components/common/SurfaceCard";
+import { unknownToAppError } from "../utils/appError";
+import {
+  FIELD_ERROR,
+  FIELD_LABEL,
+  LINK,
+  TEXT_INPUT,
+} from "../components/common/styles";
 
 export function Login() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const returnTo = searchParams.get('returnTo') || '/'
-  const { login } = useAuth()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("returnTo") || "/";
+  const { login } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      await login(username, password)
-      navigate(returnTo)
+      await login(username, password);
+      navigate(returnTo);
     } catch (err) {
-      setError(unknownToAppError(err, 'login', 'Login failed').message)
+      setError(unknownToAppError(err, "login", "Login failed").message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <PageFrame
@@ -37,11 +42,17 @@ export function Login() {
       center
       contentClassName="items-center"
     >
-      <SurfaceCard as="form" onSubmit={handleSubmit} onChange={() => setError('')}>
+      <SurfaceCard
+        as="form"
+        onSubmit={handleSubmit}
+        onChange={() => setError("")}
+      >
         <h2 className="text-xl font-bold text-white mb-5">Log In</h2>
 
         <div className="mb-4">
-          <label htmlFor="username" className={FIELD_LABEL}>Username</label>
+          <label htmlFor="username" className={FIELD_LABEL}>
+            Username
+          </label>
           <input
             id="username"
             type="text"
@@ -54,7 +65,9 @@ export function Login() {
         </div>
 
         <div className="mb-6">
-          <label htmlFor="password" className={FIELD_LABEL}>Password</label>
+          <label htmlFor="password" className={FIELD_LABEL}>
+            Password
+          </label>
           <input
             id="password"
             type="password"
@@ -63,7 +76,11 @@ export function Login() {
             className={TEXT_INPUT}
             required
           />
-          {error && <p role="alert" className={FIELD_ERROR}>{error}</p>}
+          {error && (
+            <p role="alert" className={FIELD_ERROR}>
+              {error}
+            </p>
+          )}
         </div>
 
         <button
@@ -71,14 +88,19 @@ export function Login() {
           disabled={loading || !username || !password}
           className="btn btn-primary w-full py-2 font-semibold disabled:opacity-50"
         >
-          {loading ? 'Logging in...' : 'Log In'}
+          {loading ? "Logging in..." : "Log In"}
         </button>
 
         <p className="text-center text-[var(--ivory-muted)] text-sm mt-4">
-          Don't have an account?{' '}
-          <Link to={`/register${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className={LINK}>Create one</Link>
+          Don't have an account?{" "}
+          <Link
+            to={`/register${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
+            className={LINK}
+          >
+            Create one
+          </Link>
         </p>
       </SurfaceCard>
     </PageFrame>
-  )
+  );
 }

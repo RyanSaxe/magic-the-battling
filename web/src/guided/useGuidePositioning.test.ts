@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { computeScrollDeltaForVisibility, scrollTargetIntoVisibleArea } from "./useGuidePositioning";
+import {
+  computeScrollDeltaForVisibility,
+  scrollTargetIntoVisibleArea,
+} from "./useGuidePositioning";
 
 describe("computeScrollDeltaForVisibility", () => {
   const container = {

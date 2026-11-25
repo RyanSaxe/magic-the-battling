@@ -68,9 +68,7 @@ function sumSlack(zones: ZoneSlackInfo[]): number {
 function hasGrowableRecipient(zones: ZoneSlackInfo[]): boolean {
   // A zone can absorb more height only if it filled its current frame (slack ≈ 0)
   // AND its growPriority > 0. If a zone already has slack, more height won't help.
-  return zones.some(
-    (z) => z.slack <= SLACK_TOLERANCE_PX && z.growPriority > 0,
-  );
+  return zones.some((z) => z.slack <= SLACK_TOLERANCE_PX && z.growPriority > 0);
 }
 
 function adjustBottomLeftSplit(
@@ -194,10 +192,7 @@ export function redistributeSlack(
     return { constraints: current, iterations: 0 };
   }
 
-  const {
-    fixedHeight = 0,
-    sectionGap = 0,
-  } = config;
+  const { fixedHeight = 0, sectionGap = 0 } = config;
   const availH = containerH - fixedHeight;
   const hasTop = topIds.length > 0;
   const hasBottom = blIds.length > 0 || brIds.length > 0;

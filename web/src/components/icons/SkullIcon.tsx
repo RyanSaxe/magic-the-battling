@@ -1,16 +1,16 @@
 interface SkullIconProps {
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
 const sizes = {
   sm: 16,
   md: 24,
   lg: 32,
-}
+};
 
-export function SkullIcon({ size = 'md', className = '' }: SkullIconProps) {
-  const px = sizes[size]
+export function SkullIcon({ size = "md", className = "" }: SkullIconProps) {
+  const px = sizes[size];
   return (
     <svg
       width={px}
@@ -35,5 +35,5 @@ export function SkullIcon({ size = 'md', className = '' }: SkullIconProps) {
         strokeLinecap="round"
       />
     </svg>
-  )
+  );
 }

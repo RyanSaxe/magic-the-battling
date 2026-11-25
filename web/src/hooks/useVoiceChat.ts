@@ -1,36 +1,42 @@
-import { useState, useEffect, useRef, useCallback, type MutableRefObject } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  type MutableRefObject,
+} from "react";
 
 const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-]
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+];
 
 export interface VoicePeer {
-  name: string
-  connectionState: 'connecting' | 'connected' | 'failed' | 'disconnected'
+  name: string;
+  connectionState: "connecting" | "connected" | "failed" | "disconnected";
 }
 
 export interface VoiceChatState {
-  isAvailable: boolean
-  isMuted: boolean
-  isSpeaking: boolean
-  peers: VoicePeer[]
-  mutedPeers: Set<string>
-  speakingPeers: Set<string>
-  remoteMutedPeers: Set<string>
+  isAvailable: boolean;
+  isMuted: boolean;
+  isSpeaking: boolean;
+  peers: VoicePeer[];
+  mutedPeers: Set<string>;
+  speakingPeers: Set<string>;
+  remoteMutedPeers: Set<string>;
 }
 
 interface VoiceSignalPayload {
-  signal_type: string
-  data: unknown
-  from_player: string
+  signal_type: string;
+  data: unknown;
+  from_player: string;
 }
 
 interface PeerState {
-  pc: RTCPeerConnection
-  audioEl: HTMLAudioElement
-  iceBuffer: RTCIceCandidateInit[]
-  hasRemoteDesc: boolean
+  pc: RTCPeerConnection;
+  audioEl: HTMLAudioElement;
+  iceBuffer: RTCIceCandidateInit[];
+  hasRemoteDesc: boolean;
 }
 
 const INITIAL_STATE: VoiceChatState = {
@@ -41,106 +47,116 @@ const INITIAL_STATE: VoiceChatState = {
   mutedPeers: new Set(),
   speakingPeers: new Set(),
   remoteMutedPeers: new Set(),
-}
+};
 
-const SPEAKING_THRESHOLD = 15
-const ATTACK_ALPHA = 0.4
-const DECAY_ALPHA = 0.15
-const MAX_RETRIES = 3
-const BASE_RETRY_DELAY = 1000
-const DISCONNECTED_GRACE = 4000
-const BASE_OFFER_REPEAT_DELAY = 2000
-const MAX_OFFER_REPEAT_DELAY = 10000
-const MAX_PENDING_SIGNALS = 50
+const SPEAKING_THRESHOLD = 15;
+const ATTACK_ALPHA = 0.4;
+const DECAY_ALPHA = 0.15;
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY = 1000;
+const DISCONNECTED_GRACE = 4000;
+const BASE_OFFER_REPEAT_DELAY = 2000;
+const MAX_OFFER_REPEAT_DELAY = 10000;
+const MAX_PENDING_SIGNALS = 50;
 
-const MUTE_STORAGE_KEY = 'mtb_voice_muted'
-const MUTED_PEERS_STORAGE_KEY = 'mtb_voice_muted_peers'
+const MUTE_STORAGE_KEY = "mtb_voice_muted";
+const MUTED_PEERS_STORAGE_KEY = "mtb_voice_muted_peers";
 
 function getPersistedMute(): boolean {
-  return sessionStorage.getItem(MUTE_STORAGE_KEY) === 'true'
+  return sessionStorage.getItem(MUTE_STORAGE_KEY) === "true";
 }
 
 function setPersistedMute(muted: boolean) {
-  sessionStorage.setItem(MUTE_STORAGE_KEY, muted ? 'true' : 'false')
+  sessionStorage.setItem(MUTE_STORAGE_KEY, muted ? "true" : "false");
 }
 
 function getPersistedMutedPeers(): Set<string> {
-  const raw = sessionStorage.getItem(MUTED_PEERS_STORAGE_KEY)
-  if (!raw) return new Set()
-  try { return new Set(JSON.parse(raw) as string[]) } catch { return new Set() }
+  const raw = sessionStorage.getItem(MUTED_PEERS_STORAGE_KEY);
+  if (!raw) return new Set();
+  try {
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
 }
 
 function setPersistedMutedPeers(peers: Set<string>) {
-  sessionStorage.setItem(MUTED_PEERS_STORAGE_KEY, JSON.stringify([...peers]))
+  sessionStorage.setItem(MUTED_PEERS_STORAGE_KEY, JSON.stringify([...peers]));
 }
 
-let sharedAudioContext: AudioContext | null = null
-let sharedAudioContextRefCount = 0
+let sharedAudioContext: AudioContext | null = null;
+let sharedAudioContextRefCount = 0;
 
 function getSharedAudioContext(): AudioContext {
-  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
-    sharedAudioContext = new AudioContext()
-    sharedAudioContextRefCount = 0
+  if (!sharedAudioContext || sharedAudioContext.state === "closed") {
+    sharedAudioContext = new AudioContext();
+    sharedAudioContextRefCount = 0;
   }
-  sharedAudioContextRefCount++
-  return sharedAudioContext
+  sharedAudioContextRefCount++;
+  return sharedAudioContext;
 }
 
 function releaseSharedAudioContext() {
-  sharedAudioContextRefCount--
+  sharedAudioContextRefCount--;
   if (sharedAudioContextRefCount <= 0) {
-    sharedAudioContext?.close()
-    sharedAudioContext = null
-    sharedAudioContextRefCount = 0
+    sharedAudioContext?.close();
+    sharedAudioContext = null;
+    sharedAudioContextRefCount = 0;
   }
 }
 
-const audioLevels: Record<string, number> = {}
+const audioLevels: Record<string, number> = {};
 
 export function getAudioLevel(key: string): number {
-  return audioLevels[key] ?? 0
+  return audioLevels[key] ?? 0;
 }
 
 function browserSupportsVoice(): boolean {
-  return typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof RTCPeerConnection !== 'undefined'
+  return (
+    typeof navigator.mediaDevices?.getUserMedia === "function" &&
+    typeof RTCPeerConnection !== "undefined"
+  );
 }
 
 interface MicrophoneReply {
-  granted: (stream: MediaStream) => void
-  refused: () => void
+  granted: (stream: MediaStream) => void;
+  refused: () => void;
 }
 
 class MicrophoneRequest {
-  private status: 'unasked' | 'asking' | 'refused' = 'unasked'
-  private reply: MicrophoneReply | null = null
+  private status: "unasked" | "asking" | "refused" = "unasked";
+  private reply: MicrophoneReply | null = null;
 
   ask(reply: MicrophoneReply) {
-    if (this.status === 'refused') return
-    this.reply = reply
-    if (this.status === 'asking') return
-    this.status = 'asking'
+    if (this.status === "refused") return;
+    this.reply = reply;
+    if (this.status === "asking") return;
+    this.status = "asking";
     navigator.mediaDevices
-      .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false })
+      .getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+        video: false,
+      })
       .then(
         (stream) => {
-          this.status = 'unasked'
-          if (this.reply) this.reply.granted(stream)
-          else stream.getTracks().forEach(t => t.stop())
+          this.status = "unasked";
+          if (this.reply) this.reply.granted(stream);
+          else stream.getTracks().forEach((t) => t.stop());
         },
         () => {
           // A refusal nobody was waiting for was never shown, so the next need asks again.
-          this.status = this.reply ? 'refused' : 'unasked'
-          this.reply?.refused()
+          this.status = this.reply ? "refused" : "unasked";
+          this.reply?.refused();
         },
-      )
+      );
   }
 
   withdraw() {
-    this.reply = null
+    this.reply = null;
   }
 
   forgetRefusal() {
-    if (this.status === 'refused') this.status = 'unasked'
+    if (this.status === "refused") this.status = "unasked";
   }
 }
 
@@ -148,437 +164,554 @@ function createAudioLevelDetector(
   stream: MediaStream,
   onLevel: (level: number, speaking: boolean) => void,
 ): { stop: () => void } {
-  const ctx = getSharedAudioContext()
-  const source = ctx.createMediaStreamSource(stream)
-  const analyser = ctx.createAnalyser()
-  analyser.fftSize = 256
-  analyser.smoothingTimeConstant = 0.3
-  source.connect(analyser)
+  const ctx = getSharedAudioContext();
+  const source = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.3;
+  source.connect(analyser);
 
-  const data = new Uint8Array(analyser.frequencyBinCount)
-  let smoothed = 0
-  let rafId = 0
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  let smoothed = 0;
+  let rafId = 0;
 
   const tick = () => {
-    rafId = requestAnimationFrame(tick)
-    analyser.getByteFrequencyData(data)
-    let sum = 0
-    for (let i = 0; i < data.length; i++) sum += data[i]
-    const avg = sum / data.length
-    const raw = avg > SPEAKING_THRESHOLD ? avg / 255 : 0
-    const alpha = raw > smoothed ? ATTACK_ALPHA : DECAY_ALPHA
-    smoothed += alpha * (raw - smoothed)
-    if (smoothed < 0.01) smoothed = 0
-    onLevel(smoothed, smoothed > 0)
-  }
-  rafId = requestAnimationFrame(tick)
+    rafId = requestAnimationFrame(tick);
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i];
+    const avg = sum / data.length;
+    const raw = avg > SPEAKING_THRESHOLD ? avg / 255 : 0;
+    const alpha = raw > smoothed ? ATTACK_ALPHA : DECAY_ALPHA;
+    smoothed += alpha * (raw - smoothed);
+    if (smoothed < 0.01) smoothed = 0;
+    onLevel(smoothed, smoothed > 0);
+  };
+  rafId = requestAnimationFrame(tick);
 
   return {
     stop() {
-      cancelAnimationFrame(rafId)
-      source.disconnect()
-      releaseSharedAudioContext()
+      cancelAnimationFrame(rafId);
+      source.disconnect();
+      releaseSharedAudioContext();
     },
-  }
+  };
 }
 
 export function useVoiceChat(
   send: (action: string, payload: Record<string, unknown>) => void,
   peerNames: string[],
   selfPlayerName: string | null,
-  voiceSignalRef: MutableRefObject<((payload: VoiceSignalPayload) => void) | null>,
+  voiceSignalRef: MutableRefObject<
+    ((payload: VoiceSignalPayload) => void) | null
+  >,
   onPermissionDenied?: () => void,
   onRetriesExhausted?: (peerName: string) => void,
 ): {
-  state: VoiceChatState
-  toggleSelfMute: () => void
-  togglePeerMute: (peerName: string) => void
+  state: VoiceChatState;
+  toggleSelfMute: () => void;
+  togglePeerMute: (peerName: string) => void;
 } {
   const [state, setState] = useState<VoiceChatState>(() => ({
     ...INITIAL_STATE,
     isMuted: getPersistedMute(),
     mutedPeers: getPersistedMutedPeers(),
-  }))
+  }));
 
-  const peersRef = useRef<Map<string, PeerState>>(new Map())
-  const localStreamRef = useRef<MediaStream | null>(null)
-  const [microphone] = useState(() => new MicrophoneRequest())
-  const mutedPeersRef = useRef<Set<string>>(getPersistedMutedPeers())
+  const peersRef = useRef<Map<string, PeerState>>(new Map());
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const [microphone] = useState(() => new MicrophoneRequest());
+  const mutedPeersRef = useRef<Set<string>>(getPersistedMutedPeers());
 
-  const retryCountRef = useRef<Map<string, number>>(new Map())
-  const retryTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
-  const pendingSignalsRef = useRef<Map<string, VoiceSignalPayload[]>>(new Map())
-  const selfPlayerNameRef = useRef(selfPlayerName)
-  const createPeerConnectionRef = useRef<((peerName: string, stream: MediaStream, isOfferer: boolean) => void) | null>(null)
-  const destroyPeerRef = useRef<((peerName: string) => void) | null>(null)
-  const handleSignalRef = useRef<((payload: VoiceSignalPayload) => Promise<void>) | null>(null)
-  const onRetriesExhaustedRef = useRef(onRetriesExhausted)
-  const onPermissionDeniedRef = useRef(onPermissionDenied)
+  const retryCountRef = useRef<Map<string, number>>(new Map());
+  const retryTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+  const pendingSignalsRef = useRef<Map<string, VoiceSignalPayload[]>>(
+    new Map(),
+  );
+  const selfPlayerNameRef = useRef(selfPlayerName);
+  const createPeerConnectionRef = useRef<
+    ((peerName: string, stream: MediaStream, isOfferer: boolean) => void) | null
+  >(null);
+  const destroyPeerRef = useRef<((peerName: string) => void) | null>(null);
+  const handleSignalRef = useRef<
+    ((payload: VoiceSignalPayload) => Promise<void>) | null
+  >(null);
+  const onRetriesExhaustedRef = useRef(onRetriesExhausted);
+  const onPermissionDeniedRef = useRef(onPermissionDenied);
 
-  const selfDetectorRef = useRef<{ stop: () => void } | null>(null)
-  const peerDetectorsRef = useRef<Map<string, { stop: () => void }>>(new Map())
+  const selfDetectorRef = useRef<{ stop: () => void } | null>(null);
+  const peerDetectorsRef = useRef<Map<string, { stop: () => void }>>(new Map());
 
   const startSpeakingDetection = useCallback((stream: MediaStream) => {
-    selfDetectorRef.current?.stop()
-    selfDetectorRef.current = createAudioLevelDetector(stream, (level, speaking) => {
-      const track = localStreamRef.current?.getAudioTracks()[0]
-      if (!track?.enabled) {
-        audioLevels['__self__'] = 0
-        setState(s => s.isSpeaking ? { ...s, isSpeaking: false } : s)
-        return
-      }
-      audioLevels['__self__'] = level
-      setState(s => s.isSpeaking !== speaking ? { ...s, isSpeaking: speaking } : s)
-    })
-  }, [])
+    selfDetectorRef.current?.stop();
+    selfDetectorRef.current = createAudioLevelDetector(
+      stream,
+      (level, speaking) => {
+        const track = localStreamRef.current?.getAudioTracks()[0];
+        if (!track?.enabled) {
+          audioLevels["__self__"] = 0;
+          setState((s) => (s.isSpeaking ? { ...s, isSpeaking: false } : s));
+          return;
+        }
+        audioLevels["__self__"] = level;
+        setState((s) =>
+          s.isSpeaking !== speaking ? { ...s, isSpeaking: speaking } : s,
+        );
+      },
+    );
+  }, []);
 
   const stopSpeakingDetection = useCallback(() => {
-    selfDetectorRef.current?.stop()
-    selfDetectorRef.current = null
-  }, [])
+    selfDetectorRef.current?.stop();
+    selfDetectorRef.current = null;
+  }, []);
 
-  const sendSignalTo = useCallback((peerName: string, signalType: string, data: unknown) => {
-    send('voice_signal', { signal_type: signalType, data, target_player: peerName })
-  }, [send])
+  const sendSignalTo = useCallback(
+    (peerName: string, signalType: string, data: unknown) => {
+      send("voice_signal", {
+        signal_type: signalType,
+        data,
+        target_player: peerName,
+      });
+    },
+    [send],
+  );
 
   const updatePeerStates = useCallback(() => {
-    const peers: VoicePeer[] = []
+    const peers: VoicePeer[] = [];
     for (const [name, ps] of peersRef.current) {
-      let connectionState: VoicePeer['connectionState'] = 'connecting'
+      let connectionState: VoicePeer["connectionState"] = "connecting";
       switch (ps.pc.connectionState) {
-        case 'connected':
-          connectionState = 'connected'
-          break
-        case 'failed':
-          connectionState = 'failed'
-          break
-        case 'disconnected':
-        case 'closed':
-          connectionState = 'disconnected'
-          break
+        case "connected":
+          connectionState = "connected";
+          break;
+        case "failed":
+          connectionState = "failed";
+          break;
+        case "disconnected":
+        case "closed":
+          connectionState = "disconnected";
+          break;
       }
-      peers.push({ name, connectionState })
+      peers.push({ name, connectionState });
     }
-    setState(s => ({ ...s, peers }))
-  }, [])
+    setState((s) => ({ ...s, peers }));
+  }, []);
 
-  const createPeerConnection = useCallback((peerName: string, stream: MediaStream, isOfferer: boolean) => {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
-    const audioEl = document.createElement('audio')
-    audioEl.autoplay = true
-    if (mutedPeersRef.current.has(peerName)) {
-      audioEl.muted = true
-    }
-
-    const peerState: PeerState = { pc, audioEl, iceBuffer: [], hasRemoteDesc: false }
-    peersRef.current.set(peerName, peerState)
-
-    for (const track of stream.getTracks()) {
-      pc.addTrack(track, stream)
-    }
-
-    pc.onicecandidate = (ev) => {
-      if (ev.candidate) {
-        sendSignalTo(peerName, 'ice', ev.candidate.toJSON())
+  const createPeerConnection = useCallback(
+    (peerName: string, stream: MediaStream, isOfferer: boolean) => {
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const audioEl = document.createElement("audio");
+      audioEl.autoplay = true;
+      if (mutedPeersRef.current.has(peerName)) {
+        audioEl.muted = true;
       }
-    }
 
-    pc.ontrack = (ev) => {
-      const remoteStream = ev.streams[0] ?? new MediaStream([ev.track])
-      audioEl.srcObject = remoteStream
-      peerDetectorsRef.current.get(peerName)?.stop()
-      const detector = createAudioLevelDetector(remoteStream, (level, speaking) => {
-        audioLevels[peerName] = level
-        setState(s => {
-          const has = s.speakingPeers.has(peerName)
-          if (speaking === has) return s
-          const next = new Set(s.speakingPeers)
-          if (speaking) { next.add(peerName) } else { next.delete(peerName) }
-          return { ...s, speakingPeers: next }
-        })
-      })
-      peerDetectorsRef.current.set(peerName, detector)
-    }
+      const peerState: PeerState = {
+        pc,
+        audioEl,
+        iceBuffer: [],
+        hasRemoteDesc: false,
+      };
+      peersRef.current.set(peerName, peerState);
 
-    pc.onconnectionstatechange = () => {
-      updatePeerStates()
-      if (pc.connectionState === 'connected') {
-        retryCountRef.current.delete(peerName)
-        const timer = retryTimerRef.current.get(peerName)
-        if (timer) { clearTimeout(timer); retryTimerRef.current.delete(peerName) }
-        const track = localStreamRef.current?.getAudioTracks()[0]
-        if (track && !track.enabled) {
-          sendSignalTo(peerName, 'mute_state', { muted: true })
+      for (const track of stream.getTracks()) {
+        pc.addTrack(track, stream);
+      }
+
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          sendSignalTo(peerName, "ice", ev.candidate.toJSON());
         }
-      } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-        const delay = pc.connectionState === 'disconnected'
-          ? DISCONNECTED_GRACE
-          : BASE_RETRY_DELAY * Math.pow(2, retryCountRef.current.get(peerName) ?? 0)
-        const existingTimer = retryTimerRef.current.get(peerName)
-        if (existingTimer) clearTimeout(existingTimer)
+      };
 
-        const timerId = setTimeout(() => {
-          retryTimerRef.current.delete(peerName)
-          if (!peersRef.current.has(peerName)) return
-          const currentPc = peersRef.current.get(peerName)?.pc
-          if (currentPc && currentPc.connectionState === 'connected') return
-          const retryCount = retryCountRef.current.get(peerName) ?? 0
-          if (retryCount >= MAX_RETRIES) {
-            onRetriesExhaustedRef.current?.(peerName)
-            return
+      pc.ontrack = (ev) => {
+        const remoteStream = ev.streams[0] ?? new MediaStream([ev.track]);
+        audioEl.srcObject = remoteStream;
+        peerDetectorsRef.current.get(peerName)?.stop();
+        const detector = createAudioLevelDetector(
+          remoteStream,
+          (level, speaking) => {
+            audioLevels[peerName] = level;
+            setState((s) => {
+              const has = s.speakingPeers.has(peerName);
+              if (speaking === has) return s;
+              const next = new Set(s.speakingPeers);
+              if (speaking) {
+                next.add(peerName);
+              } else {
+                next.delete(peerName);
+              }
+              return { ...s, speakingPeers: next };
+            });
+          },
+        );
+        peerDetectorsRef.current.set(peerName, detector);
+      };
+
+      pc.onconnectionstatechange = () => {
+        updatePeerStates();
+        if (pc.connectionState === "connected") {
+          retryCountRef.current.delete(peerName);
+          const timer = retryTimerRef.current.get(peerName);
+          if (timer) {
+            clearTimeout(timer);
+            retryTimerRef.current.delete(peerName);
           }
-          retryCountRef.current.set(peerName, retryCount + 1)
-          destroyPeerRef.current?.(peerName)
-          const s = localStreamRef.current
-          if (!s) return
-          createPeerConnectionRef.current?.(peerName, s, selfPlayerNameRef.current! < peerName)
-        }, delay)
-        retryTimerRef.current.set(peerName, timerId)
-      }
-    }
+          const track = localStreamRef.current?.getAudioTracks()[0];
+          if (track && !track.enabled) {
+            sendSignalTo(peerName, "mute_state", { muted: true });
+          }
+        } else if (
+          pc.connectionState === "failed" ||
+          pc.connectionState === "disconnected"
+        ) {
+          const delay =
+            pc.connectionState === "disconnected"
+              ? DISCONNECTED_GRACE
+              : BASE_RETRY_DELAY *
+                Math.pow(2, retryCountRef.current.get(peerName) ?? 0);
+          const existingTimer = retryTimerRef.current.get(peerName);
+          if (existingTimer) clearTimeout(existingTimer);
 
-    if (isOfferer) {
-      // The server drops signals to a player whose socket isn't back yet, as after a restart. The local description
-      // gains candidates as they're found, so a repeated offer also replaces any that were dropped.
-      const sendOfferUntilAnswered = (delay: number) => {
-        if (pc.signalingState !== 'have-local-offer') return
-        sendSignalTo(peerName, 'offer', pc.localDescription)
-        setTimeout(() => sendOfferUntilAnswered(Math.min(delay * 2, MAX_OFFER_REPEAT_DELAY)), delay)
-      }
-      pc.createOffer().then(offer => {
-        return pc.setLocalDescription(offer).then(() => {
-          sendOfferUntilAnswered(BASE_OFFER_REPEAT_DELAY)
-        })
-      }).catch(err => console.error('Voice offer error:', err))
-    }
-
-    updatePeerStates()
-
-    const buffered = pendingSignalsRef.current.get(peerName)
-    if (buffered) {
-      pendingSignalsRef.current.delete(peerName)
-      ;(async () => {
-        for (const sig of buffered) {
-          await handleSignalRef.current?.(sig)
+          const timerId = setTimeout(() => {
+            retryTimerRef.current.delete(peerName);
+            if (!peersRef.current.has(peerName)) return;
+            const currentPc = peersRef.current.get(peerName)?.pc;
+            if (currentPc && currentPc.connectionState === "connected") return;
+            const retryCount = retryCountRef.current.get(peerName) ?? 0;
+            if (retryCount >= MAX_RETRIES) {
+              onRetriesExhaustedRef.current?.(peerName);
+              return;
+            }
+            retryCountRef.current.set(peerName, retryCount + 1);
+            destroyPeerRef.current?.(peerName);
+            const s = localStreamRef.current;
+            if (!s) return;
+            createPeerConnectionRef.current?.(
+              peerName,
+              s,
+              selfPlayerNameRef.current! < peerName,
+            );
+          }, delay);
+          retryTimerRef.current.set(peerName, timerId);
         }
-      })()
-    }
-  }, [sendSignalTo, updatePeerStates])
+      };
 
-  const destroyPeer = useCallback((peerName: string) => {
-    const timer = retryTimerRef.current.get(peerName)
-    if (timer) { clearTimeout(timer); retryTimerRef.current.delete(peerName) }
-    retryCountRef.current.delete(peerName)
-    pendingSignalsRef.current.delete(peerName)
-    peerDetectorsRef.current.get(peerName)?.stop()
-    peerDetectorsRef.current.delete(peerName)
-    delete audioLevels[peerName]
-    const ps = peersRef.current.get(peerName)
-    if (!ps) return
-    ps.pc.close()
-    ps.audioEl.srcObject = null
-    ps.audioEl.remove()
-    peersRef.current.delete(peerName)
-    updatePeerStates()
-    setState(s => {
-      const hasSpeaking = s.speakingPeers.has(peerName)
-      const hasRemoteMuted = s.remoteMutedPeers.has(peerName)
-      if (!hasSpeaking && !hasRemoteMuted) return s
-      const nextSpeaking = hasSpeaking ? new Set(s.speakingPeers) : s.speakingPeers
-      const nextRemoteMuted = hasRemoteMuted ? new Set(s.remoteMutedPeers) : s.remoteMutedPeers
-      if (hasSpeaking) nextSpeaking.delete(peerName)
-      if (hasRemoteMuted) nextRemoteMuted.delete(peerName)
-      return { ...s, speakingPeers: nextSpeaking, remoteMutedPeers: nextRemoteMuted }
-    })
-  }, [updatePeerStates])
-
-  useEffect(() => { selfPlayerNameRef.current = selfPlayerName }, [selfPlayerName])
-  useEffect(() => { createPeerConnectionRef.current = createPeerConnection }, [createPeerConnection])
-  useEffect(() => { destroyPeerRef.current = destroyPeer }, [destroyPeer])
-  useEffect(() => { onRetriesExhaustedRef.current = onRetriesExhausted }, [onRetriesExhausted])
-  useEffect(() => { onPermissionDeniedRef.current = onPermissionDenied }, [onPermissionDenied])
-
-  const handleSignal = useCallback(async (payload: VoiceSignalPayload) => {
-    const fromPeer = payload.from_player
-    const ps = peersRef.current.get(fromPeer)
-    if (!ps) {
-      const waiting = pendingSignalsRef.current.get(fromPeer) ?? []
-      // Offers repeat while this player's microphone prompt waits, and only the newest needs an answer.
-      const buf = payload.signal_type === 'offer' ? waiting.filter(sig => sig.signal_type === 'mute_state') : waiting
-      if (buf.length < MAX_PENDING_SIGNALS) {
-        buf.push(payload)
-        pendingSignalsRef.current.set(fromPeer, buf)
+      if (isOfferer) {
+        // The server drops signals to a player whose socket isn't back yet, as after a restart. The local description
+        // gains candidates as they're found, so a repeated offer also replaces any that were dropped.
+        const sendOfferUntilAnswered = (delay: number) => {
+          if (pc.signalingState !== "have-local-offer") return;
+          sendSignalTo(peerName, "offer", pc.localDescription);
+          setTimeout(
+            () =>
+              sendOfferUntilAnswered(
+                Math.min(delay * 2, MAX_OFFER_REPEAT_DELAY),
+              ),
+            delay,
+          );
+        };
+        pc.createOffer()
+          .then((offer) => {
+            return pc.setLocalDescription(offer).then(() => {
+              sendOfferUntilAnswered(BASE_OFFER_REPEAT_DELAY);
+            });
+          })
+          .catch((err) => console.error("Voice offer error:", err));
       }
-      return
-    }
 
-    try {
-      if (payload.signal_type === 'offer') {
-        await ps.pc.setRemoteDescription(new RTCSessionDescription(payload.data as RTCSessionDescriptionInit))
-        ps.hasRemoteDesc = true
-        for (const candidate of ps.iceBuffer) {
-          await ps.pc.addIceCandidate(new RTCIceCandidate(candidate))
-        }
-        ps.iceBuffer = []
-        const answer = await ps.pc.createAnswer()
-        await ps.pc.setLocalDescription(answer)
-        sendSignalTo(fromPeer, 'answer', answer)
-      } else if (payload.signal_type === 'answer') {
-        await ps.pc.setRemoteDescription(new RTCSessionDescription(payload.data as RTCSessionDescriptionInit))
-        ps.hasRemoteDesc = true
-        for (const candidate of ps.iceBuffer) {
-          await ps.pc.addIceCandidate(new RTCIceCandidate(candidate))
-        }
-        ps.iceBuffer = []
-      } else if (payload.signal_type === 'ice') {
-        if (ps.hasRemoteDesc) {
-          await ps.pc.addIceCandidate(new RTCIceCandidate(payload.data as RTCIceCandidateInit))
-        } else {
-          ps.iceBuffer.push(payload.data as RTCIceCandidateInit)
-        }
-      } else if (payload.signal_type === 'mute_state') {
-        const { muted } = payload.data as { muted: boolean }
-        setState(s => {
-          const next = new Set(s.remoteMutedPeers)
-          if (muted) { next.add(fromPeer) } else { next.delete(fromPeer) }
-          return { ...s, remoteMutedPeers: next }
-        })
+      updatePeerStates();
+
+      const buffered = pendingSignalsRef.current.get(peerName);
+      if (buffered) {
+        pendingSignalsRef.current.delete(peerName);
+        (async () => {
+          for (const sig of buffered) {
+            await handleSignalRef.current?.(sig);
+          }
+        })();
       }
-    } catch (err) {
-      console.error('Voice signal handling error:', err)
-    }
-  }, [sendSignalTo])
+    },
+    [sendSignalTo, updatePeerStates],
+  );
 
-  useEffect(() => { handleSignalRef.current = handleSignal }, [handleSignal])
+  const destroyPeer = useCallback(
+    (peerName: string) => {
+      const timer = retryTimerRef.current.get(peerName);
+      if (timer) {
+        clearTimeout(timer);
+        retryTimerRef.current.delete(peerName);
+      }
+      retryCountRef.current.delete(peerName);
+      pendingSignalsRef.current.delete(peerName);
+      peerDetectorsRef.current.get(peerName)?.stop();
+      peerDetectorsRef.current.delete(peerName);
+      delete audioLevels[peerName];
+      const ps = peersRef.current.get(peerName);
+      if (!ps) return;
+      ps.pc.close();
+      ps.audioEl.srcObject = null;
+      ps.audioEl.remove();
+      peersRef.current.delete(peerName);
+      updatePeerStates();
+      setState((s) => {
+        const hasSpeaking = s.speakingPeers.has(peerName);
+        const hasRemoteMuted = s.remoteMutedPeers.has(peerName);
+        if (!hasSpeaking && !hasRemoteMuted) return s;
+        const nextSpeaking = hasSpeaking
+          ? new Set(s.speakingPeers)
+          : s.speakingPeers;
+        const nextRemoteMuted = hasRemoteMuted
+          ? new Set(s.remoteMutedPeers)
+          : s.remoteMutedPeers;
+        if (hasSpeaking) nextSpeaking.delete(peerName);
+        if (hasRemoteMuted) nextRemoteMuted.delete(peerName);
+        return {
+          ...s,
+          speakingPeers: nextSpeaking,
+          remoteMutedPeers: nextRemoteMuted,
+        };
+      });
+    },
+    [updatePeerStates],
+  );
 
   useEffect(() => {
-    voiceSignalRef.current = handleSignal
-    return () => { voiceSignalRef.current = null }
-  }, [handleSignal, voiceSignalRef])
+    selfPlayerNameRef.current = selfPlayerName;
+  }, [selfPlayerName]);
+  useEffect(() => {
+    createPeerConnectionRef.current = createPeerConnection;
+  }, [createPeerConnection]);
+  useEffect(() => {
+    destroyPeerRef.current = destroyPeer;
+  }, [destroyPeer]);
+  useEffect(() => {
+    onRetriesExhaustedRef.current = onRetriesExhausted;
+  }, [onRetriesExhausted]);
+  useEffect(() => {
+    onPermissionDeniedRef.current = onPermissionDenied;
+  }, [onPermissionDenied]);
+
+  const handleSignal = useCallback(
+    async (payload: VoiceSignalPayload) => {
+      const fromPeer = payload.from_player;
+      const ps = peersRef.current.get(fromPeer);
+      if (!ps) {
+        const waiting = pendingSignalsRef.current.get(fromPeer) ?? [];
+        // Offers repeat while this player's microphone prompt waits, and only the newest needs an answer.
+        const buf =
+          payload.signal_type === "offer"
+            ? waiting.filter((sig) => sig.signal_type === "mute_state")
+            : waiting;
+        if (buf.length < MAX_PENDING_SIGNALS) {
+          buf.push(payload);
+          pendingSignalsRef.current.set(fromPeer, buf);
+        }
+        return;
+      }
+
+      try {
+        if (payload.signal_type === "offer") {
+          await ps.pc.setRemoteDescription(
+            new RTCSessionDescription(
+              payload.data as RTCSessionDescriptionInit,
+            ),
+          );
+          ps.hasRemoteDesc = true;
+          for (const candidate of ps.iceBuffer) {
+            await ps.pc.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+          ps.iceBuffer = [];
+          const answer = await ps.pc.createAnswer();
+          await ps.pc.setLocalDescription(answer);
+          sendSignalTo(fromPeer, "answer", answer);
+        } else if (payload.signal_type === "answer") {
+          await ps.pc.setRemoteDescription(
+            new RTCSessionDescription(
+              payload.data as RTCSessionDescriptionInit,
+            ),
+          );
+          ps.hasRemoteDesc = true;
+          for (const candidate of ps.iceBuffer) {
+            await ps.pc.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+          ps.iceBuffer = [];
+        } else if (payload.signal_type === "ice") {
+          if (ps.hasRemoteDesc) {
+            await ps.pc.addIceCandidate(
+              new RTCIceCandidate(payload.data as RTCIceCandidateInit),
+            );
+          } else {
+            ps.iceBuffer.push(payload.data as RTCIceCandidateInit);
+          }
+        } else if (payload.signal_type === "mute_state") {
+          const { muted } = payload.data as { muted: boolean };
+          setState((s) => {
+            const next = new Set(s.remoteMutedPeers);
+            if (muted) {
+              next.add(fromPeer);
+            } else {
+              next.delete(fromPeer);
+            }
+            return { ...s, remoteMutedPeers: next };
+          });
+        }
+      } catch (err) {
+        console.error("Voice signal handling error:", err);
+      }
+    },
+    [sendSignalTo],
+  );
+
+  useEffect(() => {
+    handleSignalRef.current = handleSignal;
+  }, [handleSignal]);
+
+  useEffect(() => {
+    voiceSignalRef.current = handleSignal;
+    return () => {
+      voiceSignalRef.current = null;
+    };
+  }, [handleSignal, voiceSignalRef]);
 
   useEffect(() => {
     // Only a missing name means Voice is off: a fight against a puppet has no peers either.
-    if (!selfPlayerName) microphone.forgetRefusal()
+    if (!selfPlayerName) microphone.forgetRefusal();
     if (peerNames.length === 0 || !selfPlayerName) {
       for (const name of peersRef.current.keys()) {
-        destroyPeer(name)
+        destroyPeer(name);
       }
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => t.stop())
-        localStreamRef.current = null
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
       }
-      stopSpeakingDetection()
-      audioLevels['__self__'] = 0
-      pendingSignalsRef.current.clear()
-      setState(s => ({ ...s, peers: [], isSpeaking: false }))
-      return
+      stopSpeakingDetection();
+      audioLevels["__self__"] = 0;
+      pendingSignalsRef.current.clear();
+      setState((s) => ({ ...s, peers: [], isSpeaking: false }));
+      return;
     }
 
     if (!browserSupportsVoice()) {
-      setState(s => ({ ...s, isAvailable: false }))
-      return
+      setState((s) => ({ ...s, isAvailable: false }));
+      return;
     }
 
     function connectPeers(stream: MediaStream) {
-      const currentNames = new Set(peersRef.current.keys())
-      const desiredNames = new Set(peerNames)
+      const currentNames = new Set(peersRef.current.keys());
+      const desiredNames = new Set(peerNames);
 
       for (const name of currentNames) {
         if (!desiredNames.has(name)) {
-          destroyPeer(name)
+          destroyPeer(name);
         }
       }
 
       for (const name of desiredNames) {
         if (!currentNames.has(name)) {
-          const isOfferer = selfPlayerName! < name
-          createPeerConnection(name, stream, isOfferer)
+          const isOfferer = selfPlayerName! < name;
+          createPeerConnection(name, stream, isOfferer);
         }
       }
     }
 
     if (localStreamRef.current) {
-      connectPeers(localStreamRef.current)
-      return
+      connectPeers(localStreamRef.current);
+      return;
     }
 
     microphone.ask({
       granted: (stream) => {
-        localStreamRef.current = stream
+        localStreamRef.current = stream;
         if (getPersistedMute()) {
-          const track = stream.getAudioTracks()[0]
-          if (track) track.enabled = false
+          const track = stream.getAudioTracks()[0];
+          if (track) track.enabled = false;
         }
-        startSpeakingDetection(stream)
-        connectPeers(stream)
+        startSpeakingDetection(stream);
+        connectPeers(stream);
       },
       refused: () => {
-        setState(s => ({ ...s, isAvailable: false }))
-        onPermissionDeniedRef.current?.()
+        setState((s) => ({ ...s, isAvailable: false }));
+        onPermissionDeniedRef.current?.();
       },
-    })
-    return () => microphone.withdraw()
-  }, [microphone, peerNames, selfPlayerName, createPeerConnection, destroyPeer, startSpeakingDetection, stopSpeakingDetection])
+    });
+    return () => microphone.withdraw();
+  }, [
+    microphone,
+    peerNames,
+    selfPlayerName,
+    createPeerConnection,
+    destroyPeer,
+    startSpeakingDetection,
+    stopSpeakingDetection,
+  ]);
 
   useEffect(() => {
-    const timers = retryTimerRef.current
-    const retryCounts = retryCountRef.current
-    const peers = peersRef.current
-    const detectors = peerDetectorsRef.current
-    const pending = pendingSignalsRef.current
+    const timers = retryTimerRef.current;
+    const retryCounts = retryCountRef.current;
+    const peers = peersRef.current;
+    const detectors = peerDetectorsRef.current;
+    const pending = pendingSignalsRef.current;
     return () => {
-      for (const timer of timers.values()) clearTimeout(timer)
-      timers.clear()
-      retryCounts.clear()
-      pending.clear()
-      for (const d of detectors.values()) d.stop()
-      detectors.clear()
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+      retryCounts.clear();
+      pending.clear();
+      for (const d of detectors.values()) d.stop();
+      detectors.clear();
       for (const name of peers.keys()) {
-        const ps = peers.get(name)
+        const ps = peers.get(name);
         if (ps) {
-          ps.pc.close()
-          ps.audioEl.srcObject = null
-          ps.audioEl.remove()
+          ps.pc.close();
+          ps.audioEl.srcObject = null;
+          ps.audioEl.remove();
         }
       }
-      peers.clear()
+      peers.clear();
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => t.stop())
-        localStreamRef.current = null
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
       }
-      stopSpeakingDetection()
-    }
-  }, [stopSpeakingDetection])
+      stopSpeakingDetection();
+    };
+  }, [stopSpeakingDetection]);
 
   const toggleSelfMute = useCallback(() => {
-    const stream = localStreamRef.current
-    if (!stream) return
-    const track = stream.getAudioTracks()[0]
-    if (!track) return
-    track.enabled = !track.enabled
-    const muted = !track.enabled
-    setPersistedMute(muted)
-    if (muted) audioLevels['__self__'] = 0
-    setState(s => ({ ...s, isMuted: muted, ...(muted && { isSpeaking: false }) }))
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    const track = stream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !track.enabled;
+    const muted = !track.enabled;
+    setPersistedMute(muted);
+    if (muted) audioLevels["__self__"] = 0;
+    setState((s) => ({
+      ...s,
+      isMuted: muted,
+      ...(muted && { isSpeaking: false }),
+    }));
     for (const peerName of peersRef.current.keys()) {
-      sendSignalTo(peerName, 'mute_state', { muted })
+      sendSignalTo(peerName, "mute_state", { muted });
     }
-  }, [sendSignalTo])
+  }, [sendSignalTo]);
 
   const togglePeerMute = useCallback((peerName: string) => {
-    const ps = peersRef.current.get(peerName)
-    const next = new Set(mutedPeersRef.current)
+    const ps = peersRef.current.get(peerName);
+    const next = new Set(mutedPeersRef.current);
     if (next.has(peerName)) {
-      next.delete(peerName)
-      if (ps) ps.audioEl.muted = false
+      next.delete(peerName);
+      if (ps) ps.audioEl.muted = false;
     } else {
-      next.add(peerName)
-      if (ps) ps.audioEl.muted = true
+      next.add(peerName);
+      if (ps) ps.audioEl.muted = true;
     }
-    mutedPeersRef.current = next
-    setPersistedMutedPeers(next)
-    setState(s => ({ ...s, mutedPeers: next }))
-  }, [])
+    mutedPeersRef.current = next;
+    setPersistedMutedPeers(next);
+    setState((s) => ({ ...s, mutedPeers: next }));
+  }, []);
 
-  return { state, toggleSelfMute, togglePeerMute }
+  return { state, toggleSelfMute, togglePeerMute };
 }

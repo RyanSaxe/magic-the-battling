@@ -27,16 +27,16 @@ status=$(curl --silent --show-error --retry 12 --retry-delay 5 --retry-all-error
 }
 
 case "$status" in
-  200)
-    echo "Server is in $mode mode."
-    ;;
-  401|403|404|405|503)
-    echo "Ops mode unavailable (HTTP $status); continuing without setting $mode mode."
-    cat "$response"
-    ;;
-  *)
-    echo "Unexpected status from the ops mode endpoint: $status" >&2
-    cat "$response" >&2
-    exit 1
-    ;;
+200)
+  echo "Server is in $mode mode."
+  ;;
+401 | 403 | 404 | 405 | 503)
+  echo "Ops mode unavailable (HTTP $status); continuing without setting $mode mode."
+  cat "$response"
+  ;;
+*)
+  echo "Unexpected status from the ops mode endpoint: $status" >&2
+  cat "$response" >&2
+  exit 1
+  ;;
 esac

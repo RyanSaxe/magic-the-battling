@@ -8,10 +8,16 @@ const SWAP_PAUSE = 80;
 
 type HintsBannerVariant = "default" | "dark" | "rail";
 
-export function HintsBanner({ place, variant = "default" }: { place: HintPlace; variant?: HintsBannerVariant }) {
+export function HintsBanner({
+  place,
+  variant = "default",
+}: {
+  place: HintPlace;
+  variant?: HintsBannerVariant;
+}) {
   const hints = hintsFor(place);
-  const [index, setIndex] = useState(
-    () => Math.floor(Math.random() * hints.length),
+  const [index, setIndex] = useState(() =>
+    Math.floor(Math.random() * hints.length),
   );
   const [visible, setVisible] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -29,18 +35,21 @@ export function HintsBanner({ place, variant = "default" }: { place: HintPlace; 
     }
   }, []);
 
-  const goTo = useCallback((next: number) => {
-    clearTransitionTimers();
-    setVisible(false);
-    fadeOutRef.current = setTimeout(() => {
-      setIndex(next);
-      fadeInRef.current = setTimeout(() => {
-        setVisible(true);
-        fadeInRef.current = null;
-      }, SWAP_PAUSE);
-      fadeOutRef.current = null;
-    }, FADE_OUT_DURATION);
-  }, [clearTransitionTimers]);
+  const goTo = useCallback(
+    (next: number) => {
+      clearTransitionTimers();
+      setVisible(false);
+      fadeOutRef.current = setTimeout(() => {
+        setIndex(next);
+        fadeInRef.current = setTimeout(() => {
+          setVisible(true);
+          fadeInRef.current = null;
+        }, SWAP_PAUSE);
+        fadeOutRef.current = null;
+      }, FADE_OUT_DURATION);
+    },
+    [clearTransitionTimers],
+  );
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -73,20 +82,24 @@ export function HintsBanner({ place, variant = "default" }: { place: HintPlace; 
     goTo((index + 1) % hints.length);
   };
 
-  const wrapperClass = variant === "dark"
-    ? "rounded-md border-l-[3px] border-l-amber-500 bg-black/40 flex items-center gap-2 !mb-0 py-1.5 px-3"
-    : variant === "rail"
-      ? "hint-rail flex items-center gap-2 !mb-0 py-1.5 px-3 sm:px-4"
-      : "callout callout-tip flex items-center gap-2 !mb-0 !py-1.5";
-  const labelClass = variant === "rail"
-    ? "text-amber-200/95 font-semibold text-xs uppercase tracking-[0.04em] shrink-0"
-    : "text-amber-400 font-medium text-xs shrink-0";
-  const navButtonClass = variant === "rail"
-    ? "touch-area text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors text-base leading-none shrink-0 px-1"
-    : "text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors text-sm shrink-0";
-  const tipTextClass = variant === "rail"
-    ? "text-[12px] text-[var(--ivory-muted)]"
-    : "text-xs text-[var(--ivory-muted)]";
+  const wrapperClass =
+    variant === "dark"
+      ? "rounded-md border-l-[3px] border-l-amber-500 bg-black/40 flex items-center gap-2 !mb-0 py-1.5 px-3"
+      : variant === "rail"
+        ? "hint-rail flex items-center gap-2 !mb-0 py-1.5 px-3 sm:px-4"
+        : "callout callout-tip flex items-center gap-2 !mb-0 !py-1.5";
+  const labelClass =
+    variant === "rail"
+      ? "text-amber-200/95 font-semibold text-xs uppercase tracking-[0.04em] shrink-0"
+      : "text-amber-400 font-medium text-xs shrink-0";
+  const navButtonClass =
+    variant === "rail"
+      ? "touch-area text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors text-base leading-none shrink-0 px-1"
+      : "text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors text-sm shrink-0";
+  const tipTextClass =
+    variant === "rail"
+      ? "text-[12px] text-[var(--ivory-muted)]"
+      : "text-xs text-[var(--ivory-muted)]";
 
   return (
     <div className={wrapperClass}>
@@ -103,16 +116,15 @@ export function HintsBanner({ place, variant = "default" }: { place: HintPlace; 
         className={`grid flex-1 items-center text-center leading-tight ${tipTextClass} ${visible ? "hint-fade-in" : "hint-fade-out"}`}
       >
         {hints.map((hint, i) => (
-          <span key={hint.text} className={`col-start-1 row-start-1 ${i === index ? "" : "invisible"}`}>
+          <span
+            key={hint.text}
+            className={`col-start-1 row-start-1 ${i === index ? "" : "invisible"}`}
+          >
             {textForInput(hint)}
           </span>
         ))}
       </p>
-      <button
-        onClick={next}
-        className={navButtonClass}
-        aria-label="Next tip"
-      >
+      <button onClick={next} className={navButtonClass} aria-label="Next tip">
         ›
       </button>
     </div>

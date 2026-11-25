@@ -52,7 +52,10 @@ function buildPool(ctx: GuidedWalkthroughContext) {
   return [...ctx.selfPlayer.hand, ...ctx.selfPlayer.sideboard];
 }
 
-function cardProducesTreasure(card: { name: string; tokens?: { name: string; type_line: string }[] }): boolean {
+function cardProducesTreasure(card: {
+  name: string;
+  tokens?: { name: string; type_line: string }[];
+}): boolean {
   if (TREASURE_EXCEPTION_NAMES.has(card.name)) return false;
   return (card.tokens ?? []).some((token) => {
     const name = token.name.toLowerCase();
@@ -91,8 +94,10 @@ function buildWelcomeGuide(): GuideDefinition {
         positionTargetId: "game-content",
         primaryActionLabel: "Game Phases",
         content: {
-          summary: "Like an autobattler, players alternate between drafting cards and fighting with them until only one player remains.",
-          detail: "Unlike an autobattler, fights are mini-games of Magic you play out manually vs. your opponent.",
+          summary:
+            "Like an autobattler, players alternate between drafting cards and fighting with them until only one player remains.",
+          detail:
+            "Unlike an autobattler, fights are mini-games of Magic you play out manually vs. your opponent.",
         },
       },
       {
@@ -103,7 +108,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "The game is played in stages of three rounds. Your stage number matches your starting hand size, so the game begins at Stage 3, Round 1.",
+          summary:
+            "The game is played in stages of three rounds. Your stage number matches your starting hand size, so the game begins at Stage 3, Round 1.",
         },
       },
       {
@@ -114,8 +120,10 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "You are dealt a pack of 5 cards and may swap any number of cards between that pack and your pool.",
-          detail: "The game starts in Build on Stage 3, Round 1 so you can learn Build and Fight before making draft picks.",
+          summary:
+            "You are dealt a pack of 5 cards and may swap any number of cards between that pack and your pool.",
+          detail:
+            "The game starts in Build on Stage 3, Round 1 so you can learn Build and Fight before making draft picks.",
         },
       },
       {
@@ -126,7 +134,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Choose your exact starting hand and 3 basic lands to fight with.",
+          summary:
+            "Choose your exact starting hand and 3 basic lands to fight with.",
         },
       },
       {
@@ -137,7 +146,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Play a quick game of Magic with a small hand, 10 life, and empty libraries.",
+          summary:
+            "Play a quick game of Magic with a small hand, 10 life, and empty libraries.",
         },
       },
       {
@@ -148,8 +158,10 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "After each fight, get a Treasure token, some extra loot, and then advance to the next round.",
-          detail: "After the last fight of a stage, the extra loot is very special and powerful.",
+          summary:
+            "After each fight, get a Treasure token, some extra loot, and then advance to the next round.",
+          detail:
+            "After the last fight of a stage, the extra loot is very special and powerful.",
         },
       },
       {
@@ -162,8 +174,10 @@ function buildWelcomeGuide(): GuideDefinition {
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Begin Game",
         content: {
-          summary: "Open the Guide any time you want a reference while you play.",
-          detail: "The guide includes comprehensive rules, hotkeys, tips, a searchable card list, and more.",
+          summary:
+            "Open the Guide any time you want a reference while you play.",
+          detail:
+            "The guide includes comprehensive rules, hotkeys, tips, a searchable card list, and more.",
         },
       },
     ],
@@ -184,20 +198,23 @@ function buildBuildGuide(): GuideDefinition {
         positionTargetId: "game-content",
         primaryActionLabel: "Next",
         content: {
-          summary: "Build the best starting hand you can from your pool. You begin the fight with 3 basic lands of your choice already untapped on the battlefield.",
+          summary:
+            "Build the best starting hand you can from your pool. You begin the fight with 3 basic lands of your choice already untapped on the battlefield.",
         },
       },
       {
         id: "sideboard",
         title: "Your Pool of Cards",
         targetId: "build-sideboard",
-        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-sideboard"),
+        positionTargetId: (ctx) =>
+          ctx.isMobile ? "build-battlefield" : "build-sideboard",
         placement: "right",
         cardPlacement: "top-right",
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "At the start of the game, you're dealt 7 cards. This is the pool you build from.",
+          summary:
+            "At the start of the game, you're dealt 7 cards. This is the pool you build from.",
           detail: "Cards you don't put into your hand stay in your sideboard.",
         },
       },
@@ -205,28 +222,34 @@ function buildBuildGuide(): GuideDefinition {
         id: "battlefield",
         title: "Choose Your Lands",
         targetId: "build-battlefield",
-        positionTargetId: (ctx) => (ctx.isMobile ? "build-hand" : "build-battlefield"),
+        positionTargetId: (ctx) =>
+          ctx.isMobile ? "build-hand" : "build-battlefield",
         placement: "bottom",
         cardPlacement: "top-right",
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "The 3 basic lands you choose will start on the battlefield untapped.",
-          detail: "Treasures and poison carry over from round to round, so they can change which cards are strongest later.",
+          summary:
+            "The 3 basic lands you choose will start on the battlefield untapped.",
+          detail:
+            "Treasures and poison carry over from round to round, so they can change which cards are strongest later.",
         },
       },
       {
         id: "hand",
         title: "Choose Your Cards",
         targetId: "build-hand",
-        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-hand"),
+        positionTargetId: (ctx) =>
+          ctx.isMobile ? "build-battlefield" : "build-hand",
         placement: "bottom",
         cardPlacement: "bottom-right",
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in the fight.",
-          detail: "The game starts with 3 cards in hand, and your hand size increases by 1 after every 3 rounds.",
+          summary:
+            "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in the fight.",
+          detail:
+            "The game starts with 3 cards in hand, and your hand size increases by 1 after every 3 rounds.",
         },
       },
       {
@@ -266,7 +289,8 @@ function buildPlayDrawGuide(): GuideDefinition {
         allowTargetInteraction: true,
         content: {
           summary: "Play or draw is submitted as part of your build.",
-          detail: "The player with the most poison gets their submitted choice of play or draw. If there's a tie, a coin flip decides.",
+          detail:
+            "The player with the most poison gets their submitted choice of play or draw. If there's a tie, a coin flip decides.",
         },
       },
     ],
@@ -283,28 +307,33 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       positionTargetId: "game-content",
       primaryActionLabel: "Next",
       content: {
-        summary: "Fight is a short game of Magic with 10 life and empty libraries.",
-        detail: "You play it out manually against your opponent. You keep any treasures still on your battlefield after the fight, up to five.",
+        summary:
+          "Fight is a short game of Magic with 10 life and empty libraries.",
+        detail:
+          "You play it out manually against your opponent. You keep any treasures still on your battlefield after the fight, up to five.",
       },
     },
     {
       id: "hand",
       title: "Your Hand",
       targetId: "battle-hand" as const,
-      positionTargetId: (ctx) => (ctx.isMobile ? "battle-battlefield" : "battle-hand"),
+      positionTargetId: (ctx) =>
+        ctx.isMobile ? "battle-battlefield" : "battle-hand",
       placement: "top" as const,
       cardPlacement: "top-right",
       mobileCardPlacement: "top-center",
       primaryActionLabel: "Next",
       content: {
-        summary: "Your opponent cannot see your hand. To play a card, move it from your hand onto the battlefield.",
+        summary:
+          "Your opponent cannot see your hand. To play a card, move it from your hand onto the battlefield.",
       },
     },
     {
       id: "battlefield",
       title: "The Battlefield",
       targetId: "battle-battlefield" as const,
-      positionTargetId: (ctx) => (ctx.isMobile ? "battle-hand" : "battle-battlefield"),
+      positionTargetId: (ctx) =>
+        ctx.isMobile ? "battle-hand" : "battle-battlefield",
       placement: "right" as const,
       cardPlacement: "bottom-right",
       mobileCardPlacement: "bottom-center",
@@ -312,7 +341,8 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       content: {
         summary: textForInput({
           text: "Double click permanents to tap/untap them. Right click for a full option menu.",
-          touch: "Double-tap permanents to tap/untap them. Tap a card, then Actions, for a full option menu.",
+          touch:
+            "Double-tap permanents to tap/untap them. Tap a card, then Actions, for a full option menu.",
         }),
       },
     },
@@ -326,7 +356,8 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       primaryActionLabel: "Next",
       content: {
         summary: "This button opens the full actions menu.",
-        detail: "If a card is selected, its specific actions also appear in the menu.",
+        detail:
+          "If a card is selected, its specific actions also appear in the menu.",
       },
     },
   ];
@@ -342,8 +373,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Got it",
       content: {
-        summary: "A puppet is an opponent created from a historical game to enable goldfishing. Their hand is visible and you can move their cards too.",
-        detail: "Use both hands and battlefields to play out the likely game, then submit the player who would have won.",
+        summary:
+          "A puppet is an opponent created from a historical game to enable goldfishing. Their hand is visible and you can move their cards too.",
+        detail:
+          "Use both hands and battlefields to play out the likely game, then submit the player who would have won.",
       },
     });
   }
@@ -383,8 +416,10 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       positionTargetId: "game-content",
       primaryActionLabel: "Next",
       content: {
-        summary: "After each fight, everyone gets +1 treasure and a random card as loot.",
-        detail: "At the end of a stage, the loot is different and more powerful.",
+        summary:
+          "After each fight, everyone gets +1 treasure and a random card as loot.",
+        detail:
+          "At the end of a stage, the loot is different and more powerful.",
       },
     },
     {
@@ -429,7 +464,9 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
-function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
+function buildRewardStageEndGuide(
+  ctx: GuidedWalkthroughContext,
+): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
       id: "vanquisher",
@@ -442,8 +479,10 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
       primaryActionLabel:
         ctx.useUpgrades && ctx.hasRewardUpgradeChoice ? "Next" : "Got it",
       content: {
-        summary: "On the final round of a stage, you earn The Vanquisher instead of a random card.",
-        detail: "This advances your stage and permanently increases your starting hand size by 1, making future builds stronger.",
+        summary:
+          "On the final round of a stage, you earn The Vanquisher instead of a random card.",
+        detail:
+          "This advances your stage and permanently increases your starting hand size by 1, making future builds stronger.",
       },
     },
   ];
@@ -457,8 +496,10 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
       cardPlacement: "top-center",
       primaryActionLabel: "Got it",
       content: {
-        summary: "You can apply this upgrade during the build phase to make one of your cards better. This cannot be undone, so choose carefully!",
-        detail: "You deal extra poison to your opponent for each revealed upgrade applied to cards in your hand.",
+        summary:
+          "You can apply this upgrade during the build phase to make one of your cards better. This cannot be undone, so choose carefully!",
+        detail:
+          "You deal extra poison to your opponent for each revealed upgrade applied to cards in your hand.",
       },
     });
   }
@@ -485,8 +526,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         positionTargetId: "game-content",
         primaryActionLabel: "Next",
         content: {
-          summary: "Draft improves your pool by swapping weaker cards for stronger ones from a pack.",
-          detail: "Sometimes a card isn't strong now, but could be later. You have to decide if it's worth holding onto.",
+          summary:
+            "Draft improves your pool by swapping weaker cards for stronger ones from a pack.",
+          detail:
+            "Sometimes a card isn't strong now, but could be later. You have to decide if it's worth holding onto.",
         },
       },
       {
@@ -514,7 +557,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         content: {
           summary: textForInput({
             text: "To make a pick, click a card in the pack and a card in your pool to swap them.",
-            touch: "To make a pick, tap a card in the pack and a card in your pool to swap them.",
+            touch:
+              "To make a pick, tap a card in the pack and a card in your pool to swap them.",
           }),
           detail: "You can do this as many times as you want.",
         },
@@ -533,10 +577,12 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
           playerName: null,
         },
         content: {
-          summary: "This sidebar shows key info about each opponent, including how likely you are to face them.",
+          summary:
+            "This sidebar shows key info about each opponent, including how likely you are to face them.",
           detail: textForInput({
             text: "Click a player to inspect their revealed cards and other details.",
-            touch: "Tap a player to inspect their revealed cards and other details.",
+            touch:
+              "Tap a player to inspect their revealed cards and other details.",
           }),
         },
       },
@@ -544,9 +590,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         id: "revealed-cards",
         title: "Draft Signals",
         targetId: "sidebar-seen-in-battle",
-        waitForLayoutTargetId: (ctx) => (
-          ctx.isMobile ? undefined : "sidebar-detail-drawer"
-        ),
+        waitForLayoutTargetId: (ctx) =>
+          ctx.isMobile ? undefined : "sidebar-detail-drawer",
         placement: "left",
         cardPlacement: "middle-left",
         mobileCardPlacement: "bottom-center",
@@ -557,12 +602,14 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
           detailTab: "seen",
         },
         content: {
-          summary: ctx.draftGuideOpponentRevealedCount > 0
-            ? "This panel shows the most recent cards that opponent has revealed in a fight."
-            : "This panel is where revealed cards will appear after an opponent has shown cards in a fight.",
-          detail: ctx.draftGuideOpponentRevealedCount > 0
-            ? "Use those cards to infer what they are building, then adjust your picks, rolls, and later build decisions."
-            : "When this area is populated, use it as scouting information. What opponents have shown can change the value of cards and help you set up positive matchups.",
+          summary:
+            ctx.draftGuideOpponentRevealedCount > 0
+              ? "This panel shows the most recent cards that opponent has revealed in a fight."
+              : "This panel is where revealed cards will appear after an opponent has shown cards in a fight.",
+          detail:
+            ctx.draftGuideOpponentRevealedCount > 0
+              ? "Use those cards to infer what they are building, then adjust your picks, rolls, and later build decisions."
+              : "When this area is populated, use it as scouting information. What opponents have shown can change the value of cards and help you set up positive matchups.",
         },
       },
       {
@@ -578,8 +625,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
           playerName: null,
         },
         content: {
-          summary: "Rolling spends 1 treasure to exile the current pack and replace it with a new pack of 5 cards.",
-          detail: "Treasures matter across phases, so rolling is a real resource decision, not a free redraw.",
+          summary:
+            "Rolling spends 1 treasure to exile the current pack and replace it with a new pack of 5 cards.",
+          detail:
+            "Treasures matter across phases, so rolling is a real resource decision, not a free redraw.",
         },
       },
       {
@@ -602,7 +651,9 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
-function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefinition {
+function buildTreasureProducerHint(
+  ctx: GuidedWalkthroughContext,
+): GuideDefinition {
   const source = findTreasureProducer(ctx);
   const isBuild = source?.phase === "build";
 
@@ -622,7 +673,8 @@ function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefiniti
         mobileCardPlacement: isBuild ? "top-center" : "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "Treasure-producing cards are worth extra attention because they help both in fights and in future drafts.",
+          summary:
+            "Treasure-producing cards are worth extra attention because they help both in fights and in future drafts.",
           detail: isBuild
             ? "If you can start this card early, it may be something you can turn into an advantage."
             : "Even a modest treasure producer can be worth prioritizing because economy carries across phases.",
@@ -648,15 +700,19 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "After a fight, you keep at most 5 treasure that remain on your battlefield.",
-          detail: "You're already above the amount you can carry out of a fight. Spending one on a roll now is often better than letting that value go to waste later.",
+          summary:
+            "After a fight, you keep at most 5 treasure that remain on your battlefield.",
+          detail:
+            "You're already above the amount you can carry out of a fight. Spending one on a roll now is often better than letting that value go to waste later.",
         },
       },
     ],
   };
 }
 
-function buildBattleResultSubmitGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
+function buildBattleResultSubmitGuide(
+  ctx: GuidedWalkthroughContext,
+): GuideDefinition {
   const isPuppet = !!ctx.currentBattle?.can_manipulate_opponent;
   return {
     id: "battle_result_submit",
@@ -701,8 +757,10 @@ function buildUnappliedUpgradeHint(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "You have at least one upgrade that has not been applied to a card yet.",
-          detail: "Applying an upgrade is permanent and cannot be undone. Choose wisely!",
+          summary:
+            "You have at least one upgrade that has not been applied to a card yet.",
+          detail:
+            "Applying an upgrade is permanent and cannot be undone. Choose wisely!",
         },
       },
     ],
@@ -726,8 +784,10 @@ function buildBattleRevealUpgradeHint(): GuideDefinition {
         primaryActionLabel: "Got it",
         allowTargetInteraction: true,
         content: {
-          summary: "This card has an upgrade applied, but that upgrade stays hidden until you choose to reveal it.",
-          detail: "Revealing it makes the upgrade public for the rest of the game, including damage scaling, card zoom, borders, and scouting details.",
+          summary:
+            "This card has an upgrade applied, but that upgrade stays hidden until you choose to reveal it.",
+          detail:
+            "Revealing it makes the upgrade public for the rest of the game, including damage scaling, card zoom, borders, and scouting details.",
         },
       },
     ],
@@ -754,12 +814,16 @@ export function isConditionalGuideEligible(
     case "hint_treasure_producer":
       return !!findTreasureProducer(ctx);
     case "hint_build_unapplied_upgrade":
-      return ctx.currentPhase === "build"
-        && !!ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target);
+      return (
+        ctx.currentPhase === "build" &&
+        !!ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target)
+      );
     case "hint_battle_unrevealed_upgrade":
       return ctx.currentPhase === "battle" && ctx.hasBattleRevealUpgrade;
     case "hint_treasure_cap":
-      return ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6;
+      return (
+        ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6
+      );
   }
 }
 

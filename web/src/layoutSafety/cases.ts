@@ -1,9 +1,15 @@
 import { deckLayoutConfig } from "../components/common/deckLayout";
-import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from "../components/common/upgradeModalLayouts";
+import {
+  upgradeApplyLayoutConfig,
+  upgradeListLayoutConfig,
+} from "../components/common/upgradeModalLayouts";
 import { GAME_BANNER_HEIGHT } from "../components/common/bannerSizes";
 import type { ZoneConstraints } from "../hooks/computeConstrainedLayout";
 import type { CardLayoutConfig } from "../hooks/useCardLayout";
-import { computeGameShellMode, GAME_SHELL_SMALL_BREAKPOINT_PX } from "../hooks/useGameShellMode";
+import {
+  computeGameShellMode,
+  GAME_SHELL_SMALL_BREAKPOINT_PX,
+} from "../hooks/useGameShellMode";
 import { MOBILE_BREAKPOINT_PX } from "../hooks/useViewportCardSizes";
 import {
   battleBoardMetrics,
@@ -54,13 +60,15 @@ const MEASURED: [number, number, Box, Box][] = [
   [2560, 1440, { width: 2232, height: 1352 }, { width: 2232, height: 1352 }],
 ];
 
-export const VIEWPORTS: Viewport[] = MEASURED.map(([width, height, zoneBoard, battleBoard]) => ({
-  name: `${width}x${height}`,
-  width,
-  height,
-  zoneBoard,
-  battleBoard,
-}));
+export const VIEWPORTS: Viewport[] = MEASURED.map(
+  ([width, height, zoneBoard, battleBoard]) => ({
+    name: `${width}x${height}`,
+    width,
+    height,
+    zoneBoard,
+    battleBoard,
+  }),
+);
 
 /** The game shows the desktop upgrade rail only in its widest shell. */
 export function hasUpgradeRail(viewport: Viewport): boolean {
@@ -98,7 +106,9 @@ export interface ZoneCase {
 }
 
 // Pools grow by about a card a round, so long games reach the 30s.
-const POOL_COUNTS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32];
+const POOL_COUNTS = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32,
+];
 // Every player starts with Config.starting_pool_size (7) cards.
 const DRAFT_POOL_COUNTS = POOL_COUNTS.filter((count) => count >= 7);
 // Draft packs hold Config.pack_size (5) cards.
@@ -123,7 +133,11 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
           phase: "draft",
           label: `pack ${pack}, pool ${pool}, rail ${rail}`,
           counts: { pack, pool, rail },
-          config: draftLayoutConfig({ packCount: pack, poolCount: pool, upgradeRailCount: rail }),
+          config: draftLayoutConfig({
+            packCount: pack,
+            poolCount: pool,
+            upgradeRailCount: rail,
+          }),
           railZone: "upgrades",
           allowHorizontalResize: horizontal,
           hasDividers: true,
@@ -138,7 +152,11 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
           phase: "build",
           label: `hand ${hand}, sideboard ${sideboard}, rail ${rail}`,
           counts: { hand, sideboard, rail },
-          config: buildLayoutConfig({ handSize: hand, sideboardCount: sideboard, upgradeRailCount: rail }),
+          config: buildLayoutConfig({
+            handSize: hand,
+            sideboardCount: sideboard,
+            upgradeRailCount: rail,
+          }),
           railZone: "commandZone",
           allowHorizontalResize: true,
           hasDividers: true,
@@ -151,7 +169,13 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
       phase: "reward",
       label: `rewards ${rewards}`,
       counts: { rewards },
-      config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: false, upgradeCount: 0, poolCount: 0, isDesktop }),
+      config: rewardLayoutConfig({
+        rewardCount: rewards,
+        hasUpgradeSection: false,
+        upgradeCount: 0,
+        poolCount: 0,
+        isDesktop,
+      }),
       allowHorizontalResize: false,
       hasDividers: true,
     });
@@ -162,7 +186,13 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
           phase: "reward-stage-end",
           label: `rewards ${rewards}, upgrades ${offered}, pool ${pool}`,
           counts: { rewards, offered, pool },
-          config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: true, upgradeCount: offered, poolCount: pool, isDesktop }),
+          config: rewardLayoutConfig({
+            rewardCount: rewards,
+            hasUpgradeSection: true,
+            upgradeCount: offered,
+            poolCount: pool,
+            isDesktop,
+          }),
           allowHorizontalResize: false,
           hasDividers: true,
         });
@@ -233,7 +263,11 @@ export function modalCases(): ZoneCase[] {
         phase: "upgrade-apply",
         label: `upgrades ${upgrades}, targets ${targets}`,
         counts: { upgrades, targets },
-        config: upgradeApplyLayoutConfig({ upgradeCount: upgrades, targetCount: targets, separatorHeight: APPLY_SEPARATOR_HEIGHT }),
+        config: upgradeApplyLayoutConfig({
+          upgradeCount: upgrades,
+          targetCount: targets,
+          separatorHeight: APPLY_SEPARATOR_HEIGHT,
+        }),
         allowHorizontalResize: false,
         hasDividers: false,
       });
@@ -274,7 +308,12 @@ const SAVED_LAYOUT_COUNTS: Record<string, number[]> = {
 
 /** Saved layouts are checked on fewer card counts, since each runs against every saved layout. */
 export function checksSavedLayouts(zoneCase: ZoneCase): boolean {
-  return zoneCase.hasDividers && Object.entries(zoneCase.counts).every(([zone, count]) => SAVED_LAYOUT_COUNTS[zone].includes(count));
+  return (
+    zoneCase.hasDividers &&
+    Object.entries(zoneCase.counts).every(([zone, count]) =>
+      SAVED_LAYOUT_COUNTS[zone].includes(count),
+    )
+  );
 }
 
 /** One ordinary game per phase, for checks that do not depend on card counts. */
@@ -288,7 +327,11 @@ export function isTypicalCase(viewport: Viewport, zoneCase: ZoneCase): boolean {
   };
   const label = typical[zoneCase.phase];
   const rail = hasUpgradeRail(viewport) ? 2 : 0;
-  return label !== undefined && zoneCase.label.startsWith(label) && (zoneCase.counts.rail ?? rail) === rail;
+  return (
+    label !== undefined &&
+    zoneCase.label.startsWith(label) &&
+    (zoneCase.counts.rail ?? rail) === rail
+  );
 }
 
 export interface BattleCase {
@@ -331,11 +374,15 @@ export function battleCases(): BattleCase[] {
 /** Sudden Death's banner spans the board and the sidebar above them, so the board gives up the banner's height. */
 export function battleBoard(viewport: Viewport, isSuddenDeath: boolean): Box {
   const { width, height } = viewport.battleBoard;
-  return isSuddenDeath ? { width, height: height - GAME_BANNER_HEIGHT } : viewport.battleBoard;
+  return isSuddenDeath
+    ? { width, height: height - GAME_BANNER_HEIGHT }
+    : viewport.battleBoard;
 }
 
 export function battleConfig(viewport: Viewport, battleCase: BattleCase) {
-  const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({ isMobile: isMobileViewport(viewport) });
+  const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({
+    isMobile: isMobileViewport(viewport),
+  });
   // Defaults useBattleCardSizes applies to what Battle.tsx passes.
   return {
     ...battleCase,

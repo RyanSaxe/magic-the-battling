@@ -89,10 +89,17 @@ describe("remembered seats", () => {
   });
 
   it("keeps the seat token and join code when the game is remembered again without them", () => {
-    rememberPlayerForGame("game-1", "Alice", { seatToken: "token-1", joinCode: "ABC123" });
+    rememberPlayerForGame("game-1", "Alice", {
+      seatToken: "token-1",
+      joinCode: "ABC123",
+    });
     rememberPlayerForGame("game-1", "Alice");
 
-    expect(getRememberedSeat("game-1")).toMatchObject({ name: "Alice", seatToken: "token-1", joinCode: "ABC123" });
+    expect(getRememberedSeat("game-1")).toMatchObject({
+      name: "Alice",
+      seatToken: "token-1",
+      joinCode: "ABC123",
+    });
   });
 
   it("replaces the seat token when a reclaim issues a new one", () => {
@@ -106,23 +113,35 @@ describe("remembered seats", () => {
     rememberPlayerForGame("game-1", "Alice", { seatToken: "token-1" });
     rememberPlayerForGame("game-1", "Bob");
 
-    expect(getRememberedSeat("game-1")).toMatchObject({ name: "Bob", seatToken: null });
+    expect(getRememberedSeat("game-1")).toMatchObject({
+      name: "Bob",
+      seatToken: null,
+    });
   });
 
   it("finds a seat by its join code, whatever the case and spaces", () => {
-    rememberPlayerForGame("game-1", "Alice", { seatToken: "token-1", joinCode: "ABC123" });
+    rememberPlayerForGame("game-1", "Alice", {
+      seatToken: "token-1",
+      joinCode: "ABC123",
+    });
 
     expect(findRememberedSeatByJoinCode(" abc123 ")?.gameId).toBe("game-1");
     expect(findRememberedSeatByJoinCode("ZZZZZZ")).toBeNull();
   });
 
   it("lists only reclaimable seats, most recent first", () => {
-    vi.spyOn(Date, "now").mockReturnValueOnce(1).mockReturnValueOnce(2).mockReturnValueOnce(3);
+    vi.spyOn(Date, "now")
+      .mockReturnValueOnce(1)
+      .mockReturnValueOnce(2)
+      .mockReturnValueOnce(3);
     rememberPlayerForGame("old", "Alice", { seatToken: "t-old" });
     rememberPlayerForGame("no-token", "Alice");
     rememberPlayerForGame("new", "Alice", { seatToken: "t-new" });
 
-    expect(listReclaimableSeats(10).map((seat) => seat.gameId)).toEqual(["new", "old"]);
+    expect(listReclaimableSeats(10).map((seat) => seat.gameId)).toEqual([
+      "new",
+      "old",
+    ]);
     expect(listReclaimableSeats(1).map((seat) => seat.gameId)).toEqual(["new"]);
   });
 

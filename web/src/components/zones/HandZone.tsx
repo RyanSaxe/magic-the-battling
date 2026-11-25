@@ -45,7 +45,7 @@ export function HandZone({
   cardDimensions,
   gap,
 }: HandZoneProps) {
-  const zoneStyle = gap !== undefined ? { gap: Math.max(0, gap) } : undefined
+  const zoneStyle = gap !== undefined ? { gap: Math.max(0, gap) } : undefined;
 
   return (
     <DroppableZone
@@ -55,10 +55,12 @@ export function HandZone({
       style={zoneStyle}
     >
       {cards.map((card, i) => {
-        const isOverlapping = gap !== undefined && gap < 0
+        const isOverlapping = gap !== undefined && gap < 0;
         const zIndex = isOverlapping
-          ? card.id === selectedCardId ? cards.length + 1 : cards.length - i
-          : undefined
+          ? card.id === selectedCardId
+            ? cards.length + 1
+            : cards.length - i
+          : undefined;
         return (
           <DraggableCard
             key={card.id}
@@ -67,17 +69,28 @@ export function HandZone({
             dimensions={cardDimensions}
             selected={card.id === selectedCardId}
             onClick={() => onCardClick?.(card)}
-            onContextMenu={onCardContextMenu ? (e) => onCardContextMenu(e, card) : undefined}
+            onContextMenu={
+              onCardContextMenu ? (e) => onCardContextMenu(e, card) : undefined
+            }
             disabled={!draggable}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
-            hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
-            onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
+            hiddenUpgradeCount={
+              (hiddenUpgradesByCardId?.get(card.id) ?? []).length
+            }
+            onRevealHiddenUpgrades={
+              onRevealHiddenUpgrades
+                ? () => onRevealHiddenUpgrades(card.id)
+                : undefined
+            }
             onCardHover={onCardHover}
             onCardHoverEnd={onCardHoverEnd}
-            style={{ ...(isOverlapping && i > 0 ? { marginLeft: gap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }}
+            style={{
+              ...(isOverlapping && i > 0 ? { marginLeft: gap } : undefined),
+              ...(zIndex !== undefined ? { zIndex } : undefined),
+            }}
           />
-        )
+        );
       })}
     </DroppableZone>
   );

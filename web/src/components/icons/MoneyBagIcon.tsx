@@ -1,16 +1,19 @@
 interface MoneyBagIconProps {
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
 const sizes = {
   sm: 16,
   md: 24,
   lg: 32,
-}
+};
 
-export function MoneyBagIcon({ size = 'md', className = '' }: MoneyBagIconProps) {
-  const px = sizes[size]
+export function MoneyBagIcon({
+  size = "md",
+  className = "",
+}: MoneyBagIconProps) {
+  const px = sizes[size];
   return (
     <svg
       width={px}
@@ -44,5 +47,5 @@ export function MoneyBagIcon({ size = 'md', className = '' }: MoneyBagIconProps)
       {/* Highlight */}
       <circle cx="8" cy="13" r="1" fill="#FCD34D" />
     </svg>
-  )
+  );
 }

@@ -1,140 +1,147 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Card } from '../card'
-import { PoisonCard } from './PoisonCard'
-import type { BattleResolution, BattleView, Card as CardType } from '../../types'
-import { POISON_TO_LOSE } from '../../constants/rules'
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Card } from "../card";
+import { PoisonCard } from "./PoisonCard";
+import type {
+  BattleResolution,
+  BattleView,
+  Card as CardType,
+} from "../../types";
+import { POISON_TO_LOSE } from "../../constants/rules";
 
-type OverlayOwner = 'player' | 'opponent'
+type OverlayOwner = "player" | "opponent";
 
 interface BattleResolutionOverlayProps {
-  battle: BattleView
-  resolution: BattleResolution
-  onComplete: () => void
+  battle: BattleView;
+  resolution: BattleResolution;
+  onComplete: () => void;
 }
 
 interface CardLookupEntry {
-  card: CardType
-  owner: OverlayOwner
+  card: CardType;
+  owner: OverlayOwner;
 }
 
 interface Point {
-  x: number
-  y: number
+  x: number;
+  y: number;
 }
 
 interface StageRect {
-  left: number
-  top: number
-  width: number
-  height: number
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 interface ActiveSourceState {
-  card: CardType
-  owner: OverlayOwner
-  stageRect: StageRect
-  enterX: number
-  enterY: number
-  enterScale: number
-  isExiting: boolean
+  card: CardType;
+  owner: OverlayOwner;
+  stageRect: StageRect;
+  enterX: number;
+  enterY: number;
+  enterScale: number;
+  isExiting: boolean;
 }
 
 interface BeamGroup {
-  sourceCardId: string
-  targetOwner: OverlayOwner
-  beamCount: number
+  sourceCardId: string;
+  targetOwner: OverlayOwner;
+  beamCount: number;
 }
 
-const BASE_SETTLE_MS = 620
-const COUNTER_TICK_MS = 260
-const DEATH_PHASE_MS = 1450
-const SOURCE_MOVE_MS = 540
-const BEAM_TRAVEL_MS = 260
-const BEAM_SETTLE_MS = 320
-const BEAM_PAUSE_MS = 260
-const GROUP_EXIT_MS = 220
-const COUNTER_SETTLE_MS = 800
-const COUNTER_SETTLE_PAUSE_MS = 200
-const CONTINUATION_MS = 1500
+const BASE_SETTLE_MS = 620;
+const COUNTER_TICK_MS = 260;
+const DEATH_PHASE_MS = 1450;
+const SOURCE_MOVE_MS = 540;
+const BEAM_TRAVEL_MS = 260;
+const BEAM_SETTLE_MS = 320;
+const BEAM_PAUSE_MS = 260;
+const GROUP_EXIT_MS = 220;
+const COUNTER_SETTLE_MS = 800;
+const COUNTER_SETTLE_PAUSE_MS = 200;
+const CONTINUATION_MS = 1500;
 
 function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function buildCardLookup(battle: BattleView): Map<string, CardLookupEntry> {
-  const lookup = new Map<string, CardLookupEntry>()
+  const lookup = new Map<string, CardLookupEntry>();
   const addCards = (cards: CardType[], owner: OverlayOwner) => {
-    cards.forEach((card) => lookup.set(card.id, { card, owner }))
-  }
+    cards.forEach((card) => lookup.set(card.id, { card, owner }));
+  };
 
-  const addZones = (owner: OverlayOwner, zones: BattleView['your_zones']) => {
-    addCards(zones.hand, owner)
-    addCards(zones.battlefield, owner)
-    addCards(zones.graveyard, owner)
-    addCards(zones.exile, owner)
-    addCards(zones.sideboard, owner)
-    addCards(zones.command_zone, owner)
-    addCards(zones.submitted_cards, owner)
-    addCards(zones.upgrades, owner)
+  const addZones = (owner: OverlayOwner, zones: BattleView["your_zones"]) => {
+    addCards(zones.hand, owner);
+    addCards(zones.battlefield, owner);
+    addCards(zones.graveyard, owner);
+    addCards(zones.exile, owner);
+    addCards(zones.sideboard, owner);
+    addCards(zones.command_zone, owner);
+    addCards(zones.submitted_cards, owner);
+    addCards(zones.upgrades, owner);
     for (const upgrade of zones.upgrades) {
       if (upgrade.upgrade_target) {
-        lookup.set(upgrade.upgrade_target.id, { card: upgrade.upgrade_target, owner })
+        lookup.set(upgrade.upgrade_target.id, {
+          card: upgrade.upgrade_target,
+          owner,
+        });
       }
     }
-  }
+  };
 
-  addZones('player', battle.your_zones)
-  addZones('opponent', battle.opponent_zones)
-  return lookup
+  addZones("player", battle.your_zones);
+  addZones("opponent", battle.opponent_zones);
+  return lookup;
 }
 
 function selectorForCard(cardId: string): string {
-  const escaped = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
-    ? CSS.escape(cardId)
-    : cardId.replace(/["\\]/g, '\\$&')
-  return `[data-card-id="${escaped}"]`
+  const escaped =
+    typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(cardId)
+      : cardId.replace(/["\\]/g, "\\$&");
+  return `[data-card-id="${escaped}"]`;
 }
 
 function rectForSelector(selector: string): DOMRect | null {
-  return document.querySelector(selector)?.getBoundingClientRect() ?? null
+  return document.querySelector(selector)?.getBoundingClientRect() ?? null;
 }
 
 function centerOfRect(rect: StageRect | DOMRect): Point {
   return {
     x: rect.left + rect.width / 2,
     y: rect.top + rect.height / 2,
-  }
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
+  return Math.max(min, Math.min(max, value));
 }
 
 function uniqueOwners(owners: OverlayOwner[]): OverlayOwner[] {
-  return Array.from(new Set(owners))
+  return Array.from(new Set(owners));
 }
 
 function buildStageRect(owner: OverlayOwner): StageRect {
-  const viewportWidth = window.innerWidth
-  const viewportHeight = window.innerHeight
-  const margin = clamp(Math.round(viewportWidth * 0.035), 18, 34)
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const margin = clamp(Math.round(viewportWidth * 0.035), 18, 34);
   const width = clamp(
     Math.round(Math.min(viewportWidth * 0.22, viewportHeight * 0.19)),
     120,
     220,
-  )
-  const height = Math.round((width * 7) / 5)
-  const topPadding = clamp(Math.round(viewportHeight * 0.11), 74, 116)
-  const bottomPadding = clamp(Math.round(viewportHeight * 0.14), 96, 132)
+  );
+  const height = Math.round((width * 7) / 5);
+  const topPadding = clamp(Math.round(viewportHeight * 0.11), 74, 116);
+  const bottomPadding = clamp(Math.round(viewportHeight * 0.14), 96, 132);
 
   return {
     left: margin,
-    top: owner === 'player'
-      ? viewportHeight - bottomPadding - height
-      : topPadding,
+    top:
+      owner === "player" ? viewportHeight - bottomPadding - height : topPadding,
     width,
     height,
-  }
+  };
 }
 
 function buildEntryTransform(
@@ -144,55 +151,61 @@ function buildEntryTransform(
 ): { enterX: number; enterY: number; enterScale: number } {
   if (!sourceRect) {
     return {
-      enterX: owner === 'player' ? 36 : 28,
-      enterY: owner === 'player' ? 54 : -54,
+      enterX: owner === "player" ? 36 : 28,
+      enterY: owner === "player" ? 54 : -54,
       enterScale: 0.84,
-    }
+    };
   }
 
   return {
     enterX: sourceRect.left - stageRect.left,
     enterY: sourceRect.top - stageRect.top,
     enterScale: clamp(sourceRect.width / stageRect.width, 0.28, 0.86),
-  }
+  };
 }
 
 function groupUpgradeEvents(
-  events: BattleResolution['your_side']['events'],
+  events: BattleResolution["your_side"]["events"],
   targetOwner: OverlayOwner,
 ): BeamGroup[] {
-  const groups: BeamGroup[] = []
+  const groups: BeamGroup[] = [];
 
   events
-    .filter((event) => event.event_type === 'upgrade_beam' && event.source_card_id)
+    .filter(
+      (event) => event.event_type === "upgrade_beam" && event.source_card_id,
+    )
     .forEach((event) => {
-      const sourceCardId = event.source_card_id
-      if (!sourceCardId) return
+      const sourceCardId = event.source_card_id;
+      if (!sourceCardId) return;
 
-      const previous = groups.at(-1)
-      if (previous && previous.sourceCardId === sourceCardId && previous.targetOwner === targetOwner) {
-        previous.beamCount += 1
-        return
+      const previous = groups.at(-1);
+      if (
+        previous &&
+        previous.sourceCardId === sourceCardId &&
+        previous.targetOwner === targetOwner
+      ) {
+        previous.beamCount += 1;
+        return;
       }
 
       groups.push({
         sourceCardId,
         targetOwner,
         beamCount: 1,
-      })
-    })
+      });
+    });
 
-  return groups
+  return groups;
 }
 
 function interleave<T>(first: T[], second: T[]): T[] {
-  const output: T[] = []
-  const maxLength = Math.max(first.length, second.length)
+  const output: T[] = [];
+  const maxLength = Math.max(first.length, second.length);
   for (let index = 0; index < maxLength; index += 1) {
-    if (index < first.length) output.push(first[index])
-    if (index < second.length) output.push(second[index])
+    if (index < first.length) output.push(first[index]);
+    if (index < second.length) output.push(second[index]);
   }
-  return output
+  return output;
 }
 
 function SkullIcon() {
@@ -203,7 +216,7 @@ function SkullIcon() {
         fill="currentColor"
       />
     </svg>
-  )
+  );
 }
 
 export function BattleResolutionOverlay({
@@ -214,94 +227,113 @@ export function BattleResolutionOverlay({
   const [counts, setCounts] = useState({
     player: resolution.your_side.starting_poison,
     opponent: resolution.opponent_side.starting_poison,
-  })
-  const [focusedOwners, setFocusedOwners] = useState<OverlayOwner[]>([])
-  const [incrementOwners, setIncrementOwners] = useState<OverlayOwner[]>([])
-  const [lethalOwners, setLethalOwners] = useState<OverlayOwner[]>([])
-  const [deadOwners, setDeadOwners] = useState<OverlayOwner[]>([])
-  const [settlingOwners, setSettlingOwners] = useState<OverlayOwner[]>([])
-  const [activeSource, setActiveSource] = useState<ActiveSourceState | null>(null)
+  });
+  const [focusedOwners, setFocusedOwners] = useState<OverlayOwner[]>([]);
+  const [incrementOwners, setIncrementOwners] = useState<OverlayOwner[]>([]);
+  const [lethalOwners, setLethalOwners] = useState<OverlayOwner[]>([]);
+  const [deadOwners, setDeadOwners] = useState<OverlayOwner[]>([]);
+  const [settlingOwners, setSettlingOwners] = useState<OverlayOwner[]>([]);
+  const [activeSource, setActiveSource] = useState<ActiveSourceState | null>(
+    null,
+  );
   const [activeBeam, setActiveBeam] = useState<{
-    from: Point
-    to: Point
-  } | null>(null)
-  const [showContinuation, setShowContinuation] = useState(false)
+    from: Point;
+    to: Point;
+  } | null>(null);
+  const [showContinuation, setShowContinuation] = useState(false);
 
-  const onCompleteRef = useRef(onComplete)
-  useEffect(() => { onCompleteRef.current = onComplete })
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  });
 
-  const cardLookup = useMemo(() => buildCardLookup(battle), [battle])
+  const cardLookup = useMemo(() => buildCardLookup(battle), [battle]);
   const resolutionSides = useMemo(
     () => ({
       player: resolution.your_side,
       opponent: resolution.opponent_side,
     }),
     [resolution],
-  )
+  );
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     const applyIncrement = (owner: OverlayOwner, nextValue: number) => {
       setCounts((current) => ({
         ...current,
         [owner]: nextValue,
-      }))
+      }));
       if (nextValue >= POISON_TO_LOSE) {
-        setLethalOwners((current) => uniqueOwners([...current, owner]))
+        setLethalOwners((current) => uniqueOwners([...current, owner]));
       }
-    }
+    };
 
     const run = async () => {
-      await wait(160)
-      if (cancelled) return
+      await wait(160);
+      if (cancelled) return;
 
-      const damagedOwners = (['player', 'opponent'] as const).filter(
+      const damagedOwners = (["player", "opponent"] as const).filter(
         (owner) => resolutionSides[owner].took_damage,
-      )
+      );
 
       if (damagedOwners.length === 0) {
-        await wait(220)
-        if (!cancelled) onCompleteRef.current()
-        return
+        await wait(220);
+        if (!cancelled) onCompleteRef.current();
+        return;
       }
 
-      setFocusedOwners(damagedOwners)
-      await wait(360)
-      if (cancelled) return
+      setFocusedOwners(damagedOwners);
+      await wait(360);
+      if (cancelled) return;
 
-      const baseOwners = (['player', 'opponent'] as const).filter(
-        (owner) => resolutionSides[owner].events[0]?.event_type === 'base_increment',
-      )
+      const baseOwners = (["player", "opponent"] as const).filter(
+        (owner) =>
+          resolutionSides[owner].events[0]?.event_type === "base_increment",
+      );
 
       if (baseOwners.length > 0) {
         baseOwners.forEach((owner) => {
-          applyIncrement(owner, resolutionSides[owner].starting_poison + 1)
-        })
-        setIncrementOwners(baseOwners)
-        await wait(COUNTER_TICK_MS)
-        if (cancelled) return
-        setIncrementOwners([])
-        await wait(BASE_SETTLE_MS)
-        if (cancelled) return
+          applyIncrement(owner, resolutionSides[owner].starting_poison + 1);
+        });
+        setIncrementOwners(baseOwners);
+        await wait(COUNTER_TICK_MS);
+        if (cancelled) return;
+        setIncrementOwners([]);
+        await wait(BASE_SETTLE_MS);
+        if (cancelled) return;
       }
 
-      const playerGroups = groupUpgradeEvents(resolutionSides.player.events, 'player')
-      const opponentGroups = groupUpgradeEvents(resolutionSides.opponent.events, 'opponent')
-      const groups = interleave(playerGroups, opponentGroups)
+      const playerGroups = groupUpgradeEvents(
+        resolutionSides.player.events,
+        "player",
+      );
+      const opponentGroups = groupUpgradeEvents(
+        resolutionSides.opponent.events,
+        "opponent",
+      );
+      const groups = interleave(playerGroups, opponentGroups);
 
       const currentCounts = {
-        player: resolutionSides.player.starting_poison + (baseOwners.includes('player') ? 1 : 0),
-        opponent: resolutionSides.opponent.starting_poison + (baseOwners.includes('opponent') ? 1 : 0),
-      }
+        player:
+          resolutionSides.player.starting_poison +
+          (baseOwners.includes("player") ? 1 : 0),
+        opponent:
+          resolutionSides.opponent.starting_poison +
+          (baseOwners.includes("opponent") ? 1 : 0),
+      };
 
       for (const group of groups) {
-        const lookup = cardLookup.get(group.sourceCardId) ?? null
-        if (!lookup) continue
+        const lookup = cardLookup.get(group.sourceCardId) ?? null;
+        if (!lookup) continue;
 
-        const sourceRect = rectForSelector(selectorForCard(group.sourceCardId))
-        const stageRect = buildStageRect(lookup.owner)
-        const { enterX, enterY, enterScale } = buildEntryTransform(lookup.owner, stageRect, sourceRect)
+        const sourceRect = rectForSelector(selectorForCard(group.sourceCardId));
+        const stageRect = buildStageRect(lookup.owner);
+        const { enterX, enterY, enterScale } = buildEntryTransform(
+          lookup.owner,
+          stageRect,
+          sourceRect,
+        );
 
         setActiveSource({
           card: lookup.card,
@@ -311,95 +343,105 @@ export function BattleResolutionOverlay({
           enterY,
           enterScale,
           isExiting: false,
-        })
+        });
 
-        await wait(SOURCE_MOVE_MS)
-        if (cancelled) return
+        await wait(SOURCE_MOVE_MS);
+        if (cancelled) return;
 
-        const targetRect = rectForSelector(`[data-poison-owner="${group.targetOwner}"]`)
-        const beamStart = centerOfRect(stageRect)
+        const targetRect = rectForSelector(
+          `[data-poison-owner="${group.targetOwner}"]`,
+        );
+        const beamStart = centerOfRect(stageRect);
         const beamEnd = targetRect
           ? centerOfRect(targetRect)
           : {
-              x: group.targetOwner === 'player' ? window.innerWidth * 0.72 : window.innerWidth * 0.78,
-              y: group.targetOwner === 'player' ? window.innerHeight * 0.68 : window.innerHeight * 0.24,
-            }
+              x:
+                group.targetOwner === "player"
+                  ? window.innerWidth * 0.72
+                  : window.innerWidth * 0.78,
+              y:
+                group.targetOwner === "player"
+                  ? window.innerHeight * 0.68
+                  : window.innerHeight * 0.24,
+            };
 
         for (let beamIndex = 0; beamIndex < group.beamCount; beamIndex += 1) {
-          setActiveBeam({ from: beamStart, to: beamEnd })
-          await wait(BEAM_TRAVEL_MS)
-          if (cancelled) return
+          setActiveBeam({ from: beamStart, to: beamEnd });
+          await wait(BEAM_TRAVEL_MS);
+          if (cancelled) return;
 
-          currentCounts[group.targetOwner] += 1
-          applyIncrement(group.targetOwner, currentCounts[group.targetOwner])
-          setIncrementOwners([group.targetOwner])
+          currentCounts[group.targetOwner] += 1;
+          applyIncrement(group.targetOwner, currentCounts[group.targetOwner]);
+          setIncrementOwners([group.targetOwner]);
 
-          await wait(BEAM_SETTLE_MS)
-          if (cancelled) return
+          await wait(BEAM_SETTLE_MS);
+          if (cancelled) return;
 
-          setActiveBeam(null)
-          setIncrementOwners([])
+          setActiveBeam(null);
+          setIncrementOwners([]);
 
           if (beamIndex < group.beamCount - 1) {
-            await wait(BEAM_PAUSE_MS)
-            if (cancelled) return
+            await wait(BEAM_PAUSE_MS);
+            if (cancelled) return;
           }
         }
 
-        setActiveSource((current) => (
+        setActiveSource((current) =>
           current && current.card.id === group.sourceCardId
             ? { ...current, isExiting: true }
-            : current
-        ))
+            : current,
+        );
 
-        await wait(GROUP_EXIT_MS)
-        if (cancelled) return
-        setActiveSource(null)
-        await wait(120)
-        if (cancelled) return
+        await wait(GROUP_EXIT_MS);
+        if (cancelled) return;
+        setActiveSource(null);
+        await wait(120);
+        if (cancelled) return;
       }
 
-      const deathTargets = (['player', 'opponent'] as const).filter(
-        (owner) => resolutionSides[owner].show_death_animation && currentCounts[owner] >= POISON_TO_LOSE,
-      )
+      const deathTargets = (["player", "opponent"] as const).filter(
+        (owner) =>
+          resolutionSides[owner].show_death_animation &&
+          currentCounts[owner] >= POISON_TO_LOSE,
+      );
 
       if (deathTargets.length > 0) {
-        await wait(360)
-        if (cancelled) return
-        setDeadOwners(deathTargets)
-        await wait(DEATH_PHASE_MS)
-        if (cancelled) return
+        await wait(360);
+        if (cancelled) return;
+        setDeadOwners(deathTargets);
+        await wait(DEATH_PHASE_MS);
+        if (cancelled) return;
       }
 
-      setSettlingOwners(damagedOwners)
-      await wait(COUNTER_SETTLE_MS)
-      if (cancelled) return
-      await wait(COUNTER_SETTLE_PAUSE_MS)
-      if (cancelled) return
+      setSettlingOwners(damagedOwners);
+      await wait(COUNTER_SETTLE_MS);
+      if (cancelled) return;
+      await wait(COUNTER_SETTLE_PAUSE_MS);
+      if (cancelled) return;
 
       if (resolution.continue_sudden_death) {
-        setShowContinuation(true)
-        await wait(CONTINUATION_MS)
-        if (cancelled) return
+        setShowContinuation(true);
+        await wait(CONTINUATION_MS);
+        if (cancelled) return;
       }
 
-      onCompleteRef.current()
-    }
+      onCompleteRef.current();
+    };
 
-    void run()
+    void run();
 
     return () => {
-      cancelled = true
-    }
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []);
 
   const poisonRects = {
     player: rectForSelector('[data-poison-owner="player"]'),
     opponent: rectForSelector('[data-poison-owner="opponent"]'),
-  }
+  };
 
-  const counterScale = window.innerWidth < 640 ? '1.55' : '1.82'
+  const counterScale = window.innerWidth < 640 ? "1.55" : "1.82";
 
   return (
     <div className="fixed inset-0 z-[80] pointer-events-auto">
@@ -426,63 +468,66 @@ export function BattleResolutionOverlay({
         )}
       </svg>
 
-      {(['player', 'opponent'] as const).map((owner) => {
-        const rect = poisonRects[owner]
-        if (!rect) return null
+      {(["player", "opponent"] as const).map((owner) => {
+        const rect = poisonRects[owner];
+        if (!rect) return null;
 
-        const isFocused = focusedOwners.includes(owner)
-        const isIncrementing = incrementOwners.includes(owner)
-        const isLethal = lethalOwners.includes(owner)
-        const isDead = deadOwners.includes(owner)
+        const isFocused = focusedOwners.includes(owner);
+        const isIncrementing = incrementOwners.includes(owner);
+        const isLethal = lethalOwners.includes(owner);
+        const isDead = deadOwners.includes(owner);
 
         return (
           <div
             key={owner}
             className={[
-              'fixed z-[83] battle-resolution-counter',
-              isFocused && 'battle-resolution-counter-focused',
-              isIncrementing && 'battle-resolution-counter-increment',
-              isLethal && 'battle-resolution-counter-lethal',
-              isDead && 'battle-resolution-counter-dead',
-              settlingOwners.includes(owner) && 'battle-resolution-counter-settling',
-            ].filter(Boolean).join(' ')}
+              "fixed z-[83] battle-resolution-counter",
+              isFocused && "battle-resolution-counter-focused",
+              isIncrementing && "battle-resolution-counter-increment",
+              isLethal && "battle-resolution-counter-lethal",
+              isDead && "battle-resolution-counter-dead",
+              settlingOwners.includes(owner) &&
+                "battle-resolution-counter-settling",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             style={{
               left: rect.left,
               top: rect.top,
               width: rect.width,
               height: rect.height,
-              ['--battle-counter-scale' as string]: counterScale,
+              ["--battle-counter-scale" as string]: counterScale,
             }}
           >
             <PoisonCard
               count={counts[owner]}
               dimensions={{ width: rect.width, height: rect.height }}
               owner={owner}
-              badgeTextClassName={isLethal ? 'text-red-200' : 'text-purple-200'}
+              badgeTextClassName={isLethal ? "text-red-200" : "text-purple-200"}
             />
             <div className="battle-resolution-counter-skull">
               <SkullIcon />
             </div>
           </div>
-        )
+        );
       })}
 
       {activeSource && (
         <div
           className={[
-            'fixed z-[84] battle-resolution-source-card',
+            "fixed z-[84] battle-resolution-source-card",
             activeSource.isExiting
-              ? 'battle-resolution-source-card-exiting'
-              : 'battle-resolution-source-card-entering',
-          ].join(' ')}
+              ? "battle-resolution-source-card-exiting"
+              : "battle-resolution-source-card-entering",
+          ].join(" ")}
           style={{
             left: activeSource.stageRect.left,
             top: activeSource.stageRect.top,
             width: activeSource.stageRect.width,
             height: activeSource.stageRect.height,
-            ['--battle-enter-x' as string]: `${activeSource.enterX}px`,
-            ['--battle-enter-y' as string]: `${activeSource.enterY}px`,
-            ['--battle-enter-scale' as string]: String(activeSource.enterScale),
+            ["--battle-enter-x" as string]: `${activeSource.enterX}px`,
+            ["--battle-enter-y" as string]: `${activeSource.enterY}px`,
+            ["--battle-enter-scale" as string]: String(activeSource.enterScale),
           }}
         >
           <Card
@@ -499,11 +544,9 @@ export function BattleResolutionOverlay({
 
       {showContinuation && (
         <div className="fixed inset-0 z-[86] pointer-events-none flex items-center justify-center">
-          <div className="battle-resolution-continue-panel">
-            Sudden Death
-          </div>
+          <div className="battle-resolution-continue-panel">Sudden Death</div>
         </div>
       )}
     </div>
-  )
+  );
 }

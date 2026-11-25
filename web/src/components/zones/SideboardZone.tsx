@@ -1,20 +1,20 @@
-import type { Card as CardType, ZoneName } from '../../types'
-import { DraggableCard, DroppableZone } from '../../dnd'
-import { Card } from '../card'
+import type { Card as CardType, ZoneName } from "../../types";
+import { DraggableCard, DroppableZone } from "../../dnd";
+import { Card } from "../card";
 
 interface SideboardZoneProps {
-  cards: CardType[]
-  selectedCardId?: string
-  onCardClick?: (card: CardType) => void
-  validFromZones?: ZoneName[]
-  draggable?: boolean
+  cards: CardType[];
+  selectedCardId?: string;
+  onCardClick?: (card: CardType) => void;
+  validFromZones?: ZoneName[];
+  draggable?: boolean;
 }
 
 export function SideboardZone({
   cards,
   selectedCardId,
   onCardClick,
-  validFromZones = ['hand'],
+  validFromZones = ["hand"],
   draggable = true,
 }: SideboardZoneProps) {
   return (
@@ -28,9 +28,11 @@ export function SideboardZone({
       </div>
       <div className="flex flex-wrap gap-1.5">
         {cards.length === 0 ? (
-          <div className="text-[var(--ivory-felt)] text-sm">No cards in sideboard</div>
+          <div className="text-[var(--ivory-felt)] text-sm">
+            No cards in sideboard
+          </div>
         ) : (
-          cards.map((card) => (
+          cards.map((card) =>
             draggable ? (
               <DraggableCard
                 key={card.id}
@@ -48,10 +50,10 @@ export function SideboardZone({
                 selected={card.id === selectedCardId}
                 onClick={() => onCardClick?.(card)}
               />
-            )
-          ))
+            ),
+          )
         )}
       </div>
     </DroppableZone>
-  )
+  );
 }

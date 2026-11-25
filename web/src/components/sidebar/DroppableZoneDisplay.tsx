@@ -1,33 +1,41 @@
-import { useState } from 'react'
-import type { Card as CardType, ZoneName } from '../../types'
-import type { ZoneOwner } from '../../dnd/types'
-import { Card } from '../card'
-import { DraggableCard, DroppableZone } from '../../dnd'
-import { DndPanel } from '../common/DndPanel'
+import { useState } from "react";
+import type { Card as CardType, ZoneName } from "../../types";
+import type { ZoneOwner } from "../../dnd/types";
+import { Card } from "../card";
+import { DraggableCard, DroppableZone } from "../../dnd";
+import { DndPanel } from "../common/DndPanel";
 
-type CardSize = 'xs' | 'sm'
+type CardSize = "xs" | "sm";
 
 const sizeStyles = {
   xs: { width: 50, height: 70 },
   sm: { width: 80, height: 112 },
-}
+};
 
 interface DroppableZoneDisplayProps {
-  title: string
-  zone: ZoneName
-  cards: CardType[]
-  maxThumbnails?: number
-  validFromZones: ZoneName[]
-  isOpponent?: boolean
-  canManipulateOpponent?: boolean
-  titleClassName?: string
-  hideCount?: boolean
-  size?: CardSize
-  upgradedCardIds?: Set<string>
-  appliedUpgradesByCardId?: Map<string, CardType[]>
+  title: string;
+  zone: ZoneName;
+  cards: CardType[];
+  maxThumbnails?: number;
+  validFromZones: ZoneName[];
+  isOpponent?: boolean;
+  canManipulateOpponent?: boolean;
+  titleClassName?: string;
+  hideCount?: boolean;
+  size?: CardSize;
+  upgradedCardIds?: Set<string>;
+  appliedUpgradesByCardId?: Map<string, CardType[]>;
 }
 
-const VALID_FROM_ZONES: ZoneName[] = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']
+const VALID_FROM_ZONES: ZoneName[] = [
+  "hand",
+  "battlefield",
+  "graveyard",
+  "exile",
+  "sideboard",
+  "command_zone",
+  "library",
+];
 
 export function ZoneModal({
   open,
@@ -44,40 +52,44 @@ export function ZoneModal({
   onCardContextMenu,
   selectedCardId,
   forceFaceDown = false,
-  tone = 'default',
+  tone = "default",
   headerActions,
   upgradedCardIds,
   appliedUpgradesByCardId,
   hiddenUpgradesByCardId,
   onRevealHiddenUpgrades,
 }: {
-  open: boolean
-  title: string
-  zone: ZoneName
-  cards: CardType[]
-  allowZoneInteraction: boolean
-  allowCardInteraction: boolean
-  isOpponent: boolean
-  onClose: () => void
-  onCardHover?: (cardId: string, zone: ZoneName) => void
-  onCardHoverEnd?: () => void
-  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
-  onCardContextMenu?: (e: React.MouseEvent, card: CardType, zone: ZoneName) => void
-  selectedCardId?: string
-  forceFaceDown?: boolean
-  tone?: 'default' | 'battle'
-  headerActions?: React.ReactNode
-  upgradedCardIds?: Set<string>
-  appliedUpgradesByCardId?: Map<string, CardType[]>
-  hiddenUpgradesByCardId?: Map<string, CardType[]>
-  onRevealHiddenUpgrades?: (cardId: string) => void
+  open: boolean;
+  title: string;
+  zone: ZoneName;
+  cards: CardType[];
+  allowZoneInteraction: boolean;
+  allowCardInteraction: boolean;
+  isOpponent: boolean;
+  onClose: () => void;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void;
+  onCardContextMenu?: (
+    e: React.MouseEvent,
+    card: CardType,
+    zone: ZoneName,
+  ) => void;
+  selectedCardId?: string;
+  forceFaceDown?: boolean;
+  tone?: "default" | "battle";
+  headerActions?: React.ReactNode;
+  upgradedCardIds?: Set<string>;
+  appliedUpgradesByCardId?: Map<string, CardType[]>;
+  hiddenUpgradesByCardId?: Map<string, CardType[]>;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
 }) {
-  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
   const handleClose = () => {
-    onCardHoverEnd?.()
-    onClose()
-  }
+    onCardHoverEnd?.();
+    onClose();
+  };
 
   if (allowZoneInteraction) {
     return (
@@ -106,22 +118,36 @@ export function ZoneModal({
               onCardHover={allowCardInteraction ? onCardHover : undefined}
               onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
               selected={selectedCardId === card.id}
-              onClick={allowCardInteraction && onCardClick ? () => onCardClick(card, zone, zoneOwner) : undefined}
-              onContextMenu={allowCardInteraction && onCardContextMenu ? (e) => onCardContextMenu(e, card, zone) : undefined}
+              onClick={
+                allowCardInteraction && onCardClick
+                  ? () => onCardClick(card, zone, zoneOwner)
+                  : undefined
+              }
+              onContextMenu={
+                allowCardInteraction && onCardContextMenu
+                  ? (e) => onCardContextMenu(e, card, zone)
+                  : undefined
+              }
               faceDown={forceFaceDown}
               canPeekFaceDown={!forceFaceDown}
               upgraded={upgradedCardIds?.has(card.id)}
               appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
-              hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
-              onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
+              hiddenUpgradeCount={
+                (hiddenUpgradesByCardId?.get(card.id) ?? []).length
+              }
+              onRevealHiddenUpgrades={
+                onRevealHiddenUpgrades
+                  ? () => onRevealHiddenUpgrades(card.id)
+                  : undefined
+              }
             />
           ))
         }
       </DndPanel>
-    )
+    );
   }
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div
@@ -145,7 +171,9 @@ export function ZoneModal({
           </div>
         </div>
         {cards.length === 0 ? (
-          <div className="text-[var(--ivory-muted)] text-center py-4">No cards</div>
+          <div className="text-[var(--ivory-muted)] text-center py-4">
+            No cards
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {cards.map((card) => (
@@ -156,15 +184,21 @@ export function ZoneModal({
                 faceDown={forceFaceDown}
                 upgraded={upgradedCardIds?.has(card.id)}
                 appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
-                hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
-                onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
+                hiddenUpgradeCount={
+                  (hiddenUpgradesByCardId?.get(card.id) ?? []).length
+                }
+                onRevealHiddenUpgrades={
+                  onRevealHiddenUpgrades
+                    ? () => onRevealHiddenUpgrades(card.id)
+                    : undefined
+                }
               />
             ))}
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 export function DroppableZoneDisplay({
@@ -175,18 +209,18 @@ export function DroppableZoneDisplay({
   validFromZones,
   isOpponent = false,
   canManipulateOpponent = false,
-  titleClassName = 'text-[var(--ivory-muted)]',
+  titleClassName = "text-[var(--ivory-muted)]",
   hideCount = false,
-  size = 'xs',
+  size = "xs",
   upgradedCardIds,
   appliedUpgradesByCardId,
 }: DroppableZoneDisplayProps) {
-  const [showModal, setShowModal] = useState(false)
-  const allowZoneInteraction = !isOpponent || canManipulateOpponent
-  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+  const [showModal, setShowModal] = useState(false);
+  const allowZoneInteraction = !isOpponent || canManipulateOpponent;
+  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
-  const displayedCards = cards.slice(0, maxThumbnails)
-  const remainingCount = cards.length - displayedCards.length
+  const displayedCards = cards.slice(0, maxThumbnails);
+  const remainingCount = cards.length - displayedCards.length;
 
   return (
     <>
@@ -201,19 +235,25 @@ export function DroppableZoneDisplay({
           onClick={() => cards.length > 0 && setShowModal(true)}
           className={`w-full flex flex-col items-center p-2 rounded ${
             cards.length > 0
-              ? 'hover:bg-[var(--stone)]/50 cursor-pointer'
-              : 'cursor-default'
+              ? "hover:bg-[var(--stone)]/50 cursor-pointer"
+              : "cursor-default"
           }`}
         >
           <div className={`text-[10px] uppercase mb-1 ${titleClassName}`}>
-            {title}{!hideCount && ` (${cards.length})`}
+            {title}
+            {!hideCount && ` (${cards.length})`}
           </div>
           {cards.length === 0 ? (
             <div
               className="border border-dashed border-[var(--stone-light)] rounded flex items-center justify-center"
-              style={{ width: sizeStyles[size].width, height: sizeStyles[size].height }}
+              style={{
+                width: sizeStyles[size].width,
+                height: sizeStyles[size].height,
+              }}
             >
-              <span className="text-[var(--ivory-muted)] text-[10px]">Empty</span>
+              <span className="text-[var(--ivory-muted)] text-[10px]">
+                Empty
+              </span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-0.5">
@@ -238,11 +278,13 @@ export function DroppableZoneDisplay({
                       upgraded={upgradedCardIds?.has(card.id)}
                       appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
                     />
-                  )
+                  ),
                 )}
               </div>
               {remainingCount > 0 && (
-                <div className="text-[10px] text-[var(--ivory-muted)]">+{remainingCount} more</div>
+                <div className="text-[10px] text-[var(--ivory-muted)]">
+                  +{remainingCount} more
+                </div>
               )}
             </div>
           )}
@@ -262,5 +304,5 @@ export function DroppableZoneDisplay({
         appliedUpgradesByCardId={appliedUpgradesByCardId}
       />
     </>
-  )
+  );
 }

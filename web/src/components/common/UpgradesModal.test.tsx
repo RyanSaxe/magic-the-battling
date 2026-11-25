@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Card } from '../../types'
-import { applyUpgradeWithModalClose, revealUpgradeWithModalClose } from './upgradeModalFlow'
-import { UpgradesModal } from './UpgradesModal'
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Card } from "../../types";
+import {
+  applyUpgradeWithModalClose,
+  revealUpgradeWithModalClose,
+} from "./upgradeModalFlow";
+import { UpgradesModal } from "./UpgradesModal";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
@@ -12,91 +15,98 @@ vi.hoisted(() => {
     media: query,
     addEventListener() {},
     removeEventListener() {},
-  })) as unknown as typeof window.matchMedia
-})
+  })) as unknown as typeof window.matchMedia;
+});
 
-const upgrade = { id: 'upgrade', name: 'Upgrade', upgrade_target: null } as Card
-const target = { id: 'target', name: 'Target', upgrade_target: null } as Card
+const upgrade = {
+  id: "upgrade",
+  name: "Upgrade",
+  upgrade_target: null,
+} as Card;
+const target = { id: "target", name: "Target", upgrade_target: null } as Card;
 
-describe('upgradeModalFlow', () => {
-  it('closes the modal before applying the upgrade', () => {
-    const events: string[] = []
+describe("upgradeModalFlow", () => {
+  it("closes the modal before applying the upgrade", () => {
+    const events: string[] = [];
     const flush = vi.fn((callback: () => void) => {
-      events.push('flush')
-      callback()
-    })
+      events.push("flush");
+      callback();
+    });
 
     applyUpgradeWithModalClose({
-      upgradeId: 'upgrade-1',
-      targetId: 'target-1',
+      upgradeId: "upgrade-1",
+      targetId: "target-1",
       onClose: () => {
-        events.push('close')
+        events.push("close");
       },
       onApply: (upgradeId, targetId) => {
-        events.push(`apply:${upgradeId}:${targetId}`)
+        events.push(`apply:${upgradeId}:${targetId}`);
       },
       flush,
-    })
+    });
 
-    expect(flush).toHaveBeenCalledTimes(1)
-    expect(events).toEqual(['flush', 'close', 'apply:upgrade-1:target-1'])
-  })
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(events).toEqual(["flush", "close", "apply:upgrade-1:target-1"]);
+  });
 
-  it('does nothing when there is no apply handler', () => {
-    const flush = vi.fn()
-    const onClose = vi.fn()
+  it("does nothing when there is no apply handler", () => {
+    const flush = vi.fn();
+    const onClose = vi.fn();
 
     applyUpgradeWithModalClose({
-      upgradeId: 'upgrade-1',
-      targetId: 'target-1',
+      upgradeId: "upgrade-1",
+      targetId: "target-1",
       onClose,
       flush,
-    })
+    });
 
-    expect(flush).not.toHaveBeenCalled()
-    expect(onClose).not.toHaveBeenCalled()
-  })
+    expect(flush).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 
-  it('closes the modal before revealing the upgrade', () => {
-    const events: string[] = []
+  it("closes the modal before revealing the upgrade", () => {
+    const events: string[] = [];
     const flush = vi.fn((callback: () => void) => {
-      events.push('flush')
-      callback()
-    })
+      events.push("flush");
+      callback();
+    });
 
     revealUpgradeWithModalClose({
-      upgradeIds: ['upgrade-1', 'upgrade-2'],
+      upgradeIds: ["upgrade-1", "upgrade-2"],
       onClose: () => {
-        events.push('close')
+        events.push("close");
       },
       onReveal: (upgradeIds) => {
-        events.push(`reveal:${upgradeIds.join(',')}`)
+        events.push(`reveal:${upgradeIds.join(",")}`);
       },
       flush,
-    })
+    });
 
-    expect(flush).toHaveBeenCalledTimes(1)
-    expect(events).toEqual(['flush', 'close', 'reveal:upgrade-1,upgrade-2'])
-  })
-})
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(events).toEqual(["flush", "close", "reveal:upgrade-1,upgrade-2"]);
+  });
+});
 
-describe('UpgradesModal keyboard interactions', () => {
+describe("UpgradesModal keyboard interactions", () => {
   beforeEach(() => {
     // jsdom has no layout to observe.
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    })
-  })
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+  });
 
   afterEach(() => {
-    cleanup()
-    vi.unstubAllGlobals()
-  })
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
-  it('applies on a press of Enter, and never from holding it', () => {
-    const onApply = vi.fn()
+  it("applies on a press of Enter, and never from holding it", () => {
+    const onApply = vi.fn();
     render(
       <>
         <button>Upgrade Target</button>
@@ -109,25 +119,27 @@ describe('UpgradesModal keyboard interactions', () => {
           onClose={vi.fn()}
         />
       </>,
-    )
-    const opener = screen.getByRole('button', { name: 'Upgrade Target' })
-    const confirm = screen.getByRole('button', { name: 'Confirm' })
+    );
+    const opener = screen.getByRole("button", { name: "Upgrade Target" });
+    const confirm = screen.getByRole("button", { name: "Confirm" });
 
-    fireEvent.keyDown(opener, { key: 'Enter', repeat: true })
-    expect(onApply).not.toHaveBeenCalled()
+    fireEvent.keyDown(opener, { key: "Enter", repeat: true });
+    expect(onApply).not.toHaveBeenCalled();
 
-    confirm.focus()
+    confirm.focus();
     // False when the dialog took the key, so the browser won't press Confirm either.
-    expect(fireEvent.keyDown(confirm, { key: 'Enter', repeat: true })).toBe(false)
+    expect(fireEvent.keyDown(confirm, { key: "Enter", repeat: true })).toBe(
+      false,
+    );
 
-    opener.focus()
-    fireEvent.keyDown(opener, { key: 'Enter' })
-    expect(onApply).toHaveBeenCalledOnce()
-  })
+    opener.focus();
+    fireEvent.keyDown(opener, { key: "Enter" });
+    expect(onApply).toHaveBeenCalledOnce();
+  });
 
-  it('closes Apply Upgrade on one Escape with an upgrade and a card selected', () => {
-    const onClose = vi.fn()
-    const onApply = vi.fn()
+  it("closes Apply Upgrade on one Escape with an upgrade and a card selected", () => {
+    const onClose = vi.fn();
+    const onApply = vi.fn();
     render(
       <UpgradesModal
         upgrades={[upgrade]}
@@ -137,13 +149,13 @@ describe('UpgradesModal keyboard interactions', () => {
         onApply={onApply}
         onClose={onClose}
       />,
-    )
+    );
     // Confirm shows only with both selected, as the Upgrade pill opens the dialog.
-    screen.getByRole('button', { name: 'Confirm' })
+    screen.getByRole("button", { name: "Confirm" });
 
-    fireEvent.keyDown(document.body, { key: 'Escape' })
+    fireEvent.keyDown(document.body, { key: "Escape" });
 
-    expect(onClose).toHaveBeenCalledOnce()
-    expect(onApply).not.toHaveBeenCalled()
-  })
-})
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+});

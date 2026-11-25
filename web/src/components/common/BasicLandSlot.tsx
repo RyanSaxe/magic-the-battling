@@ -9,11 +9,11 @@ import { POPOVER_CHROME } from "./styles";
 import { usePanelHoldsEnter } from "../../utils/enterKey";
 
 const VIEWPORT_MARGIN = 8;
-const POPOVER_PADDING = 8;  // p-2
-const GRID_GAP = 6;         // gap-1.5
-const BUTTON_PADDING = 4;   // p-1
+const POPOVER_PADDING = 8; // p-2
+const GRID_GAP = 6; // gap-1.5
+const BUTTON_PADDING = 4; // p-1
 const LABEL_HEIGHT = 14;
-const LABEL_GAP = 2;        // gap-0.5
+const LABEL_GAP = 2; // gap-0.5
 
 interface BasicLandSlotProps {
   selected: string | null;
@@ -34,7 +34,10 @@ export function BasicLandSlot({
   const popoverRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
-  const [landSize, setLandSize] = useState({ w: dimensions.width, h: Math.round(dimensions.width * CARD_ASPECT_RATIO) });
+  const [landSize, setLandSize] = useState({
+    w: dimensions.width,
+    h: Math.round(dimensions.width * CARD_ASPECT_RATIO),
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -71,14 +74,28 @@ export function BasicLandSlot({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    const NON_LAND_H = 2 * POPOVER_PADDING + GRID_GAP + 2 * (2 * BUTTON_PADDING + LABEL_GAP + LABEL_HEIGHT);
+    const NON_LAND_H =
+      2 * POPOVER_PADDING +
+      GRID_GAP +
+      2 * (2 * BUTTON_PADDING + LABEL_GAP + LABEL_HEIGHT);
     const availableHeight = vh - rect.bottom - 4 - VIEWPORT_MARGIN;
-    const maxFromVertical = Math.floor((availableHeight - NON_LAND_H) / (2 * CARD_ASPECT_RATIO));
+    const maxFromVertical = Math.floor(
+      (availableHeight - NON_LAND_H) / (2 * CARD_ASPECT_RATIO),
+    );
     const maxFromHorizontal = Math.floor(
-      (vw - 2 * VIEWPORT_MARGIN - 2 * POPOVER_PADDING - 2 * GRID_GAP - 6 * BUTTON_PADDING) / 3,
+      (vw -
+        2 * VIEWPORT_MARGIN -
+        2 * POPOVER_PADDING -
+        2 * GRID_GAP -
+        6 * BUTTON_PADDING) /
+        3,
     );
 
-    const landWidth = Math.min(dimensions.width, maxFromHorizontal, maxFromVertical);
+    const landWidth = Math.min(
+      dimensions.width,
+      maxFromHorizontal,
+      maxFromVertical,
+    );
     const landHeight = Math.round(landWidth * CARD_ASPECT_RATIO);
     setLandSize({ w: landWidth, h: landHeight });
 
@@ -97,9 +114,7 @@ export function BasicLandSlot({
     setOpen(true);
   };
 
-  const emptyLabel = isMobile
-    ? "+\nLand"
-    : "Click to pick basic land";
+  const emptyLabel = isMobile ? "+\nLand" : "Click to pick basic land";
 
   return (
     <div ref={triggerRef}>
@@ -138,7 +153,9 @@ export function BasicLandSlot({
                       borderRadius: "var(--card-border-radius)",
                     }}
                   />
-                  <span className="text-[9px] text-[var(--ivory-muted)]">{name}</span>
+                  <span className="text-[9px] text-[var(--ivory-muted)]">
+                    {name}
+                  </span>
                 </button>
               ))}
             </div>

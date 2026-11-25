@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { IconType } from 'react-icons'
+import { useState, useEffect, useCallback } from "react";
+import type { IconType } from "react-icons";
 import {
   FaXTwitter,
   FaBluesky,
@@ -8,111 +8,113 @@ import {
   FaWhatsapp,
   FaMessage,
   FaLink,
-} from 'react-icons/fa6'
-import { copyText } from '../utils/clipboard'
-import { Dialog } from './common/Dialog'
+} from "react-icons/fa6";
+import { copyText } from "../utils/clipboard";
+import { Dialog } from "./common/Dialog";
 
 interface ShareModalProps {
-  url: string
-  shareText: string
-  onClose: () => void
+  url: string;
+  shareText: string;
+  onClose: () => void;
 }
 
 interface Platform {
-  label: string
-  icon: IconType
-  mobileOnly?: boolean
-  desktopOnly?: boolean
-  getUrl: (url: string, text: string) => string
+  label: string;
+  icon: IconType;
+  mobileOnly?: boolean;
+  desktopOnly?: boolean;
+  getUrl: (url: string, text: string) => string;
 }
 
 const PLATFORMS: Platform[] = [
   {
-    label: 'Twitter',
+    label: "Twitter",
     icon: FaXTwitter,
     getUrl: (url, text) =>
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
   },
   {
-    label: 'Bluesky',
+    label: "Bluesky",
     icon: FaBluesky,
     getUrl: (url, text) =>
       `https://bsky.app/intent/compose?text=${encodeURIComponent(`${text} ${url}`)}`,
   },
   {
-    label: 'Reddit',
+    label: "Reddit",
     icon: FaRedditAlien,
     getUrl: (url, text) =>
       `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(text)}`,
   },
   {
-    label: 'Facebook',
+    label: "Facebook",
     icon: FaFacebook,
     desktopOnly: true,
     getUrl: (url) =>
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
   },
   {
-    label: 'WhatsApp',
+    label: "WhatsApp",
     icon: FaWhatsapp,
     getUrl: (url, text) =>
       `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
   },
   {
-    label: 'Text',
+    label: "Text",
     icon: FaMessage,
     mobileOnly: true,
-    getUrl: (url, text) =>
-      `sms:?body=${encodeURIComponent(`${text} ${url}`)}`,
+    getUrl: (url, text) => `sms:?body=${encodeURIComponent(`${text} ${url}`)}`,
   },
-]
+];
 
-const SHARE_TILE = 'btn-secondary flex flex-col items-center gap-1.5 p-3 rounded-lg'
+const SHARE_TILE =
+  "btn-secondary flex flex-col items-center gap-1.5 p-3 rounded-lg";
 
 export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
 
   const handlePlatformClick = useCallback(
     (getUrl: (url: string, text: string) => string) => {
-      window.open(getUrl(url, shareText), '_blank')
-      onClose()
+      window.open(getUrl(url, shareText), "_blank");
+      onClose();
     },
     [url, shareText, onClose],
-  )
+  );
 
   const handleCopyLink = useCallback(async () => {
-    if (!(await copyText(url))) return
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [url])
+    if (!(await copyText(url))) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [url]);
 
   return (
     <Dialog title="Share Game" onClose={onClose}>
       <div className="grid grid-cols-3 gap-3">
-        {PLATFORMS.map(({ label, icon: Icon, mobileOnly, desktopOnly, getUrl }) => (
-          <button
-            key={label}
-            onClick={() => handlePlatformClick(getUrl)}
-            className={`${SHARE_TILE} ${mobileOnly ? 'sm:hidden' : ''} ${desktopOnly ? 'hidden sm:flex' : ''}`}
-          >
-            <Icon className="text-2xl" />
-            <span className="text-xs">{label}</span>
-          </button>
-        ))}
+        {PLATFORMS.map(
+          ({ label, icon: Icon, mobileOnly, desktopOnly, getUrl }) => (
+            <button
+              key={label}
+              onClick={() => handlePlatformClick(getUrl)}
+              className={`${SHARE_TILE} ${mobileOnly ? "sm:hidden" : ""} ${desktopOnly ? "hidden sm:flex" : ""}`}
+            >
+              <Icon className="text-2xl" />
+              <span className="text-xs">{label}</span>
+            </button>
+          ),
+        )}
 
         <button onClick={handleCopyLink} className={SHARE_TILE}>
           <FaLink className="text-2xl" />
-          <span className="text-xs">{copied ? 'Copied!' : 'Copy Link'}</span>
+          <span className="text-xs">{copied ? "Copied!" : "Copy Link"}</span>
         </button>
       </div>
     </Dialog>
-  )
+  );
 }

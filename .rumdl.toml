@@ -22,3 +22,7 @@ code-blocks = false
 # <picture>.
 [MD033]
 allowed-elements = ["picture", "source", "img"]
+
+[per-file-ignores]
+# Claude Code reads this single-line `@AGENTS.md` pointer file, which has no heading.
+"CLAUDE.md" = ["MD041"]

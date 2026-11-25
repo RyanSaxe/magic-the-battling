@@ -23,11 +23,30 @@ function createPanels(initial: {
   const press = (key: string) => {
     const hotkeys = buildPanelHotkeys({
       guideOpen: panels.guideOpen,
-      gameplayHotkeysDisabled: panels.guideOpen || panels.menuOpen || panels.upgradesOpen || panels.otherModalOpen,
-      openGuide: () => { panels.guideOpen = true; },
-      closeGuide: () => { panels.guideOpen = false; },
-      closeMenu: panels.menuOpen ? () => { panels.menuOpen = false; } : null,
-      closeUpgrades: panels.upgradesOpen ? { key: "u", close: () => { panels.upgradesOpen = false; } } : null,
+      gameplayHotkeysDisabled:
+        panels.guideOpen ||
+        panels.menuOpen ||
+        panels.upgradesOpen ||
+        panels.otherModalOpen,
+      openGuide: () => {
+        panels.guideOpen = true;
+      },
+      closeGuide: () => {
+        panels.guideOpen = false;
+      },
+      closeMenu: panels.menuOpen
+        ? () => {
+            panels.menuOpen = false;
+          }
+        : null,
+      closeUpgrades: panels.upgradesOpen
+        ? {
+            key: "u",
+            close: () => {
+              panels.upgradesOpen = false;
+            },
+          }
+        : null,
     });
     hotkeys[hotkeyFor(key)]?.();
   };
@@ -84,7 +103,9 @@ function createBattle(zones: Partial<Record<ZoneName, string[]>>) {
     hoveredCard: null as HoveredBattleCard | null,
   };
   const hover = (id: string) => {
-    const zone = (Object.keys(battle.zones) as ZoneName[]).find((name) => battle.zones[name]?.includes(id));
+    const zone = (Object.keys(battle.zones) as ZoneName[]).find((name) =>
+      battle.zones[name]?.includes(id),
+    );
     if (!zone) throw new Error(`card ${id} is not in any zone`);
     battle.hoveredCard = { id, zone, owner: "player" };
   };
@@ -93,10 +114,14 @@ function createBattle(zones: Partial<Record<ZoneName, string[]>>) {
     const hotkeys = buildCardMoveHotkeys({
       hoveredCard: battle.hoveredCard,
       moveCard: (card, toZone) => {
-        battle.zones[card.zone] = battle.zones[card.zone]?.filter((id) => id !== card.id);
+        battle.zones[card.zone] = battle.zones[card.zone]?.filter(
+          (id) => id !== card.id,
+        );
         battle.zones[toZone] = [...(battle.zones[toZone] ?? []), card.id];
       },
-      clearHoveredCard: () => { battle.hoveredCard = null; },
+      clearHoveredCard: () => {
+        battle.hoveredCard = null;
+      },
     });
     hotkeys[hotkeyFor(key)]?.();
   };
@@ -121,7 +146,9 @@ describe("buildCardMoveHotkeys", () => {
   });
 
   it("moves only the card under the pointer when the key is pressed again", () => {
-    const { battle, hover, press } = createBattle({ battlefield: ["a", "b", "c"] });
+    const { battle, hover, press } = createBattle({
+      battlefield: ["a", "b", "c"],
+    });
 
     hover("a");
     press("g");
@@ -145,12 +172,17 @@ describe("buildCardMoveHotkeys", () => {
     press("g");
 
     expect(battle.zones.graveyard).toEqual(["a"]);
-    expect(battle.hoveredCard).toEqual({ id: "a", zone: "graveyard", owner: "player" });
+    expect(battle.hoveredCard).toEqual({
+      id: "a",
+      zone: "graveyard",
+      owner: "player",
+    });
   });
 });
 
 function zonesWith(cards: Partial<Record<ZoneName, string[]>>): Zones {
-  const zone = (name: ZoneName) => (cards[name] ?? []).map((id) => ({ id }) as Card);
+  const zone = (name: ZoneName) =>
+    (cards[name] ?? []).map((id) => ({ id }) as Card);
   return {
     battlefield: zone("battlefield"),
     graveyard: zone("graveyard"),
@@ -178,8 +210,16 @@ describe("findBattleCard", () => {
   };
 
   it("finds the zone and owner of a card that slid under the pointer", () => {
-    expect(findBattleCard(battle, "mine")).toEqual({ id: "mine", zone: "hand", owner: "player" });
-    expect(findBattleCard(battle, "theirs")).toEqual({ id: "theirs", zone: "graveyard", owner: "opponent" });
+    expect(findBattleCard(battle, "mine")).toEqual({
+      id: "mine",
+      zone: "hand",
+      owner: "player",
+    });
+    expect(findBattleCard(battle, "theirs")).toEqual({
+      id: "theirs",
+      zone: "graveyard",
+      owner: "opponent",
+    });
   });
 
   it("finds nothing for a card that is not in the battle", () => {

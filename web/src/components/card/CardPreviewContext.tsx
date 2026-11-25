@@ -1,8 +1,14 @@
-import { createContext } from 'react'
-import type { Card as CardType } from '../../types'
+import { createContext } from "react";
+import type { Card as CardType } from "../../types";
 
 export interface CardPreviewContextValue {
-  setPreviewCard: (card: CardType | null, appliedUpgrades?: CardType[], counters?: Record<string, number>) => void
+  setPreviewCard: (
+    card: CardType | null,
+    appliedUpgrades?: CardType[],
+    counters?: Record<string, number>,
+  ) => void;
 }
 
-export const CardPreviewContext = createContext<CardPreviewContextValue | null>(null)
+export const CardPreviewContext = createContext<CardPreviewContextValue | null>(
+  null,
+);

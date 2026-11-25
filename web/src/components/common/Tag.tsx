@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from "react";
 
-export type TagTone = 'gold' | 'stone' | 'muted' | 'crimson' | 'emerald'
+export type TagTone = "gold" | "stone" | "muted" | "crimson" | "emerald";
 
 /**
  * A small rimmed label: what a cube is, a feature's status or a player's state.
@@ -17,20 +17,27 @@ export function Tag({
   className,
   children,
 }: {
-  tone: TagTone
-  small?: boolean
-  quiet?: boolean
-  dot?: boolean
-  title?: string
-  className?: string
-  children: ReactNode
+  tone: TagTone;
+  small?: boolean;
+  quiet?: boolean;
+  dot?: boolean;
+  title?: string;
+  className?: string;
+  children: ReactNode;
 }) {
-  const classes = ['tag', `tag-${tone}`, small && 'tag-small', quiet && 'tag-quiet', dot && 'tag-dot', className]
+  const classes = [
+    "tag",
+    `tag-${tone}`,
+    small && "tag-small",
+    quiet && "tag-quiet",
+    dot && "tag-dot",
+    className,
+  ]
     .filter(Boolean)
-    .join(' ')
+    .join(" ");
   return (
     <span className={classes} title={title}>
       {children}
     </span>
-  )
+  );
 }

@@ -1,53 +1,58 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { ShareModal } from './ShareModal'
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { ShareModal } from "./ShareModal";
 
-const SHARE_URL = 'http://pitfight.test/game/abc/share/Morgan'
+const SHARE_URL = "http://pitfight.test/game/abc/share/Morgan";
 
-let copied: string[]
-let copyWorks: boolean
+let copied: string[];
+let copyWorks: boolean;
 
 // jsdom has no Clipboard API, as in a browser on a plain http page, so copying selects the text instead.
 beforeEach(() => {
-  copied = []
-  copyWorks = true
+  copied = [];
+  copyWorks = true;
   // Browsers focus a field when selecting its text, and jsdom doesn't.
-  vi.spyOn(HTMLTextAreaElement.prototype, 'select').mockImplementation(function (this: HTMLTextAreaElement) {
-    this.focus()
-  })
+  vi.spyOn(HTMLTextAreaElement.prototype, "select").mockImplementation(
+    function (this: HTMLTextAreaElement) {
+      this.focus();
+    },
+  );
   document.execCommand = () => {
-    const field = document.activeElement
-    if (copyWorks && field instanceof HTMLTextAreaElement) copied.push(field.value)
-    return copyWorks
-  }
-})
+    const field = document.activeElement;
+    if (copyWorks && field instanceof HTMLTextAreaElement)
+      copied.push(field.value);
+    return copyWorks;
+  };
+});
 
 afterEach(() => {
-  cleanup()
-  vi.restoreAllMocks()
-  Reflect.deleteProperty(document, 'execCommand')
-})
+  cleanup();
+  vi.restoreAllMocks();
+  Reflect.deleteProperty(document, "execCommand");
+});
 
 async function tapCopyLink() {
-  render(<ShareModal url={SHARE_URL} shareText="4th place" onClose={vi.fn()} />)
+  render(
+    <ShareModal url={SHARE_URL} shareText="4th place" onClose={vi.fn()} />,
+  );
   // Safari leaves nothing focused when a button is tapped.
-  ;(document.activeElement as HTMLElement).blur()
-  fireEvent.click(screen.getByRole('button', { name: 'Copy Link' }))
-  await new Promise((resolve) => setTimeout(resolve))
+  (document.activeElement as HTMLElement).blur();
+  fireEvent.click(screen.getByRole("button", { name: "Copy Link" }));
+  await new Promise((resolve) => setTimeout(resolve));
 }
 
-it('copies the share link from inside the dialog', async () => {
-  await tapCopyLink()
+it("copies the share link from inside the dialog", async () => {
+  await tapCopyLink();
 
-  expect(copied).toEqual([SHARE_URL])
-  expect(screen.getByText('Copied!')).toBeTruthy()
-})
+  expect(copied).toEqual([SHARE_URL]);
+  expect(screen.getByText("Copied!")).toBeTruthy();
+});
 
 it("doesn't say Copied when nothing was copied", async () => {
-  copyWorks = false
+  copyWorks = false;
 
-  await tapCopyLink()
+  await tapCopyLink();
 
-  expect(screen.queryByText('Copied!')).toBeNull()
-})
+  expect(screen.queryByText("Copied!")).toBeNull();
+});

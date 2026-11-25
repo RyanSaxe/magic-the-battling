@@ -25,7 +25,10 @@ export const PLAYER_ROW_STACK_CLASS = "space-y-3";
 
 type ShareResultStatus = "viewing" | "alive" | "dead";
 
-function getShownStanding(player: PlayerView, shareStatus: ShareResultStatus | undefined): Standing {
+function getShownStanding(
+  player: PlayerView,
+  shareStatus: ShareResultStatus | undefined,
+): Standing {
   if (shareStatus) return shareStatus === "dead" ? "out" : "alive";
   return getStanding(player);
 }
@@ -44,15 +47,28 @@ function StatusLabel({
 }) {
   if (standing === "out") {
     // A shared game shows the round each player went out in, since the viewer moves between rounds.
-    const round = variant === "share" ? ` at ${player.stage}-${player.round}` : "";
-    return <span className="player-card-label player-card-label-out">Out{round}</span>;
+    const round =
+      variant === "share" ? ` at ${player.stage}-${player.round}` : "";
+    return (
+      <span className="player-card-label player-card-label-out">
+        Out{round}
+      </span>
+    );
   }
-  if (standing === "ghost") return <span className="player-card-label">Ghost</span>;
-  if (player.is_puppet) return <span className="player-card-label">Puppet</span>;
+  if (standing === "ghost")
+    return <span className="player-card-label">Ghost</span>;
+  if (player.is_puppet)
+    return <span className="player-card-label">Puppet</span>;
 
   const activity = getPlayerActivity(player);
-  if (variant === "game" && activity) return <span className="player-card-label">{activity}</span>;
-  if (isSelected) return <span className="player-card-label player-card-label-viewing">Viewing</span>;
+  if (variant === "game" && activity)
+    return <span className="player-card-label">{activity}</span>;
+  if (isSelected)
+    return (
+      <span className="player-card-label player-card-label-viewing">
+        Viewing
+      </span>
+    );
   return null;
 }
 
@@ -70,10 +86,22 @@ function Outlook({
 }) {
   if (variant === "share") return null;
   if (player.in_sudden_death) {
-    return <span className="player-card-label player-card-label-out" title="Sudden Death">SD</span>;
+    return (
+      <span
+        className="player-card-label player-card-label-out"
+        title="Sudden Death"
+      >
+        SD
+      </span>
+    );
   }
-  if (isSelf || standing === "out" || player.pairing_probability === null) return null;
-  return <span title="Chance you face them next">{Math.round(player.pairing_probability * 100)}%</span>;
+  if (isSelf || standing === "out" || player.pairing_probability === null)
+    return null;
+  return (
+    <span title="Chance you face them next">
+      {Math.round(player.pairing_probability * 100)}%
+    </span>
+  );
 }
 
 export function PlayerRow({
@@ -99,21 +127,37 @@ export function PlayerRow({
 }) {
   const isSelf = variant === "game" && player.name === currentPlayerName;
   const viewerFighting =
-    variant === "game" && players.find(({ name }) => name === currentPlayerName)?.phase === "battle";
+    variant === "game" &&
+    players.find(({ name }) => name === currentPlayerName)?.phase === "battle";
   const hiddenInFight = viewerFighting && !isSelf;
-  const standing = getShownStanding(player, variant === "share" ? shareStatus : undefined);
+  const standing = getShownStanding(
+    player,
+    variant === "share" ? shareStatus : undefined,
+  );
   const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
 
   return (
     <PlayerCard
       guideName={player.name}
-      lead={rank === null ? undefined : <StandingsRank rank={rank} isLast={isSidebarLastPlace(player, players)} />}
+      lead={
+        rank === null ? undefined : (
+          <StandingsRank
+            rank={rank}
+            isLast={isSidebarLastPlace(player, players)}
+          />
+        )
+      }
       name={player.name}
-      nameEnd={player.last_result && (
-        <span className={`player-card-result player-card-result-${player.last_result}`} title="Last fight">
-          {getLastResultWord(player.last_result)}
-        </span>
-      )}
+      nameEnd={
+        player.last_result && (
+          <span
+            className={`player-card-result player-card-result-${player.last_result}`}
+            title="Last fight"
+          >
+            {getLastResultWord(player.last_result)}
+          </span>
+        )
+      }
       control={micToggle}
       isSelf={isSelf}
       isOut={standing !== "alive"}
@@ -132,11 +176,21 @@ export function PlayerRow({
           </span>
         </>
       )}
-      <StatusLabel player={player} standing={standing} variant={variant} isSelected={isSelected} />
+      <StatusLabel
+        player={player}
+        standing={standing}
+        variant={variant}
+        isSelected={isSelected}
+      />
       <span className="player-card-outlook">
         {/* The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death. */}
         {(!hiddenInFight || player.in_sudden_death) && (
-          <Outlook player={player} standing={standing} variant={variant} isSelf={isSelf} />
+          <Outlook
+            player={player}
+            standing={standing}
+            variant={variant}
+            isSelf={isSelf}
+          />
         )}
       </span>
     </PlayerCard>

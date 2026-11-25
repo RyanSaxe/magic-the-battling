@@ -1,13 +1,21 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { getLobby, joinGame } from '../../api/client'
-import { useAuth } from '../../contexts/authState'
-import type { SeatGrant, SeatState } from '../../hooks/useGameSeat'
-import type { LobbyState } from '../../types'
-import { type AppError, getAppErrorMessage, unknownToAppError } from '../../utils/appError'
-import { getRememberedGuestName, getRememberedSeat, rememberGuestName } from '../../utils/deviceIdentity'
-import { BusyNotice, StatusNotice } from '../common/StatusNotice'
-import { FIELD_LABEL, TEXT_INPUT } from '../common/styles'
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getLobby, joinGame } from "../../api/client";
+import { useAuth } from "../../contexts/authState";
+import type { SeatGrant, SeatState } from "../../hooks/useGameSeat";
+import type { LobbyState } from "../../types";
+import {
+  type AppError,
+  getAppErrorMessage,
+  unknownToAppError,
+} from "../../utils/appError";
+import {
+  getRememberedGuestName,
+  getRememberedSeat,
+  rememberGuestName,
+} from "../../utils/deviceIdentity";
+import { BusyNotice, StatusNotice } from "../common/StatusNotice";
+import { FIELD_LABEL, TEXT_INPUT } from "../common/styles";
 
 /** What a lobby link shows a tab that has no live seat in the lobby, by the state of its seat. */
 export function LobbySeatNotice({
@@ -17,78 +25,127 @@ export function LobbySeatNotice({
   onClaim,
   onTakeBack,
 }: {
-  gameId: string
-  seat: Exclude<SeatState, { kind: 'held' }>
-  onJoined: (grant: SeatGrant, playerName: string, joinCode: string) => void
-  onClaim: (playerName: string) => void
-  onTakeBack: () => void
+  gameId: string;
+  seat: Exclude<SeatState, { kind: "held" }>;
+  onJoined: (grant: SeatGrant, playerName: string, joinCode: string) => void;
+  onClaim: (playerName: string) => void;
+  onTakeBack: () => void;
 }) {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const goToPlay = (
-    <button onClick={() => navigate('/play')} className="btn btn-primary flex-1 py-2">
+    <button
+      onClick={() => navigate("/play")}
+      className="btn btn-primary flex-1 py-2"
+    >
       Go to Play
     </button>
-  )
+  );
   const goHome = (
-    <button onClick={() => navigate('/')} className="btn btn-secondary flex-1 py-2">
+    <button
+      onClick={() => navigate("/")}
+      className="btn btn-secondary flex-1 py-2"
+    >
       Home
     </button>
-  )
+  );
 
-  if (seat.kind === 'claiming') {
-    return <BusyNotice label="Reconnecting to your seat..." />
+  if (seat.kind === "claiming") {
+    return <BusyNotice label="Reconnecting to your seat..." />;
   }
-  if (seat.kind === 'none') {
-    return <JoinLobbyNotice gameId={gameId} onJoined={onJoined} onClaim={onClaim} refused={seat.refused} />
+  if (seat.kind === "none") {
+    return (
+      <JoinLobbyNotice
+        gameId={gameId}
+        onJoined={onJoined}
+        onClaim={onClaim}
+        refused={seat.refused}
+      />
+    );
   }
 
   switch (seat.error.code) {
-    case 'KICKED':
+    case "KICKED":
       return (
-        <StatusNotice title="Removed from the lobby" actions={<>{goToPlay}{goHome}</>}>
-          The host removed you from this lobby. You can join another game or start your own.
+        <StatusNotice
+          title="Removed from the lobby"
+          actions={
+            <>
+              {goToPlay}
+              {goHome}
+            </>
+          }
+        >
+          The host removed you from this lobby. You can join another game or
+          start your own.
         </StatusNotice>
-      )
-    case 'SEAT_MOVED':
+      );
+    case "SEAT_MOVED":
       return (
         <StatusNotice
           title="Open somewhere else"
           actions={
             <>
-              <button onClick={onTakeBack} className="btn btn-primary flex-1 py-2">
+              <button
+                onClick={onTakeBack}
+                className="btn btn-primary flex-1 py-2"
+              >
                 Play here
               </button>
               {goHome}
             </>
           }
         >
-          This lobby is now open in another tab or on another device. Only one can hold your seat at a time.
+          This lobby is now open in another tab or on another device. Only one
+          can hold your seat at a time.
         </StatusNotice>
-      )
-    case 'PLAYER_NOT_IN_GAME':
-      return <JoinLobbyNotice gameId={gameId} onJoined={onJoined} onClaim={onClaim} seatReleased />
-    case 'GAME_NOT_FOUND':
+      );
+    case "PLAYER_NOT_IN_GAME":
       return (
-        <StatusNotice title="Lobby not found" actions={<>{goToPlay}{goHome}</>}>
-          This lobby has ended or the link is wrong. Check the link, or start a new game.
+        <JoinLobbyNotice
+          gameId={gameId}
+          onJoined={onJoined}
+          onClaim={onClaim}
+          seatReleased
+        />
+      );
+    case "GAME_NOT_FOUND":
+      return (
+        <StatusNotice
+          title="Lobby not found"
+          actions={
+            <>
+              {goToPlay}
+              {goHome}
+            </>
+          }
+        >
+          This lobby has ended or the link is wrong. Check the link, or start a
+          new game.
         </StatusNotice>
-      )
+      );
     default:
       return (
         <StatusNotice
           title="Lobby Unavailable"
           actions={
             <>
-              <button onClick={onTakeBack} className="btn btn-primary flex-1 py-2">
+              <button
+                onClick={onTakeBack}
+                className="btn btn-primary flex-1 py-2"
+              >
                 Try again
               </button>
               {goHome}
             </>
           }
         >
-          {getAppErrorMessage(seat.error, 'lobby-connection', 'This lobby is not available right now.')}
+          {getAppErrorMessage(
+            seat.error,
+            "lobby-connection",
+            "This lobby is not available right now.",
+          )}
         </StatusNotice>
-      )
+      );
   }
 }
 
@@ -99,73 +156,97 @@ function JoinLobbyNotice({
   seatReleased = false,
   refused,
 }: {
-  gameId: string
-  onJoined: (grant: SeatGrant, playerName: string, joinCode: string) => void
-  onClaim: (playerName: string) => void
-  seatReleased?: boolean
-  refused?: AppError
+  gameId: string;
+  onJoined: (grant: SeatGrant, playerName: string, joinCode: string) => void;
+  onClaim: (playerName: string) => void;
+  seatReleased?: boolean;
+  refused?: AppError;
 }) {
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const rememberedName = getRememberedSeat(gameId)?.name ?? null
-  const [lobby, setLobby] = useState<LobbyState | 'missing' | null>(null)
-  const [typedName, setTypedName] = useState<string | null>(null)
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const rememberedName = getRememberedSeat(gameId)?.name ?? null;
+  const [lobby, setLobby] = useState<LobbyState | "missing" | null>(null);
+  const [typedName, setTypedName] = useState<string | null>(null);
   // Derived, as the login check can finish after the first render and an account's name beats a guest's.
-  const playerName = typedName ?? rememberedName ?? user?.username ?? getRememberedGuestName() ?? ''
-  const [joining, setJoining] = useState(false)
+  const playerName =
+    typedName ??
+    rememberedName ??
+    user?.username ??
+    getRememberedGuestName() ??
+    "";
+  const [joining, setJoining] = useState(false);
   const [error, setError] = useState(
-    refused ? getAppErrorMessage(refused, 'rejoin-game', 'Could not reconnect to that seat.') : '',
-  )
+    refused
+      ? getAppErrorMessage(
+          refused,
+          "rejoin-game",
+          "Could not reconnect to that seat.",
+        )
+      : "",
+  );
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     getLobby(gameId)
       .then((state) => {
-        if (!cancelled) setLobby(state)
+        if (!cancelled) setLobby(state);
       })
       .catch(() => {
-        if (!cancelled) setLobby('missing')
-      })
+        if (!cancelled) setLobby("missing");
+      });
     return () => {
-      cancelled = true
-    }
-  }, [gameId])
+      cancelled = true;
+    };
+  }, [gameId]);
 
   useEffect(() => {
     // A link to a lobby whose game has started belongs on the game page, which offers to watch or reconnect.
-    if (lobby === 'missing') navigate(`/game/${gameId}/play`, { replace: true })
-  }, [lobby, gameId, navigate])
+    if (lobby === "missing")
+      navigate(`/game/${gameId}/play`, { replace: true });
+  }, [lobby, gameId, navigate]);
 
-  if (lobby === null || lobby === 'missing') {
-    return <BusyNotice label="Loading lobby..." />
+  if (lobby === null || lobby === "missing") {
+    return <BusyNotice label="Loading lobby..." />;
   }
 
   const join = async (name: string) => {
-    const trimmed = name.trim()
+    const trimmed = name.trim();
     if (!trimmed) {
-      setError('Please enter your name')
-      return
+      setError("Please enter your name");
+      return;
     }
-    setJoining(true)
-    setError('')
+    setJoining(true);
+    setError("");
     try {
-      const grant = await joinGame(lobby.join_code, trimmed)
-      if (!user) rememberGuestName(trimmed)
-      onJoined(grant, trimmed, lobby.join_code)
+      const grant = await joinGame(lobby.join_code, trimmed);
+      if (!user) rememberGuestName(trimmed);
+      onJoined(grant, trimmed, lobby.join_code);
     } catch (err) {
-      setError(getAppErrorMessage(unknownToAppError(err, 'join-game', 'Failed to join'), 'join-game', 'Failed to join'))
-      setJoining(false)
+      setError(
+        getAppErrorMessage(
+          unknownToAppError(err, "join-game", "Failed to join"),
+          "join-game",
+          "Failed to join",
+        ),
+      );
+      setJoining(false);
     }
-  }
+  };
 
-  const host = lobby.players.find((p) => p.is_host)?.name
-  const occupied = lobby.players.length + lobby.puppet_count
-  const accountSeat = user && !refused ? lobby.players.find((p) => p.name === user.username) : undefined
+  const host = lobby.players.find((p) => p.is_host)?.name;
+  const occupied = lobby.players.length + lobby.puppet_count;
+  const accountSeat =
+    user && !refused
+      ? lobby.players.find((p) => p.name === user.username)
+      : undefined;
   const goHome = (
-    <button onClick={() => navigate('/')} className="btn btn-secondary flex-1 py-2">
+    <button
+      onClick={() => navigate("/")}
+      className="btn btn-secondary flex-1 py-2"
+    >
       Home
     </button>
-  )
+  );
 
   if (accountSeat) {
     return (
@@ -173,7 +254,10 @@ function JoinLobbyNotice({
         title="Your seat is waiting"
         actions={
           <>
-            <button onClick={() => onClaim(accountSeat.name)} className="btn btn-primary flex-1 py-2">
+            <button
+              onClick={() => onClaim(accountSeat.name)}
+              className="btn btn-primary flex-1 py-2"
+            >
               Reconnect as {accountSeat.name}
             </button>
             {goHome}
@@ -182,7 +266,7 @@ function JoinLobbyNotice({
       >
         You joined this lobby as {accountSeat.name} with your account.
       </StatusNotice>
-    )
+    );
   }
 
   if (seatReleased && rememberedName) {
@@ -191,17 +275,22 @@ function JoinLobbyNotice({
         title="Your seat was released"
         actions={
           <>
-            <button onClick={() => join(rememberedName)} disabled={joining} className="btn btn-primary flex-1 py-2">
-              {joining ? 'Joining...' : `Join again as ${rememberedName}`}
+            <button
+              onClick={() => join(rememberedName)}
+              disabled={joining}
+              className="btn btn-primary flex-1 py-2"
+            >
+              {joining ? "Joining..." : `Join again as ${rememberedName}`}
             </button>
             {goHome}
           </>
         }
       >
-        You were away from this lobby for more than 10 minutes, so your seat was given up. The lobby is still open.
+        You were away from this lobby for more than 10 minutes, so your seat was
+        given up. The lobby is still open.
         {error && <p className="mt-2 text-red-300">{error}</p>}
       </StatusNotice>
-    )
+    );
   }
 
   return (
@@ -209,16 +298,20 @@ function JoinLobbyNotice({
       title="Join this lobby"
       actions={
         <>
-          <button onClick={() => join(playerName)} disabled={joining} className="btn btn-primary flex-1 py-2">
-            {joining ? 'Joining...' : 'Join Lobby'}
+          <button
+            onClick={() => join(playerName)}
+            disabled={joining}
+            className="btn btn-primary flex-1 py-2"
+          >
+            {joining ? "Joining..." : "Join Lobby"}
           </button>
           {goHome}
         </>
       }
     >
       <p>
-        {host ? `${host}'s lobby · ` : ''}
-        {occupied} of {lobby.target_player_count} players · code{' '}
+        {host ? `${host}'s lobby · ` : ""}
+        {occupied} of {lobby.target_player_count} players · code{" "}
         <span className="font-mono text-amber-400">{lobby.join_code}</span>
       </p>
       <label htmlFor="lobby-join-name" className={`${FIELD_LABEL} mt-4`}>
@@ -230,12 +323,12 @@ function JoinLobbyNotice({
         value={playerName}
         onChange={(e) => setTypedName(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') void join(playerName)
+          if (e.key === "Enter") void join(playerName);
         }}
         maxLength={32}
         className={TEXT_INPUT}
       />
       {error && <p className="mt-2 text-red-300">{error}</p>}
     </StatusNotice>
-  )
+  );
 }

@@ -1,15 +1,18 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 /** A list's first load: running, failed, or done with what it loaded. */
-export type FirstLoad<T> = { status: 'loading' } | { status: 'failed' } | { status: 'loaded'; value: T }
+export type FirstLoad<T> =
+  | { status: "loading" }
+  | { status: "failed" }
+  | { status: "loaded"; value: T };
 
 interface Run<T> {
-  state: FirstLoad<T>
-  attempt: number
+  state: FirstLoad<T>;
+  attempt: number;
 }
 
 function restarted<T>(run: Run<T>): Run<T> {
-  return { state: { status: 'loading' }, attempt: run.attempt + 1 }
+  return { state: { status: "loading" }, attempt: run.attempt + 1 };
 }
 
 /**
@@ -21,38 +24,49 @@ export function useFirstLoad<T>(
   load: () => Promise<T>,
   enabled: boolean,
 ): {
-  state: FirstLoad<T>
-  update: Dispatch<SetStateAction<FirstLoad<T>>>
-  updateOrReload: (change: (value: T) => T) => void
-  retry: () => void
+  state: FirstLoad<T>;
+  update: Dispatch<SetStateAction<FirstLoad<T>>>;
+  updateOrReload: (change: (value: T) => T) => void;
+  retry: () => void;
 } {
-  const [{ state, attempt }, setRun] = useState<Run<T>>({ state: { status: 'loading' }, attempt: 0 })
+  const [{ state, attempt }, setRun] = useState<Run<T>>({
+    state: { status: "loading" },
+    attempt: 0,
+  });
 
   useEffect(() => {
-    if (!enabled) return
-    let cancelled = false
+    if (!enabled) return;
+    let cancelled = false;
     load().then(
       (value) => {
-        if (!cancelled) setRun((run) => ({ ...run, state: { status: 'loaded', value } }))
+        if (!cancelled)
+          setRun((run) => ({ ...run, state: { status: "loaded", value } }));
       },
       () => {
-        if (!cancelled) setRun((run) => ({ ...run, state: { status: 'failed' } }))
+        if (!cancelled)
+          setRun((run) => ({ ...run, state: { status: "failed" } }));
       },
-    )
+    );
     return () => {
-      cancelled = true
-    }
-  }, [load, enabled, attempt])
+      cancelled = true;
+    };
+  }, [load, enabled, attempt]);
 
   const update: Dispatch<SetStateAction<FirstLoad<T>>> = (next) =>
-    setRun((run) => ({ ...run, state: typeof next === 'function' ? next(run.state) : next }))
+    setRun((run) => ({
+      ...run,
+      state: typeof next === "function" ? next(run.state) : next,
+    }));
   const updateOrReload = (change: (value: T) => T) =>
     setRun((run) =>
-      run.state.status === 'loaded'
-        ? { ...run, state: { status: 'loaded', value: change(run.state.value) } }
+      run.state.status === "loaded"
+        ? {
+            ...run,
+            state: { status: "loaded", value: change(run.state.value) },
+          }
         : restarted(run),
-    )
-  const retry = () => setRun(restarted)
+    );
+  const retry = () => setRun(restarted);
 
-  return { state, update, updateOrReload, retry }
+  return { state, update, updateOrReload, retry };
 }

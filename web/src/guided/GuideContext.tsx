@@ -29,7 +29,12 @@ import {
 } from "./content";
 
 function isTimelinePhase(phase: string | undefined): phase is Phase {
-  return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
+  return (
+    phase === "draft" ||
+    phase === "build" ||
+    phase === "battle" ||
+    phase === "reward"
+  );
 }
 
 /** The submit choices a guide points at, which stay open while every other overlay closes. */
@@ -146,15 +151,17 @@ export function GuideProvider({
   const requestGuide = useCallback(
     (guideId: GuidedGuideId) => {
       const overlayException: GuideOverlayException | undefined =
-        guideId === "build_play_draw" ? "submitHand"
-        : guideId === "battle_result_submit" ? "submitResult"
-        : undefined;
+        guideId === "build_play_draw"
+          ? "submitHand"
+          : guideId === "battle_result_submit"
+            ? "submitResult"
+            : undefined;
       closeGameplayOverlays(overlayException);
       if (storageIdentity) {
         setActiveGuideForGame(storageIdentity, guideId, 0);
       }
-      setGuideRequest((current) =>
-        current ?? { guideId, nonce: Date.now(), stepIndex: 0 },
+      setGuideRequest(
+        (current) => current ?? { guideId, nonce: Date.now(), stepIndex: 0 },
       );
     },
     [closeGameplayOverlays, storageIdentity],
@@ -181,11 +188,11 @@ export function GuideProvider({
     const activeGuideId = guideRequest?.guideId ?? null;
     const pending = eligibleConditionalGuides.filter(
       (guideId) =>
-        (isGuidedMode || isAlwaysOnConditionalGuide(guideId))
-        && (!skippedAll || isAlwaysOnConditionalGuide(guideId))
-        && !seenGuides.has(guideId)
-        && activeGuideId !== guideId
-        && !guideQueue.includes(guideId),
+        (isGuidedMode || isAlwaysOnConditionalGuide(guideId)) &&
+        (!skippedAll || isAlwaysOnConditionalGuide(guideId)) &&
+        !seenGuides.has(guideId) &&
+        activeGuideId !== guideId &&
+        !guideQueue.includes(guideId),
     );
 
     if (pending.length === 0) {
@@ -229,10 +236,10 @@ export function GuideProvider({
 
     const nextQueue = guideQueue.filter(
       (guideId) =>
-        (isGuidedMode || isAlwaysOnConditionalGuide(guideId))
-        && (!skippedAll || isAlwaysOnConditionalGuide(guideId))
-        && !seenGuides.has(guideId)
-        && isConditionalGuideEligible(guideId, guideContext),
+        (isGuidedMode || isAlwaysOnConditionalGuide(guideId)) &&
+        (!skippedAll || isAlwaysOnConditionalGuide(guideId)) &&
+        !seenGuides.has(guideId) &&
+        isConditionalGuideEligible(guideId, guideContext),
     );
 
     if (nextQueue.length !== guideQueue.length) {
@@ -260,9 +267,9 @@ export function GuideProvider({
     }
 
     if (
-      selfPhase === "build"
-      && guideContext.showBuildSubmitPopover
-      && !seenGuides.has("build_play_draw")
+      selfPhase === "build" &&
+      guideContext.showBuildSubmitPopover &&
+      !seenGuides.has("build_play_draw")
     ) {
       queueMicrotask(() => {
         requestGuide("build_play_draw");
@@ -271,9 +278,9 @@ export function GuideProvider({
     }
 
     if (
-      selfPhase === "battle"
-      && guideContext.showBattleSubmitPopover
-      && !seenGuides.has("battle_result_submit")
+      selfPhase === "battle" &&
+      guideContext.showBattleSubmitPopover &&
+      !seenGuides.has("battle_result_submit")
     ) {
       queueMicrotask(() => {
         requestGuide("battle_result_submit");
@@ -289,9 +296,9 @@ export function GuideProvider({
     }
 
     if (
-      selfPhase === "reward"
-      && guideContext.isStageEnd
-      && !seenGuides.has("reward_stage_end")
+      selfPhase === "reward" &&
+      guideContext.isStageEnd &&
+      !seenGuides.has("reward_stage_end")
     ) {
       queueMicrotask(() => requestGuide("reward_stage_end"));
       return;

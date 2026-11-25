@@ -1,5 +1,8 @@
 import { BATTLEFIELD_INSET } from "../../hooks/useBattleCardSizes";
-import { ZONE_LAYOUT_PADDING, type CardLayoutConfig } from "../../hooks/useCardLayout";
+import {
+  ZONE_LAYOUT_PADDING,
+  type CardLayoutConfig,
+} from "../../hooks/useCardLayout";
 import { getUpgradeZoneLayoutBounds } from "../../utils/upgradeGrid";
 
 /** Treasure and poison sit beside the three basic land slots on the Build battlefield. */
@@ -47,7 +50,11 @@ export function buildLayoutConfig({
   return {
     zones: {
       hand: { count: handSize },
-      battlefield: { count: BUILD_BATTLEFIELD_COUNT, priority: "fill", maxRows: 1 },
+      battlefield: {
+        count: BUILD_BATTLEFIELD_COUNT,
+        priority: "fill",
+        maxRows: 1,
+      },
       sideboard: { count: sideboardCount },
       commandZone: {
         count: upgradeRailCount,
@@ -112,7 +119,11 @@ export interface BattleBoardMetrics {
   zoneColumnWidth: number;
 }
 
-export function battleBoardMetrics({ isMobile }: { isMobile: boolean }): BattleBoardMetrics {
+export function battleBoardMetrics({
+  isMobile,
+}: {
+  isMobile: boolean;
+}): BattleBoardMetrics {
   const handPadding = 16;
   const battlefieldPadding = BATTLEFIELD_INSET;
   const midDividerHeight = 2;
@@ -120,8 +131,7 @@ export function battleBoardMetrics({ isMobile }: { isMobile: boolean }): BattleB
     handPadding,
     battlefieldPadding,
     midDividerHeight,
-    fixedHeight:
-      2 * handPadding + 2 * battlefieldPadding + midDividerHeight,
+    fixedHeight: 2 * handPadding + 2 * battlefieldPadding + midDividerHeight,
     zoneColumnWidth: isMobile ? 64 : 96,
   };
 }

@@ -13,20 +13,20 @@ import type {
   PlayerView,
   SelfPlayerView,
   Zones,
-} from '../types'
+} from "../types";
 
-type Catalog = Record<string, CardCatalogEntry>
+type Catalog = Record<string, CardCatalogEntry>;
 
 function makeFallbackCard(ref: CardRef): Card {
   return {
     id: ref.id,
     scryfall_id: ref.scryfall_id,
-    name: '',
-    image_url: '',
+    name: "",
+    image_url: "",
     flip_image_url: null,
     png_url: null,
     flip_png_url: null,
-    type_line: '',
+    type_line: "",
     tokens: [],
     elo: null,
     upgrade_target: null,
@@ -36,7 +36,7 @@ function makeFallbackCard(ref: CardRef): Card {
     keywords: [],
     cmc: 0,
     original_owner: ref.original_owner,
-  }
+  };
 }
 
 function hydrateCatalogCard(
@@ -45,21 +45,23 @@ function hydrateCatalogCard(
   instanceId: string,
   tokenStack: Set<string>,
 ): Card {
-  const def = catalog[scryfallId]
+  const def = catalog[scryfallId];
   if (!def) {
     return makeFallbackCard({
       id: instanceId,
       scryfall_id: scryfallId,
       upgrade_target_id: null,
       original_owner: null,
-    })
+    });
   }
 
-  const nextTokenStack = new Set(tokenStack)
-  nextTokenStack.add(scryfallId)
+  const nextTokenStack = new Set(tokenStack);
+  nextTokenStack.add(scryfallId);
   const tokens = def.token_scryfall_ids
     .filter((tokenId) => !nextTokenStack.has(tokenId))
-    .map((tokenId) => hydrateCatalogCard(catalog, tokenId, tokenId, nextTokenStack))
+    .map((tokenId) =>
+      hydrateCatalogCard(catalog, tokenId, tokenId, nextTokenStack),
+    );
 
   return {
     id: instanceId,
@@ -79,34 +81,34 @@ function hydrateCatalogCard(
     keywords: def.keywords,
     cmc: def.cmc,
     original_owner: null,
-  }
+  };
 }
 
 function indexCardRefs(obj: unknown, refs: Map<string, CardRef>): void {
   if (obj == null) {
-    return
+    return;
   }
   if (Array.isArray(obj)) {
     for (const item of obj) {
-      indexCardRefs(item, refs)
+      indexCardRefs(item, refs);
     }
-    return
+    return;
   }
-  if (typeof obj !== 'object') {
-    return
+  if (typeof obj !== "object") {
+    return;
   }
 
-  if ('id' in obj && 'scryfall_id' in obj) {
-    const ref = obj as CardRef
-    refs.set(ref.id, ref)
+  if ("id" in obj && "scryfall_id" in obj) {
+    const ref = obj as CardRef;
+    refs.set(ref.id, ref);
     if (ref.upgrade_target_ref) {
-      refs.set(ref.upgrade_target_ref.id, ref.upgrade_target_ref)
+      refs.set(ref.upgrade_target_ref.id, ref.upgrade_target_ref);
     }
-    return
+    return;
   }
 
   for (const value of Object.values(obj)) {
-    indexCardRefs(value, refs)
+    indexCardRefs(value, refs);
   }
 }
 
@@ -117,19 +119,26 @@ function hydrateCard(
   stack: Set<string> = new Set(),
 ): Card {
   if (stack.has(ref.id)) {
-    return makeFallbackCard(ref)
+    return makeFallbackCard(ref);
   }
 
-  const base = hydrateCatalogCard(catalog, ref.scryfall_id, ref.id, new Set())
-  const nextStack = new Set(stack)
-  nextStack.add(ref.id)
+  const base = hydrateCatalogCard(catalog, ref.scryfall_id, ref.id, new Set());
+  const nextStack = new Set(stack);
+  nextStack.add(ref.id);
 
   return {
     ...base,
     original_owner: ref.original_owner,
     is_revealed: ref.is_revealed !== false,
-    upgrade_target: ref.upgrade_target_id ? hydrateOptionalCard(refsById.get(ref.upgrade_target_id) ?? null, catalog, refsById, nextStack) : null,
-  }
+    upgrade_target: ref.upgrade_target_id
+      ? hydrateOptionalCard(
+          refsById.get(ref.upgrade_target_id) ?? null,
+          catalog,
+          refsById,
+          nextStack,
+        )
+      : null,
+  };
 }
 
 function hydrateOptionalCard(
@@ -139,16 +148,24 @@ function hydrateOptionalCard(
   stack: Set<string> = new Set(),
 ): Card | null {
   if (!ref) {
-    return null
+    return null;
   }
-  return hydrateCard(ref, catalog, refsById, stack)
+  return hydrateCard(ref, catalog, refsById, stack);
 }
 
-function hydrateCards(refs: CardRef[], catalog: Catalog, refsById: Map<string, CardRef>): Card[] {
-  return refs.map((ref) => hydrateCard(ref, catalog, refsById))
+function hydrateCards(
+  refs: CardRef[],
+  catalog: Catalog,
+  refsById: Map<string, CardRef>,
+): Card[] {
+  return refs.map((ref) => hydrateCard(ref, catalog, refsById));
 }
 
-function hydrateZones(zones: CompactZones, catalog: Catalog, refsById: Map<string, CardRef>): Zones {
+function hydrateZones(
+  zones: CompactZones,
+  catalog: Catalog,
+  refsById: Map<string, CardRef>,
+): Zones {
   return {
     battlefield: hydrateCards(zones.battlefield, catalog, refsById),
     graveyard: hydrateCards(zones.graveyard, catalog, refsById),
@@ -166,7 +183,7 @@ function hydrateZones(zones: CompactZones, catalog: Catalog, refsById: Map<strin
     counters: zones.counters,
     attachments: zones.attachments,
     spawned_tokens: hydrateCards(zones.spawned_tokens, catalog, refsById),
-  }
+  };
 }
 
 function hydrateLastBattleResult(
@@ -175,23 +192,31 @@ function hydrateLastBattleResult(
   refsById: Map<string, CardRef>,
 ): LastBattleResult | null {
   if (!result) {
-    return null
+    return null;
   }
   return {
     ...result,
     card_gained: hydrateOptionalCard(result.card_gained, catalog, refsById),
-  }
+  };
 }
 
-function hydratePlayerView(player: CompactPlayerView, catalog: Catalog, refsById: Map<string, CardRef>): PlayerView {
+function hydratePlayerView(
+  player: CompactPlayerView,
+  catalog: Catalog,
+  refsById: Map<string, CardRef>,
+): PlayerView {
   return {
     ...player,
     upgrades: hydrateCards(player.upgrades, catalog, refsById),
     vanguard: hydrateOptionalCard(player.vanguard, catalog, refsById),
-    most_recently_revealed_cards: hydrateCards(player.most_recently_revealed_cards, catalog, refsById),
+    most_recently_revealed_cards: hydrateCards(
+      player.most_recently_revealed_cards,
+      catalog,
+      refsById,
+    ),
     full_sideboard: hydrateCards(player.full_sideboard, catalog, refsById),
     command_zone: hydrateCards(player.command_zone, catalog, refsById),
-  }
+  };
 }
 
 function hydrateSelfPlayer(
@@ -205,9 +230,15 @@ function hydrateSelfPlayer(
     hand_slots: player.hand_slots,
     sideboard: hydrateCards(player.sideboard, catalog, refsById),
     command_zone: hydrateCards(player.command_zone, catalog, refsById),
-    current_pack: player.current_pack ? hydrateCards(player.current_pack, catalog, refsById) : null,
-    last_battle_result: hydrateLastBattleResult(player.last_battle_result, catalog, refsById),
-  }
+    current_pack: player.current_pack
+      ? hydrateCards(player.current_pack, catalog, refsById)
+      : null,
+    last_battle_result: hydrateLastBattleResult(
+      player.last_battle_result,
+      catalog,
+      refsById,
+    ),
+  };
 }
 
 function hydrateBattleView(
@@ -216,39 +247,68 @@ function hydrateBattleView(
   refsById: Map<string, CardRef>,
 ) {
   if (!battle) {
-    return null
+    return null;
   }
   return {
     ...battle,
     your_zones: hydrateZones(battle.your_zones, catalog, refsById),
     opponent_zones: hydrateZones(battle.opponent_zones, catalog, refsById),
-    opponent_full_sideboard: hydrateCards(battle.opponent_full_sideboard, catalog, refsById),
-    pending_reveal_animations: (battle.pending_reveal_animations ?? []).map((anim) => ({
-      animation_id: anim.animation_id,
-      upgrade: hydrateCard(anim.upgrade, catalog, refsById),
-      target: hydrateCard(anim.target, catalog, refsById),
-      player_name: anim.player_name,
-    })),
-  }
+    opponent_full_sideboard: hydrateCards(
+      battle.opponent_full_sideboard,
+      catalog,
+      refsById,
+    ),
+    pending_reveal_animations: (battle.pending_reveal_animations ?? []).map(
+      (anim) => ({
+        animation_id: anim.animation_id,
+        upgrade: hydrateCard(anim.upgrade, catalog, refsById),
+        target: hydrateCard(anim.target, catalog, refsById),
+        player_name: anim.player_name,
+      }),
+    ),
+  };
 }
 
-export function hydrateGameState(compact: CompactGameState, catalog: Catalog): GameState {
-  const refsById = new Map<string, CardRef>()
-  indexCardRefs(compact, refsById)
+export function hydrateGameState(
+  compact: CompactGameState,
+  catalog: Catalog,
+): GameState {
+  const refsById = new Map<string, CardRef>();
+  indexCardRefs(compact, refsById);
 
   return {
     ...compact,
-    players: compact.players.map((player) => hydratePlayerView(player, catalog, refsById)),
+    players: compact.players.map((player) =>
+      hydratePlayerView(player, catalog, refsById),
+    ),
     self_player: hydrateSelfPlayer(compact.self_player, catalog, refsById),
-    available_upgrades: hydrateCards(compact.available_upgrades, catalog, refsById),
-    current_battle: hydrateBattleView(compact.current_battle, catalog, refsById),
-  }
+    available_upgrades: hydrateCards(
+      compact.available_upgrades,
+      catalog,
+      refsById,
+    ),
+    current_battle: hydrateBattleView(
+      compact.current_battle,
+      catalog,
+      refsById,
+    ),
+  };
 }
 
-export function hydrateCardCatalogEntries(cards: CardCatalogEntry[], catalog: Catalog): Card[] {
-  const mergedCatalog: Catalog = { ...catalog }
+export function hydrateCardCatalogEntries(
+  cards: CardCatalogEntry[],
+  catalog: Catalog,
+): Card[] {
+  const mergedCatalog: Catalog = { ...catalog };
   for (const card of cards) {
-    mergedCatalog[card.scryfall_id] = card
+    mergedCatalog[card.scryfall_id] = card;
   }
-  return cards.map((card) => hydrateCatalogCard(mergedCatalog, card.scryfall_id, card.scryfall_id, new Set()))
+  return cards.map((card) =>
+    hydrateCatalogCard(
+      mergedCatalog,
+      card.scryfall_id,
+      card.scryfall_id,
+      new Set(),
+    ),
+  );
 }

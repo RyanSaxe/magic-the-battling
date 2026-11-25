@@ -1,61 +1,71 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
-import { createPortal } from 'react-dom'
-import { InfoIcon } from '../icons/InfoIcon'
-import { usePanelHoldsEnter } from '../../utils/enterKey'
-import { BoardBackdrop } from './BoardBackdrop'
-import { POPOVER_CHROME } from './styles'
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { InfoIcon } from "../icons/InfoIcon";
+import { usePanelHoldsEnter } from "../../utils/enterKey";
+import { BoardBackdrop } from "./BoardBackdrop";
+import { POPOVER_CHROME } from "./styles";
 
-const TIP_WIDTH = 256
-const SCREEN_EDGE = 8
-const ROOM_NEEDED_ABOVE = 104
+const TIP_WIDTH = 256;
+const SCREEN_EDGE = 8;
+const ROOM_NEEDED_ABOVE = 104;
 
 function placeBeside(anchor: DOMRect): CSSProperties {
-  const width = Math.min(TIP_WIDTH, window.innerWidth - 2 * SCREEN_EDGE)
-  const left = Math.min(Math.max(anchor.right - width, SCREEN_EDGE), window.innerWidth - SCREEN_EDGE - width)
+  const width = Math.min(TIP_WIDTH, window.innerWidth - 2 * SCREEN_EDGE);
+  const left = Math.min(
+    Math.max(anchor.right - width, SCREEN_EDGE),
+    window.innerWidth - SCREEN_EDGE - width,
+  );
   return anchor.top >= ROOM_NEEDED_ABOVE
     ? { left, width, bottom: window.innerHeight - anchor.top }
-    : { left, width, top: anchor.bottom }
+    : { left, width, top: anchor.bottom };
 }
 
 /** An ⓘ that explains the setting beside it on hover or focus, and until the next press when clicked or tapped. */
 export function InfoTip({ label, text }: { label: string; text: string }) {
-  const id = useId()
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const backdropRef = useRef<HTMLDivElement>(null)
-  const [tip, setTip] = useState<{ placement: CSSProperties; pinned: boolean } | null>(null)
-  const isOpen = tip !== null
-  usePanelHoldsEnter(!!tip?.pinned)
+  const id = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<{
+    placement: CSSProperties;
+    pinned: boolean;
+  } | null>(null);
+  const isOpen = tip !== null;
+  usePanelHoldsEnter(!!tip?.pinned);
 
   const show = (pinned: boolean) => {
-    const button = buttonRef.current
-    if (!button) return
-    const placement = placeBeside(button.getBoundingClientRect())
-    setTip((open) => ({ placement, pinned: pinned || !!open?.pinned }))
-  }
-  const hide = () => setTip(null)
+    const button = buttonRef.current;
+    if (!button) return;
+    const placement = placeBeside(button.getBoundingClientRect());
+    setTip((open) => ({ placement, pinned: pinned || !!open?.pinned }));
+  };
+  const hide = () => setTip(null);
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) return;
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (buttonRef.current?.contains(target) || backdropRef.current?.contains(target)) return
-      hide()
-    }
+      const target = event.target as Node;
+      if (
+        buttonRef.current?.contains(target) ||
+        backdropRef.current?.contains(target)
+      )
+        return;
+      hide();
+    };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') hide()
-    }
-    const follow = () => show(false)
-    window.addEventListener('pointerdown', onPointerDown)
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('resize', follow)
-    window.addEventListener('scroll', follow, true)
+      if (event.key === "Escape") hide();
+    };
+    const follow = () => show(false);
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", follow);
+    window.addEventListener("scroll", follow, true);
     return () => {
-      window.removeEventListener('pointerdown', onPointerDown)
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('resize', follow)
-      window.removeEventListener('scroll', follow, true)
-    }
-  }, [isOpen])
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", follow);
+      window.removeEventListener("scroll", follow, true);
+    };
+  }, [isOpen]);
 
   return (
     <>
@@ -69,13 +79,18 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
         onFocus={() => show(false)}
         // Pressing the backdrop blurs the button to nothing. The backdrop closes the tip on the click that follows.
         onBlur={(event) => {
-          if (!tip?.pinned || event.relatedTarget) hide()
+          if (!tip?.pinned || event.relatedTarget) hide();
         }}
         onPointerEnter={(event) => {
-          if (event.pointerType === 'mouse') show(false)
+          if (event.pointerType === "mouse") show(false);
         }}
         onPointerLeave={(event) => {
-          if (event.pointerType === 'mouse' && !tip?.pinned && document.activeElement !== buttonRef.current) hide()
+          if (
+            event.pointerType === "mouse" &&
+            !tip?.pinned &&
+            document.activeElement !== buttonRef.current
+          )
+            hide();
         }}
         className="icon-target"
       >
@@ -97,5 +112,5 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
           document.body,
         )}
     </>
-  )
+  );
 }

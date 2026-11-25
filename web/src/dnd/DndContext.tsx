@@ -23,7 +23,9 @@ const panelFirstPointerWithin: CollisionDetection = (args) => {
   const collisions = pointerWithin(args);
   if (collisions.length <= 1) return collisions;
   const panelHit = collisions.find((c) => String(c.id).startsWith("panel:"));
-  return panelHit ? [panelHit, ...collisions.filter((c) => c !== panelHit)] : collisions;
+  return panelHit
+    ? [panelHit, ...collisions.filter((c) => c !== panelHit)]
+    : collisions;
 };
 
 interface GameDndProviderProps {
@@ -46,7 +48,9 @@ export function GameDndProvider({
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [activeFromZone, setActiveFromZone] = useState<ZoneName | null>(null);
   const [activeFromZoneId, setActiveFromZoneId] = useState<string | null>(null);
-  const [activeDraggableId, setActiveDraggableId] = useState<string | null>(null);
+  const [activeDraggableId, setActiveDraggableId] = useState<string | null>(
+    null,
+  );
   const [activeFaceDown, setActiveFaceDown] = useState(false);
 
   const mouseSensor = useSensor(MouseSensor, {
@@ -121,7 +125,12 @@ export function GameDndProvider({
 
   return (
     <GameDndContext.Provider
-      value={{ activeCard, activeFromZone, activeFromZoneId, activeDraggableId }}
+      value={{
+        activeCard,
+        activeFromZone,
+        activeFromZoneId,
+        activeDraggableId,
+      }}
     >
       <DndKitContext
         sensors={sensors}

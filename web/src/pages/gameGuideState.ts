@@ -46,8 +46,8 @@ export function matchesGuideCompletionTrigger(options: {
   }
 
   return (
-    activeGuideRequest.guideId === trigger.guideId
-    && activeStepId === trigger.stepId
+    activeGuideRequest.guideId === trigger.guideId &&
+    activeStepId === trigger.stepId
   );
 }
 
@@ -61,14 +61,14 @@ export function isSubmitPopoverGuideStepActive(
 
   if (phase === "build") {
     return (
-      visibleGuideStep.guideId === "build_play_draw"
-      && visibleGuideStep.stepId === "play-draw"
+      visibleGuideStep.guideId === "build_play_draw" &&
+      visibleGuideStep.stepId === "play-draw"
     );
   }
 
   return (
-    visibleGuideStep.guideId === "battle_result_submit"
-    && visibleGuideStep.stepId === "result-submit"
+    visibleGuideStep.guideId === "battle_result_submit" &&
+    visibleGuideStep.stepId === "result-submit"
   );
 }
 

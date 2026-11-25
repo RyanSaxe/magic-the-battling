@@ -1,35 +1,41 @@
-import { useState, useEffect } from 'react'
-import type { Card as CardType } from '../../types'
-import { formatCounter } from '../../utils/counters'
+import { useState, useEffect } from "react";
+import type { Card as CardType } from "../../types";
+import { formatCounter } from "../../utils/counters";
 
 interface CardPreviewModalProps {
-  card: CardType
-  appliedUpgrades: CardType[]
-  counters?: Record<string, number>
-  onClose: () => void
+  card: CardType;
+  appliedUpgrades: CardType[];
+  counters?: Record<string, number>;
+  onClose: () => void;
 }
 
-export function CardPreviewModal({ card, appliedUpgrades, counters = {}, onClose }: CardPreviewModalProps) {
-  const [isFlipped, setIsFlipped] = useState(false)
-  const counterEntries = Object.entries(counters)
-  const imageHeight = counterEntries.length > 0 ? 'max-h-[72vh]' : 'max-h-[80vh]'
+export function CardPreviewModal({
+  card,
+  appliedUpgrades,
+  counters = {},
+  onClose,
+}: CardPreviewModalProps) {
+  const [isFlipped, setIsFlipped] = useState(false);
+  const counterEntries = Object.entries(counters);
+  const imageHeight =
+    counterEntries.length > 0 ? "max-h-[72vh]" : "max-h-[80vh]";
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
+      if (e.key === "Escape") {
+        onClose();
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const getImageUrl = (c: CardType, flipped: boolean) => {
     if (flipped && c.flip_image_url) {
-      return c.flip_image_url
+      return c.flip_image_url;
     }
-    return c.png_url ?? c.image_url
-  }
+    return c.png_url ?? c.image_url;
+  };
 
   return (
     <div
@@ -45,7 +51,10 @@ export function CardPreviewModal({ card, appliedUpgrades, counters = {}, onClose
           src={getImageUrl(card, isFlipped)}
           alt={card.name}
           className={`${imageHeight} min-w-0 shrink shadow-2xl`}
-          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`, borderRadius: 'var(--card-border-radius)' }}
+          style={{
+            maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`,
+            borderRadius: "var(--card-border-radius)",
+          }}
         />
         {appliedUpgrades.length > 0 && (
           <>
@@ -56,7 +65,10 @@ export function CardPreviewModal({ card, appliedUpgrades, counters = {}, onClose
                 src={getImageUrl(upgrade, isFlipped)}
                 alt={upgrade.name}
                 className={`${imageHeight} min-w-0 shrink shadow-2xl`}
-                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`, borderRadius: 'var(--card-border-radius)' }}
+                style={{
+                  maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`,
+                  borderRadius: "var(--card-border-radius)",
+                }}
               />
             ))}
           </>
@@ -80,10 +92,12 @@ export function CardPreviewModal({ card, appliedUpgrades, counters = {}, onClose
       {counterEntries.length > 0 && (
         <div className="preview-counters" onClick={(e) => e.stopPropagation()}>
           {counterEntries.map(([type, count]) => (
-            <span key={type} className="counter-chip">{formatCounter(type, count)}</span>
+            <span key={type} className="counter-chip">
+              {formatCounter(type, count)}
+            </span>
           ))}
         </div>
       )}
     </div>
-  )
+  );
 }

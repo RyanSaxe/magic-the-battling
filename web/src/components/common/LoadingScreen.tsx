@@ -1,19 +1,24 @@
-import { AppHeader, HomeButton } from './AppHeader'
-import { BottomBar, BrandMark } from './FrameBar'
-import { PageFrame } from './PageFrame'
-import type { LoadingStep } from './loadingSteps'
+import { AppHeader, HomeButton } from "./AppHeader";
+import { BottomBar, BrandMark } from "./FrameBar";
+import { PageFrame } from "./PageFrame";
+import type { LoadingStep } from "./loadingSteps";
 
 interface LoadingScreenProps {
-  title?: string
-  steps: LoadingStep[]
-  current: LoadingStep
+  title?: string;
+  steps: LoadingStep[];
+  current: LoadingStep;
   /** Given while the wait can still be cancelled. */
-  onCancel?: () => void
+  onCancel?: () => void;
 }
 
 /** The wait for a lobby or a board: an opening hand on the felt over the steps the wait is really at. */
-export function LoadingScreen({ title = 'Setting the table', steps, current, onCancel }: LoadingScreenProps) {
-  const at = steps.indexOf(current)
+export function LoadingScreen({
+  title = "Setting the table",
+  steps,
+  current,
+  onCancel,
+}: LoadingScreenProps) {
+  const at = steps.indexOf(current);
   return (
     <PageFrame
       header={<AppHeader home={<HomeButton />} />}
@@ -47,15 +52,17 @@ export function LoadingScreen({ title = 'Setting the table', steps, current, onC
           {steps.map((step, i) => (
             <li
               key={step}
-              aria-current={i === at ? 'step' : undefined}
-              className={`loading-step ${i < at ? 'loading-step-done' : i === at ? 'loading-step-current' : ''}`}
+              aria-current={i === at ? "step" : undefined}
+              className={`loading-step ${i < at ? "loading-step-done" : i === at ? "loading-step-current" : ""}`}
             >
-              <span className="loading-dot" aria-hidden="true">{i < at && '✓'}</span>
+              <span className="loading-dot" aria-hidden="true">
+                {i < at && "✓"}
+              </span>
               {step}
             </li>
           ))}
         </ol>
       </div>
     </PageFrame>
-  )
+  );
 }

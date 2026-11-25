@@ -13,6 +13,7 @@ export const GuideStateContext = createContext<GuideState | null>(null);
 
 export function useGuideContext(): GuideState {
   const ctx = useContext(GuideStateContext);
-  if (!ctx) throw new Error("useGuideContext must be used within GuideProvider");
+  if (!ctx)
+    throw new Error("useGuideContext must be used within GuideProvider");
   return ctx;
 }

@@ -226,24 +226,28 @@ input:-webkit-autofill:focus {
 /* Game table background - classic felt */
 .game-table {
   background-color: var(--table-felt);
-  background-image: radial-gradient(ellipse at center,
-      var(--table-felt-light) 0%,
-      var(--table-felt) 50%,
-      var(--table-dark) 100%);
+  background-image: radial-gradient(
+    ellipse at center,
+    var(--table-felt-light) 0%,
+    var(--table-felt) 50%,
+    var(--table-dark) 100%
+  );
   min-height: 100dvh;
 }
 
 /* Solid warm-brown chrome for header, footer, sidebar */
 .frame-chrome {
-  background: radial-gradient(ellipse at 50% 50%,
-      color-mix(in srgb, var(--chrome) 95%, white) 0%,
-      var(--chrome) 70%);
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    color-mix(in srgb, var(--chrome) 95%, white) 0%,
+    var(--chrome) 70%
+  );
 }
 
 /* The 42px bars above and below the felt line their content up with the felt's gold edge.
    Registered as a length so a script that places a popover reads it in pixels. */
 @property --bar-inline {
-  syntax: '<length>';
+  syntax: "<length>";
   inherits: true;
   initial-value: 6px;
 }
@@ -597,11 +601,13 @@ input:-webkit-autofill:focus {
 .menu-submenu > .menu-item,
 .menu-submenu-grid {
   padding-left: 26px;
-  background-image: linear-gradient(to right,
-      transparent 12px,
-      rgba(212, 175, 55, 0.28) 12px,
-      rgba(212, 175, 55, 0.28) 13px,
-      transparent 13px);
+  background-image: linear-gradient(
+    to right,
+    transparent 12px,
+    rgba(212, 175, 55, 0.28) 12px,
+    rgba(212, 175, 55, 0.28) 13px,
+    transparent 13px
+  );
 }
 
 /* A destructive item, like Delete. These reds keep 4.5:1 on walnut and on every hover fill. */
@@ -762,15 +768,17 @@ input:-webkit-autofill:focus {
   }
 
   .game-surface::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     bottom: 0;
     width: var(--frame-rail-width);
-    background: radial-gradient(ellipse at 50% 50%,
-        color-mix(in srgb, var(--chrome) 95%, white) 0%,
-        var(--chrome) 70%);
+    background: radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--chrome) 95%, white) 0%,
+      var(--chrome) 70%
+    );
     z-index: 2;
   }
 
@@ -803,7 +811,9 @@ input:-webkit-autofill:focus {
 .side-panel-beside > .side-panel {
   width: 288px;
   border-left: 2px solid var(--seam-stroke);
-  box-shadow: -14px 0 28px rgba(0, 0, 0, 0.56), -4px 0 10px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    -14px 0 28px rgba(0, 0, 0, 0.56),
+    -4px 0 10px rgba(0, 0, 0, 0.4);
 }
 
 /* Closing the drawer closes scouting with it, so the edge scouting slides under has to leave with the drawer.
@@ -844,7 +854,9 @@ input:-webkit-autofill:focus {
 .zone-battlefield,
 .zone-sideboard,
 .zone-upgrades {
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .zone-column {
@@ -853,7 +865,7 @@ input:-webkit-autofill:focus {
 
 /* Going out: the words, and the felt they stand on until the player opens their deck */
 .out-title {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -861,7 +873,12 @@ input:-webkit-autofill:focus {
 }
 
 .out-felt {
-  background: radial-gradient(ellipse at center, var(--table-felt-light), var(--table-felt) 55%, var(--table-dark));
+  background: radial-gradient(
+    ellipse at center,
+    var(--table-felt-light),
+    var(--table-felt) 55%,
+    var(--table-dark)
+  );
 }
 
 /* Gold divider between zones */
@@ -896,7 +913,14 @@ input:-webkit-autofill:focus {
 
 /* Felt inside the board's gold edge, so a screen without zones, or a board dimmed while waiting, isn't left on gold */
 .frame-board {
-  background-image: radial-gradient(ellipse at center, var(--table-felt-light) 0%, var(--table-felt) 50%, var(--table-dark) 100%), none;
+  background-image:
+    radial-gradient(
+      ellipse at center,
+      var(--table-felt-light) 0%,
+      var(--table-felt) 50%,
+      var(--table-dark) 100%
+    ),
+    none;
   background-origin: content-box, padding-box;
   background-clip: content-box, border-box;
 }
@@ -912,38 +936,34 @@ input:-webkit-autofill:focus {
 }
 
 .zone-divider-line--horizontal {
-  background:
-    linear-gradient(
-      to bottom,
-      var(--seam-ridge-light) 0 50%,
-      var(--seam-ridge-dark) 50% 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
 }
 
 .zone-divider-line--vertical {
-  background:
-    linear-gradient(
-      to right,
-      var(--seam-ridge-light) 0 50%,
-      var(--seam-ridge-dark) 50% 100%
-    );
+  background: linear-gradient(
+    to right,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
 }
 
 .zone-label-pill {
   border: 1px solid transparent;
   background:
     linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--zone-label-bg) 84%, rgb(96, 81, 72) 16%) 0%,
-      color-mix(in srgb, var(--zone-label-bg) 90%, rgb(71, 58, 51) 10%) 18%,
-      color-mix(in srgb, var(--zone-label-bg) 96%, rgb(55, 44, 39) 4%) 46%,
-      color-mix(in srgb, var(--zone-label-bg) 90%, black 10%) 74%,
-      color-mix(in srgb, var(--zone-label-bg) 72%, black 28%) 100%
-    ) padding-box,
-    linear-gradient(
-      var(--seam-ridge-light),
-      var(--seam-ridge-light)
-    ) border-box;
+        to bottom,
+        color-mix(in srgb, var(--zone-label-bg) 84%, rgb(96, 81, 72) 16%) 0%,
+        color-mix(in srgb, var(--zone-label-bg) 90%, rgb(71, 58, 51) 10%) 18%,
+        color-mix(in srgb, var(--zone-label-bg) 96%, rgb(55, 44, 39) 4%) 46%,
+        color-mix(in srgb, var(--zone-label-bg) 90%, black 10%) 74%,
+        color-mix(in srgb, var(--zone-label-bg) 72%, black 28%) 100%
+      )
+      padding-box,
+    linear-gradient(var(--seam-ridge-light), var(--seam-ridge-light)) border-box;
   box-shadow:
     0 -1px 2px rgba(0, 0, 0, 0.1),
     0 1px 0 rgba(0, 0, 0, 0.12),
@@ -957,7 +977,9 @@ input:-webkit-autofill:focus {
 /* Mobile battle life bar: zone-style inset on light walnut */
 .mobile-life-bar {
   background: var(--chrome-modal);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
   /* Keeps the life buttons' tap areas inside the bar, clear of the top bar above and the opponent's hand below. */
   overflow: hidden;
 }
@@ -1046,7 +1068,9 @@ input:-webkit-autofill:focus {
 }
 
 .floating-window--instant {
-  transition: opacity 160ms ease-out, transform 160ms ease-out;
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms ease-out;
 }
 
 .floating-window--closing {
@@ -1203,7 +1227,11 @@ input:-webkit-autofill:focus {
     height: auto;
     min-height: 100%;
     object-fit: cover;
-    translate: 0 calc(-100% * (var(--arch-depth, 0) + var(--art-focus) * (1 - var(--arch-depth, 0))));
+    translate: 0
+      calc(
+        -100% *
+          (var(--arch-depth, 0) + var(--art-focus) * (1 - var(--arch-depth, 0)))
+      );
     filter: brightness(0.63) saturate(0.74);
   }
 
@@ -1227,7 +1255,9 @@ input:-webkit-autofill:focus {
   .cube-banner-name {
     min-width: 0;
     color: #fffbeb;
-    font: 700 18px/21px "Cinzel", serif;
+    font:
+      700 18px/21px "Cinzel",
+      serif;
     overflow-wrap: anywhere;
     text-shadow: 0 1px 2px #000b;
     text-wrap: balance;
@@ -1569,7 +1599,9 @@ input:-webkit-autofill:focus {
 
   .resume-stage-number {
     color: var(--gold-pale);
-    font: 700 17px/19px 'Cinzel', serif;
+    font:
+      700 17px/19px "Cinzel",
+      serif;
     white-space: nowrap;
   }
 
@@ -1723,7 +1755,9 @@ input:-webkit-autofill:focus {
   .seat-taken {
     border: 1px solid #5a4d46;
     background: linear-gradient(180deg, #453a36, var(--chrome-modal));
-    box-shadow: 0 1px 0 #0000004d, inset 0 1px 0 #ffecb51a;
+    box-shadow:
+      0 1px 0 #0000004d,
+      inset 0 1px 0 #ffecb51a;
   }
 
   .seat-taken.is-self {
@@ -1912,7 +1946,8 @@ input:-webkit-autofill:focus {
       max-width: calc(100% - 64px);
     }
 
-    .cube-banner-top:not(:has(.cube-banner-action)) > .cube-banner-title:has(.is-longest) {
+    .cube-banner-top:not(:has(.cube-banner-action))
+      > .cube-banner-title:has(.is-longest) {
       max-width: 100%;
     }
 
@@ -2300,7 +2335,9 @@ input:-webkit-autofill:focus {
       max-width: calc(100% - 136px);
     }
 
-    .setup-page:has(.lobby-deck.is-loaded) .cube-banner.has-notice:not(:has(.is-longest)) .cube-band-image {
+    .setup-page:has(.lobby-deck.is-loaded)
+      .cube-banner.has-notice:not(:has(.is-longest))
+      .cube-band-image {
       display: block;
     }
 
@@ -2324,7 +2361,11 @@ input:-webkit-autofill:focus {
 
     /* Over art the name needs a tighter halo, to stay readable on pale cards */
     .cube-banner.has-art .cube-banner-name {
-      text-shadow: 0 1px 1px #000, 0 0 2px #000, 0 0 3px #000, 0 0 6px #000;
+      text-shadow:
+        0 1px 1px #000,
+        0 0 2px #000,
+        0 0 3px #000,
+        0 0 6px #000;
     }
   }
 
@@ -2443,7 +2484,7 @@ input:-webkit-autofill:focus {
 
 .card.upgraded::after,
 .card.companion::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
@@ -2460,7 +2501,9 @@ input:-webkit-autofill:focus {
 }
 
 .card.upgraded.companion::after {
-  box-shadow: inset 0 0 0 2px #fbbf24, inset 0 0 0 4px #a855f7;
+  box-shadow:
+    inset 0 0 0 2px #fbbf24,
+    inset 0 0 0 4px #a855f7;
 }
 
 .card.selected.upgraded::after,
@@ -2508,7 +2551,7 @@ input:-webkit-autofill:focus {
 }
 
 .card.unrevealed-upgrade::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
@@ -2523,8 +2566,13 @@ input:-webkit-autofill:focus {
 }
 
 @keyframes unrevealed-upgrade-pulse {
-  0%, 100% { border-color: rgba(251, 191, 36, 0.3); }
-  50% { border-color: rgba(251, 191, 36, 0.9); }
+  0%,
+  100% {
+    border-color: rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    border-color: rgba(251, 191, 36, 0.9);
+  }
 }
 
 /* Card on table has shadow for depth */
@@ -2585,18 +2633,17 @@ input:-webkit-autofill:focus {
 }
 
 .battle-side-column::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
   width: 2px;
-  background:
-    linear-gradient(
-      to right,
-      var(--seam-ridge-light) 0 50%,
-      var(--seam-ridge-dark) 50% 100%
-    );
+  background: linear-gradient(
+    to right,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
   pointer-events: none;
 }
 
@@ -2610,18 +2657,17 @@ input:-webkit-autofill:focus {
 }
 
 .battle-side-column-player::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 2px;
-  background:
-    linear-gradient(
-      to bottom,
-      var(--seam-ridge-light) 0 50%,
-      var(--seam-ridge-dark) 50% 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
   pointer-events: none;
 }
 
@@ -2631,23 +2677,28 @@ input:-webkit-autofill:focus {
   position: relative;
 }
 
-.battle-side-column > .battle-side-dropzone ~ .battle-side-dropzone .battle-side-cell {
+.battle-side-column
+  > .battle-side-dropzone
+  ~ .battle-side-dropzone
+  .battle-side-cell {
   border-top: 0;
 }
 
-.battle-side-column > .battle-side-dropzone ~ .battle-side-dropzone .battle-side-cell::before {
-  content: '';
+.battle-side-column
+  > .battle-side-dropzone
+  ~ .battle-side-dropzone
+  .battle-side-cell::before {
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 2px;
-  background:
-    linear-gradient(
-      to bottom,
-      var(--seam-ridge-light) 0 50%,
-      var(--seam-ridge-dark) 50% 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
   pointer-events: none;
 }
 
@@ -2665,12 +2716,12 @@ input:-webkit-autofill:focus {
   outline-offset: -2px;
 }
 
-.battle-side-dropzone.zone.drop-valid>.battle-side-cell {
+.battle-side-dropzone.zone.drop-valid > .battle-side-cell {
   box-shadow: inset 0 0 30px rgba(34, 197, 94, 0.3);
   background-color: rgba(34, 197, 94, 0.1);
 }
 
-.battle-side-dropzone.zone.drop-invalid>.battle-side-cell {
+.battle-side-dropzone.zone.drop-invalid > .battle-side-cell {
   box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.3);
   background-color: rgba(239, 68, 68, 0.08);
 }
@@ -2684,34 +2735,32 @@ input:-webkit-autofill:focus {
 }
 
 .battle-hand-separator-bottom::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   height: 2px;
-  background:
-    linear-gradient(
-      to bottom,
-      var(--seam-ridge-dark) 0 50%,
-      var(--seam-ridge-light) 50% 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-dark) 0 50%,
+    var(--seam-ridge-light) 50% 100%
+  );
   pointer-events: none;
 }
 
 .battle-hand-separator-top::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   height: 2px;
-  background:
-    linear-gradient(
-      to bottom,
-      var(--seam-ridge-light) 0 50%,
-      var(--seam-ridge-dark) 50% 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
   pointer-events: none;
 }
 
@@ -2746,10 +2795,9 @@ input:-webkit-autofill:focus {
   isolation: isolate;
 }
 
-.hand-zone> :hover {
+.hand-zone > :hover {
   z-index: 100 !important;
 }
-
 
 /* Counter badges */
 .counter-badge {
@@ -2777,10 +2825,12 @@ input:-webkit-autofill:focus {
 }
 
 .skeleton {
-  background: linear-gradient(90deg,
-      var(--chrome-modal) 0%,
-      var(--stone) 50%,
-      var(--chrome-modal) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--chrome-modal) 0%,
+    var(--stone) 50%,
+    var(--chrome-modal) 100%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -2942,7 +2992,11 @@ input:-webkit-autofill:focus {
   scroll-padding-right: var(--timeline-fade);
   /* A scroll container clips overflow on both axes, which would cut the active step's 1px ring. */
   padding-block: 1px;
-  mask-image: linear-gradient(to right, #000 calc(100% - var(--timeline-fade)), transparent);
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--timeline-fade)),
+    transparent
+  );
 }
 
 .phase-timeline-scroll::-webkit-scrollbar {
@@ -3023,9 +3077,11 @@ input:-webkit-autofill:focus {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg,
-      var(--color-gold) 0%,
-      var(--color-gold-dark) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-gold) 0%,
+    var(--color-gold-dark) 100%
+  );
   color: #1a1a1a;
   --btn-raise-edge: rgba(255, 248, 220, 0.45);
 }
@@ -3148,7 +3204,9 @@ input:-webkit-autofill:focus {
 .btn-secondary,
 .btn-game,
 .segmented-option[aria-checked="true"] {
-  box-shadow: inset 0 1px 0 var(--btn-raise-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 var(--btn-raise-edge),
+    0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .btn:active:not(:disabled),
@@ -3269,20 +3327,25 @@ input:-webkit-autofill:focus {
 
 /* Hero page styles */
 .hero-title {
-  font-family: 'Cinzel', serif;
-  background: linear-gradient(135deg, var(--color-gold) 0%, #f5d76e 50%, var(--color-gold-dark) 100%);
+  font-family: "Cinzel", serif;
+  background: linear-gradient(
+    135deg,
+    var(--color-gold) 0%,
+    #f5d76e 50%,
+    var(--color-gold-dark) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .hero-subtitle {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   color: var(--color-gold-dark);
 }
 
 .hero-sep {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   color: var(--gold-border-opaque);
   font-weight: 300;
 }
@@ -3295,14 +3358,15 @@ input:-webkit-autofill:focus {
 }
 
 @keyframes gentle-glow {
-
   0%,
   100% {
     box-shadow: 0 0 8px var(--color-gold-glow);
   }
 
   50% {
-    box-shadow: 0 0 20px var(--color-gold-glow), 0 0 40px rgba(212, 175, 55, 0.2);
+    box-shadow:
+      0 0 20px var(--color-gold-glow),
+      0 0 40px rgba(212, 175, 55, 0.2);
   }
 }
 
@@ -3330,7 +3394,7 @@ input:-webkit-autofill:focus {
 }
 
 .mic-level-bar::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   bottom: 0;
@@ -3342,12 +3406,19 @@ input:-webkit-autofill:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mic-level-bar::after { transition: none; }
+  .mic-level-bar::after {
+    transition: none;
+  }
 }
 
 @keyframes mic-connecting {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 .animate-mic-connecting {
@@ -3367,7 +3438,8 @@ input:-webkit-autofill:focus {
 
 /* Upgrade hand animation */
 .upgrade-target {
-  transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
+  transition:
+    transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 500ms ease-out;
   z-index: 1;
   position: relative;
@@ -3394,7 +3466,9 @@ input:-webkit-autofill:focus {
   }
 
   40% {
-    box-shadow: 0 0 40px rgba(251, 191, 36, 0.9), 0 0 80px rgba(212, 175, 55, 0.4);
+    box-shadow:
+      0 0 40px rgba(251, 191, 36, 0.9),
+      0 0 80px rgba(212, 175, 55, 0.4);
   }
 
   100% {
@@ -3410,7 +3484,8 @@ input:-webkit-autofill:focus {
   position: fixed;
   z-index: 21;
   opacity: 0;
-  transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
+  transition:
+    transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
     opacity 400ms ease-out;
 }
 
@@ -3503,7 +3578,8 @@ input:-webkit-autofill:focus {
 @keyframes battle-resolution-source-stage-enter {
   0% {
     opacity: 0;
-    transform: translate(var(--battle-enter-x), var(--battle-enter-y)) scale(var(--battle-enter-scale));
+    transform: translate(var(--battle-enter-x), var(--battle-enter-y))
+      scale(var(--battle-enter-scale));
   }
 
   100% {
@@ -3520,7 +3596,8 @@ input:-webkit-autofill:focus {
 
   100% {
     opacity: 0;
-    transform: translate(var(--battle-enter-x), var(--battle-enter-y)) scale(var(--battle-enter-scale));
+    transform: translate(var(--battle-enter-x), var(--battle-enter-y))
+      scale(var(--battle-enter-scale));
   }
 }
 
@@ -3557,7 +3634,8 @@ input:-webkit-autofill:focus {
 }
 
 .battle-resolution-counter-focused {
-  animation: battle-resolution-counter-focus 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: battle-resolution-counter-focus 420ms
+    cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .battle-resolution-counter-increment [data-token-counter-badge] {
@@ -3618,7 +3696,8 @@ input:-webkit-autofill:focus {
 }
 
 .battle-resolution-source-card-entering {
-  animation: battle-resolution-source-stage-enter 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: battle-resolution-source-stage-enter 540ms
+    cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .battle-resolution-source-card-exiting {
@@ -3643,8 +3722,12 @@ input:-webkit-autofill:focus {
 
 .battle-resolution-continue-panel {
   border: 1px solid rgba(248, 113, 113, 0.72);
-  background:
-    radial-gradient(circle at top, rgba(127, 29, 29, 0.96), rgba(69, 10, 10, 0.98) 58%, rgba(18, 3, 3, 0.98));
+  background: radial-gradient(
+    circle at top,
+    rgba(127, 29, 29, 0.96),
+    rgba(69, 10, 10, 0.98) 58%,
+    rgba(18, 3, 3, 0.98)
+  );
   color: #fee2e2;
   font-size: clamp(22px, 4vw, 42px);
   font-weight: 800;
@@ -3728,7 +3811,8 @@ input:-webkit-autofill:focus {
   display: flex;
   align-items: center;
   position: fixed;
-  animation: build-upgrade-row-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: build-upgrade-row-enter 420ms cubic-bezier(0.22, 1, 0.36, 1)
+    forwards;
 }
 
 .build-upgrade-row-glow {
@@ -3750,8 +3834,17 @@ input:-webkit-autofill:focus {
   inset: -20px;
   border-radius: 28px;
   background:
-    radial-gradient(circle at center, rgba(251, 191, 36, 0.34), rgba(251, 191, 36, 0)),
-    linear-gradient(90deg, rgba(255, 248, 196, 0), rgba(255, 248, 196, 0.34), rgba(255, 248, 196, 0));
+    radial-gradient(
+      circle at center,
+      rgba(251, 191, 36, 0.34),
+      rgba(251, 191, 36, 0)
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 248, 196, 0),
+      rgba(255, 248, 196, 0.34),
+      rgba(255, 248, 196, 0)
+    );
   opacity: 0;
   pointer-events: none;
 }
@@ -3878,7 +3971,11 @@ input:-webkit-autofill:focus {
   content: "";
   position: absolute;
   inset: -28% -18%;
-  background: radial-gradient(closest-side, rgba(250, 230, 150, 0.2), transparent);
+  background: radial-gradient(
+    closest-side,
+    rgba(250, 230, 150, 0.2),
+    transparent
+  );
 }
 
 .loading-slot {
@@ -3909,8 +4006,14 @@ input:-webkit-autofill:focus {
   place-items: center;
   border: 2px solid var(--color-gold-dark);
   border-radius: calc(var(--loading-card) * 0.09);
-  background: radial-gradient(ellipse at 50% 38%, var(--chrome-modal), var(--chrome) 78%);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 236, 181, 0.28);
+  background: radial-gradient(
+    ellipse at 50% 38%,
+    var(--chrome-modal),
+    var(--chrome) 78%
+  );
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 236, 181, 0.28);
   animation: loading-lift 2.4s ease-in-out infinite both;
 }
 
@@ -4049,7 +4152,9 @@ input:-webkit-autofill:focus {
 }
 
 @keyframes loading-lift {
-  0%, 45%, 100% {
+  0%,
+  45%,
+  100% {
     translate: 0 0;
     border-color: var(--color-gold-dark);
   }
@@ -4101,7 +4206,7 @@ input:-webkit-autofill:focus {
   grid-template-rows: 1fr;
 }
 
-.accordion-body>div {
+.accordion-body > div {
   overflow: hidden;
   min-height: 0;
 }
@@ -4140,7 +4245,9 @@ input:-webkit-autofill:focus {
 .guide-book-switch-title,
 .guide-book-title {
   color: var(--color-gold-bright);
-  font: 700 17px/21px "Cinzel", serif;
+  font:
+    700 17px/21px "Cinzel",
+    serif;
 }
 
 .guide-book-switch-title {
@@ -4358,8 +4465,13 @@ input:-webkit-autofill:focus {
 }
 
 @keyframes guide-spotlight-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4); }
-  50%      { box-shadow: 0 0 0 4px rgba(212, 175, 55, 0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(212, 175, 55, 0);
+  }
 }
 
 .animate-guide-spotlight-pulse {
@@ -4434,24 +4546,38 @@ input:-webkit-autofill:focus {
 
 @keyframes guide-spotlight-morph-glow {
   0% {
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 24px rgba(245, 186, 64, 0.18);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.25),
+      0 0 24px rgba(245, 186, 64, 0.18);
   }
   50% {
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 36px rgba(245, 186, 64, 0.35);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.25),
+      0 0 36px rgba(245, 186, 64, 0.35);
   }
   100% {
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 24px rgba(245, 186, 64, 0.18);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.25),
+      0 0 24px rgba(245, 186, 64, 0.18);
   }
 }
 
 @keyframes guide-overlay-enter {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes guide-overlay-exit {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4473,7 +4599,7 @@ input:-webkit-autofill:focus {
 }
 
 .standings-rank-number {
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 20px;
   font-weight: 700;
   line-height: 1;
@@ -4738,7 +4864,8 @@ div.player-card-button:hover {
   padding-right: 22px;
 }
 
-.player-card.has-actions:has(.player-card-actions > :nth-child(2)) .player-card-line:last-child {
+.player-card.has-actions:has(.player-card-actions > :nth-child(2))
+  .player-card-line:last-child {
   padding-right: 54px;
 }
 
@@ -4829,7 +4956,9 @@ div.player-card-button:hover {
 }
 
 .board-art.board-picture {
-  box-shadow: 0 0 0 1px var(--gold-border-opaque), 0 10px 28px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 0 1px var(--gold-border-opaque),
+    0 10px 28px rgba(0, 0, 0, 0.35);
 }
 
 .board-slot {
@@ -4873,7 +5002,9 @@ div.player-card-button:hover {
 .board-title h2 {
   min-width: 0;
   color: var(--ivory);
-  font: 700 26px/30px "Cinzel", serif;
+  font:
+    700 26px/30px "Cinzel",
+    serif;
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
@@ -5091,7 +5222,9 @@ div.player-card-button:hover {
   border: 1px solid #5a4d46;
   border-radius: 8px;
   background: linear-gradient(180deg, var(--stone), #473d37);
-  box-shadow: 0 1px 0 #0000004d, inset 0 1px 0 #ffecb51a;
+  box-shadow:
+    0 1px 0 #0000004d,
+    inset 0 1px 0 #ffecb51a;
 }
 
 .board-game-open {
@@ -5314,7 +5447,7 @@ div.player-card-button:hover {
   display: flex;
   align-items: baseline;
   height: 32px;
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 28px;
   font-weight: 700;
   line-height: 32px;
@@ -5542,7 +5675,9 @@ div.player-card-button:hover {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: opacity var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    opacity var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .mana-filter-btn.is-on {
@@ -5590,12 +5725,14 @@ div.player-card-button:hover {
 }
 
 @media (hover: hover) {
-  .game-table:has(.btn-primary:not(.notice-tile-action)) .btn.notice-tile-action:hover:not(:disabled) {
+  .game-table:has(.btn-primary:not(.notice-tile-action))
+    .btn.notice-tile-action:hover:not(:disabled) {
     background: var(--btn-secondary-fill-hover);
   }
 }
 
-.game-table:has(.btn-primary:not(.notice-tile-action)) .btn.notice-tile-action:active:not(:disabled) {
+.game-table:has(.btn-primary:not(.notice-tile-action))
+  .btn.notice-tile-action:active:not(:disabled) {
   background: var(--btn-secondary-fill-pressed);
 }
 

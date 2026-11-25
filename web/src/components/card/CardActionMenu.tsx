@@ -1,42 +1,50 @@
-import { useState, useRef, useLayoutEffect, useEffect } from 'react'
-import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
-import { useFaceDown } from '../../contexts/faceDownState'
-import { useOpenSubmenus } from '../../hooks/useOpenSubmenus'
-import { MenuPrompt } from '../common/MenuPrompt'
-import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../../utils/battleInteraction'
-import { clampMenuToViewport, menuMaxHeight } from '../../utils/menuPosition'
-import { POPOVER_CHROME } from '../common/styles'
-import { usePanelHoldsEnter } from '../../utils/enterKey'
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import type { Card as CardType, ZoneName, CardStateAction } from "../../types";
+import { useFaceDown } from "../../contexts/faceDownState";
+import { useOpenSubmenus } from "../../hooks/useOpenSubmenus";
+import { MenuPrompt } from "../common/MenuPrompt";
+import {
+  canUseBattleFaceDownAction,
+  canUseBattleFlipAction,
+} from "../../utils/battleInteraction";
+import { clampMenuToViewport, menuMaxHeight } from "../../utils/menuPosition";
+import { POPOVER_CHROME } from "../common/styles";
+import { usePanelHoldsEnter } from "../../utils/enterKey";
 
 interface CardActionMenuProps {
-  card: CardType
-  position: { x: number; y: number }
-  zone: ZoneName
-  isTapped: boolean
-  isFlipped: boolean
-  counters: Record<string, number>
-  isAttached: boolean
-  battlefieldCards: CardType[]
-  isOpponent?: boolean
-  canManipulateOpponent?: boolean
-  onAction: (action: CardStateAction, data?: Record<string, unknown>) => void
-  onMove: (toZone: ZoneName) => void
-  onClose: () => void
+  card: CardType;
+  position: { x: number; y: number };
+  zone: ZoneName;
+  isTapped: boolean;
+  isFlipped: boolean;
+  counters: Record<string, number>;
+  isAttached: boolean;
+  battlefieldCards: CardType[];
+  isOpponent?: boolean;
+  canManipulateOpponent?: boolean;
+  onAction: (action: CardStateAction, data?: Record<string, unknown>) => void;
+  onMove: (toZone: ZoneName) => void;
+  onClose: () => void;
 }
 
-type Submenu = 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo'
+type Submenu =
+  | "addCounter"
+  | "removeCounter"
+  | "spawnToken"
+  | "attachTo"
+  | "moveTo";
 
-const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge']
+const COUNTER_TYPES = ["+1/+1", "-1/-1", "Loyalty", "Charge"];
 // Custom's field is taller than the row it replaces, so it takes the room of two.
-const ADD_COUNTER_ROWS = COUNTER_TYPES.length + 2
-const ATTACH_TO_MAX_HEIGHT = 200
+const ADD_COUNTER_ROWS = COUNTER_TYPES.length + 2;
+const ATTACH_TO_MAX_HEIGHT = 200;
 const MOVE_TARGETS: { zone: ZoneName; label: string }[] = [
-  { zone: 'hand', label: 'Hand' },
-  { zone: 'battlefield', label: 'Battlefield' },
-  { zone: 'graveyard', label: 'Graveyard' },
-  { zone: 'exile', label: 'Exile' },
-  { zone: 'library', label: 'Library' },
-]
+  { zone: "hand", label: "Hand" },
+  { zone: "battlefield", label: "Battlefield" },
+  { zone: "graveyard", label: "Graveyard" },
+  { zone: "exile", label: "Exile" },
+  { zone: "library", label: "Library" },
+];
 
 export function CardActionMenu({
   card,
@@ -53,77 +61,89 @@ export function CardActionMenu({
   onMove,
   onClose,
 }: CardActionMenuProps) {
-  const isFaceDown = useFaceDown(card.id)
-  const { isOpen, toggle } = useOpenSubmenus<Submenu>()
-  const [namingCounter, setNamingCounter] = useState(false)
+  const isFaceDown = useFaceDown(card.id);
+  const { isOpen, toggle } = useOpenSubmenus<Submenu>();
+  const [namingCounter, setNamingCounter] = useState(false);
 
-  const menuRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const onBattlefield = zone === 'battlefield'
-  const moveTargets = MOVE_TARGETS.filter((target) => target.zone !== zone)
-  const attachableCards = battlefieldCards.filter(c => c.id !== card.id)
+  const onBattlefield = zone === "battlefield";
+  const moveTargets = MOVE_TARGETS.filter((target) => target.zone !== zone);
+  const attachableCards = battlefieldCards.filter((c) => c.id !== card.id);
   const tallestSubmenuRows = Math.max(
     moveTargets.length,
     onBattlefield ? ADD_COUNTER_ROWS : 0,
     onBattlefield ? Object.keys(counters).length : 0,
     onBattlefield ? card.tokens.length : 0,
-  )
-  const attachToRows = onBattlefield ? attachableCards.length : 0
+  );
+  const attachToRows = onBattlefield ? attachableCards.length : 0;
 
   // A submenu opens under the row that was clicked. Moving the menu then would put a different row under the pointer,
   // so the menu is placed once, with room under it for its tallest submenu.
   useLayoutEffect(() => {
-    const node = menuRef.current
-    if (!node) return
-    const rowHeight = node.querySelector<HTMLElement>('.menu-item')?.offsetHeight ?? 0
+    const node = menuRef.current;
+    if (!node) return;
+    const rowHeight =
+      node.querySelector<HTMLElement>(".menu-item")?.offsetHeight ?? 0;
     const tallestSubmenu = Math.max(
       tallestSubmenuRows * rowHeight,
       Math.min(attachToRows * rowHeight, ATTACH_TO_MAX_HEIGHT),
-    )
-    const rect = node.getBoundingClientRect()
-    const viewport = { width: window.innerWidth, height: window.innerHeight }
-    const { x, y } = clampMenuToViewport(position, { width: rect.width, height: rect.height + tallestSubmenu }, viewport)
-    node.style.left = `${x}px`
-    node.style.top = `${y}px`
-    node.style.maxHeight = `${menuMaxHeight(y, viewport)}px`
-  }, [position, tallestSubmenuRows, attachToRows])
+    );
+    const rect = node.getBoundingClientRect();
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const { x, y } = clampMenuToViewport(
+      position,
+      { width: rect.width, height: rect.height + tallestSubmenu },
+      viewport,
+    );
+    node.style.left = `${x}px`;
+    node.style.top = `${y}px`;
+    node.style.maxHeight = `${menuMaxHeight(y, viewport)}px`;
+  }, [position, tallestSubmenuRows, attachToRows]);
 
-  usePanelHoldsEnter()
+  usePanelHoldsEnter();
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      e.preventDefault()
-      onClose()
-    }
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      onClose();
+    };
     // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
-    window.addEventListener('keydown', handleEscape, true)
-    return () => window.removeEventListener('keydown', handleEscape, true)
-  }, [onClose])
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [onClose]);
 
-  const owner = isOpponent ? 'opponent' : 'player'
-  const canFaceDown = canUseBattleFaceDownAction(owner, canManipulateOpponent)
-  const canFlip = canUseBattleFlipAction(owner, isFaceDown, canManipulateOpponent)
-  const hasFlip = !!card.flip_image_url
-  const hasTokens = card.tokens.length > 0
-  const hasCounters = Object.keys(counters).length > 0
+  const owner = isOpponent ? "opponent" : "player";
+  const canFaceDown = canUseBattleFaceDownAction(owner, canManipulateOpponent);
+  const canFlip = canUseBattleFlipAction(
+    owner,
+    isFaceDown,
+    canManipulateOpponent,
+  );
+  const hasFlip = !!card.flip_image_url;
+  const hasTokens = card.tokens.length > 0;
+  const hasCounters = Object.keys(counters).length > 0;
 
-  const handleAction = (action: CardStateAction, data?: Record<string, unknown>) => {
-    onAction(action, data)
-    onClose()
-  }
+  const handleAction = (
+    action: CardStateAction,
+    data?: Record<string, unknown>,
+  ) => {
+    onAction(action, data);
+    onClose();
+  };
 
   const handleMove = (toZone: ZoneName) => {
-    onMove(toZone)
-    onClose()
-  }
+    onMove(toZone);
+    onClose();
+  };
 
   const menuStyle: React.CSSProperties = {
-    position: 'fixed',
+    position: "fixed",
     left: position.x,
     top: position.y,
     zIndex: 100,
-    overflowY: 'auto',
-  }
+    overflowY: "auto",
+  };
 
   return (
     <>
@@ -131,8 +151,8 @@ export function CardActionMenu({
         className="fixed inset-0 z-50"
         onClick={onClose}
         onContextMenu={(e) => {
-          e.preventDefault()
-          onClose()
+          e.preventDefault();
+          onClose();
         }}
       />
       <div
@@ -143,8 +163,8 @@ export function CardActionMenu({
         {onBattlefield && (
           <>
             <MenuItem
-              label={isTapped ? 'Untap' : 'Tap'}
-              onClick={() => handleAction(isTapped ? 'untap' : 'tap')}
+              label={isTapped ? "Untap" : "Tap"}
+              onClick={() => handleAction(isTapped ? "untap" : "tap")}
             />
             <MenuDivider />
           </>
@@ -152,15 +172,15 @@ export function CardActionMenu({
 
         {hasFlip && canFlip && (
           <MenuItem
-            label={isFlipped ? 'Flip to Front' : 'Flip to Back'}
-            onClick={() => handleAction('flip')}
+            label={isFlipped ? "Flip to Front" : "Flip to Back"}
+            onClick={() => handleAction("flip")}
           />
         )}
 
         {canFaceDown && (
           <MenuItem
-            label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
-            onClick={() => handleAction('face_down')}
+            label={isFaceDown ? "Turn Face Up" : "Turn Face Down"}
+            onClick={() => handleAction("face_down")}
           />
         )}
 
@@ -171,16 +191,18 @@ export function CardActionMenu({
             <MenuItem
               label="Add Counter"
               hasSubmenu
-              open={isOpen('addCounter')}
-              onClick={() => toggle('addCounter')}
+              open={isOpen("addCounter")}
+              onClick={() => toggle("addCounter")}
             />
-            {isOpen('addCounter') && (
+            {isOpen("addCounter") && (
               <Submenu>
-                {COUNTER_TYPES.map(type => (
+                {COUNTER_TYPES.map((type) => (
                   <MenuItem
                     key={type}
                     label={type}
-                    onClick={() => handleAction('counter', { counter_type: type, delta: 1 })}
+                    onClick={() =>
+                      handleAction("counter", { counter_type: type, delta: 1 })
+                    }
                   />
                 ))}
                 {namingCounter ? (
@@ -188,11 +210,16 @@ export function CardActionMenu({
                     label="Counter name"
                     placeholder="Name"
                     action="Add"
-                    onSubmit={(name) => handleAction('counter', { counter_type: name, delta: 1 })}
+                    onSubmit={(name) =>
+                      handleAction("counter", { counter_type: name, delta: 1 })
+                    }
                     onCancel={() => setNamingCounter(false)}
                   />
                 ) : (
-                  <MenuItem label="Custom..." onClick={() => setNamingCounter(true)} />
+                  <MenuItem
+                    label="Custom..."
+                    onClick={() => setNamingCounter(true)}
+                  />
                 )}
               </Submenu>
             )}
@@ -202,16 +229,21 @@ export function CardActionMenu({
                 <MenuItem
                   label="Remove Counter"
                   hasSubmenu
-                  open={isOpen('removeCounter')}
-                  onClick={() => toggle('removeCounter')}
+                  open={isOpen("removeCounter")}
+                  onClick={() => toggle("removeCounter")}
                 />
-                {isOpen('removeCounter') && (
+                {isOpen("removeCounter") && (
                   <Submenu>
                     {Object.entries(counters).map(([type, count]) => (
                       <MenuItem
                         key={type}
                         label={`${type} (${count})`}
-                        onClick={() => handleAction('counter', { counter_type: type, delta: -1 })}
+                        onClick={() =>
+                          handleAction("counter", {
+                            counter_type: type,
+                            delta: -1,
+                          })
+                        }
                       />
                     ))}
                   </Submenu>
@@ -228,23 +260,25 @@ export function CardActionMenu({
             <MenuItem
               label="Spawn Token"
               hasSubmenu
-              open={isOpen('spawnToken')}
-              onClick={() => toggle('spawnToken')}
+              open={isOpen("spawnToken")}
+              onClick={() => toggle("spawnToken")}
             />
-            {isOpen('spawnToken') && (
+            {isOpen("spawnToken") && (
               <Submenu>
-                {card.tokens.map(token => (
+                {card.tokens.map((token) => (
                   <MenuItem
                     key={token.id}
                     label={token.name}
-                    onClick={() => handleAction('spawn', {
-                      token: {
-                        name: token.name,
-                        image_url: token.image_url,
-                        type_line: token.type_line,
-                      },
-                      for_opponent: isOpponent,
-                    })}
+                    onClick={() =>
+                      handleAction("spawn", {
+                        token: {
+                          name: token.name,
+                          image_url: token.image_url,
+                          type_line: token.type_line,
+                        },
+                        for_opponent: isOpponent,
+                      })
+                    }
                   />
                 ))}
               </Submenu>
@@ -257,7 +291,7 @@ export function CardActionMenu({
           <>
             <MenuItem
               label="Make Copy Token"
-              onClick={() => handleAction('copy_token')}
+              onClick={() => handleAction("copy_token")}
             />
             <MenuDivider />
           </>
@@ -268,16 +302,18 @@ export function CardActionMenu({
             <MenuItem
               label="Attach To"
               hasSubmenu
-              open={isOpen('attachTo')}
-              onClick={() => toggle('attachTo')}
+              open={isOpen("attachTo")}
+              onClick={() => toggle("attachTo")}
             />
-            {isOpen('attachTo') && (
+            {isOpen("attachTo") && (
               <Submenu maxHeight={ATTACH_TO_MAX_HEIGHT}>
-                {attachableCards.map(target => (
+                {attachableCards.map((target) => (
                   <MenuItem
                     key={target.id}
                     label={target.name}
-                    onClick={() => handleAction('attach', { parent_id: target.id })}
+                    onClick={() =>
+                      handleAction("attach", { parent_id: target.id })
+                    }
                   />
                 ))}
               </Submenu>
@@ -286,30 +322,33 @@ export function CardActionMenu({
         )}
 
         {isAttached && (
-          <MenuItem
-            label="Detach"
-            onClick={() => handleAction('detach')}
-          />
+          <MenuItem label="Detach" onClick={() => handleAction("detach")} />
         )}
 
-        {(onBattlefield && attachableCards.length > 0) || isAttached ? <MenuDivider /> : null}
+        {(onBattlefield && attachableCards.length > 0) || isAttached ? (
+          <MenuDivider />
+        ) : null}
 
         <MenuItem
           label="Move To"
           hasSubmenu
-          open={isOpen('moveTo')}
-          onClick={() => toggle('moveTo')}
+          open={isOpen("moveTo")}
+          onClick={() => toggle("moveTo")}
         />
-        {isOpen('moveTo') && (
+        {isOpen("moveTo") && (
           <Submenu>
             {moveTargets.map((target) => (
-              <MenuItem key={target.zone} label={target.label} onClick={() => handleMove(target.zone)} />
+              <MenuItem
+                key={target.zone}
+                label={target.label}
+                onClick={() => handleMove(target.zone)}
+              />
             ))}
           </Submenu>
         )}
       </div>
     </>
-  )
+  );
 }
 
 function MenuItem({
@@ -319,17 +358,17 @@ function MenuItem({
   open,
   disabled,
 }: {
-  label: string
-  onClick: () => void
-  hasSubmenu?: boolean
-  open?: boolean
-  disabled?: boolean
+  label: string;
+  onClick: () => void;
+  hasSubmenu?: boolean;
+  open?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       className={`
         w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
-        menu-item ${disabled ? 'text-[var(--ivory-faint)] cursor-not-allowed' : 'text-white'}
+        menu-item ${disabled ? "text-[var(--ivory-faint)] cursor-not-allowed" : "text-white"}
       `}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
@@ -338,20 +377,26 @@ function MenuItem({
       <span>{label}</span>
       {hasSubmenu && <span className="text-[var(--ivory-muted)]">›</span>}
     </button>
-  )
+  );
 }
 
 function MenuDivider() {
-  return <div className="border-t gold-divider my-1" />
+  return <div className="border-t gold-divider my-1" />;
 }
 
-function Submenu({ children, maxHeight }: { children: React.ReactNode; maxHeight?: number }) {
+function Submenu({
+  children,
+  maxHeight,
+}: {
+  children: React.ReactNode;
+  maxHeight?: number;
+}) {
   return (
     <div
       className="menu-submenu"
-      style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
+      style={maxHeight ? { maxHeight, overflowY: "auto" } : undefined}
     >
       {children}
     </div>
-  )
+  );
 }

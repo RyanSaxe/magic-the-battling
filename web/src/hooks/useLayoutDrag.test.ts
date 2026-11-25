@@ -17,12 +17,18 @@ describe("useLayoutDrag", () => {
     act(() => result.current.drag.start(SEED));
     act(() => result.current.drag.move("topFraction", 0.45));
     act(() => result.current.drag.move("topFraction", 0.5));
-    expect(result.current.constraints).toEqual({ topFraction: 0.5, bottomLeftSplit: 0.5 });
+    expect(result.current.constraints).toEqual({
+      topFraction: 0.5,
+      bottomLeftSplit: 0.5,
+    });
     expect(save).not.toHaveBeenCalled();
 
     act(() => result.current.drag.end());
     expect(save).toHaveBeenCalledTimes(1);
-    expect(save).toHaveBeenCalledWith({ topFraction: 0.5, bottomLeftSplit: 0.5 });
+    expect(save).toHaveBeenCalledWith({
+      topFraction: 0.5,
+      bottomLeftSplit: 0.5,
+    });
   });
 
   it("saves nothing when a divider is pressed and released without moving", () => {
@@ -39,9 +45,12 @@ describe("useLayoutDrag", () => {
   it("saves to the layout the drag started on when the board changes size mid-drag", () => {
     const saveOnLaptop = vi.fn();
     const saveOnDesktop = vi.fn();
-    const { result, rerender } = renderHook(({ save }) => useLayoutDrag(null, save), {
-      initialProps: { save: saveOnLaptop },
-    });
+    const { result, rerender } = renderHook(
+      ({ save }) => useLayoutDrag(null, save),
+      {
+        initialProps: { save: saveOnLaptop },
+      },
+    );
 
     act(() => result.current.drag.start(SEED));
     rerender({ save: saveOnDesktop });
@@ -56,19 +65,32 @@ describe("useLayoutDrag", () => {
     const setItem = vi.fn((key: string, value: string) => {
       store.set(key, value);
     });
-    vi.stubGlobal("localStorage", { getItem: (key: string) => store.get(key) ?? null, setItem });
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem,
+    });
     const board: BoardSize = { width: 952, height: 712 };
     const { result } = renderHook(() => {
-      const saved = useSavedLayout({ scopeKey: "phase:build", stage: 4, round: 2 }, board);
-      return { saved, ...useLayoutDrag(saved.constraints, saved.setConstraints) };
+      const saved = useSavedLayout(
+        { scopeKey: "phase:build", stage: 4, round: 2 },
+        board,
+      );
+      return {
+        saved,
+        ...useLayoutDrag(saved.constraints, saved.setConstraints),
+      };
     });
 
     act(() => result.current.drag.start(SEED));
-    for (const fraction of [0.41, 0.42, 0.43, 0.44]) act(() => result.current.drag.move("topFraction", fraction));
+    for (const fraction of [0.41, 0.42, 0.43, 0.44])
+      act(() => result.current.drag.move("topFraction", fraction));
     expect(setItem).not.toHaveBeenCalled();
 
     act(() => result.current.drag.end());
     expect(setItem).toHaveBeenCalledTimes(1);
-    expect(result.current.saved.constraints).toEqual({ topFraction: 0.44, bottomLeftSplit: 0.5 });
+    expect(result.current.saved.constraints).toEqual({
+      topFraction: 0.44,
+      bottomLeftSplit: 0.5,
+    });
   });
 });

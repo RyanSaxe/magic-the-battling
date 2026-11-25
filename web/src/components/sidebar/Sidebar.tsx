@@ -3,7 +3,10 @@ import type { PlayerView } from "../../types";
 import type { ScoutingTab } from "../../pages/gameSurfaces";
 import { PlayerList } from "../PlayerList";
 import { SidePanel } from "../common/SidePanel";
-import { SegmentedFilter, type SegmentOption } from "../dashboard/SegmentedFilter";
+import {
+  SegmentedFilter,
+  type SegmentOption,
+} from "../dashboard/SegmentedFilter";
 import { PlayerDetailPanel } from "./PlayerDetailPanel";
 
 export type FightSidebarView = "fight" | "players";
@@ -55,11 +58,16 @@ export function Sidebar({
 }: SidebarProps) {
   // The scouting panel keeps showing the last player while it slides out.
   const [shownScouting, setShownScouting] = useState(scouting);
-  if (scouting && (scouting.player !== shownScouting?.player || scouting.tab !== shownScouting.tab)) {
+  if (
+    scouting &&
+    (scouting.player !== shownScouting?.player ||
+      scouting.tab !== shownScouting.tab)
+  ) {
     setShownScouting(scouting);
   }
   const showingFight = !!renderFight && fightView === "fight";
-  const findPlayer = (name: string | undefined) => players.find((player) => player.name === name) ?? null;
+  const findPlayer = (name: string | undefined) =>
+    players.find((player) => player.name === name) ?? null;
   const scoutedPlayer = findPlayer(scouting?.player);
   const shownPlayer = findPlayer(shownScouting?.player);
 
@@ -77,7 +85,11 @@ export function Sidebar({
     />
   ) : null;
 
-  const scoutingDetails = (player: PlayerView, scoutingTab: ScoutingTab, onBack?: () => void) => (
+  const scoutingDetails = (
+    player: PlayerView,
+    scoutingTab: ScoutingTab,
+    onBack?: () => void,
+  ) => (
     <PlayerDetailPanel
       player={player}
       players={players}
@@ -92,12 +104,16 @@ export function Sidebar({
   return (
     <aside
       className={`relative h-full frame-chrome flex flex-col ${
-        isMobile ? "w-full overflow-hidden" : "w-[var(--sidebar-width)] overflow-visible"
+        isMobile
+          ? "w-full overflow-hidden"
+          : "w-[var(--sidebar-width)] overflow-visible"
       }`}
       data-guide-target="sidebar-panel"
     >
       {showingFight ? (
-        <div className={`flex flex-col flex-1 min-h-0 ${isMobile ? "py-[2px]" : ""}`}>
+        <div
+          className={`flex flex-col flex-1 min-h-0 ${isMobile ? "py-[2px]" : ""}`}
+        >
           <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0">
             {renderFight(viewSwitch)}
           </div>
@@ -111,9 +127,11 @@ export function Sidebar({
             players={players}
             currentPlayerName={currentPlayer.name}
             scoutedPlayerName={scouting?.player ?? null}
-            onPlayerClick={(player) => (
-              scouting?.player === player ? onStopScouting() : onScout(player, "seen")
-            )}
+            onPlayerClick={(player) =>
+              scouting?.player === player
+                ? onStopScouting()
+                : onScout(player, "seen")
+            }
             renderMicToggle={renderMicToggle}
           />
           {watchLink}
@@ -128,7 +146,9 @@ export function Sidebar({
           placement="beside"
           guideTarget="sidebar-detail-drawer"
         >
-          {shownScouting && shownPlayer && scoutingDetails(shownPlayer, shownScouting.tab)}
+          {shownScouting &&
+            shownPlayer &&
+            scoutingDetails(shownPlayer, shownScouting.tab)}
         </SidePanel>
       )}
     </aside>

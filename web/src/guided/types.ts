@@ -101,9 +101,16 @@ export interface GuidedWalkthroughContext {
 }
 
 export interface GuideStepSidebarState {
-  openOnMobile?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
-  playerName?: string | null | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
-  detailTab?: ScoutingTab | ((ctx: GuidedWalkthroughContext) => ScoutingTab | undefined);
+  openOnMobile?:
+    | boolean
+    | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
+  playerName?:
+    | string
+    | null
+    | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
+  detailTab?:
+    | ScoutingTab
+    | ((ctx: GuidedWalkthroughContext) => ScoutingTab | undefined);
 }
 
 export interface GuideStepDefinition {
@@ -111,11 +118,21 @@ export interface GuideStepDefinition {
   title: string;
   content: GuideStepContent;
   targetId?: GuideTargetId;
-  targetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
-  waitForLayoutTargetId?: GuideTargetId | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
-  waitForLayoutTargetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
-  positionTargetId?: GuideTargetId | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
-  positionTargetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  targetSelector?:
+    | string
+    | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  waitForLayoutTargetId?:
+    | GuideTargetId
+    | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
+  waitForLayoutTargetSelector?:
+    | string
+    | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  positionTargetId?:
+    | GuideTargetId
+    | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
+  positionTargetSelector?:
+    | string
+    | ((ctx: GuidedWalkthroughContext) => string | undefined);
   placement?: GuidePlacement;
   cardPlacement?: GuideCardPlacement;
   mobileCardPlacement?: GuideCardPlacement;

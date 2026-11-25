@@ -1,39 +1,39 @@
-import Markdown, { defaultUrlTransform } from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkDirective from 'remark-directive'
-import remarkCalloutDirectives from '@microflash/remark-callout-directives'
-import rehypeRaw from 'rehype-raw'
-import type { Components } from 'react-markdown'
-import { useDocNav } from '../contexts/DocNavContext'
-import { PHASE_HOTKEYS } from '../constants/hotkeys'
-import { HotkeyRow } from './HotkeyRow'
-import { selectInputBlocks } from '../docs/parse'
-import { canHover } from '../utils/inputMode'
-import { LINK } from './common/styles'
+import Markdown, { defaultUrlTransform } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkDirective from "remark-directive";
+import remarkCalloutDirectives from "@microflash/remark-callout-directives";
+import rehypeRaw from "rehype-raw";
+import type { Components } from "react-markdown";
+import { useDocNav } from "../contexts/DocNavContext";
+import { PHASE_HOTKEYS } from "../constants/hotkeys";
+import { HotkeyRow } from "./HotkeyRow";
+import { selectInputBlocks } from "../docs/parse";
+import { canHover } from "../utils/inputMode";
+import { LINK } from "./common/styles";
 
 function urlTransform(url: string) {
-  if (url.startsWith('doc:') || url.startsWith('docs:')) return url
-  return defaultUrlTransform(url)
+  if (url.startsWith("doc:") || url.startsWith("docs:")) return url;
+  return defaultUrlTransform(url);
 }
 
 const calloutOptions = {
   callouts: {
     tip: {
-      title: 'Tip',
+      title: "Tip",
       hint: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>',
     },
   },
-}
+};
 
-const HOTKEY_RE = /\{\{hotkeys:(\w[\w-]*)\}\}/
+const HOTKEY_RE = /\{\{hotkeys:(\w[\w-]*)\}\}/;
 
 interface DocRendererProps {
-  content: string
-  className?: string
+  content: string;
+  className?: string;
 }
 
 export function DocRenderer({ content, className }: DocRendererProps) {
-  const docNav = useDocNav()
+  const docNav = useDocNav();
 
   const components: Components = {
     h2: ({ children }) => (
@@ -47,7 +47,9 @@ export function DocRenderer({ content, className }: DocRendererProps) {
       </h3>
     ),
     p: ({ children }) => (
-      <p className="text-sm text-[var(--ivory-muted)] mb-3 leading-relaxed">{children}</p>
+      <p className="text-sm text-[var(--ivory-muted)] mb-3 leading-relaxed">
+        {children}
+      </p>
     ),
     ul: ({ children }) => (
       <ul className="doc-list space-y-1.5 mb-3">{children}</ul>
@@ -58,29 +60,29 @@ export function DocRenderer({ content, className }: DocRendererProps) {
       </li>
     ),
     table: ({ children }) => (
-      <table className="w-full text-sm text-[var(--ivory-muted)] mb-3 [&_tr:nth-child(even)]:bg-white/3">{children}</table>
+      <table className="w-full text-sm text-[var(--ivory-muted)] mb-3 [&_tr:nth-child(even)]:bg-white/3">
+        {children}
+      </table>
     ),
     th: ({ children }) => (
-      <th className="text-left text-[var(--ivory-muted)] font-medium pb-1 pr-3 border-b border-amber-400/15">{children}</th>
+      <th className="text-left text-[var(--ivory-muted)] font-medium pb-1 pr-3 border-b border-amber-400/15">
+        {children}
+      </th>
     ),
-    td: ({ children }) => (
-      <td className="pb-1 pr-3">{children}</td>
-    ),
+    td: ({ children }) => <td className="pb-1 pr-3">{children}</td>,
     strong: ({ children }) => (
       <strong className="text-amber-200 font-semibold">{children}</strong>
     ),
-    hr: () => (
-      <hr className="border-t border-amber-400/20 my-4" />
-    ),
+    hr: () => <hr className="border-t border-amber-400/20 my-4" />,
     blockquote: ({ children }) => (
       <blockquote className="border-l-3 border-amber-400/40 pl-4 italic text-[var(--ivory-muted)] my-3">
         {children}
       </blockquote>
     ),
     a: ({ href, children }) => {
-      if (href?.startsWith('doc:') || href?.startsWith('docs:')) {
-        const rest = href.startsWith('docs:') ? href.slice(5) : href.slice(4)
-        const [docId, tab] = rest.split('#')
+      if (href?.startsWith("doc:") || href?.startsWith("docs:")) {
+        const rest = href.startsWith("docs:") ? href.slice(5) : href.slice(4);
+        const [docId, tab] = rest.split("#");
         return (
           <button
             onClick={() => docNav.navigate(docId, tab)}
@@ -88,25 +90,30 @@ export function DocRenderer({ content, className }: DocRendererProps) {
           >
             {children}
           </button>
-        )
+        );
       }
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors`}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors`}
+        >
           {children}
         </a>
-      )
+      );
     },
-  }
+  };
 
-  const segments = selectInputBlocks(content, canHover).split(HOTKEY_RE)
+  const segments = selectInputBlocks(content, canHover).split(HOTKEY_RE);
 
   return (
     <div className={className}>
       {segments.map((segment, i) => {
         if (i % 2 === 1) {
-          const key = segment
-          const hotkeys = PHASE_HOTKEYS[key] ?? []
-          const hoverHotkeys = PHASE_HOTKEYS[`${key}-hover`] ?? []
+          const key = segment;
+          const hotkeys = PHASE_HOTKEYS[key] ?? [];
+          const hoverHotkeys = PHASE_HOTKEYS[`${key}-hover`] ?? [];
           return (
             <div key={i} className="space-y-4">
               {hotkeys.length > 0 && (
@@ -129,15 +136,25 @@ export function DocRenderer({ content, className }: DocRendererProps) {
                 </div>
               )}
             </div>
-          )
+          );
         }
-        if (!segment) return null
+        if (!segment) return null;
         return (
-          <Markdown key={i} remarkPlugins={[remarkGfm, remarkDirective, [remarkCalloutDirectives, calloutOptions]]} rehypePlugins={[rehypeRaw]} urlTransform={urlTransform} components={components}>
+          <Markdown
+            key={i}
+            remarkPlugins={[
+              remarkGfm,
+              remarkDirective,
+              [remarkCalloutDirectives, calloutOptions],
+            ]}
+            rehypePlugins={[rehypeRaw]}
+            urlTransform={urlTransform}
+            components={components}
+          >
             {segment}
           </Markdown>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

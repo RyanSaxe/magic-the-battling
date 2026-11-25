@@ -1,9 +1,6 @@
 import type { PlayerView } from "../types";
 
-export function comparePlayersForSidebar(
-  a: PlayerView,
-  b: PlayerView,
-): number {
+export function comparePlayersForSidebar(a: PlayerView, b: PlayerView): number {
   if (a.placement === 0 && b.placement === 0) {
     const poisonDiff = a.poison - b.poison;
     // A tie keeps the server's order, which is the Lobby's: people as they joined, then puppets.
@@ -21,7 +18,9 @@ export function comparePlayersForSidebar(
 }
 
 export function suddenDeathDecidesGame(players: PlayerView[]): boolean {
-  return !players.some((player) => !player.in_sudden_death && player.placement === 0);
+  return !players.some(
+    (player) => !player.in_sudden_death && player.placement === 0,
+  );
 }
 
 export function getSidebarPlayerOrder(players: PlayerView[]): PlayerView[] {
@@ -57,7 +56,9 @@ export function isSidebarLastPlace(
   player: PlayerView,
   players: PlayerView[],
 ): boolean {
-  const ranks = players.map((candidate) => getSidebarPlacementRank(candidate, players));
+  const ranks = players.map((candidate) =>
+    getSidebarPlacementRank(candidate, players),
+  );
   const lastRank = Math.max(...ranks);
   return lastRank > 1 && getSidebarPlacementRank(player, players) === lastRank;
 }

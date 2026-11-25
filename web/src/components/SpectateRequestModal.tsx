@@ -1,19 +1,21 @@
-import type { SpectateRequest } from '../hooks/useWebSocket'
-import { usePanelHoldsEnter } from '../utils/enterKey'
-import { DIALOG_BACKDROP } from './common/styles'
-import { SurfaceCard } from './common/SurfaceCard'
+import type { SpectateRequest } from "../hooks/useWebSocket";
+import { usePanelHoldsEnter } from "../utils/enterKey";
+import { DIALOG_BACKDROP } from "./common/styles";
+import { SurfaceCard } from "./common/SurfaceCard";
 
 export function SpectateRequestModal({
   request,
   onRespond,
 }: {
-  request: SpectateRequest
-  onRespond: (requestId: string, allowed: boolean) => void
+  request: SpectateRequest;
+  onRespond: (requestId: string, allowed: boolean) => void;
 }) {
-  usePanelHoldsEnter()
+  usePanelHoldsEnter();
   // A spectator is waiting on this answer, so it sits above the guide and any menu or card preview.
   return (
-    <div className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-[102] p-4`}>
+    <div
+      className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-[102] p-4`}
+    >
       <SurfaceCard>
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-[var(--ivory-muted)] mb-6">
@@ -35,5 +37,5 @@ export function SpectateRequestModal({
         </div>
       </SurfaceCard>
     </div>
-  )
+  );
 }

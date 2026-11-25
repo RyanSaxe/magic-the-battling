@@ -36,7 +36,8 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
     ref,
   ) {
     const isLastStep = stepIndex + 1 === totalSteps;
-    const primaryActionLabel = step.primaryActionLabel ?? (isLastStep ? "Got it" : "Next");
+    const primaryActionLabel =
+      step.primaryActionLabel ?? (isLastStep ? "Got it" : "Next");
     const showSkipTutorial = showSkipAll && stepIndex === 0;
 
     return (

@@ -1,38 +1,38 @@
-import { useState } from 'react'
-import { createBattler } from '../../api/client'
-import type { PlayMode, UserBattler } from '../../types'
-import { unknownToAppError } from '../../utils/appError'
-import { DefaultOpponentsField } from './DefaultOpponentsField'
-import { FIELD_LABEL, OPTION_BOX, TEXT_INPUT } from '../common/styles'
-import { Dialog } from '../common/Dialog'
-import { InfoTip } from '../common/InfoTip'
-import { UPGRADES_HELP } from '../../constants/rules'
+import { useState } from "react";
+import { createBattler } from "../../api/client";
+import type { PlayMode, UserBattler } from "../../types";
+import { unknownToAppError } from "../../utils/appError";
+import { DefaultOpponentsField } from "./DefaultOpponentsField";
+import { FIELD_LABEL, OPTION_BOX, TEXT_INPUT } from "../common/styles";
+import { Dialog } from "../common/Dialog";
+import { InfoTip } from "../common/InfoTip";
+import { UPGRADES_HELP } from "../../constants/rules";
 
 export function AddCubeModal({
-  initialCubeId = '',
+  initialCubeId = "",
   onClose,
   onCreated,
   addToast,
 }: {
-  initialCubeId?: string
-  onClose: () => void
-  onCreated: (b: UserBattler) => void
-  addToast: (msg: string, type: 'error' | 'info') => void
+  initialCubeId?: string;
+  onClose: () => void;
+  onCreated: (b: UserBattler) => void;
+  addToast: (msg: string, type: "error" | "info") => void;
 }) {
-  const [cubeId, setCubeId] = useState(initialCubeId)
-  const [displayName, setDisplayName] = useState('')
-  const [playMode, setPlayMode] = useState<PlayMode>('limited')
-  const [useUpgrades, setUseUpgrades] = useState(true)
-  const [puppetCount, setPuppetCount] = useState(3)
-  const [saving, setSaving] = useState(false)
+  const [cubeId, setCubeId] = useState(initialCubeId);
+  const [displayName, setDisplayName] = useState("");
+  const [playMode, setPlayMode] = useState<PlayMode>("limited");
+  const [useUpgrades, setUseUpgrades] = useState(true);
+  const [puppetCount, setPuppetCount] = useState(3);
+  const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!cubeId.trim()) {
-      addToast('Please enter a CubeCobra ID', 'error')
-      return
+      addToast("Please enter a CubeCobra ID", "error");
+      return;
     }
-    setSaving(true)
+    setSaving(true);
     try {
       const b = await createBattler({
         cube_id: cubeId.trim(),
@@ -41,18 +41,20 @@ export function AddCubeModal({
         use_upgrades: useUpgrades,
         puppet_count: puppetCount,
         target_player_count: puppetCount + 1,
-      })
-      onCreated(b)
+      });
+      onCreated(b);
     } catch (err) {
-      addToast(unknownToAppError(err, 'create-battler', 'Failed to create').message, 'error')
+      addToast(
+        unknownToAppError(err, "create-battler", "Failed to create").message,
+        "error",
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <Dialog title="Add Cube / Deck" onClose={onClose} onSubmit={handleSubmit}>
-
       <div className="space-y-3">
         <div>
           <label className={FIELD_LABEL}>CubeCobra ID</label>
@@ -68,7 +70,10 @@ export function AddCubeModal({
         </div>
 
         <div>
-          <label className={FIELD_LABEL}>Display Name <span className="text-[var(--ivory-muted)]">(optional)</span></label>
+          <label className={FIELD_LABEL}>
+            Display Name{" "}
+            <span className="text-[var(--ivory-muted)]">(optional)</span>
+          </label>
           <input
             type="text"
             value={displayName}
@@ -78,15 +83,21 @@ export function AddCubeModal({
           />
         </div>
 
-        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+        <label
+          className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}
+        >
           <input
             type="checkbox"
-            checked={playMode === 'constructed'}
-            onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
+            checked={playMode === "constructed"}
+            onChange={(e) =>
+              setPlayMode(e.target.checked ? "constructed" : "limited")
+            }
             className="w-4 h-4"
           />
           <span className="text-white text-sm">Constructed</span>
-          <span className="text-[var(--ivory-muted)] text-xs">— bring your own deck</span>
+          <span className="text-[var(--ivory-muted)] text-xs">
+            — bring your own deck
+          </span>
         </label>
 
         <div className={`${OPTION_BOX} pl-3 pr-1 flex items-center`}>
@@ -110,8 +121,8 @@ export function AddCubeModal({
         disabled={saving || !cubeId.trim()}
         className="btn btn-primary w-full py-2 mt-4 font-semibold disabled:opacity-50"
       >
-        {saving ? 'Saving...' : 'Add Cube / Deck'}
+        {saving ? "Saving..." : "Add Cube / Deck"}
       </button>
     </Dialog>
-  )
+  );
 }
