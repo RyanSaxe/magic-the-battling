@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState, type ReactNode } from "react";
 import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
+import { useObservedElement } from "../../hooks/pages/useObservedElement";
 import type { Card as CardType } from "../../types";
 import { Card } from "../card";
 import { UpgradeStack } from "./UpgradeStack";
@@ -37,90 +38,67 @@ export function ZoneModal({
   upgradedCardIds?: Set<string>;
   appliedUpgradesByCardId?: Map<string, CardType[]>;
   onClose: () => void;
-}) {
+}): ReactNode {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_MODAL_DIMS);
-  const observerRef = useRef<ResizeObserver | null>(null);
 
-  const bodyRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
+  const bodyRef = useObservedElement<HTMLDivElement>(
+    (node) => {
+      const cs = getComputedStyle(node);
+      const width =
+        node.clientWidth -
+        parseFloat(cs.paddingLeft) -
+        parseFloat(cs.paddingRight);
+      const height =
+        node.clientHeight -
+        parseFloat(cs.paddingTop) -
+        parseFloat(cs.paddingBottom);
 
-      if (!node) return;
-
-      const measure = () => {
-        const cs = getComputedStyle(node);
-        const width =
-          node.clientWidth -
-          parseFloat(cs.paddingLeft) -
-          parseFloat(cs.paddingRight);
-        const height =
-          node.clientHeight -
-          parseFloat(cs.paddingTop) -
-          parseFloat(cs.paddingBottom);
-
-        const next = bestFit(
-          cards.length,
-          Math.max(width, 0),
-          Math.max(height, 0),
-          8,
-          220,
-          64,
-        );
-
-        setDims((prev) =>
-          prev.width === next.width &&
-          prev.height === next.height &&
-          prev.rows === next.rows &&
-          prev.columns === next.columns
-            ? prev
-            : next,
-        );
-      };
-
-      measure();
-
-      const observer = new ResizeObserver(() => {
-        measure();
+      const next = bestFit({
+        count: cards.length,
+        availWidth: Math.max(width, 0),
+        availHeight: Math.max(height, 0),
+        gap: 8,
+        maxWidth: 220,
+        minWidth: 64,
       });
 
-      observer.observe(node);
-      observerRef.current = observer;
+      setDims((prev) =>
+        prev.width === next.width &&
+        prev.height === next.height &&
+        prev.rows === next.rows &&
+        prev.columns === next.columns
+          ? prev
+          : next,
+      );
     },
-    [cards.length],
+    { deps: [cards.length] },
   );
 
-  useEffect(() => {
-    return () => {
-      observerRef.current?.disconnect();
-    };
-  }, []);
-
   return (
-    <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="modal-chrome border gold-border rounded-lg w-full max-w-6xl h-[85vh] max-h-[860px] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <button
+        type="button"
+        aria-label={`Close ${title}`}
+        className="absolute inset-0 bg-black/60 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative z-10 modal-chrome border gold-border rounded-lg w-full max-w-6xl h-[85vh] max-h-[860px] flex flex-col overflow-hidden">
         <div className="px-4 py-2 border-b gold-divider flex justify-between items-center shrink-0">
           <h3 className="text-white font-medium">
             {title} ({cards.length})
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-lg leading-none"
+            className="text-[var(--ivory-muted)] hover:text-white text-lg leading-none"
           >
             ✕
           </button>
         </div>
         <div ref={bodyRef} className="flex-1 min-h-0 p-3 overflow-auto">
           {cards.length === 0 ? (
-            <div className="text-gray-500 text-center py-4">No cards</div>
+            <div className="text-[var(--ivory-muted)] text-center py-4">
+              No cards
+            </div>
           ) : (
             <div
               className="grid gap-2 justify-center content-start"
@@ -165,7 +143,7 @@ export function ZoneDisplay({
   companionIds,
   upgradedCardIds,
   appliedUpgradesByCardId,
-}: ZoneDisplayProps) {
+}: ZoneDisplayProps): ReactNode {
   const [showModal, setShowModal] = useState(false);
 
   const displayedCards = cards.slice(0, maxThumbnails);
@@ -179,9 +157,13 @@ export function ZoneDisplay({
           cards.length > 0 ? "hover:cursor-pointer" : "cursor-default"
         }`}
       >
-        <div className="text-[10px] text-gray-400 uppercase mb-1">{title}</div>
+        <div className="text-[10px] text-[var(--ivory-muted)] uppercase mb-1">
+          {title}
+        </div>
         {cards.length === 0 ? (
-          <span className="text-gray-500 text-xs">No Cards Seen</span>
+          <span className="text-[var(--ivory-muted)] text-xs">
+            No Cards Seen
+          </span>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
             <div className="grid gap-1 grid-cols-3">
@@ -205,7 +187,7 @@ export function ZoneDisplay({
               )}
             </div>
             {remainingCount > 0 && (
-              <div className="text-[10px] text-gray-400">
+              <div className="text-[10px] text-[var(--ivory-muted)]">
                 +{remainingCount} more
               </div>
             )}

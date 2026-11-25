@@ -1,815 +1,778 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FaDiscord, FaUser } from 'react-icons/fa6'
-import { PuppetIcon } from '../components/icons/PuppetIcon'
-import { useAuth } from '../contexts/authState'
-import { useToast } from '../contexts'
-import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
-import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
-import { InfoCard } from '../components/common/InfoCard'
+import { useState, type CSSProperties, type ReactElement } from "react";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "../contexts";
+import { useRequireAuth } from "../hooks/pages/useAuthSession";
+import { AppHeader, UserMenuButton } from "../components/common/AppHeader";
+import { SurfaceCard } from "../components/common/SurfaceCard";
+import { JoinGameModal } from "../components/home/JoinGameModal";
+import { CloseSeatDialog, ResumeGamesDialog } from "../components/ResumeGame";
+import { AddCubeModal } from "../components/dashboard/AddCubeModal";
+import { CubeTile } from "../components/dashboard/CubeTile";
+import { DashboardFrame } from "../components/dashboard/DashboardFrame";
+import { DeletePresetDialog } from "../components/dashboard/DeletePresetDialog";
+import { GameTile } from "../components/dashboard/GameTile";
+import { JoinCodeBox } from "../components/dashboard/JoinCodeBox";
+import { ResumeBanner } from "../components/dashboard/ResumeBanner";
+import { LoadMoreButton } from "../components/dashboard/ResultList";
 import {
-  getBattlers,
-  createBattler,
+  Count,
+  NoticeTile,
+  PlayIcon,
+  SectionCounts,
+  SectionLink,
+  SectionTitle,
+  WinsCount,
+} from "../components/dashboard/Section";
+import { SegmentedFilter } from "../components/dashboard/SegmentedFilter";
+import {
   deleteBattler,
+  getBattlers,
   getFollowing,
-  unfollowCube,
-  discoverCubes,
-  followCube,
   getMyGames,
-  type DiscoverResult,
-} from '../api/client'
-import type { UserBattler, FollowedBattler, GameSummary, PlayMode } from '../types'
-import { unknownToAppError } from '../utils/appError'
-import { battlerPlayUrl } from '../utils/battlerPlayUrl'
+  unfollowCube,
+} from "../api/client";
+import { useFirstLoad } from "../hooks/useFirstLoad";
+import {
+  useResumableGames,
+  type ResumableSeat,
+} from "../hooks/useResumableGames";
+import type { GameSummary } from "../types";
+import { battlerPlayUrl } from "../utils/battlerPlayUrl";
+import {
+  countLabel,
+  cubeTitle,
+  formatWhen,
+  upgradesLabel,
+} from "../utils/accountFormat";
+import {
+  canRemove,
+  libraryEntries,
+  libraryEntryKey,
+  libraryHasMore,
+  loadedLibrary,
+  nextLibraryPage,
+  withAddedPreset,
+  withLibraryPage,
+  withLibraryPageFailed,
+  withLibraryPageRequested,
+  withRemovalFailed,
+  withRemovalStarted,
+  withRemoved,
+  type Library,
+  type LibraryEntry,
+  type LibraryPage,
+} from "./dashboardState";
 
-type Tab = 'battlers' | 'following' | 'games' | 'discover'
+const RECENT_GAME_COUNT = 3;
 
-const TAB_LABELS: Record<Tab, string> = {
-  battlers: 'My Cubes',
-  following: 'Following',
-  games: 'Games',
-  discover: 'Discover',
+type BoardSection = "library" | "recent";
+
+/** The two sections' names, shared by their headers on wide screens and the switch that stands in for them below. */
+const SECTION_NAMES: Record<BoardSection, string> = {
+  library: "Cubes & Decks",
+  recent: "Recent Games",
+};
+
+/** Both headers share a height and center their items, so their titles share a baseline and their first cards a top. */
+const SECTION_HEADER = "flex min-h-9 flex-wrap items-center gap-x-3 gap-y-2";
+
+interface GridCellStyle extends CSSProperties {
+  "--grid-row": number;
+  "--grid-column": number;
 }
 
-export function Dashboard() {
-  const navigate = useNavigate()
-  const { user, loading: authLoading } = useAuth()
-  const { addToast } = useToast()
-  const [tab, setTab] = useState<Tab>('battlers')
+interface BoardRowsStyle extends CSSProperties {
+  "--board-rows": string;
+}
 
-  const [battlers, setBattlers] = useState<UserBattler[]>([])
-  const [battlersHasMore, setBattlersHasMore] = useState(false)
-  const [battlersOffset, setBattlersOffset] = useState(0)
-  const [following, setFollowing] = useState<FollowedBattler[]>([])
-  const [followingHasMore, setFollowingHasMore] = useState(false)
-  const [followingOffset, setFollowingOffset] = useState(0)
-  const [loadingData, setLoadingData] = useState(true)
-  const [showAddModal, setShowAddModal] = useState(false)
+/** Places a card in the grid on screens 1280px and wider: the library fills columns 1 and 2, and recent games column 4, after a spacer. */
+function gridCell(row: number, column: number): CSSProperties {
+  const style: GridCellStyle = { "--grid-row": row, "--grid-column": column };
+  return style;
+}
 
-  const [myGames, setMyGames] = useState<GameSummary[]>([])
-  const [myGamesHasMore, setMyGamesHasMore] = useState(false)
-  const [myGamesOffset, setMyGamesOffset] = useState(0)
-  const [myGamesLoading, setMyGamesLoading] = useState(false)
-  const [myGamesLoaded, setMyGamesLoaded] = useState(false)
-  const [myGamesTotalGames, setMyGamesTotalGames] = useState(0)
-  const [myGamesTotalWins, setMyGamesTotalWins] = useState(0)
+function boardRowsStyle(libraryRows: number): CSSProperties {
+  const style: BoardRowsStyle = {
+    "--board-rows": `auto repeat(${libraryRows}, auto) 1fr`,
+  };
+  return style;
+}
 
-  const [discoverResults, setDiscoverResults] = useState<DiscoverResult[]>([])
-  const [discoverLoading, setDiscoverLoading] = useState(false)
-  const [discoverHasMore, setDiscoverHasMore] = useState(false)
-  const [discoverOffset, setDiscoverOffset] = useState(0)
-  const [discoverLoaded, setDiscoverLoaded] = useState(false)
+const GRID_CELL =
+  "xl:[grid-row:var(--grid-row)] xl:[grid-column:var(--grid-column)]";
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login?returnTo=/dashboard', { replace: true })
-    }
-  }, [authLoading, user, navigate])
+interface MyGames {
+  games: GameSummary[];
+  totalGames: number;
+  totalWins: number;
+}
 
-  const refresh = useCallback(async () => {
-    if (!user) return
-    setLoadingData(true)
-    try {
-      const [bData, fData] = await Promise.all([getBattlers(), getFollowing()])
-      setBattlers(bData.battlers)
-      setBattlersHasMore(bData.has_more)
-      setBattlersOffset(bData.battlers.length)
-      setFollowing(fData.following)
-      setFollowingHasMore(fData.has_more)
-      setFollowingOffset(fData.following.length)
-    } catch {
-      addToast('Failed to load data', 'error')
-    } finally {
-      setLoadingData(false)
-    }
-  }, [user, addToast])
+async function loadLibrary(): Promise<Library> {
+  const [saved, following] = await Promise.all([getBattlers(), getFollowing()]);
+  return loadedLibrary(saved, following);
+}
 
-  useEffect(() => { refresh() }, [refresh])
+async function loadMyGames(): Promise<MyGames> {
+  const data = await getMyGames(0);
+  return {
+    games: data.games,
+    totalGames: data.total_games,
+    totalWins: data.total_wins,
+  };
+}
 
-  if (authLoading || !user) return null
+function DashboardQuickBar({
+  username,
+  myGames,
+  allCount,
+  showLibraryCount,
+  onNewGame,
+  onOpenJoinModal,
+}: {
+  username: string;
+  myGames: MyGames | null;
+  allCount: string;
+  showLibraryCount: boolean;
+  onNewGame: () => void;
+  onOpenJoinModal: () => void;
+}): ReactElement {
+  return (
+    <SurfaceCard
+      as="section"
+      layout="tile"
+      aria-label="Start or join a game"
+      className="flex flex-col gap-3 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onNewGame}
+          className="btn btn-primary flex h-9 flex-1 items-center justify-center gap-2 !py-0 px-5 font-semibold sm:flex-none"
+        >
+          <PlayIcon />
+          New Game
+        </button>
+        <JoinCodeBox playerName={username} className="hidden md:flex" />
+        <button
+          type="button"
+          onClick={onOpenJoinModal}
+          className="btn btn-secondary h-9 flex-1 !py-0 px-4 font-medium sm:flex-none md:hidden"
+        >
+          Join Code
+        </button>
+      </div>
+      {myGames && (
+        <SectionCounts className="flex items-center justify-between gap-4 whitespace-nowrap sm:justify-end">
+          <Count value={myGames.totalGames}>
+            {" "}
+            {myGames.totalGames === 1 ? "game" : "games"}
+          </Count>
+          <WinsCount wins={myGames.totalWins} games={myGames.totalGames} />
+          {showLibraryCount && (
+            <Count value={allCount} className="hidden lg:inline">
+              {" "}
+              saved &amp; followed
+            </Count>
+          )}
+        </SectionCounts>
+      )}
+    </SurfaceCard>
+  );
+}
+
+function LibraryCards({
+  status,
+  library,
+  entries,
+  libraryCell,
+  onRetry,
+  onRemove,
+}: {
+  status: string;
+  library: Library | null;
+  entries: LibraryEntry[];
+  libraryCell: string;
+  onRetry: () => void;
+  onRemove: (entry: LibraryEntry) => void;
+}): ReactElement {
+  if (status === "failed") {
+    return (
+      <NoticeTile
+        style={gridCell(2, 2)}
+        className={libraryCell}
+        action={{ label: "Retry", onClick: onRetry }}
+      >
+        Your cubes and decks didn&apos;t load.
+      </NoticeTile>
+    );
+  }
+  if (!library) {
+    return (
+      <NoticeTile style={gridCell(2, 2)} className={libraryCell}>
+        Loading...
+      </NoticeTile>
+    );
+  }
+  return (
+    <>
+      {entries.map((entry, index) => (
+        <LibraryTile
+          key={libraryEntryKey(entry)}
+          entry={entry}
+          style={gridCell(
+            2 + Math.floor((index + 1) / 2),
+            1 + ((index + 1) % 2),
+          )}
+          className={libraryCell}
+          removable={canRemove(library, entry)}
+          onRemove={onRemove}
+        />
+      ))}
+    </>
+  );
+}
+
+function RecentGamesCards({
+  status,
+  myGames,
+  recentGames,
+  onRetry,
+}: {
+  status: string;
+  myGames: MyGames | null;
+  recentGames: GameSummary[];
+  onRetry: () => void;
+}): ReactElement {
+  if (status === "failed") {
+    return (
+      <NoticeTile action={{ label: "Retry", onClick: onRetry }}>
+        Your games didn&apos;t load.
+      </NoticeTile>
+    );
+  }
+  if (!myGames) {
+    return <NoticeTile>Loading...</NoticeTile>;
+  }
+  if (recentGames.length === 0) {
+    return <NoticeTile>Your finished games show up here.</NoticeTile>;
+  }
+  return (
+    <>
+      {recentGames.map((game) => (
+        <GameTile key={game.game_id} game={game} />
+      ))}
+    </>
+  );
+}
+
+function LibraryAddSlot({
+  isLibraryEmpty,
+  className,
+  onOpenAddModal,
+}: {
+  isLibraryEmpty: boolean;
+  className: string;
+  onOpenAddModal: () => void;
+}): ReactElement {
+  return (
+    <div
+      data-testid="library-add-slot"
+      style={gridCell(2, 1)}
+      className={`dashboard-add-slot ${className}`}
+    >
+      {isLibraryEmpty && (
+        <p className="max-w-sm text-sm text-[var(--ivory-felt)]">
+          Save a cube or deck with your settings to play it again in one click.
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onOpenAddModal}
+        className="btn btn-secondary py-2 px-4 text-sm font-semibold"
+      >
+        + Add Cube / Deck
+      </button>
+      <SectionLink to="/dashboard/discover">
+        Discover cubes / decks →
+      </SectionLink>
+    </div>
+  );
+}
+
+function LibraryLoadMoreSlot({
+  library,
+  hasMore,
+  libraryRows,
+  className,
+  onLoadMore,
+}: {
+  library: Library | null;
+  hasMore: boolean;
+  libraryRows: number;
+  className: string;
+  onLoadMore: () => void;
+}): ReactElement | null {
+  if (!library || !hasMore) return null;
+  return (
+    <LoadMoreButton
+      loading={library.loadingMore}
+      disabled={!nextLibraryPage(library)}
+      onClick={onLoadMore}
+      style={gridCell(2 + libraryRows, 1)}
+      className={`${className} justify-self-center self-start`}
+    />
+  );
+}
+
+function DashboardBoard({
+  phoneSection,
+  setPhoneSection,
+  libraryStatus,
+  library,
+  entries,
+  hasMore,
+  myGamesStatus,
+  myGames,
+  onRetryLibrary,
+  onRetryGames,
+  onLoadMoreLibrary,
+  onRemove,
+  onOpenAddModal,
+}: {
+  phoneSection: BoardSection;
+  setPhoneSection: (section: BoardSection) => void;
+  libraryStatus: string;
+  library: Library | null;
+  entries: LibraryEntry[];
+  hasMore: boolean;
+  myGamesStatus: string;
+  myGames: MyGames | null;
+  onRetryLibrary: () => void;
+  onRetryGames: () => void;
+  onLoadMoreLibrary: () => void;
+  onRemove: (entry: LibraryEntry) => void;
+  onOpenAddModal: () => void;
+}): ReactElement {
+  const isLibraryEmpty = Boolean(library) && entries.length === 0;
+  const libraryRows = Math.max(1, Math.ceil((entries.length + 1) / 2));
+  const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? [];
+  // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
+  const libraryCell = `${GRID_CELL} ${phoneSection === "library" ? "" : "max-xl:hidden"}`;
+  const libraryNotice = `col-span-full ${libraryCell} xl:col-span-2`;
 
   return (
-    <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <AppHeader renderRight={({ compact }) => <UserMenuButton compact={compact} />} />
+    <div
+      data-testid="dashboard-board"
+      // Only the last row flexes, so when Recent Games runs longer it lengthens that row and no cube card.
+      style={boardRowsStyle(libraryRows)}
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.5rem_minmax(0,1fr)] xl:[grid-template-rows:var(--board-rows)]"
+    >
+      <SegmentedFilter
+        label="Section"
+        variant="heading"
+        value={phoneSection}
+        onChange={setPhoneSection}
+        className="col-span-full w-full sm:w-auto sm:justify-self-start xl:hidden"
+        options={[
+          { value: "library", label: SECTION_NAMES.library },
+          { value: "recent", label: SECTION_NAMES.recent },
+        ]}
+      />
 
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-
-        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col px-4 py-4">
-            <div className="flex justify-center mb-4">
-              <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
-                {(['battlers', 'following', 'games', 'discover'] as Tab[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTab(t)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      tab === t
-                        ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
-                        : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
-                    }`}
-                  >
-                    {TAB_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {loadingData ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-gray-500">Loading...</p>
-              </div>
-            ) : tab === 'battlers' ? (
-              <BattlersGrid
-                battlers={battlers}
-                hasMore={battlersHasMore}
-                onPlay={(b) => navigate(battlerPlayUrl(b))}
-                onView={(b) => navigate(`/dashboard/list/${b.id}`)}
-                onDelete={async (b) => {
-                  if (!window.confirm(`Delete "${b.display_name || b.cube_id}"?`)) return
-                  try {
-                    await deleteBattler(b.id)
-                    setBattlers((prev) => prev.filter((x) => x.id !== b.id))
-                  } catch {
-                    addToast('Failed to delete', 'error')
-                  }
-                }}
-                onAdd={() => setShowAddModal(true)}
-                onLoadMore={async () => {
-                  try {
-                    const data = await getBattlers(battlersOffset)
-                    setBattlers((prev) => [...prev, ...data.battlers])
-                    setBattlersHasMore(data.has_more)
-                    setBattlersOffset((prev) => prev + data.battlers.length)
-                  } catch {
-                    addToast('Failed to load more', 'error')
-                  }
-                }}
-              />
-            ) : tab === 'following' ? (
-              <FollowingGrid
-                following={following}
-                hasMore={followingHasMore}
-                onPlay={(f) => navigate(`/play?cubeId=${encodeURIComponent(f.cube_id)}`)}
-                onView={(f) => navigate(`/cube/${encodeURIComponent(f.cube_id)}`)}
-                onUnfollow={async (f) => {
-                  try {
-                    await unfollowCube(f.id)
-                    setFollowing((prev) => prev.filter((x) => x.id !== f.id))
-                  } catch {
-                    addToast('Failed to unfollow', 'error')
-                  }
-                }}
-                onLoadMore={async () => {
-                  try {
-                    const data = await getFollowing(followingOffset)
-                    setFollowing((prev) => [...prev, ...data.following])
-                    setFollowingHasMore(data.has_more)
-                    setFollowingOffset((prev) => prev + data.following.length)
-                  } catch {
-                    addToast('Failed to load more', 'error')
-                  }
-                }}
-                onSwitchToDiscover={() => setTab('discover')}
-              />
-            ) : tab === 'games' ? (
-              <MyGamesGrid
-                games={myGames}
-                hasMore={myGamesHasMore}
-                loading={myGamesLoading}
-                loaded={myGamesLoaded}
-                totalGames={myGamesTotalGames}
-                totalWins={myGamesTotalWins}
-                onLoadInitial={async () => {
-                  setMyGamesLoading(true)
-                  try {
-                    const data = await getMyGames(0)
-                    setMyGames(data.games)
-                    setMyGamesHasMore(data.has_more)
-                    setMyGamesOffset(data.games.length)
-                    setMyGamesTotalGames(data.total_games)
-                    setMyGamesTotalWins(data.total_wins)
-                    setMyGamesLoaded(true)
-                  } catch {
-                    addToast('Failed to load games', 'error')
-                  } finally {
-                    setMyGamesLoading(false)
-                  }
-                }}
-                onLoadMore={async () => {
-                  setMyGamesLoading(true)
-                  try {
-                    const data = await getMyGames(myGamesOffset)
-                    setMyGames((prev) => [...prev, ...data.games])
-                    setMyGamesHasMore(data.has_more)
-                    setMyGamesOffset((prev) => prev + data.games.length)
-                  } catch {
-                    addToast('Failed to load games', 'error')
-                  } finally {
-                    setMyGamesLoading(false)
-                  }
-                }}
-                onView={(g) => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
-                onPlayGame={() => navigate('/play')}
-              />
-            ) : (
-              <DiscoverGrid
-                results={discoverResults}
-                loading={discoverLoading}
-                hasMore={discoverHasMore}
-                loaded={discoverLoaded}
-                onLoadInitial={async () => {
-                  setDiscoverLoading(true)
-                  try {
-                    const data = await discoverCubes(0)
-                    setDiscoverResults(data.results)
-                    setDiscoverHasMore(data.has_more)
-                    setDiscoverOffset(data.results.length)
-                    setDiscoverLoaded(true)
-                  } catch {
-                    addToast('Failed to load cubes', 'error')
-                  } finally {
-                    setDiscoverLoading(false)
-                  }
-                }}
-                onLoadMore={async () => {
-                  setDiscoverLoading(true)
-                  try {
-                    const data = await discoverCubes(discoverOffset)
-                    setDiscoverResults((prev) => [...prev, ...data.results])
-                    setDiscoverHasMore(data.has_more)
-                    setDiscoverOffset((prev) => prev + data.results.length)
-                  } catch {
-                    addToast('Failed to load cubes', 'error')
-                  } finally {
-                    setDiscoverLoading(false)
-                  }
-                }}
-                onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
-                onView={(cubeId) => navigate(`/cube/${encodeURIComponent(cubeId)}`)}
-                onFollow={async (cubeId) => {
-                  try {
-                    await followCube(cubeId)
-                    setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: true } : r))
-                  } catch (err) {
-                    addToast(unknownToAppError(err, 'follow-cube', 'Failed to follow').message, 'error')
-                  }
-                }}
-                onUnfollow={async (cubeId) => {
-                  const match = following.find((f) => f.cube_id === cubeId)
-                  if (!match) {
-                    addToast('Reload the page and try again', 'error')
-                    return
-                  }
-                  try {
-                    await unfollowCube(match.id)
-                    setFollowing((prev) => prev.filter((x) => x.id !== match.id))
-                    setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: false } : r))
-                  } catch {
-                    addToast('Failed to unfollow', 'error')
-                  }
-                }}
-                onPlayGame={() => navigate('/play')}
-              />
-            )}
-          </div>
-        </main>
-
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
+      <div
+        data-testid="library-header"
+        style={gridCell(1, 1)}
+        className={`max-xl:hidden ${GRID_CELL} xl:col-span-2 ${SECTION_HEADER}`}
+      >
+        <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
       </div>
 
-      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-        <div className="flex items-center justify-between">
-          <a
-            href="https://discord.gg/2NAjcWXNKn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
-          >
-            <FaDiscord className="w-4 h-4" />
-            Join Discord
-          </a>
-          <CubeCobraPrimerLink />
-        </div>
-      </footer>
+      <LibraryAddSlot
+        isLibraryEmpty={isLibraryEmpty}
+        className={isLibraryEmpty ? libraryNotice : libraryCell}
+        onOpenAddModal={onOpenAddModal}
+      />
 
+      <LibraryCards
+        status={libraryStatus}
+        library={library}
+        entries={entries}
+        libraryCell={libraryCell}
+        onRetry={onRetryLibrary}
+        onRemove={onRemove}
+      />
+
+      <LibraryLoadMoreSlot
+        library={library}
+        hasMore={hasMore}
+        libraryRows={libraryRows}
+        className={libraryNotice}
+        onLoadMore={onLoadMoreLibrary}
+      />
+
+      {/* One section, so it can stay in view while the cubes scroll, with rows of its own so its cards stay short. */}
+      <section
+        aria-label={SECTION_NAMES.recent}
+        data-beside-cubes={entries.length > 0 || undefined}
+        className={`${phoneSection === "recent" ? "contents" : "hidden"} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:grid-cols-1 xl:gap-3 xl:[grid-row:1/-1] xl:self-start`}
+      >
+        <div
+          data-testid="recent-header"
+          className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}
+        >
+          <div className="max-xl:hidden">
+            <SectionTitle>{SECTION_NAMES.recent}</SectionTitle>
+          </div>
+          <SectionLink to="/dashboard/games">All games →</SectionLink>
+        </div>
+
+        <RecentGamesCards
+          status={myGamesStatus}
+          myGames={myGames}
+          recentGames={recentGames}
+          onRetry={onRetryGames}
+        />
+      </section>
+    </div>
+  );
+}
+
+type SavedLibraryEntry = Extract<LibraryEntry, { kind: "saved" }>;
+
+function DashboardModals({
+  showAddModal,
+  showJoinModal,
+  showAllGames,
+  activeSeats,
+  closingSeat,
+  confirmingDelete,
+  onCloseAddModal,
+  onCreatedPreset,
+  onCloseJoinModal,
+  onCloseAllGames,
+  onSelectSeatToClose,
+  onKeepSeat,
+  onSeatClosed,
+  onKeepDelete,
+  onConfirmDelete,
+  addToast,
+}: {
+  showAddModal: boolean;
+  showJoinModal: boolean;
+  showAllGames: boolean;
+  activeSeats: ResumableSeat[];
+  closingSeat: ResumableSeat | null;
+  confirmingDelete: SavedLibraryEntry | null;
+  onCloseAddModal: () => void;
+  onCreatedPreset: (preset: SavedLibraryEntry["preset"]) => void;
+  onCloseJoinModal: () => void;
+  onCloseAllGames: () => void;
+  onSelectSeatToClose: (seat: ResumableSeat) => void;
+  onKeepSeat: () => void;
+  onSeatClosed: (gameId: string) => void;
+  onKeepDelete: () => void;
+  onConfirmDelete: (entry: SavedLibraryEntry) => void;
+  addToast: (message: string, type?: "error" | "info" | "warning") => void;
+}): ReactElement {
+  return (
+    <>
       {showAddModal && (
-        <AddBattlerModal
-          onClose={() => setShowAddModal(false)}
-          onCreated={(b) => {
-            setBattlers((prev) => [...prev, b])
-            setShowAddModal(false)
-          }}
+        <AddCubeModal
+          onClose={onCloseAddModal}
+          onCreated={onCreatedPreset}
           addToast={addToast}
         />
       )}
-    </div>
-  )
-}
-
-function SectionHeading({ title, count }: { title: string; count?: number }) {
-  return (
-    <div className="flex items-center justify-between gap-2 mb-3">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-amber-200/80">{title}</span>
-      {count !== undefined && (
-        <span className="text-[10px] text-amber-200/70">
-          {count} {count === 1 ? 'cube' : 'cubes'}
-        </span>
+      {showJoinModal && <JoinGameModal onClose={onCloseJoinModal} />}
+      {showAllGames && (
+        <ResumeGamesDialog
+          seats={activeSeats}
+          onClose={onCloseAllGames}
+          onCloseSeat={onSelectSeatToClose}
+        />
       )}
-    </div>
-  )
-}
-
-function BattlersGrid({
-  battlers,
-  hasMore,
-  onPlay,
-  onView,
-  onDelete,
-  onAdd,
-  onLoadMore,
-}: {
-  battlers: UserBattler[]
-  hasMore: boolean
-  onPlay: (b: UserBattler) => void
-  onView: (b: UserBattler) => void
-  onDelete: (b: UserBattler) => void
-  onAdd: () => void
-  onLoadMore: () => void
-}) {
-  if (battlers.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300 mb-4">No cubes saved yet. Add your first cube to start tracking your games.</p>
-          <button onClick={onAdd} className="btn btn-primary py-2 px-6 font-semibold">
-            Add Your First Cube
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <SectionHeading title="My Cubes" count={battlers.length} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {battlers.map((b) => (
-          <InfoCard
-            key={b.id}
-            imageUrl={b.cube_image_uri ?? undefined}
-            title={b.cube_name || b.display_name || b.cube_id}
-            subtitle={b.cube_id !== (b.cube_name || b.display_name || '') ? b.cube_id : undefined}
-            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(b.cube_id)}`}
-            badge={{ text: b.play_mode === 'constructed' ? 'Deck' : 'Cube', color: b.play_mode === 'constructed' ? 'blue' : 'gold' }}
-            inlineStats={<>
-              <FaUser className="w-3 h-3 text-gray-500" /><span>{b.human_player_count}</span>
-              <span className="text-gray-600">·</span>
-              <span>{b.game_count} games</span>
-            </>}
-            onClick={() => onView(b)}
-            actions={[
-              { label: 'Play', onClick: () => onPlay(b), variant: 'primary' },
-              { label: 'View', onClick: () => onView(b), variant: 'secondary' },
-              { label: 'Delete', onClick: () => onDelete(b), variant: 'danger' },
-            ]}
-          />
-        ))}
-        <button
-          onClick={onAdd}
-          className="border-2 border-dashed border-amber-700/60 rounded-lg p-4 flex items-center justify-center text-amber-400/80 hover:text-amber-300 hover:border-amber-600 hover:animate-gentle-glow transition-colors min-h-[120px] font-medium"
-        >
-          + Add Cube
-        </button>
-      </div>
-      {hasMore && (
-        <button onClick={onLoadMore} className="btn btn-secondary py-2 px-6 mx-auto mt-4 block">
-          Load More
-        </button>
+      {closingSeat && (
+        <CloseSeatDialog
+          seat={closingSeat}
+          onKeep={onKeepSeat}
+          onClosed={() => onSeatClosed(closingSeat.gameId)}
+        />
+      )}
+      {confirmingDelete && (
+        <DeletePresetDialog
+          title={cubeTitle(confirmingDelete.preset)}
+          imageUri={confirmingDelete.preset.cube_image_uri}
+          onKeep={onKeepDelete}
+          onDelete={() => onConfirmDelete(confirmingDelete)}
+        />
       )}
     </>
-  )
+  );
 }
 
-function FollowingGrid({
-  following,
-  hasMore,
-  onPlay,
-  onView,
-  onUnfollow,
-  onLoadMore,
-  onSwitchToDiscover,
-}: {
-  following: FollowedBattler[]
-  hasMore: boolean
-  onPlay: (f: FollowedBattler) => void
-  onView: (f: FollowedBattler) => void
-  onUnfollow: (f: FollowedBattler) => void
-  onLoadMore: () => void
-  onSwitchToDiscover: () => void
-}) {
-  if (following.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300">Not following any cubes yet.</p>
-          <button onClick={onSwitchToDiscover} className="btn btn-secondary py-2 px-6 mt-4">
-            Browse Cubes
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <SectionHeading title="Following" count={following.length} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {following.map((f) => (
-          <InfoCard
-            key={f.id}
-            imageUrl={f.cube_image_uri ?? undefined}
-            title={f.cube_name || f.display_name || f.cube_id}
-            subtitle={f.cube_id !== (f.cube_name || f.display_name || '') ? f.cube_id : undefined}
-            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(f.cube_id)}`}
-            inlineStats={<>
-              <FaUser className="w-3 h-3 text-gray-500" /><span>{f.human_player_count}</span>
-              <span className="text-gray-600">·</span>
-              <span>{f.game_count} games</span>
-              {f.last_played && <>
-                <span className="text-gray-600">·</span>
-                <span>{formatDate(f.last_played)}</span>
-              </>}
-            </>}
-            onClick={() => onView(f)}
-            actions={[
-              { label: 'Play', onClick: () => onPlay(f), variant: 'primary' },
-              { label: 'View', onClick: () => onView(f), variant: 'secondary' },
-              { label: 'Unfollow', onClick: () => onUnfollow(f), variant: 'danger' },
-            ]}
-          />
-        ))}
-      </div>
-      {hasMore && (
-        <button onClick={onLoadMore} className="btn btn-secondary py-2 px-6 mx-auto mt-4 block">
-          Load More
-        </button>
-      )}
-    </>
-  )
+function formatLibraryCount(library: Library | null, count: number): string {
+  if (!library) return "";
+  return `${count}${libraryHasMore(library) ? "+" : ""}`;
 }
 
-function AddBattlerModal({
-  onClose,
-  onCreated,
-  addToast,
-}: {
-  onClose: () => void
-  onCreated: (b: UserBattler) => void
-  addToast: (msg: string, type: 'error' | 'info') => void
-}) {
-  const [cubeId, setCubeId] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [playMode, setPlayMode] = useState<PlayMode>('limited')
-  const [useUpgrades, setUseUpgrades] = useState(true)
-  const [puppetCount, setPuppetCount] = useState(3)
-  const [saving, setSaving] = useState(false)
+export function Dashboard(): ReactElement | null {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useRequireAuth("/dashboard");
+  const { addToast } = useToast();
+  const resumableGames = useResumableGames();
+  const [closedSeatIds, setClosedSeatIds] = useState<string[]>([]);
+  const [showAllGames, setShowAllGames] = useState(false);
+  const [closingSeat, setClosingSeat] = useState<ResumableSeat | null>(null);
+  const activeSeats = resumableGames.filter(
+    (seat) => !closedSeatIds.includes(seat.gameId),
+  );
+  const resumable = activeSeats[0];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!cubeId.trim()) {
-      addToast('Please enter a CubeCobra ID', 'error')
-      return
-    }
-    setSaving(true)
+  const libraryLoad = useFirstLoad(loadLibrary, Boolean(user));
+  const myGamesLoad = useFirstLoad(loadMyGames, Boolean(user));
+  const [phoneSection, setPhoneSection] = useState<BoardSection>("library");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] =
+    useState<SavedLibraryEntry | null>(null);
+
+  const library =
+    libraryLoad.state.status === "loaded" ? libraryLoad.state.value : null;
+  const myGames =
+    myGamesLoad.state.status === "loaded" ? myGamesLoad.state.value : null;
+
+  const updateLibrary = (change: (library: Library) => Library): void =>
+    libraryLoad.update((prev) =>
+      prev.status === "loaded" ? { ...prev, value: change(prev.value) } : prev,
+    );
+
+  const loadMoreLibrary = async (): Promise<void> => {
+    const next = library && nextLibraryPage(library);
+    if (!next) return;
+    updateLibrary(withLibraryPageRequested);
     try {
-      const b = await createBattler({
-        cube_id: cubeId.trim(),
-        display_name: displayName.trim() || undefined,
-        play_mode: playMode,
-        use_upgrades: useUpgrades,
-        puppet_count: puppetCount,
-        target_player_count: puppetCount + 1,
-      })
-      onCreated(b)
-    } catch (err) {
-      addToast(unknownToAppError(err, 'create-battler', 'Failed to create').message, 'error')
-    } finally {
-      setSaving(false)
+      const page: LibraryPage =
+        next.list === "saved"
+          ? { list: "saved", page: await getBattlers(next.offset) }
+          : { list: "following", page: await getFollowing(next.offset) };
+      updateLibrary((current) => withLibraryPage(current, page));
+    } catch {
+      updateLibrary(withLibraryPageFailed);
+      addToast("Failed to load more", "error");
     }
-  }
+  };
+
+  const performRemove = async (entry: LibraryEntry): Promise<void> => {
+    if (!library || !canRemove(library, entry)) return;
+    updateLibrary((current) => withRemovalStarted(current, entry));
+    try {
+      await (entry.kind === "saved"
+        ? deleteBattler(entry.preset.id)
+        : unfollowCube(entry.follow.id));
+      updateLibrary((current) => withRemoved(current, entry));
+    } catch {
+      updateLibrary((current) => withRemovalFailed(current, entry));
+      addToast(
+        entry.kind === "saved" ? "Failed to delete" : "Failed to unfollow",
+        "error",
+      );
+    }
+  };
+
+  const remove = (entry: LibraryEntry): void => {
+    if (!library || !canRemove(library, entry)) return;
+    if (entry.kind === "saved") {
+      setConfirmingDelete(entry);
+      return;
+    }
+    void performRemove(entry);
+  };
+
+  if (authLoading || !user) return null;
+
+  const entries = library ? libraryEntries(library) : [];
+  const hasMore = Boolean(library && libraryHasMore(library));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <form
-        onSubmit={handleSubmit}
-        className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel"
-      >
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
-          <h3 className="text-white font-semibold">Add Cube</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="block text-white text-sm mb-1">CubeCobra ID</label>
-            <input
-              type="text"
-              value={cubeId}
-              onChange={(e) => setCubeId(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-              placeholder="e.g. auto"
-              autoFocus
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-white text-sm mb-1">Display Name <span className="text-gray-500">(optional)</span></label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-              placeholder="My Draft Cube"
-            />
-          </div>
-
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={playMode === 'constructed'}
-              onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
-            />
-            <span className="text-white text-sm">Constructed</span>
-            <span className="text-gray-500 text-xs">— bring your own deck</span>
-          </label>
-
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useUpgrades}
-              onChange={(e) => setUseUpgrades(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
-            />
-            <span className="text-white text-sm">Upgrades</span>
-            <span className="text-gray-500 text-xs">— upgrade a card every 3 rounds</span>
-          </label>
-
-          <div className="bg-black/35 border border-black/40 rounded-lg p-3">
-            <label className="block text-gray-300 text-sm mb-2">Default Opponents</label>
-            <div className="flex gap-1.5">
-              {([1, 3, 5, 7] as const).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPuppetCount(n)}
-                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${
-                    puppetCount === n ? 'bg-amber-500 text-black' : 'bg-black/40 text-gray-300 hover:bg-black/30'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={saving || !cubeId.trim()}
-          className="btn btn-primary w-full py-2 mt-4 font-semibold disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : 'Add Cube'}
-        </button>
-      </form>
-    </div>
-  )
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return 'Never'
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-  } catch {
-    return iso
-  }
-}
-
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
-}
-
-function scryfallSmall(id: string): string {
-  return `https://cards.scryfall.io/small/front/${id[0]}/${id[1]}/${id}.jpg`
-}
-
-function MyGamesGrid({
-  games,
-  hasMore,
-  loading,
-  loaded,
-  totalGames,
-  totalWins,
-  onLoadInitial,
-  onLoadMore,
-  onView,
-  onPlayGame,
-}: {
-  games: GameSummary[]
-  hasMore: boolean
-  loading: boolean
-  loaded: boolean
-  totalGames: number
-  totalWins: number
-  onLoadInitial: () => void
-  onLoadMore: () => void
-  onView: (g: GameSummary) => void
-  onPlayGame: () => void
-}) {
-  useEffect(() => {
-    if (!loaded) onLoadInitial()
-  }, [loaded, onLoadInitial])
-
-  if (!loaded && loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-amber-200/70">Loading...</p>
-      </div>
-    )
-  }
-
-  if (games.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300">No completed games yet.</p>
-          <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
-            Play a Game
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-amber-200/80">My Games</span>
-        <div className="flex items-center gap-3 text-[10px] text-amber-200/70">
-          <span>{totalGames} games</span>
-          <span className="text-amber-200/40">·</span>
-          <span>{totalGames > 0 ? `${totalWins} wins (${Math.round((totalWins / totalGames) * 100)}%)` : '0 wins'}</span>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {games.map((g) => (
-          <InfoCard
-            key={g.game_id}
-            title={formatDate(g.created_at)}
-            subtitle={g.cube_name || g.cube_id || undefined}
-            badge={g.best_human_placement ? { text: ordinal(g.best_human_placement), color: g.best_human_placement === 1 ? 'gold' : 'gray' } : undefined}
-            inlineStats={<>
-              <FaUser className="w-3 h-3 text-gray-500" /><span>{g.human_count}</span>
-              {g.player_count - g.human_count > 0 && <>
-                <PuppetIcon size="sm" className="opacity-60" />
-                <span>{g.player_count - g.human_count}</span>
-              </>}
-            </>}
-            onClick={() => onView(g)}
-            className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
-          >
-            {g.hand_scryfall_ids.length > 0 && (
-              <div className="flex -space-x-3 mt-2">
-                {g.hand_scryfall_ids.slice(0, 7).map((sid) => (
-                  <img
-                    key={sid}
-                    src={scryfallSmall(sid)}
-                    alt=""
-                    className="w-10 h-14 rounded-sm border border-black/60 object-cover"
-                    loading="lazy"
-                  />
-                ))}
-              </div>
-            )}
-          </InfoCard>
-        ))}
-      </div>
-      {hasMore && (
-        <button
-          onClick={onLoadMore}
-          disabled={loading}
-          className="btn btn-secondary py-2 px-6 mx-auto mt-4 block disabled:opacity-50"
-        >
-          {loading ? 'Loading...' : 'Load More'}
-        </button>
-      )}
-    </div>
-  )
-}
-
-function DiscoverGrid({
-  results,
-  loading,
-  hasMore,
-  loaded,
-  onLoadInitial,
-  onLoadMore,
-  onPlay,
-  onView,
-  onFollow,
-  onUnfollow,
-  onPlayGame,
-}: {
-  results: DiscoverResult[]
-  loading: boolean
-  hasMore: boolean
-  loaded: boolean
-  onLoadInitial: () => void
-  onLoadMore: () => void
-  onPlay: (cubeId: string) => void
-  onView: (cubeId: string) => void
-  onFollow: (cubeId: string) => void
-  onUnfollow: (cubeId: string) => void
-  onPlayGame: () => void
-}) {
-  useEffect(() => {
-    if (!loaded) onLoadInitial()
-  }, [loaded, onLoadInitial])
-
-  if (!loaded && loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-amber-200/70">Loading...</p>
-      </div>
-    )
-  }
-
-  if (results.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300">No cubes found yet.</p>
-          <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
-            Play a Game
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <SectionHeading title="Popular Cubes" count={results.length} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {results.map((r) => (
-          <InfoCard
-            key={r.cube_id}
-            imageUrl={r.cube_image_uri ?? undefined}
-            title={r.cube_name || r.cube_id}
-            subtitle={r.cube_name && r.cube_name !== r.cube_id ? r.cube_id : undefined}
-            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
-            badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
-            inlineStats={<>
-              <FaUser className="w-3 h-3 text-gray-500" /><span>{r.player_count}</span>
-              <span className="text-gray-600">·</span>
-              <span>{r.game_count} games</span>
-              {r.last_played && <>
-                <span className="text-gray-600">·</span>
-                <span>{formatDate(r.last_played)}</span>
-              </>}
-            </>}
-            onClick={() => onView(r.cube_id)}
-            actions={[
-              { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
-              { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
-              ...(r.is_following
-                ? [{ label: 'Unfollow', onClick: () => onUnfollow(r.cube_id), variant: 'danger' as const }]
-                : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
-            ]}
-            className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
+    <>
+      <DashboardFrame header={<AppHeader account={<UserMenuButton />} />}>
+        {resumable && (
+          <ResumeBanner
+            seat={resumable}
+            totalCount={activeSeats.length}
+            onClose={setClosingSeat}
+            onShowAll={() => setShowAllGames(true)}
           />
-        ))}
-      </div>
-      {hasMore && (
-        <button
-          onClick={onLoadMore}
-          disabled={loading}
-          className="btn btn-secondary py-2 px-6 mx-auto mt-4 disabled:opacity-50"
-        >
-          {loading ? 'Loading...' : 'Load More'}
-        </button>
-      )}
-    </div>
-  )
+        )}
+
+        <DashboardQuickBar
+          username={user.username}
+          myGames={myGames}
+          allCount={formatLibraryCount(library, entries.length)}
+          showLibraryCount={Boolean(library)}
+          onNewGame={() => {
+            void navigate("/play");
+          }}
+          onOpenJoinModal={() => setShowJoinModal(true)}
+        />
+
+        <DashboardBoard
+          phoneSection={phoneSection}
+          setPhoneSection={setPhoneSection}
+          libraryStatus={libraryLoad.state.status}
+          library={library}
+          entries={entries}
+          hasMore={hasMore}
+          myGamesStatus={myGamesLoad.state.status}
+          myGames={myGames}
+          onRetryLibrary={libraryLoad.retry}
+          onRetryGames={myGamesLoad.retry}
+          onLoadMoreLibrary={() => {
+            void loadMoreLibrary();
+          }}
+          onRemove={remove}
+          onOpenAddModal={() => setShowAddModal(true)}
+        />
+      </DashboardFrame>
+
+      <DashboardModals
+        showAddModal={showAddModal}
+        showJoinModal={showJoinModal}
+        showAllGames={showAllGames}
+        activeSeats={activeSeats}
+        closingSeat={closingSeat}
+        confirmingDelete={confirmingDelete}
+        onCloseAddModal={() => setShowAddModal(false)}
+        onCreatedPreset={(preset) => {
+          // The list can finish loading after Add is sent, so this can't go by the `library` of that render.
+          libraryLoad.updateOrReload((current) =>
+            withAddedPreset(current, preset),
+          );
+          setShowAddModal(false);
+        }}
+        onCloseJoinModal={() => setShowJoinModal(false)}
+        onCloseAllGames={() => setShowAllGames(false)}
+        onSelectSeatToClose={setClosingSeat}
+        onKeepSeat={() => setClosingSeat(null)}
+        onSeatClosed={(gameId) => {
+          setClosedSeatIds((ids) => [...ids, gameId]);
+          setClosingSeat(null);
+        }}
+        onKeepDelete={() => setConfirmingDelete(null)}
+        onConfirmDelete={(entry) => {
+          setConfirmingDelete(null);
+          void performRemove(entry);
+        }}
+        addToast={addToast}
+      />
+    </>
+  );
+}
+
+function LibraryTile({
+  entry,
+  style,
+  className,
+  removable,
+  onRemove,
+}: {
+  entry: LibraryEntry;
+  style: CSSProperties;
+  className: string;
+  /** False while this card's delete or unfollow, or a page of the library, is loading. */
+  removable: boolean;
+  onRemove: (entry: LibraryEntry) => void;
+}): ReactElement {
+  const navigate = useNavigate();
+
+  if (entry.kind === "saved") {
+    const { preset } = entry;
+    const href = `/dashboard/list/${preset.id}`;
+    return (
+      <CubeTile
+        title={cubeTitle(preset)}
+        cubeId={preset.cube_id}
+        imageUri={preset.cube_image_uri}
+        badge={preset.play_mode === "constructed" ? "Deck" : "Cube"}
+        chips={[
+          countLabel(preset.puppet_count, "opponent"),
+          upgradesLabel(preset.use_upgrades),
+        ]}
+        footer={
+          preset.my_game_count > 0 ? (
+            <>
+              <Count value={preset.my_game_count}>
+                {" "}
+                {preset.my_game_count === 1 ? "game" : "games"}
+              </Count>
+              {preset.my_last_played &&
+                ` · ${formatWhen(preset.my_last_played)}`}
+            </>
+          ) : (
+            "No games yet"
+          )
+        }
+        href={href}
+        onPlay={() => {
+          void navigate(battlerPlayUrl(preset));
+        }}
+        menuItems={[
+          {
+            label: "View",
+            onSelect: (): void => {
+              void navigate(href);
+            },
+          },
+          {
+            label: "Delete",
+            onSelect: (): void => onRemove(entry),
+            danger: true,
+            disabled: !removable,
+          },
+        ]}
+        style={style}
+        className={className}
+      />
+    );
+  }
+
+  const { follow } = entry;
+  const href = `/cube/${encodeURIComponent(follow.cube_id)}`;
+  return (
+    <CubeTile
+      title={cubeTitle(follow)}
+      cubeId={follow.cube_id}
+      imageUri={follow.cube_image_uri}
+      badge="Following"
+      chips={[
+        countLabel(follow.human_player_count, "player"),
+        countLabel(follow.game_count, "community game"),
+      ]}
+      footer={
+        follow.last_played
+          ? `Last played ${formatWhen(follow.last_played)}`
+          : "No games yet"
+      }
+      href={href}
+      onPlay={() => {
+        void navigate(`/play?cubeId=${encodeURIComponent(follow.cube_id)}`);
+      }}
+      menuItems={[
+        {
+          label: "View",
+          onSelect: (): void => {
+            void navigate(href);
+          },
+        },
+        {
+          label: "Unfollow",
+          onSelect: (): void => onRemove(entry),
+          danger: true,
+          disabled: !removable,
+        },
+      ]}
+      style={style}
+      className={className}
+    />
+  );
 }

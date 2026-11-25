@@ -1,11 +1,11 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext } from "react";
 
 interface DocNav {
-  navigate: (docId: string, tab?: string) => void
+  navigate: (docId: string, tab?: string) => void;
 }
 
-export const DocNavContext = createContext<DocNav>({ navigate: () => {} })
+export const DocNavContext = createContext<DocNav>({ navigate: () => {} });
 
-export function useDocNav() {
-  return useContext(DocNavContext)
+export function useDocNav(): DocNav {
+  return useContext(DocNavContext);
 }

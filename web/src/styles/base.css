@@ -1,0 +1,603 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  accent-color: var(--color-gold);
+
+  /* Magic-themed color palette */
+  --color-gold: #d4af37;
+  --color-gold-dark: #a88b3d;
+  --color-gold-glow: rgba(212, 175, 55, 0.6);
+
+  /* Map Tailwind's amber and green utilities onto the table's own gold, ivory and win tokens. */
+  --color-amber-50: var(--ivory);
+  --color-amber-100: var(--ivory);
+  --color-amber-200: var(--gold-pale);
+  --color-amber-300: var(--color-gold-bright);
+  --color-amber-400: var(--color-gold);
+  --color-amber-500: var(--color-gold);
+  --color-green-400: var(--win-text);
+  --color-green-500: var(--win-text);
+
+  /* Mana colors */
+  --mana-white: #f8f6e3;
+  --mana-blue: #0e68ab;
+  --mana-black: #150b00;
+  --mana-red: #d3202a;
+  --mana-green: #00733e;
+
+  /* Chrome (warm walnut-tinted dark) */
+  --chrome: #1c1714;
+  --chrome-highlight: rgba(255, 255, 255, 0.03);
+
+  /* Gold accent (for frame-to-felt border) */
+  --gold-border: rgba(212, 175, 55, 0.45);
+
+  /* Modal / popover chrome */
+  --chrome-modal: #3d3330;
+
+  /* The colour a cube's art fades into on its card and page */
+  --art-fade: #2a2118;
+
+  /* Zone column — blends toward sidebar chrome */
+  --zone-column-bg: #3d3330;
+
+  /* Warm stone, one and two steps lighter than the walnut surface */
+  --stone: #4e443d;
+  --stone-light: #5e534b;
+
+  /* A switch's track while it's off */
+  --walnut-track: #29231f;
+
+  /* Ivory label text on walnut, then quieter text, then the faintest, which is for disabled text and placeholders */
+  --ivory: #f3ead9;
+  --ivory-muted: #b8aea3;
+  --ivory-faint: #94897f;
+
+  /* A won fight and being ready, then a lost fight and last place, on walnut */
+  --win-text: #86efac;
+  --loss-text: #f2b4aa;
+
+  /* Quiet text on the felt: muted ivory a step lighter, so it holds 4.5:1 on the felt's lightest centre */
+  --ivory-felt: #e0d6c8;
+
+  /* Read-only text that names things: detail lines and zone labels, keys beside their values, and the pale gold of
+     a chosen option */
+  --ivory-soft: #d8cfc2;
+  --ivory-key: #a89e92;
+  --gold-pale: #fae696;
+  --brass-dot: #9a8040;
+
+  /* Bright gold marker for something waiting on the player */
+  --color-gold-bright: #f5d76e;
+
+  /* Ready, play and win. Hover darkens, since a lighter green fails contrast with white. */
+  --success: #1d7d3e;
+  --success-hover: #186b35;
+  --success-pressed: #176632;
+
+  /* Top highlight of a raised walnut button; brighter fills set their own */
+  --btn-raise-edge: rgba(255, 236, 181, 0.14);
+
+  /* Secondary buttons on bars and felt; a surface that matches this fill sets its own */
+  --btn-secondary-fill: var(--chrome-modal);
+  --btn-secondary-fill-hover: var(--stone);
+  --btn-secondary-fill-pressed: #332a27;
+
+  /* Opaque gold for dividers over colored backgrounds */
+  --gold-border-opaque: #6b5c2e;
+  --seam-stroke: var(--gold-border-opaque);
+  --seam-stroke-soft: rgba(107, 92, 46, 0.72);
+  --seam-highlight: rgba(255, 236, 181, 0.24);
+  --seam-shadow: rgba(0, 0, 0, 0.55);
+  --seam-ridge-top: rgba(255, 236, 181, 0.08);
+  --seam-ridge-bottom: rgba(0, 0, 0, 0.42);
+  --seam-ridge-light: var(--seam-stroke);
+  --seam-ridge-dark: color-mix(in srgb, var(--seam-stroke) 58%, black 42%);
+  --zone-label-bg: #2a2320;
+
+  /* Hand zone (warmer, lighter green) */
+  --hand-felt: #2a5e3a;
+  --hand-felt-light: #306842;
+
+  /* Table/playmat */
+  --table-dark: #0f2d1a;
+  --table-felt: #1a4d2e;
+  --table-felt-light: #234d32;
+
+  /* Zone backgrounds */
+  --zone-battlefield: rgba(34, 77, 50, 0.3);
+  --zone-graveyard: rgba(75, 45, 45, 0.4);
+  --zone-exile: rgba(88, 28, 135, 0.3);
+  --zone-hand: rgba(30, 58, 95, 0.3);
+
+  /* Card dimensions */
+  --card-border-radius: 5% / 3.5%;
+  --card-width-sm: 80px;
+  --card-height-sm: 112px;
+  --card-width-md: 130px;
+  --card-height-md: 182px;
+  --card-width-lg: 200px;
+  --card-height-lg: 280px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease-out;
+  --transition-normal: 200ms ease-out;
+  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Shared shell spacing */
+  --frame-rail-width: 40px;
+  --frame-rail-edge: calc(var(--frame-rail-width) + 1px);
+  --frame-bar-height: 42px;
+  --sidebar-width: 16rem;
+  /* Docked inside the felt's gold edge, the sidebar is narrower, so with the right rail back the board loses 28px. */
+  --frame-sidebar-width: 242px;
+  --bar-inline: 6px;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+  background-color: var(--table-dark);
+}
+
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold-bright);
+    outline-offset: 2px;
+  }
+}
+
+/* Keep white utility text in warm ivory; .btn-success below sets its own pure white for contrast. */
+.text-white {
+  color: var(--ivory);
+}
+
+:is([class*="border-amber-400/1"], [class*="border-amber-400/2"]) {
+  border-color: var(--gold-border-opaque);
+}
+
+/* Prevent browser autofill from overriding dark theme */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--walnut-track) inset;
+  -webkit-text-fill-color: white;
+  caret-color: white;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Walnut-themed scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--stone-light) transparent;
+}
+
+/*
+ * Chrome and Safari ignore ::-webkit-scrollbar while either property above is set, and those rules alone can make a
+ * bar 4px. Bars that overlay the page keep the properties, as iOS takes the colour only from them.
+ */
+@supports selector(::-webkit-scrollbar) {
+  :where([data-scrollbars="classic"], [data-scrollbars="classic"] *) {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--stone-light);
+  border-radius: 2px;
+}
+
+/* Game table background - classic felt */
+.game-table {
+  background-color: var(--table-felt);
+  background-image: radial-gradient(
+    ellipse at center,
+    var(--table-felt-light) 0%,
+    var(--table-felt) 50%,
+    var(--table-dark) 100%
+  );
+  min-height: 100dvh;
+}
+
+/* Solid warm-brown chrome for header, footer, sidebar */
+.frame-chrome {
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    color-mix(in srgb, var(--chrome) 95%, white) 0%,
+    var(--chrome) 70%
+  );
+}
+
+/* The 42px bars above and below the felt line their content up with the felt's gold edge.
+   Registered as a length so a script that places a popover reads it in pixels. */
+@property --bar-inline {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 6px;
+}
+
+.frame-bar-pad {
+  padding-left: var(--bar-inline);
+  padding-right: var(--bar-inline);
+}
+
+/* Felt content area — gold emboss + dark groove for 3D depth */
+.game-surface {
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 236, 181, 0.58),
+    inset 0 1px 0 0 rgba(255, 231, 163, 0.42),
+    inset 0 2px 0 0 rgba(0, 0, 0, 0.32),
+    inset 0 -1px 0 0 rgba(255, 231, 163, 0.36),
+    inset 0 -2px 0 0 rgba(212, 175, 55, 0.64),
+    inset 0 -3px 0 0 rgba(0, 0, 0, 0.58),
+    inset 0 -4px 0 0 rgba(0, 0, 0, 0.24),
+    inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
+    inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* A docked sidebar sits inside the felt's gold edge, which the board's own edge closes on its left. */
+.frame-sidebar {
+  --sidebar-width: var(--frame-sidebar-width);
+  padding: 2px 2px 2px 0;
+}
+
+.modal-chrome {
+  background-color: var(--chrome-modal);
+  --btn-secondary-fill: var(--stone);
+  --btn-secondary-fill-hover: var(--stone-light);
+  --btn-secondary-fill-pressed: #453b35;
+}
+
+/* A switch and its label: walnut when off and green when on. Its checkbox is visually hidden, so the track shows
+   the focus ring. */
+@layer components {
+  .switch {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--ivory-felt);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .switch:has(input:disabled) {
+    cursor: default;
+  }
+
+  .switch-with-tip {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+  }
+
+  .switch-label-group {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .switch-spread {
+    justify-content: space-between;
+    white-space: normal;
+  }
+
+  .switch-beta {
+    margin-left: 2px;
+    color: var(--ivory-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .switch-track {
+    position: relative;
+    flex: none;
+    width: 34px;
+    height: 19px;
+    border-radius: 8px;
+    background-color: var(--walnut-track);
+    box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.22);
+    transition: background-color var(--transition-fast);
+  }
+
+  .switch-track::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background-color: var(--ivory);
+    transition: translate var(--transition-fast);
+  }
+
+  .switch input:checked + .switch-track {
+    background-color: var(--success);
+  }
+
+  .switch input:checked + .switch-track::after {
+    translate: 15px;
+  }
+
+  .switch input:disabled + .switch-track {
+    opacity: 0.5;
+  }
+
+  .switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--color-gold-bright);
+    outline-offset: 2px;
+  }
+
+  @media (width < 360px) {
+    .switch {
+      gap: 5px;
+    }
+  }
+}
+
+/* An icon's 44px button */
+@layer components {
+  .icon-target {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    color: var(--ivory-muted);
+  }
+
+  @media (hover: hover) {
+    .icon-target:hover {
+      color: var(--ivory);
+    }
+  }
+
+  .icon-target:focus-visible {
+    outline-offset: -4px;
+  }
+
+  .help-glyph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: 1.3px solid currentColor;
+    border-radius: 50%;
+    font: 700 9px/1 system-ui;
+  }
+}
+
+/* A small rimmed label: what a cube is, a feature's status or a player's state. Each tone is a dark
+   tinted fill, a 1px rim and light text. Small quiet tags, for statuses, sit on a near-black fill with a softer rim
+   and can lead with a dot. In the components layer so positioning classes can move a tag. */
+@layer components {
+  .tag {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 20px;
+    padding: 0 7px;
+    border: 1px solid var(--tag-rim);
+    border-radius: 4px;
+    background: var(--tag-fill);
+    color: var(--tag-text);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .tag-small {
+    height: 18px;
+    padding: 0 6px;
+    letter-spacing: 0.08em;
+  }
+
+  .tag-quiet {
+    background: #15100f;
+    border-color: var(--tag-rim-quiet);
+  }
+
+  .tag-dot::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--tag-dot);
+  }
+
+  .tag-gold {
+    --tag-fill: #443415;
+    --tag-rim: #a2832a;
+    --tag-rim-quiet: #6b5820;
+    --tag-text: var(--color-gold-bright);
+    --tag-dot: var(--color-gold);
+  }
+
+  .tag-stone {
+    --tag-fill: #39312c;
+    --tag-rim: #736b63;
+    --tag-rim-quiet: #4a423c;
+    --tag-text: #e2d8cb;
+    --tag-dot: var(--ivory-muted);
+  }
+
+  .tag-muted {
+    --tag-fill: var(--zone-label-bg);
+    --tag-rim: #574c45;
+    --tag-rim-quiet: #4a423c;
+    --tag-text: var(--ivory-muted);
+    --tag-dot: var(--ivory-muted);
+  }
+
+  .tag-crimson {
+    --tag-fill: #441e1a;
+    --tag-rim: #843b34;
+    --tag-rim-quiet: #5e2f29;
+    --tag-text: var(--loss-text);
+    --tag-dot: var(--mana-red);
+  }
+
+  .tag-emerald {
+    --tag-fill: #153721;
+    --tag-rim: #23703f;
+    --tag-rim-quiet: #1e4a2b;
+    --tag-text: var(--win-text);
+    --tag-dot: #22c55e;
+  }
+}
+
+/* Read-only facts as plain text with gold middots between them. Each item's dot sits before it, and the list is
+   pulled left by one dot inside a clipped box, so a line that wraps never starts with a dot. */
+.detail-line {
+  overflow: hidden;
+}
+
+.detail-line > ul {
+  display: flex;
+  flex-wrap: wrap;
+  margin-left: -1.25em;
+}
+
+.detail-line li::before {
+  content: "·";
+  display: inline-block;
+  width: 1.25em;
+  text-align: center;
+  color: var(--brass-dot);
+}
+
+/* A segmented control: a recessed track whose chosen option is a raised walnut thumb, so it reads as clickable where
+   the flat read-only details don't. In the components layer so a caller's layout classes, such as xl:hidden, apply. */
+@layer components {
+  .segmented-track {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    border-radius: 6px;
+    background: #171210;
+  }
+
+  .segmented-option {
+    border-radius: 4px;
+    color: var(--ivory-key);
+  }
+
+  @media (hover: hover) {
+    .segmented-option:hover {
+      color: var(--ivory);
+    }
+  }
+
+  .segmented-option[aria-checked="true"] {
+    background: var(--btn-secondary-fill);
+    color: var(--gold-pale);
+  }
+
+  .segmented-field {
+    display: flex;
+    flex: none;
+    width: 100%;
+    height: 44px;
+    padding: 2px;
+  }
+
+  .segmented-field .segmented-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Over the track's padding and border, so the option is tapped anywhere in the 44px */
+  .segmented-field .segmented-option::before {
+    content: "";
+    position: absolute;
+    inset: -3px 0;
+  }
+
+  @media (width < 360px) {
+    .segmented-field .segmented-option {
+      gap: 5px;
+      font-size: 12px;
+    }
+  }
+}
+
+/* An item in a walnut menu or picker. Hover fills the whole item, including a submenu's indent. */
+.menu-item:hover:not(:disabled) {
+  background-color: var(--stone);
+}
+
+/* Inside the item, so the menu's rounded edges and a scrolling submenu don't clip the ring */
+.menu-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.menu-item[aria-expanded="true"] {
+  background-color: rgba(212, 175, 55, 0.12);
+  color: #fae6a2;
+}
+
+/* A submenu sits recessed under its row. Its items are indented past a gold guide line, drawn on each row so it
+   scrolls with them and shows over their hover. */
+.menu-submenu {
+  background-color: #332a28;
+}
+
+.menu-submenu > .menu-item,
+.menu-submenu-grid {
+  padding-left: 26px;
+  background-image: linear-gradient(
+    to right,
+    transparent 12px,
+    rgba(212, 175, 55, 0.28) 12px,
+    rgba(212, 175, 55, 0.28) 13px,
+    transparent 13px
+  );
+}
+
+/* A destructive item, like Delete. These reds keep 4.5:1 on walnut and on every hover fill. */
+.menu-item-destructive,
+.btn-secondary.btn-destructive {
+  color: var(--loss-text);
+}
+
+.menu-item-destructive:hover:not(:disabled),
+.btn-secondary.btn-destructive:hover:not(:disabled) {
+  color: #fecaca;
+}

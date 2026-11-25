@@ -1,6 +1,6 @@
 import type { BattleView, Card as GameCard, SelfPlayerView } from "../types";
 import type { Phase } from "../constants/phases";
-import type { RevealedPlayerTab } from "../contexts/contextStripState";
+import type { ScoutingTab } from "../hooks/useGameSurfaces";
 
 export type ConditionalGuideId =
   | "hint_treasure_producer"
@@ -45,7 +45,6 @@ export type GuideTargetId =
   | "battle-submit-popover"
   | "reward-continue"
   | "reward-summary"
-  | "reward-progression"
   | "reward-current-upgrades"
   | "reward-upgrades"
   | "draft-pack"
@@ -102,9 +101,16 @@ export interface GuidedWalkthroughContext {
 }
 
 export interface GuideStepSidebarState {
-  openOnMobile?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
-  playerName?: string | null | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
-  detailTab?: RevealedPlayerTab | ((ctx: GuidedWalkthroughContext) => RevealedPlayerTab | undefined);
+  openOnMobile?:
+    | boolean
+    | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
+  playerName?:
+    | string
+    | null
+    | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
+  detailTab?:
+    | ScoutingTab
+    | ((ctx: GuidedWalkthroughContext) => ScoutingTab | undefined);
 }
 
 export interface GuideStepDefinition {
@@ -112,11 +118,21 @@ export interface GuideStepDefinition {
   title: string;
   content: GuideStepContent;
   targetId?: GuideTargetId;
-  targetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
-  waitForLayoutTargetId?: GuideTargetId | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
-  waitForLayoutTargetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
-  positionTargetId?: GuideTargetId | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
-  positionTargetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  targetSelector?:
+    | string
+    | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  waitForLayoutTargetId?:
+    | GuideTargetId
+    | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
+  waitForLayoutTargetSelector?:
+    | string
+    | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  positionTargetId?:
+    | GuideTargetId
+    | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
+  positionTargetSelector?:
+    | string
+    | ((ctx: GuidedWalkthroughContext) => string | undefined);
   placement?: GuidePlacement;
   cardPlacement?: GuideCardPlacement;
   mobileCardPlacement?: GuideCardPlacement;

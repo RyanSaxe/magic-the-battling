@@ -1,5 +1,9 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { computeScrollDeltaForVisibility } from "./useGuidePositioning";
+import {
+  computeScrollDeltaForVisibility,
+  scrollTargetIntoVisibleArea,
+} from "./useGuidePositioning";
 
 describe("computeScrollDeltaForVisibility", () => {
   const container = {
@@ -51,5 +55,66 @@ describe("computeScrollDeltaForVisibility", () => {
         left: 260,
       }),
     ).toEqual({ top: 0, left: 42 });
+  });
+});
+
+function makeRect(box: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}): DOMRect {
+  return {
+    x: box.left,
+    y: box.top,
+    left: box.left,
+    top: box.top,
+    width: box.width,
+    height: box.height,
+    right: box.left + box.width,
+    bottom: box.top + box.height,
+    toJSON: (): Record<string, never> => ({}),
+  };
+}
+
+describe("scrollTargetIntoVisibleArea", () => {
+  it("never scrolls the phase timeline up or down, or past either end", () => {
+    const row = document.body.appendChild(document.createElement("div"));
+    row.style.overflowX = "auto";
+    row.style.overflowY = "auto";
+    row.getBoundingClientRect = (): DOMRect =>
+      makeRect({ left: 0, top: 10, width: 200, height: 22 });
+    Object.defineProperties(row, {
+      clientWidth: { value: 200 },
+      scrollWidth: { value: 294 },
+      clientHeight: { value: 22 },
+      scrollHeight: { value: 22 },
+      scrollTop: { value: 0, writable: true },
+      scrollLeft: { value: 0, writable: true },
+    });
+    // Unlike desktop browsers, iOS can keep a scroll past a box's end, so this row doesn't clamp.
+    row.scrollBy = (
+      optionsOrX?: ScrollToOptions | number,
+      y?: number,
+    ): void => {
+      if (typeof optionsOrX === "number") {
+        row.scrollLeft += optionsOrX;
+        row.scrollTop += y ?? 0;
+      } else {
+        row.scrollTop += optionsOrX?.top ?? 0;
+        row.scrollLeft += optionsOrX?.left ?? 0;
+      }
+    };
+    const step = row.appendChild(document.createElement("span"));
+
+    step.getBoundingClientRect = (): DOMRect =>
+      makeRect({ left: 0, top: 13, width: 24, height: 16 });
+    scrollTargetIntoVisibleArea(step, row);
+    expect([row.scrollLeft, row.scrollTop]).toEqual([0, 0]);
+
+    step.getBoundingClientRect = (): DOMRect =>
+      makeRect({ left: 204, top: 13, width: 90, height: 16 });
+    scrollTargetIntoVisibleArea(step, row);
+    expect([row.scrollLeft, row.scrollTop]).toEqual([94, 0]);
   });
 });

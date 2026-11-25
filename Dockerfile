@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install Node.js for frontend build
 RUN apt-get update && apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    curl -fsSL https://deb.nodesource.com/setup_26.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -13,7 +13,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy dependency files and package source
 COPY pyproject.toml uv.lock README.md ./
-COPY mtb/ ./mtb/
+COPY pitfight/ ./pitfight/
 COPY web/package.json web/package-lock.json ./web/
 
 # Install Python dependencies

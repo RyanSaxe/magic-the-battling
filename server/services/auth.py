@@ -1,5 +1,4 @@
-# ruff: noqa: B008
-from __future__ import annotations
+"""Password hashing, JWT cookie signing, and current-user dependencies."""
 
 import logging
 from datetime import UTC, datetime, timedelta
@@ -7,7 +6,7 @@ from uuid import uuid4
 
 import bcrypt
 import jwt
-from fastapi import Depends, Request
+from fastapi import Request
 from sqlalchemy.orm import Session
 
 from server.db import database
@@ -19,14 +18,6 @@ logger = logging.getLogger(__name__)
 
 ALGORITHM = "HS256"
 COOKIE_NAME = "mtb_auth"
-
-
-def _get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def hash_password(plain: str) -> str:
@@ -63,18 +54,20 @@ def _user_from_token(request: Request, db: Session) -> User | None:
     return db.query(User).filter(User.id == user_id).first()
 
 
-def get_current_user(request: Request, db: Session = Depends(_get_db)) -> User:
-    user = _user_from_token(request, db)
+def get_current_user(request: Request) -> User:
+    user = get_optional_user(request)
     if not user:
-        raise api_error(401, ErrorCode.NOT_AUTHENTICATED, "Not authenticated")
+        raise api_error(401, ErrorCode.NOT_AUTHENTICATED, detail="Not authenticated")
     return user
 
 
-def get_optional_user(request: Request, db: Session = Depends(_get_db)) -> User | None:
-    return _user_from_token(request, db)
+def get_optional_user(request: Request) -> User | None:
+    # The lookup gives its connection back before the route runs, which may wait 30 seconds on CubeCobra.
+    with database.SessionLocal() as db:
+        return _user_from_token(request, db)
 
 
-def create_user(db: Session, username: str, password: str, email: str | None = None) -> User:
+def create_user(db: Session, username: str, *, password: str, email: str | None = None) -> User:
     user = User(
         id=uuid4().hex,
         username=username,

@@ -1,19 +1,14 @@
-# Crucible documentation
+# Documentation
 
-Documentation is organized by task across setup, architecture, operations, and reference.
+Pitfight documentation is organized by what you are trying to do.
 
-## Getting started
+| Kind | Page | Covers |
+| --- | --- | --- |
+| Tutorial | [Getting started](getting-started.md) | Install dependencies, seed solo opponents, start the app, and play a round |
+| How-to guide | [Development](development.md) | Run checks, Playwright tests, load sweeps, container boot checks, and ops scripts |
+| Explanation | [Architecture](architecture.md) | Rules engine isolation, server service ownership, client state machines, layout solving, and deploy-safe snapshots |
+| Reference | [Reference](reference.md) | Environment variables, CLI tools, deploy and release labels, and browser storage keys |
 
-- [Local setup](getting-started/local-setup.md): install dependencies, run the dev stack, test against temporary DB copies, and run linters and tests.
-
-## Concepts
-
-- [Architecture](concepts/architecture.md): system boundaries, the round phase loop, ghosts and historical puppets, real-time state sync and snapshots, and naming conventions.
-
-## Guides
-
-- [Deployment and operations](guides/deployment-and-ops.md): Fly.io container startup, PR labels for deploy drains and GitHub releases, ops mode controls, and `fly_activity_report.py`.
-
-## Reference
-
-- [Configuration and API](reference/configuration-and-api.md): environment variables and defaults, HTTP API route groups, and phase-gated WebSocket actions.
+Contributors making code changes should also read [AGENTS.md](../AGENTS.md) for
+repository boundaries, naming rules, and branch guardrails. The in-app rules
+guide shown to players lives in `web/src/docs/`.

@@ -1,0 +1,238 @@
+"""Async-friendly JSON fetching with caching, de-duplication, and rate limiting."""
+
+import asyncio
+import atexit
+import contextlib
+import logging
+import threading
+import time
+from collections import OrderedDict
+from collections.abc import Coroutine
+from dataclasses import dataclass, field
+from typing import Any, TypeVar
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+# ----- Tunables -----
+_MIN_INTERVAL = 0.1  # seconds: minimum spacing between HTTP calls
+_TIMEOUT = httpx.Timeout(30.0, connect=5.0)
+_HTTP_NOT_MODIFIED = 304
+_CACHE_MAX = 4096  # max entries to keep in memory
+
+
+T = TypeVar("T")
+
+
+@dataclass
+class _CacheEntry:
+    data: Any
+    etag: str | None = field(default=None)
+
+
+class _AsyncRuntime:
+    def __init__(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        self._started = threading.Event()
+        self._thread = threading.Thread(target=self._run_loop, name="json-runtime", daemon=True)
+        self._thread.start()
+        self._started.wait()
+
+    def _run_loop(self) -> None:
+        asyncio.set_event_loop(self._loop)
+        self._started.set()
+        self._loop.run_forever()
+
+    def run(self, coro: Coroutine[Any, Any, T]) -> T:
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result()
+
+    def stop(self) -> None:
+        def _stop_loop() -> None:
+            for task in asyncio.all_tasks(loop=self._loop):
+                task.cancel()
+            self._loop.stop()
+
+        self._loop.call_soon_threadsafe(_stop_loop)
+        self._thread.join(timeout=5)
+        self._loop.close()
+
+
+class _JsonService:
+    def __init__(self) -> None:
+        self._runtime = _AsyncRuntime()
+        self._client = httpx.AsyncClient(timeout=_TIMEOUT)
+        self._cache: OrderedDict[str, _CacheEntry] = OrderedDict()
+        self._cache_max = _CACHE_MAX
+        self._lock = asyncio.Lock()
+        self._rate_lock = asyncio.Lock()
+        self._last_call = 0.0
+        self._inflight: dict[str, asyncio.Task[Any]] = {}
+        self._inflight_revalidations: dict[str, asyncio.Task[Any]] = {}
+
+    def is_cached(self, url: str) -> bool:
+        return url in self._cache
+
+    def get_json(self, url: str) -> dict[str, Any]:
+        return self._runtime.run(self._get_json(url))
+
+    def revalidate(self, url: str) -> None:
+        self._runtime.run(self._revalidate(url))
+
+    def revalidate_and_get(self, url: str) -> dict[str, Any]:
+        return self._runtime.run(self._revalidate_and_get(url))
+
+    def refresh(self, url: str) -> None:
+        self._runtime.run(self._refresh(url))
+
+    async def _get_json(self, url: str) -> dict[str, Any]:
+        async with self._lock:
+            entry = self._cache.get(url)
+            if entry is not None:
+                self._cache.move_to_end(url)
+                logger.debug("cache hit: %s", url)
+                return entry.data
+
+            task = self._inflight.get(url)
+            if task is None:
+                logger.debug("cache miss, fetching: %s", url)
+                task = asyncio.create_task(self._fetch_and_store(url))
+                self._inflight[url] = task
+
+        return await task
+
+    async def _revalidate(self, url: str) -> None:
+        async with self._lock:
+            existing = self._inflight_revalidations.get(url)
+            if existing is not None:
+                task = existing
+            elif (entry := self._cache.get(url)) is None:
+                task = asyncio.create_task(self._get_json(url))
+                self._inflight_revalidations[url] = task
+            elif not entry.etag:
+                return
+            else:
+                task = asyncio.create_task(self._do_revalidate(url, entry.etag))
+                self._inflight_revalidations[url] = task
+
+        try:
+            await task
+        finally:
+            async with self._lock:
+                self._inflight_revalidations.pop(url, None)
+
+    async def _do_revalidate(self, url: str, etag: str) -> None:
+        with contextlib.suppress(Exception):
+            await self._update_from_site(url, etag)
+
+    async def _refresh(self, url: str) -> None:
+        async with self._lock:
+            entry = self._cache.get(url)
+        if entry is not None and entry.etag:
+            await self._update_from_site(url, entry.etag)
+        else:
+            await self._fetch_and_store(url)
+
+    async def _update_from_site(self, url: str, etag: str) -> None:
+        async with self._rate_lock:
+            now = time.monotonic()
+            wait = _MIN_INTERVAL - (now - self._last_call)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call = time.monotonic()
+
+        response = await self._client.get(url, headers={"If-None-Match": etag})
+        if response.status_code == _HTTP_NOT_MODIFIED:
+            return
+        response.raise_for_status()
+        new_entry = _CacheEntry(data=response.json(), etag=response.headers.get("etag"))
+        async with self._lock:
+            self._cache[url] = new_entry
+            self._cache.move_to_end(url)
+
+    async def _revalidate_and_get(self, url: str) -> dict[str, Any]:
+        await self._revalidate(url)
+        return await self._get_json(url)
+
+    async def _fetch_and_store(self, url: str) -> dict[str, Any]:
+        logger.info("fetching: %s", url)
+        try:
+            data, etag = await self._rate_limited_fetch(url)
+        except Exception:
+            async with self._lock:
+                self._inflight.pop(url, None)
+            raise
+
+        async with self._lock:
+            self._cache[url] = _CacheEntry(data=data, etag=etag)
+            self._cache.move_to_end(url)
+            if len(self._cache) > self._cache_max:
+                self._cache.popitem(last=False)
+            self._inflight.pop(url, None)
+        return data
+
+    async def _rate_limited_fetch(self, url: str) -> tuple[Any, str | None]:
+        async with self._rate_lock:
+            now = time.monotonic()
+            wait = _MIN_INTERVAL - (now - self._last_call)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call = time.monotonic()
+
+        response = await self._client.get(url)
+        response.raise_for_status()
+        return response.json(), response.headers.get("etag")
+
+    async def _close(self) -> None:
+        await self._client.aclose()
+
+    def shutdown(self) -> None:
+        try:
+            self._runtime.run(self._close())
+        finally:
+            self._runtime.stop()
+
+
+_SERVICE_HOLDER: list[_JsonService | None] = [None]
+_SERVICE_LOCK = threading.Lock()
+
+
+def _get_service() -> _JsonService:
+    with _SERVICE_LOCK:
+        if _SERVICE_HOLDER[0] is None:
+            _SERVICE_HOLDER[0] = _JsonService()
+        return _SERVICE_HOLDER[0]
+
+
+def stop_worker() -> None:
+    with _SERVICE_LOCK:
+        if _SERVICE_HOLDER[0] is not None:
+            _SERVICE_HOLDER[0].shutdown()
+            _SERVICE_HOLDER[0] = None
+
+
+atexit.register(stop_worker)
+
+
+def get_json(url: str) -> dict[str, Any]:
+    return _get_service().get_json(url)
+
+
+def revalidate_json(url: str) -> None:
+    _get_service().revalidate(url)
+
+
+def revalidate_and_get(url: str) -> dict[str, Any]:
+    return _get_service().revalidate_and_get(url)
+
+
+def get_fresh_json(url: str) -> dict[str, Any]:
+    """Fetch fresh JSON from the URL, raising if the remote request fails."""
+    if is_cached(url):
+        _get_service().refresh(url)
+    return get_json(url)
+
+
+def is_cached(url: str) -> bool:
+    return _get_service().is_cached(url)

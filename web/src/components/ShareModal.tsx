@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import type { IconType } from 'react-icons'
+import { type ReactNode, useState, useCallback } from "react";
+import type { IconType } from "react-icons";
 import {
   FaXTwitter,
   FaBluesky,
@@ -8,144 +8,117 @@ import {
   FaWhatsapp,
   FaMessage,
   FaLink,
-} from 'react-icons/fa6'
+} from "react-icons/fa6";
+import { useEscapeKey } from "../hooks/useDomEffects";
+import { copyText } from "../utils/clipboard";
+import { Dialog } from "./common/Dialog";
 
 interface ShareModalProps {
-  url: string
-  shareText: string
-  onClose: () => void
+  url: string;
+  shareText: string;
+  onClose: () => void;
 }
 
 interface Platform {
-  label: string
-  icon: IconType
-  mobileOnly?: boolean
-  desktopOnly?: boolean
-  getUrl: (url: string, text: string) => string
+  label: string;
+  icon: IconType;
+  mobileOnly?: boolean;
+  desktopOnly?: boolean;
+  getUrl: (url: string, text: string) => string;
 }
 
 const PLATFORMS: Platform[] = [
   {
-    label: 'Twitter',
+    label: "Twitter",
     icon: FaXTwitter,
     getUrl: (url, text) =>
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
   },
   {
-    label: 'Bluesky',
+    label: "Bluesky",
     icon: FaBluesky,
     getUrl: (url, text) =>
       `https://bsky.app/intent/compose?text=${encodeURIComponent(`${text} ${url}`)}`,
   },
   {
-    label: 'Reddit',
+    label: "Reddit",
     icon: FaRedditAlien,
     getUrl: (url, text) =>
       `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(text)}`,
   },
   {
-    label: 'Facebook',
+    label: "Facebook",
     icon: FaFacebook,
     desktopOnly: true,
     getUrl: (url) =>
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
   },
   {
-    label: 'WhatsApp',
+    label: "WhatsApp",
     icon: FaWhatsapp,
     getUrl: (url, text) =>
       `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
   },
   {
-    label: 'Text',
+    label: "Text",
     icon: FaMessage,
     mobileOnly: true,
-    getUrl: (url, text) =>
-      `sms:?body=${encodeURIComponent(`${text} ${url}`)}`,
+    getUrl: (url, text) => `sms:?body=${encodeURIComponent(`${text} ${url}`)}`,
   },
-]
+];
 
-export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
-  const [copied, setCopied] = useState(false)
+const SHARE_TILE =
+  "btn-secondary flex flex-col items-center gap-1.5 p-3 rounded-lg";
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
+export function ShareModal({
+  url,
+  shareText,
+  onClose,
+}: ShareModalProps): ReactNode {
+  const [copied, setCopied] = useState(false);
+
+  useEscapeKey(onClose);
 
   const handlePlatformClick = useCallback(
     (getUrl: (url: string, text: string) => string) => {
-      window.open(getUrl(url, shareText), '_blank')
-      onClose()
+      window.open(getUrl(url, shareText), "_blank");
+      onClose();
     },
     [url, shareText, onClose],
-  )
+  );
 
   const handleCopyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = url
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [url])
+    if (!(await copyText(url))) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [url]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="modal-chrome border gold-border rounded-lg p-6 w-full max-w-sm mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-bold text-white">Share Game</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-xl leading-none"
-          >
-            &times;
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          {PLATFORMS.map(({ label, icon: Icon, mobileOnly, desktopOnly, getUrl }) => (
+    <Dialog title="Share Game" onClose={onClose}>
+      <div className="grid grid-cols-3 gap-3">
+        {PLATFORMS.map(
+          ({ label, icon: Icon, mobileOnly, desktopOnly, getUrl }) => (
             <button
               key={label}
               onClick={() => handlePlatformClick(getUrl)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg bg-black/40 border border-black/50 text-gray-300 hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30 transition-colors ${
-                mobileOnly ? 'sm:hidden' : ''
-              } ${desktopOnly ? 'hidden sm:flex' : ''}`}
+              className={`${SHARE_TILE} ${mobileOnly ? "sm:hidden" : ""} ${desktopOnly ? "hidden sm:flex" : ""}`}
             >
-              <Icon className="text-2xl text-gray-100" />
-              <span className="text-xs text-gray-300">{label}</span>
+              <Icon className="text-2xl" />
+              <span className="text-xs">{label}</span>
             </button>
-          ))}
+          ),
+        )}
 
-          <button
-            onClick={handleCopyLink}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-lg transition-colors ${
-              copied
-                ? 'bg-emerald-600/80 border border-emerald-400/30'
-                : 'bg-black/40 border border-black/50 text-gray-300 hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30'
-            }`}
-          >
-            <FaLink className="text-2xl text-gray-100" />
-            <span className="text-xs text-gray-300">
-              {copied ? 'Copied!' : 'Copy Link'}
-            </span>
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            void handleCopyLink();
+          }}
+          className={SHARE_TILE}
+        >
+          <FaLink className="text-2xl" />
+          <span className="text-xs">{copied ? "Copied!" : "Copy Link"}</span>
+        </button>
       </div>
-    </div>
-  )
+    </Dialog>
+  );
 }

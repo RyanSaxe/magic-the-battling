@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import {
   type DividerDragCallbacks,
   useDividerDrag,
@@ -8,6 +9,14 @@ interface ZoneDividerProps extends DividerDragCallbacks {
   interactive?: boolean;
 }
 
+function resolveDividerCursor(
+  interactive: boolean,
+  isHorizontal: boolean,
+): "row-resize" | "col-resize" | undefined {
+  if (!interactive) return undefined;
+  return isHorizontal ? "row-resize" : "col-resize";
+}
+
 export function ZoneDivider({
   orientation,
   onDragStart,
@@ -15,7 +24,7 @@ export function ZoneDivider({
   onDragEnd,
   onDoubleClick,
   interactive = true,
-}: ZoneDividerProps) {
+}: ZoneDividerProps): ReactElement {
   const dragBindings = useDividerDrag({
     orientation,
     callbacks: { onDragStart, onDrag, onDragEnd, onDoubleClick },
@@ -26,7 +35,11 @@ export function ZoneDivider({
 
   return (
     <div
-      className={isHorizontal ? "zone-divider-line zone-divider-line--horizontal" : "zone-divider-line zone-divider-line--vertical"}
+      className={
+        isHorizontal
+          ? "zone-divider-line zone-divider-line--horizontal"
+          : "zone-divider-line zone-divider-line--vertical"
+      }
       style={{
         position: "relative",
         flexShrink: 0,
@@ -39,11 +52,7 @@ export function ZoneDivider({
         {...dragBindings}
         style={{
           position: "absolute",
-          cursor: interactive
-            ? isHorizontal
-              ? "row-resize"
-              : "col-resize"
-            : undefined,
+          cursor: resolveDividerCursor(interactive, isHorizontal),
           touchAction: interactive ? "none" : undefined,
           ...(isHorizontal
             ? { top: -5, left: 0, right: 0, height: 12 }

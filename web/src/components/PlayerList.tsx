@@ -1,21 +1,23 @@
 import type { ReactNode } from "react";
-import type { LastResult, PlayerView } from "../types";
+import type { PlayerView } from "../types";
+import { MoneyBagIcon, PoisonIcon } from "./icons";
+import { PlayerCard } from "./PlayerCard";
+import { StandingsRank } from "./common/StandingsRank";
+import { getLastResultWord, getPlayerActivity } from "../utils/format";
 import {
-  GhostIcon,
-  HourglassIcon,
-  MoneyBagIcon,
-  PoisonIcon,
-  PuppetIcon,
-  SkullIcon,
-} from "./icons";
-import { useContextStrip } from "../contexts";
-import { PlacementBadge } from "./sidebar/PlacementBadge";
-import { getSidebarPlayerOrder } from "../utils/playerPlacement";
-import { getPlayerPhaseStatusLabel } from "../utils/format";
+  getSidebarPlacementRank,
+  getSidebarPlayerOrder,
+  getStanding,
+  isSidebarLastPlace,
+  type Standing,
+} from "../utils/playerPlacement";
 
 interface PlayerListProps {
   players: PlayerView[];
   currentPlayerName: string;
+  /** The player whose scouting panel is open, shown selected. */
+  scoutedPlayerName: string | null;
+  onPlayerClick: (playerName: string) => void;
   renderMicToggle?: (player: PlayerView) => ReactNode;
 }
 
@@ -23,100 +25,138 @@ export const PLAYER_ROW_STACK_CLASS = "space-y-3";
 
 type ShareResultStatus = "viewing" | "alive" | "dead";
 
-function ResultBadge({
-  result,
-  inSuddenDeath,
-  shareStatus,
+function getShownStanding(
+  player: PlayerView,
+  shareStatus: ShareResultStatus | undefined,
+): Standing {
+  if (shareStatus) return shareStatus === "dead" ? "out" : "alive";
+  return getStanding(player);
+}
+
+/** Who a player is when that matters, or else what they're doing now. */
+function StatusLabel({
+  player,
+  standing,
+  variant,
+  isSelected,
 }: {
-  result: LastResult | null;
-  inSuddenDeath: boolean;
-  shareStatus?: ShareResultStatus;
-}) {
-  const baseClassName = "inline-flex h-4 min-w-[1.25rem] shrink-0 items-center justify-center rounded-[3px] border border-[color:rgba(212,175,55,0.22)] bg-black/18 px-1 text-[10px] font-bold leading-none";
-  const shareBadgeClassName = `${baseClassName} min-w-[3.75rem] whitespace-nowrap px-1.5 text-[9px] font-semibold`;
-
-  if (shareStatus === "viewing") {
-    return <span className={`${shareBadgeClassName} text-cyan-200`}>Viewing</span>;
-  }
-
-  if (shareStatus === "alive") {
-    return <span className={`${shareBadgeClassName} text-emerald-200`}>Alive</span>;
-  }
-
-  if (shareStatus === "dead") {
-    return <span className={`${shareBadgeClassName} text-red-200`}>Dead</span>;
-  }
-
-  if (inSuddenDeath) {
+  player: PlayerView;
+  standing: Standing;
+  variant: "game" | "share";
+  isSelected: boolean;
+}): ReactNode {
+  if (standing === "out") {
+    // A shared game shows the round each player went out in, since the viewer moves between rounds.
+    const round =
+      variant === "share" ? ` at ${player.stage}-${player.round}` : "";
     return (
-      <span className={`${baseClassName} min-w-[1.5rem] text-[9px] text-red-300`} title="Sudden Death">
+      <span className="player-card-label player-card-label-out">
+        Out{round}
+      </span>
+    );
+  }
+  if (standing === "ghost") {
+    return <span className="player-card-label">Ghost</span>;
+  }
+  if (player.is_puppet) {
+    return <span className="player-card-label">Puppet</span>;
+  }
+
+  const activity = getPlayerActivity(player);
+  if (variant === "game" && activity) {
+    return <span className="player-card-label">{activity}</span>;
+  }
+  if (isSelected) {
+    return (
+      <span className="player-card-label player-card-label-viewing">
+        Viewing
+      </span>
+    );
+  }
+  return null;
+}
+
+/** The end of the stats line: Sudden Death, which fixes the next pairing, or else the chance of facing this player. */
+function Outlook({
+  player,
+  standing,
+  variant,
+  isSelf,
+}: {
+  player: PlayerView;
+  standing: Standing;
+  variant: "game" | "share";
+  isSelf: boolean;
+}): ReactNode {
+  if (variant === "share") return null;
+  if (player.in_sudden_death) {
+    return (
+      <span
+        className="player-card-label player-card-label-out"
+        title="Sudden Death"
+      >
         SD
       </span>
     );
   }
-
-  if (result === null) {
-    return <span className={`${baseClassName} font-semibold text-gray-500`}>-</span>;
+  if (isSelf || standing === "out" || player.pairing_probability === null) {
+    return null;
   }
-
-  if (result === "win") {
-    return <span className={`${baseClassName} text-emerald-300`}>W</span>;
-  }
-
-  if (result === "draw") {
-    return <span className={`${baseClassName} text-amber-200`}>D</span>;
-  }
-
-  return <span className={`${baseClassName} text-red-300`}>L</span>;
-}
-
-function PairingProbability({ probability }: { probability: number | null }) {
-  if (probability === null) {
-    return <span className="text-[10px] text-gray-500">??%</span>;
-  }
-
   return (
-    <span className="text-[10px] text-cyan-300/90">
-      {Math.round(probability * 100)}%
+    <span title="Chance you face them next">
+      {Math.round(player.pairing_probability * 100)}%
     </span>
   );
 }
 
-function StatusLine({
+function LastFightResult({
+  result,
+}: {
+  result: PlayerView["last_result"];
+}): ReactNode {
+  if (!result) return null;
+  return (
+    <span
+      className={`player-card-result player-card-result-${result}`}
+      title="Last fight"
+    >
+      {getLastResultWord(result)}
+    </span>
+  );
+}
+
+function PlayerRowStats({
   player,
-  variant,
+  hiddenInFight,
 }: {
   player: PlayerView;
-  variant: "game" | "share";
-}) {
-  const iconWrapClassName = "inline-flex h-4 w-[1.25rem] items-center justify-center";
-
-  if (variant === "share") {
-    return player.is_puppet
-      ? <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>
-      : <span className="block truncate text-right">{player.stage}-{player.round}</span>;
-  }
-
-  if (player.is_ghost && !player.is_most_recent_ghost) {
-    return <span className={iconWrapClassName}><SkullIcon size="sm" /></span>;
-  }
-
-  if (player.is_most_recent_ghost) {
-    return <span className={iconWrapClassName}><GhostIcon size="sm" /></span>;
-  }
-
-  if (player.phase === "awaiting_elimination") {
-    return <span className={iconWrapClassName}><HourglassIcon size="sm" /></span>;
-  }
-
-  if (player.is_puppet) {
-    return <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>;
-  }
-
+  hiddenInFight: boolean;
+}): ReactNode {
+  if (hiddenInFight) return null;
   return (
-    <span className="block truncate text-right">
-      {player.stage}-{player.round} @ {getPlayerPhaseStatusLabel(player.phase, player.build_ready)}
-    </span>
+    <>
+      <span className="player-card-stat" title="Poison">
+        <PoisonIcon size="sm" />
+        {player.poison}
+      </span>
+      <span className="player-card-stat" title="Treasures">
+        <MoneyBagIcon size="sm" />
+        {player.treasures}
+      </span>
+    </>
+  );
+}
+
+function isHiddenInFight(options: {
+  variant: "game" | "share";
+  isSelf: boolean;
+  players: PlayerView[];
+  currentPlayerName: string;
+}): boolean {
+  if (options.variant !== "game" || options.isSelf) return false;
+  return (
+    options.players.find(({ name }) => name === options.currentPlayerName)
+      ?.phase === "battle"
   );
 }
 
@@ -129,6 +169,7 @@ export function PlayerRow({
   variant = "game",
   shareStatus,
   micToggle,
+  showPlacement = true,
 }: {
   player: PlayerView;
   players: PlayerView[];
@@ -138,94 +179,70 @@ export function PlayerRow({
   variant?: "game" | "share";
   shareStatus?: ShareResultStatus;
   micToggle?: ReactNode;
-}) {
-  const isSelf = player.name === currentPlayerName;
-  const showPairingProbability =
-    variant !== "share" && !isSelf && (!player.is_ghost || player.is_most_recent_ghost);
-  const showLeadingMicToggle = variant === "game" && !!micToggle;
+  showPlacement?: boolean;
+}): ReactNode {
+  const isSelf = variant === "game" && player.name === currentPlayerName;
+  const hiddenInFight = isHiddenInFight({
+    variant,
+    isSelf,
+    players,
+    currentPlayerName,
+  });
+  const standing = getShownStanding(
+    player,
+    variant === "share" ? shareStatus : undefined,
+  );
+  const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
+  const showOutlook = !hiddenInFight || player.in_sudden_death;
 
   return (
-    <button
-      type="button"
-      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 text-left transition-colors player-row-etched ${
-        isSelected ? "ring-1 ring-[var(--color-gold)]/60" : ""
-      } ${player.is_ghost ? "opacity-50" : ""}`}
-      data-guide-player-row={player.name}
-      onClick={onClick}
+    <PlayerCard
+      guideName={player.name}
+      lead={
+        rank === null ? undefined : (
+          <StandingsRank
+            rank={rank}
+            isLast={isSidebarLastPlace(player, players)}
+          />
+        )
+      }
+      name={player.name}
+      nameEnd={<LastFightResult result={player.last_result} />}
+      control={micToggle}
+      isSelf={isSelf}
+      isOut={standing !== "alive"}
+      selected={isSelected}
+      onSelect={onClick}
     >
-      <PlacementBadge
+      <PlayerRowStats player={player} hiddenInFight={hiddenInFight} />
+      <StatusLabel
         player={player}
-        players={players}
-        variant="corner"
-        className="pointer-events-none absolute left-0 top-0 z-10"
+        standing={standing}
+        variant={variant}
+        isSelected={isSelected}
       />
-      <div className="min-w-0 self-end">
-        <div className="flex items-center gap-1.5">
-          {showLeadingMicToggle ? micToggle : null}
-          <span className="block truncate text-sm font-medium text-amber-50">
-            {player.name}
-          </span>
-          {!showLeadingMicToggle ? micToggle : null}
-        </div>
-      </div>
-
-      <div className="justify-self-end self-end max-w-[8.5rem] text-xs text-gray-400">
-        <ResultBadge
-          result={player.last_result}
-          inSuddenDeath={player.in_sudden_death}
-          shareStatus={variant === "share" ? shareStatus : undefined}
-        />
-      </div>
-
-      <div className="min-w-0 self-start">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <span
-            className="inline-flex items-center gap-1 text-purple-300/90"
-            title="Poison"
-          >
-            <PoisonIcon size="sm" /> {player.poison}
-          </span>
-          <span
-            className="inline-flex items-center gap-1 text-amber-300/90"
-            title="Treasures"
-          >
-            <MoneyBagIcon size="sm" /> {player.treasures}
-          </span>
-          {variant !== "share" && isSelf && (
-            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-300/90">
-              You
-            </span>
-          )}
-          {showPairingProbability && (
-            <PairingProbability probability={player.pairing_probability} />
-          )}
-        </div>
-      </div>
-
-      <div className="justify-self-end self-start max-w-[8.5rem] min-w-0 text-xs text-gray-400">
-        <div className="text-right">
-          <StatusLine player={player} variant={variant} />
-        </div>
-      </div>
-    </button>
+      <span className="player-card-outlook">
+        {/* The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death. */}
+        {showOutlook && (
+          <Outlook
+            player={player}
+            standing={standing}
+            variant={variant}
+            isSelf={isSelf}
+          />
+        )}
+      </span>
+    </PlayerCard>
   );
 }
 
 export function PlayerList({
   players,
   currentPlayerName,
+  scoutedPlayerName,
+  onPlayerClick,
   renderMicToggle,
-}: PlayerListProps) {
-  const { state, setRevealedPlayerName } = useContextStrip();
-
-  const handlePlayerClick = (player: PlayerView) => {
-    if (state.revealedPlayerName === player.name) {
-      setRevealedPlayerName(null);
-    } else {
-      setRevealedPlayerName(player.name, "seen");
-    }
-  };
-
+}: PlayerListProps): ReactNode {
   const sortedPlayers = getSidebarPlayerOrder(players);
 
   return (
@@ -240,8 +257,8 @@ export function PlayerList({
             player={player}
             players={players}
             currentPlayerName={currentPlayerName}
-            isSelected={state.revealedPlayerName === player.name}
-            onClick={() => handlePlayerClick(player)}
+            isSelected={scoutedPlayerName === player.name}
+            onClick={() => onPlayerClick(player.name)}
             micToggle={renderMicToggle?.(player)}
           />
         ))}

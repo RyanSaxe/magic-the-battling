@@ -1,1330 +1,971 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+/** Lobby route for seat setup, deck submission, readiness, and starting a multiplayer game. */
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FaDiscord } from "react-icons/fa6";
-import { useSession } from "../hooks/useSession";
+import { useGameSeat } from "../hooks/useGameSeat";
 import { useGame } from "../hooks/useGame";
+import { useLobbySync } from "../hooks/useLobbySync";
 import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { InfoIcon } from "../components/icons/InfoIcon";
+import { usePanelHoldsEnter } from "../hooks/usePanelHoldsEnter";
+import { useCubeLook } from "../hooks/useCubeLook";
+import { useBoardDesktop } from "../hooks/useBoardDesktop";
+import type { ResumableSeat } from "../hooks/useResumableGames";
+import { CloseSeatDialog } from "../components/ResumeGame";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
-import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
-import { HintsBanner } from "../components/common/HintsBanner";
-import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
+import {
+  AppHeader,
+  GuideButton,
+  HomeButton,
+} from "../components/common/AppHeader";
+import { BarLabel } from "../components/common/FrameBar";
+import { PageFrame } from "../components/common/PageFrame";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import {
+  START_STEPS,
+  useHandedOnSteps,
+} from "../components/common/loadingSteps";
+import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
+import { RemovePlayerDialog } from "../components/lobby/RemovePlayerDialog";
+import { SpectateRequestModal } from "../components/SpectateRequestModal";
 import { type AppError, getAppErrorMessage } from "../utils/appError";
-import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
+import type { LobbyPlayer, LobbyState } from "../types";
 import {
   getDefaultNewPlayerPreference,
   getNewPlayerPreferenceForGame,
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
+import { copyText } from "../utils/clipboard";
+import { clearTabSession } from "../utils/tabSession";
+import {
+  buildLeavingSeat,
+  buildLobbyHotkeys,
+  deriveLobbyHostStatus,
+} from "./lobbyState";
+import { LobbyBody, ReconnectingOverlay } from "./LobbyViews";
 
-const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
-
-function cubeCobraUrl(battlerId: string) {
-  return `https://cubecobra.com/cube/overview/${encodeURIComponent(battlerId)}`;
-}
-
-function GuidedModeSwitch({
-  enabled,
-  setEnabled,
-}: {
-  enabled: boolean;
-  setEnabled: (v: boolean) => void;
-}) {
-  const guidedModeHelpText =
-    "Guided Mode gives you a brief walkthrough the first time a new phase, action, or situation comes up.";
-  const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
-  const guidedModeHelpRef = useRef<HTMLDivElement>(null);
-  const [popupAnchorX, setPopupAnchorX] = useState<"right" | "left" | "center">("right");
-  const [popupAnchorY, setPopupAnchorY] = useState<"top" | "bottom">("top");
-
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!guidedModeHelpRef.current?.contains(target)) {
-        setShowGuidedModeHelp(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-
-  useEffect(() => {
-    if (!showGuidedModeHelp) return;
-
-    const repositionPopup = () => {
-      const anchor = guidedModeHelpRef.current;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      const viewportPadding = 8;
-      const popupWidth = Math.min(256, window.innerWidth - viewportPadding * 2);
-      const canAlignRight = rect.right - popupWidth >= viewportPadding;
-      const canAlignLeft = rect.left + popupWidth <= window.innerWidth - viewportPadding;
-
-      if (canAlignRight) {
-        setPopupAnchorX("right");
-      } else if (canAlignLeft) {
-        setPopupAnchorX("left");
-      } else {
-        setPopupAnchorX("center");
-      }
-
-      const estimatedPopupHeight = 96;
-      setPopupAnchorY(
-        rect.top - estimatedPopupHeight >= viewportPadding ? "top" : "bottom",
-      );
-    };
-
-    repositionPopup();
-    window.addEventListener("resize", repositionPopup);
-    window.addEventListener("scroll", repositionPopup, true);
-    return () => {
-      window.removeEventListener("resize", repositionPopup);
-      window.removeEventListener("scroll", repositionPopup, true);
-    };
-  }, [showGuidedModeHelp]);
-
+function initialGuidedPreference(
+  gameId: string,
+  playerId: string | undefined,
+): boolean {
+  if (!gameId) return getDefaultNewPlayerPreference();
   return (
-    <div className="flex items-center gap-1.5">
-      <label className="flex items-center gap-1.5 cursor-pointer">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
-          Guided
-        </span>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-          className="sr-only peer"
-        />
-        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              enabled ? "translate-x-5" : "translate-x-1"
-            }`}
-          />
-        </span>
-      </label>
-      <div ref={guidedModeHelpRef} className="relative group shrink-0">
-        <button
-          type="button"
-          className="text-gray-400 hover:text-gray-200"
-          aria-label="What guided mode does"
-          aria-expanded={showGuidedModeHelp}
-          onClick={() => setShowGuidedModeHelp((v) => !v)}
-        >
-          <InfoIcon size="sm" />
-        </button>
-        <span
-          className={`absolute w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-[60] ${
-            popupAnchorX === "right"
-              ? "right-0"
-              : popupAnchorX === "left"
-                ? "left-0"
-                : "left-1/2 -translate-x-1/2"
-          } ${
-            popupAnchorY === "top" ? "bottom-full mb-2" : "top-full mt-2"
-          } ${
-            showGuidedModeHelp
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
-          }`}
-          style={{ maxWidth: "calc(100vw - 1rem)" }}
-        >
-          {guidedModeHelpText}
-        </span>
-      </div>
-    </div>
+    getNewPlayerPreferenceForGame(gameId, playerId) ??
+    getDefaultNewPlayerPreference()
   );
 }
 
-function VoiceChatSwitch({
-  enabled,
-  setEnabled,
-  isHost,
-}: {
-  enabled: boolean;
-  setEnabled: (v: boolean) => void;
-  isHost: boolean;
-}) {
-  const voiceHelpText =
-    "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
-  const [showVoiceHelp, setShowVoiceHelp] = useState(false);
-  const voiceHelpRef = useRef<HTMLDivElement>(null);
-  const [popupAnchorX, setPopupAnchorX] = useState<"right" | "left" | "center">("right");
-  const [popupAnchorY, setPopupAnchorY] = useState<"top" | "bottom">("top");
-
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!voiceHelpRef.current?.contains(target)) {
-        setShowVoiceHelp(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-
-  useEffect(() => {
-    if (!showVoiceHelp) return;
-
-    const repositionPopup = () => {
-      const anchor = voiceHelpRef.current;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      const viewportPadding = 8;
-      const popupWidth = Math.min(256, window.innerWidth - viewportPadding * 2);
-      const canAlignRight = rect.right - popupWidth >= viewportPadding;
-      const canAlignLeft = rect.left + popupWidth <= window.innerWidth - viewportPadding;
-
-      if (canAlignRight) {
-        setPopupAnchorX("right");
-      } else if (canAlignLeft) {
-        setPopupAnchorX("left");
-      } else {
-        setPopupAnchorX("center");
-      }
-
-      const estimatedPopupHeight = 96;
-      setPopupAnchorY(
-        rect.top - estimatedPopupHeight >= viewportPadding ? "top" : "bottom",
-      );
-    };
-
-    repositionPopup();
-    window.addEventListener("resize", repositionPopup);
-    window.addEventListener("scroll", repositionPopup, true);
-    return () => {
-      window.removeEventListener("resize", repositionPopup);
-      window.removeEventListener("scroll", repositionPopup, true);
-    };
-  }, [showVoiceHelp]);
-
+function isReadyActionDisabled(options: {
+  isStarting: boolean;
+  isConstructed: boolean;
+  currentPlayer: LobbyPlayer | undefined;
+}): boolean {
+  if (options.isStarting) return true;
+  if (!options.currentPlayer || !options.isConstructed) return false;
   return (
-    <div
-      className={`flex items-center gap-1.5${
-        !isHost ? ' opacity-50' : ''
-      }`}
-    >
-      <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}`}>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
-          Voice
-        </span>
-        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400">
-          Beta
-        </span>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => isHost && setEnabled(e.target.checked)}
-          disabled={!isHost}
-          className="sr-only peer"
-        />
-        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              enabled ? 'translate-x-5' : 'translate-x-1'
-            }`}
-          />
-        </span>
-      </label>
-      <div ref={voiceHelpRef} className="relative group shrink-0">
-        <button
-          type="button"
-          className="text-gray-400 hover:text-gray-200"
-          aria-label="Voice chat info"
-          aria-expanded={showVoiceHelp}
-          onClick={() => setShowVoiceHelp((v) => !v)}
-        >
-          <InfoIcon size="sm" />
-        </button>
-        <span
-          className={`absolute w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-[60] ${
-            popupAnchorX === "right"
-              ? "right-0"
-              : popupAnchorX === "left"
-                ? "left-0"
-                : "left-1/2 -translate-x-1/2"
-          } ${
-            popupAnchorY === "top" ? "bottom-full mb-2" : "top-full mt-2"
-          } ${
-            showVoiceHelp
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
-          }`}
-          style={{ maxWidth: "calc(100vw - 1rem)" }}
-        >
-          {voiceHelpText}
-        </span>
-      </div>
-    </div>
+    !options.currentPlayer.is_ready &&
+    options.currentPlayer.battler_status !== "ready"
   );
 }
 
-function LobbyFooterLinks() {
-  return (
-    <div className="flex items-center justify-between">
-      <a
-        href="https://discord.gg/2NAjcWXNKn"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
-      >
-        <FaDiscord className="w-4 h-4" />
-        Join Discord
-      </a>
-      <CubeCobraPrimerLink />
-    </div>
-  );
+function resolveSummaryBattlerId(
+  isConstructed: boolean,
+  deckId: string | null | undefined,
+  lobbyCubeId: string | undefined,
+): string | null {
+  return (isConstructed ? deckId : lobbyCubeId) ?? null;
 }
 
-export function Lobby() {
-  const { gameId } = useParams<{ gameId: string }>();
-  const navigate = useNavigate();
-  const { session, clearSession } = useSession();
-  const { addToast } = useToast();
-  const handleServerError = useCallback((error: AppError) => {
-    addToast(getAppErrorMessage(error, "lobby-action", "That action could not be completed."), "error");
-  }, [addToast]);
-
-  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
-  const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
-    voiceSignalRef.current?.(payload);
-  }, []);
-
-  const {
-    lobbyState,
-    gameState,
-    isConnected,
-    kicked,
-    connectionError,
-    invalidSession,
-    actions,
-    send,
-  } = useGame(
-    gameId ?? null,
-    session?.sessionId ?? null,
-    null,
-    handleServerError,
-    handleVoiceSignal,
-  );
-
-  const peerNames = useMemo(() => {
-    if (!lobbyState?.voice_chat_enabled || !session) return []
-    return lobbyState.players
-      .filter(p => p.player_id !== session.playerId)
-      .map(p => p.name)
-  }, [lobbyState, session])
-
-  const selfName = lobbyState?.players.find(p => p.player_id === session?.playerId)?.name ?? null
-
-  const handleMicDenied = useCallback(() => {
-    addToast("Microphone access was denied. Voice chat is unavailable.", "warning")
-  }, [addToast])
-
-  const handleRetriesExhausted = useCallback((peerName: string) => {
-    addToast(`Voice connection to ${peerName} failed.`, "warning")
-  }, [addToast])
-
-  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
-
-  const [copied, setCopied] = useState(false);
-  const [startingGame, setStartingGame] = useState(false);
-  const [showRulesPanel, setShowRulesPanel] = useState(false);
-  const [isGuidedMode, setIsGuidedMode] = useState(() =>
-    getDefaultNewPlayerPreference(),
-  );
-  const [battlerIdInput, setBattlerIdInput] = useState("");
-  const [rulesPanelTarget, setRulesPanelTarget] = useState<
-    RulesPanelTarget | undefined
-  >(undefined);
-  const wasInvalidSessionRef = useRef(false);
-  const lastCubeLoadingErrorRef = useRef<string | null>(null);
-  const lastBattlerErrorRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!gameId) return;
-    const existing = getNewPlayerPreferenceForGame(gameId, session?.playerId);
-    const initial = existing ?? getDefaultNewPlayerPreference();
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setIsGuidedMode(initial);
-    });
-    if (existing === null) {
-      setNewPlayerPreferenceForGame(gameId, initial, session?.playerId);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId, session?.playerId]);
-
-  const handleGuidedModeToggle = (nextValue: boolean) => {
-    setIsGuidedMode(nextValue);
-    setGlobalGuidedModePreference(nextValue);
-    if (gameId) {
-      setNewPlayerPreferenceForGame(gameId, nextValue, session?.playerId);
-    }
-  };
-
-  const currentPlayer = lobbyState?.players.find(
-    (p) => p.player_id === session?.playerId,
-  );
+function deriveDeckFlags(options: {
+  lobbyState: LobbyState | null;
+  currentPlayer: LobbyPlayer | undefined;
+  editingDeck: boolean;
+  battlerIdInput: string;
+}): {
+  isConstructed: boolean;
+  hasLoadedBattler: boolean;
+  isBattlerLoading: boolean;
+  deckId: string | null | undefined;
+  showsDeck: boolean;
+  isEditingDeck: boolean;
+  deckUnchanged: boolean;
+  summaryBattlerId: string | null;
+} {
+  const { lobbyState, currentPlayer, editingDeck, battlerIdInput } = options;
   const isConstructed = lobbyState?.play_mode === "constructed";
   const battlerStatus = currentPlayer?.battler_status ?? null;
   const hasLoadedBattler = battlerStatus === "ready";
   const isBattlerLoading = battlerStatus === "loading";
-  const readyActionDisabled =
-    !!currentPlayer &&
-    isConstructed === true &&
-    !currentPlayer.is_ready &&
-    battlerStatus !== "ready";
-
-  const toggleReady = () => {
-    if (!currentPlayer || readyActionDisabled) return;
-    actions.setReady(!currentPlayer.is_ready);
+  // A refused deck isn't the player's, though the field keeps its ID to correct.
+  const deckId = battlerStatus === "error" ? null : currentPlayer?.battler_id;
+  const isEditingDeck = hasLoadedBattler && editingDeck;
+  return {
+    isConstructed,
+    hasLoadedBattler,
+    isBattlerLoading,
+    deckId,
+    showsDeck: hasLoadedBattler && !editingDeck,
+    isEditingDeck,
+    deckUnchanged: isEditingDeck && battlerIdInput.trim() === deckId,
+    summaryBattlerId: resolveSummaryBattlerId(
+      isConstructed,
+      deckId,
+      lobbyState?.cube_id,
+    ),
   };
+}
 
-  useEffect(() => {
-    const nextBattlerId = currentPlayer?.battler_id ?? "";
-    queueMicrotask(() => {
-      setBattlerIdInput((previous) =>
-        previous === nextBattlerId ? previous : nextBattlerId,
-      );
-    });
-  }, [currentPlayer?.battler_id]);
+function useLobbyDeckState(options: {
+  lobbyState: LobbyState | null;
+  currentPlayer: LobbyPlayer | undefined;
+  submitBattlerAction: (id: string) => void;
+  addToast: (message: string, type?: "error" | "info" | "warning") => void;
+}): {
+  isConstructed: boolean;
+  hasLoadedBattler: boolean;
+  isBattlerLoading: boolean;
+  deckId: string | null | undefined;
+  showsDeck: boolean;
+  isEditingDeck: boolean;
+  deckUnchanged: boolean;
+  summaryBattlerId: string | null;
+  battlerIdInput: string;
+  setBattlerIdInput: (value: string) => void;
+  setEditingDeck: (editing: boolean) => void;
+  submitBattler: () => void;
+  editDeck: () => void;
+  handleBattlerButtonClick: () => void;
+} {
+  const { lobbyState, currentPlayer, submitBattlerAction, addToast } = options;
+  const [battlerIdInput, setBattlerIdInput] = useState("");
+  const [syncedBattlerId, setSyncedBattlerId] = useState("");
+  const [editingDeck, setEditingDeck] = useState(false);
 
-  useEffect(() => {
-    const nextError =
-      lobbyState?.play_mode === "limited" &&
-      lobbyState.cube_loading_status === "error"
-        ? lobbyState.cube_loading_error
-        : null;
-    if (!nextError || nextError === lastCubeLoadingErrorRef.current) {
-      if (!nextError) {
-        lastCubeLoadingErrorRef.current = null;
-      }
-      return;
-    }
-    lastCubeLoadingErrorRef.current = nextError;
-    addToast(nextError, "error");
-  }, [
-    addToast,
-    lobbyState?.cube_loading_error,
-    lobbyState?.cube_loading_status,
-    lobbyState?.play_mode,
-  ]);
+  const serverBattlerId = currentPlayer?.battler_id ?? "";
+  if (syncedBattlerId !== serverBattlerId) {
+    setSyncedBattlerId(serverBattlerId);
+    setBattlerIdInput(serverBattlerId);
+  }
+  const flags = deriveDeckFlags({
+    lobbyState,
+    currentPlayer,
+    editingDeck,
+    battlerIdInput,
+  });
 
-  useEffect(() => {
-    const nextError = currentPlayer?.battler_error ?? null;
-    if (!nextError || nextError === lastBattlerErrorRef.current) {
-      if (!nextError) {
-        lastBattlerErrorRef.current = null;
-      }
-      return;
-    }
-    lastBattlerErrorRef.current = nextError;
-    addToast(nextError, "error");
-  }, [addToast, currentPlayer?.battler_error]);
-
-  const submitBattler = () => {
+  const submitBattler = (): void => {
     const battlerId = battlerIdInput.trim();
     if (!battlerId) {
-      addToast(isConstructed ? "Please enter a deck" : "Please enter a cube ID", "error");
+      addToast(
+        flags.isConstructed ? "Please enter a deck" : "Please enter a cube ID",
+        "error",
+      );
       return;
     }
-    actions.submitBattler(battlerId);
+    setEditingDeck(false);
+    submitBattlerAction(battlerId);
   };
 
-  const clearBattler = () => {
-    if (!hasLoadedBattler) return;
-    actions.clearBattler();
+  const editDeck = (): void => {
+    setBattlerIdInput(flags.deckId ?? "");
+    setEditingDeck(true);
   };
 
-  const handleBattlerButtonClick = () => {
-    if (hasLoadedBattler) {
-      clearBattler();
+  const handleBattlerButtonClick = (): void => {
+    if (flags.showsDeck) {
+      editDeck();
       return;
     }
     submitBattler();
   };
 
-  const lobbyHotkeyMap: Record<string, () => void> = {
-    "?": () => {
-      setRulesPanelTarget(undefined);
-      setShowRulesPanel(true);
-    },
+  return {
+    ...flags,
+    battlerIdInput,
+    setBattlerIdInput,
+    setEditingDeck,
+    submitBattler,
+    editDeck,
+    handleBattlerButtonClick,
   };
-  if (lobbyState && currentPlayer && !showRulesPanel) {
-    const isHost = currentPlayer.is_host;
-    lobbyHotkeyMap["r"] = toggleReady;
-    if (isConstructed) {
-      lobbyHotkeyMap["b"] = () => {
-        if (isBattlerLoading) return;
-        handleBattlerButtonClick();
-      };
+}
+
+function useLobbyGuidedMode(
+  gameId: string,
+  playerId: string | undefined,
+): [boolean, (next: boolean) => void] {
+  const scopeKey = gameId ? `${gameId}::${playerId ?? ""}` : null;
+  const [guidedScope, setGuidedScope] = useState<string | null>(scopeKey);
+  const [isGuidedMode, setIsGuidedMode] = useState(() =>
+    initialGuidedPreference(gameId, playerId),
+  );
+  if (guidedScope !== scopeKey) {
+    setGuidedScope(scopeKey);
+    if (gameId) {
+      setIsGuidedMode(initialGuidedPreference(gameId, playerId));
     }
-    lobbyHotkeyMap["Enter"] = () => {
-      if (isHost && lobbyState.can_start && !startingGame) {
-        setStartingGame(true);
-        actions.startGame();
-      } else {
-        toggleReady();
-      }
-    };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !showRulesPanel);
-
-  useEffect(() => {
-    if (gameState) {
-      navigate(`/game/${gameId}/play`);
+  const toggle = (nextValue: boolean): void => {
+    setIsGuidedMode(nextValue);
+    setGlobalGuidedModePreference(nextValue);
+    if (gameId) {
+      setNewPlayerPreferenceForGame(gameId, nextValue, playerId);
     }
-  }, [gameState, gameId, navigate]);
+  };
+  return [isGuidedMode, toggle];
+}
 
-  useEffect(() => {
-    if (kicked) {
-      navigate("/play");
-    }
-  }, [kicked, navigate]);
+function useLobbyVoice(options: {
+  gameId: string;
+  sessionId: string | null;
+  lobbyState: LobbyState | null;
+  sessionPlayerId: string | undefined;
+  send: (action: string, payload: Record<string, unknown>) => void;
+  voiceSignalRef: React.RefObject<
+    ((payload: VoiceSignalPayload) => void) | null
+  >;
+  addToast: (message: string, type?: "error" | "info" | "warning") => void;
+}): ReturnType<typeof useVoiceChat> {
+  const {
+    gameId,
+    sessionId,
+    lobbyState,
+    sessionPlayerId,
+    send,
+    voiceSignalRef,
+    addToast,
+  } = options;
+  const peerNames = useMemo(() => {
+    if (!lobbyState?.voice_chat_enabled || !sessionPlayerId) return [];
+    return lobbyState.players
+      .filter((p) => p.player_id !== sessionPlayerId)
+      .map((p) => p.name);
+  }, [lobbyState, sessionPlayerId]);
 
-  useEffect(() => {
-    const shouldClear = shouldClearSessionOnInvalidEvent(
-      invalidSession,
-      wasInvalidSessionRef.current,
-      !!session,
+  const selfName =
+    lobbyState?.players.find((p) => p.player_id === sessionPlayerId)?.name ??
+    null;
+
+  const handleMicDenied = useCallback(() => {
+    addToast(
+      "Microphone access was denied. Voice chat is unavailable.",
+      "warning",
     );
-    wasInvalidSessionRef.current = invalidSession;
-    if (shouldClear) {
-      clearSession();
-    }
-  }, [invalidSession, session, clearSession]);
+  }, [addToast]);
 
-  const copyJoinCode = async () => {
-    if (!lobbyState?.join_code) return;
-    try {
-      await navigator.clipboard.writeText(lobbyState.join_code);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = lobbyState.join_code;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
+  const handleRetriesExhausted = useCallback(
+    (peerName: string) => {
+      addToast(`Voice connection to ${peerName} failed.`, "warning");
+    },
+    [addToast],
+  );
+
+  const voiceName = lobbyState?.voice_chat_enabled ? selfName : null;
+  return useVoiceChat({
+    send,
+    peerNames,
+    selfPlayerName: voiceName,
+    voiceSignalRef,
+    gameId: gameId || null,
+    sessionId,
+    onPermissionDenied: handleMicDenied,
+    onRetriesExhausted: handleRetriesExhausted,
+  });
+}
+
+function LobbyStartingView({
+  isConnected,
+  spectateRequest,
+  onRespondSpectate,
+  rulesPanel,
+}: {
+  isConnected: boolean;
+  spectateRequest:
+    | Parameters<typeof SpectateRequestModal>[0]["request"]
+    | undefined;
+  onRespondSpectate: (requestId: string, allowed: boolean) => void;
+  rulesPanel: ReactElement | false;
+}): ReactElement {
+  return (
+    <>
+      {!isConnected && <ReconnectingOverlay />}
+      <LoadingScreen steps={START_STEPS} current="Deal cards" />
+      {spectateRequest && (
+        <SpectateRequestModal
+          request={spectateRequest}
+          onRespond={onRespondSpectate}
+        />
+      )}
+      {rulesPanel}
+    </>
+  );
+}
+
+function findRemovablePlayer(
+  lobbyState: LobbyState | null,
+  currentPlayer: LobbyPlayer | undefined,
+  removingId: string | null,
+): LobbyPlayer | undefined {
+  if (!currentPlayer?.is_host || !removingId) return undefined;
+  return lobbyState?.players.find(
+    (p) => p.player_id === removingId && !p.is_host,
+  );
+}
+
+function LobbyOverlays({
+  removing,
+  leavingSeat,
+  spectateRequest,
+  showRulesPanel,
+  guideMinimized,
+  rulesPanelTarget,
+  gameId,
+  playerName,
+  useUpgrades,
+  onKeepPlayer,
+  onConfirmRemovePlayer,
+  onKeepSeat,
+  onSeatClosed,
+  onRespondSpectate,
+  onCloseRulesPanel,
+  onGuideMinimizedChange,
+}: {
+  removing: LobbyPlayer | undefined;
+  leavingSeat: ResumableSeat | null;
+  spectateRequest:
+    | Parameters<typeof SpectateRequestModal>[0]["request"]
+    | undefined;
+  showRulesPanel: boolean;
+  guideMinimized: boolean;
+  rulesPanelTarget: RulesPanelTarget | undefined;
+  gameId: string;
+  playerName: string | undefined;
+  useUpgrades: boolean | undefined;
+  onKeepPlayer: () => void;
+  onConfirmRemovePlayer: (playerId: string) => void;
+  onKeepSeat: () => void;
+  onSeatClosed: (gameId: string) => void;
+  onRespondSpectate: (requestId: string, allowed: boolean) => void;
+  onCloseRulesPanel: () => void;
+  onGuideMinimizedChange: (minimized: boolean) => void;
+}): ReactElement {
+  return (
+    <>
+      {removing && (
+        <RemovePlayerDialog
+          name={removing.name}
+          onKeep={onKeepPlayer}
+          onRemove={() => onConfirmRemovePlayer(removing.player_id)}
+        />
+      )}
+      {leavingSeat && (
+        <CloseSeatDialog
+          seat={leavingSeat}
+          onKeep={onKeepSeat}
+          onClosed={() => onSeatClosed(leavingSeat.gameId)}
+        />
+      )}
+      {spectateRequest && (
+        <SpectateRequestModal
+          request={spectateRequest}
+          onRespond={onRespondSpectate}
+        />
+      )}
+      {showRulesPanel && (
+        <RulesPanel
+          onClose={onCloseRulesPanel}
+          minimized={guideMinimized}
+          onMinimizedChange={onGuideMinimizedChange}
+          target={rulesPanelTarget}
+          gameId={gameId}
+          playerName={playerName}
+          useUpgrades={useUpgrades}
+        />
+      )}
+    </>
+  );
+}
+
+function LobbyGateScreen({
+  seat,
+  gameId,
+  header,
+  gameStatePresent,
+  lobbyState,
+  isStarting,
+  isConnected,
+  openingSteps,
+  spectateRequest,
+  onJoined,
+  onClaim,
+  onTakeBack,
+  onRespondSpectate,
+  overlays,
+}: {
+  seat: ReturnType<typeof useGameSeat>["seat"];
+  gameId: string;
+  header: ReactElement;
+  gameStatePresent: boolean;
+  lobbyState: LobbyState | null;
+  isStarting: boolean;
+  isConnected: boolean;
+  openingSteps: ReturnType<typeof useHandedOnSteps>;
+  spectateRequest:
+    | Parameters<typeof SpectateRequestModal>[0]["request"]
+    | undefined;
+  onJoined: ReturnType<typeof useGameSeat>["adopt"];
+  onClaim: (playerName: string) => void;
+  onTakeBack: () => void;
+  onRespondSpectate: (requestId: string, allowed: boolean) => void;
+  overlays: ReactElement;
+}): ReactElement | null {
+  if (seat.kind !== "held") {
+    return (
+      <>
+        <PageFrame header={header} center contentClassName="items-center">
+          <LobbySeatNotice
+            gameId={gameId}
+            seat={seat}
+            onJoined={onJoined}
+            onClaim={onClaim}
+            onTakeBack={onTakeBack}
+          />
+        </PageFrame>
+        {overlays}
+      </>
+    );
+  }
+  // The game arrives before the route changes, and takes the lobby's state with it.
+  if (gameStatePresent) {
+    return <LoadingScreen steps={START_STEPS} current="Open board" />;
+  }
+  if (!lobbyState) {
+    return (
+      <>
+        <LoadingScreen
+          title="Opening lobby"
+          steps={openingSteps}
+          current="Open lobby"
+        />
+        {overlays}
+      </>
+    );
+  }
+  if (isStarting) {
+    return (
+      <LobbyStartingView
+        isConnected={isConnected}
+        spectateRequest={spectateRequest}
+        onRespondSpectate={onRespondSpectate}
+        rulesPanel={overlays}
+      />
+    );
+  }
+  return null;
+}
+
+function shouldResetClosedHostChange(
+  hostPass: string | null,
+  closedHostChange: string | null,
+): boolean {
+  return Boolean(hostPass && closedHostChange && closedHostChange !== hostPass);
+}
+
+function extractSeatSession(seat: ReturnType<typeof useGameSeat>["seat"]): {
+  session:
+    | Extract<
+        ReturnType<typeof useGameSeat>["seat"],
+        { kind: "held" }
+      >["session"]
+    | null;
+  sessionId: string | null;
+  sessionPlayerId: string | undefined;
+} {
+  if (seat.kind !== "held") {
+    return { session: null, sessionId: null, sessionPlayerId: undefined };
+  }
+  return {
+    session: seat.session,
+    sessionId: seat.session.sessionId,
+    sessionPlayerId: seat.session.playerId,
+  };
+}
+
+function extractLobbyPlayerMeta(
+  lobbyState: LobbyState | null,
+  sessionPlayerId: string | undefined,
+): {
+  currentPlayer: LobbyPlayer | undefined;
+  isStarting: boolean;
+  battlerError: string | null;
+  selfName: string | null;
+} {
+  const currentPlayer = lobbyState?.players.find(
+    (p) => p.player_id === sessionPlayerId,
+  );
+  return {
+    currentPlayer,
+    isStarting: lobbyState?.start_status === "starting",
+    battlerError: currentPlayer?.battler_error ?? null,
+    selfName: currentPlayer?.name ?? null,
+  };
+}
+
+function useLobbyRouteController(): {
+  gameId: string;
+  navigate: ReturnType<typeof useNavigate>;
+  openingSteps: ReturnType<typeof useHandedOnSteps>;
+  seatHook: ReturnType<typeof useGameSeat>;
+  session:
+    | Extract<
+        ReturnType<typeof useGameSeat>["seat"],
+        { kind: "held" }
+      >["session"]
+    | null;
+  sessionPlayerId: string | undefined;
+  gameHook: ReturnType<typeof useGame>;
+  voiceChat: ReturnType<typeof useVoiceChat>;
+  currentPlayer: LobbyPlayer | undefined;
+  deck: ReturnType<typeof useLobbyDeckState>;
+  cubeLook: ReturnType<typeof useCubeLook>;
+  hostStatus: ReturnType<typeof deriveLobbyHostStatus>;
+  isStarting: boolean;
+  readyActionDisabled: boolean;
+  startAwaitingServer: boolean;
+  requestStart: () => void;
+  toggleReady: () => void;
+  closedHostChange: string | null;
+  setClosedHostChange: (pass: string | null) => void;
+} {
+  const { gameId = "" } = useParams<{ gameId: string }>();
+  const navigate = useNavigate();
+  const openingSteps = useHandedOnSteps(["Open lobby"]);
+  const seatHook = useGameSeat(gameId);
+  const { session, sessionId, sessionPlayerId } = extractSeatSession(
+    seatHook.seat,
+  );
+  const { addToast } = useToast();
+  const [startSentIn, setStartSentIn] = useState<LobbyState | null>(null);
+  const [closedHostChange, setClosedHostChange] = useState<string | null>(null);
+  const handleServerError = useCallback(
+    (error: AppError) => {
+      setStartSentIn(null);
+      addToast(
+        getAppErrorMessage(
+          error,
+          "lobby-action",
+          "That action could not be completed.",
+        ),
+        "error",
+      );
+    },
+    [addToast, setStartSentIn],
+  );
+  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(
+    null,
+  );
+  const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
+    voiceSignalRef.current?.(payload);
+  }, []);
+
+  const gameHook = useGame({
+    gameId: gameId || null,
+    sessionId,
+    spectatorConfig: null,
+    onServerError: handleServerError,
+    onVoiceSignal: handleVoiceSignal,
+  });
+  const voiceChat = useLobbyVoice({
+    gameId,
+    sessionId,
+    lobbyState: gameHook.lobbyState,
+    sessionPlayerId,
+    send: gameHook.send,
+    voiceSignalRef,
+    addToast,
+  });
+
+  const { currentPlayer, isStarting, battlerError, selfName } =
+    extractLobbyPlayerMeta(gameHook.lobbyState, sessionPlayerId);
+  const deck = useLobbyDeckState({
+    lobbyState: gameHook.lobbyState,
+    currentPlayer,
+    submitBattlerAction: gameHook.actions.submitBattler,
+    addToast,
+  });
+  const cubeLook = useCubeLook(deck.summaryBattlerId);
+  const readyActionDisabled = isReadyActionDisabled({
+    isStarting,
+    isConstructed: deck.isConstructed,
+    currentPlayer,
+  });
+  const startAwaitingServer =
+    startSentIn !== null && startSentIn === gameHook.lobbyState;
+  const hostStatus = deriveLobbyHostStatus({
+    lobbyState: gameHook.lobbyState,
+    sessionPlayerId,
+    currentPlayer,
+    closedHostChange,
+  });
+  if (shouldResetClosedHostChange(hostStatus.hostPass, closedHostChange)) {
+    setClosedHostChange(null);
+  }
+
+  useLobbySync({
+    gameId,
+    session,
+    status: gameHook.status,
+    lobbyState: gameHook.lobbyState,
+    gameState: gameHook.gameState,
+    battlerError,
+    hostName: hostStatus.hostName,
+    selfName,
+    lostHost: hostStatus.lostHost,
+    gainedHost: hostStatus.gainedHost,
+    connectionOpened: seatHook.connectionOpened,
+    connectionEnded: seatHook.connectionEnded,
+    addToast,
+  });
+
+  const requestStart = (): void => {
+    if (!gameHook.lobbyState?.can_start || startAwaitingServer) return;
+    setStartSentIn(gameHook.lobbyState);
+    gameHook.actions.startGame();
+  };
+  const toggleReady = (): void => {
+    if (!currentPlayer || readyActionDisabled) return;
+    gameHook.actions.setReady(!currentPlayer.is_ready);
+  };
+
+  return {
+    gameId,
+    navigate,
+    openingSteps,
+    seatHook,
+    session,
+    sessionPlayerId,
+    gameHook,
+    voiceChat,
+    currentPlayer,
+    deck,
+    cubeLook,
+    hostStatus,
+    isStarting,
+    readyActionDisabled,
+    startAwaitingServer,
+    requestStart,
+    toggleReady,
+    closedHostChange,
+    setClosedHostChange,
+  };
+}
+
+function shouldShowGateScreen(options: {
+  seatKind: ReturnType<typeof useGameSeat>["seat"]["kind"];
+  gameStatePresent: boolean;
+  lobbyState: LobbyState | null;
+  isStarting: boolean;
+}): boolean {
+  return (
+    options.seatKind !== "held" ||
+    options.gameStatePresent ||
+    !options.lobbyState ||
+    options.isStarting
+  );
+}
+
+function LobbyHeader({
+  canLeaveLobby,
+  guideDot,
+  onLeaveClick,
+  onOpenGuide,
+}: {
+  canLeaveLobby: boolean;
+  guideDot: boolean;
+  onLeaveClick: () => void;
+  onOpenGuide: () => void;
+}): ReactElement {
+  return (
+    <AppHeader
+      helpers={
+        <>
+          {canLeaveLobby && (
+            <button
+              type="button"
+              onClick={onLeaveClick}
+              className="btn btn-secondary"
+            >
+              <BarLabel desktop="Leave Lobby" phone="Leave" />
+            </button>
+          )}
+          <GuideButton
+            onClick={onOpenGuide}
+            className={guideDot ? "btn-dot-phone" : ""}
+          />
+        </>
+      }
+      home={<HomeButton />}
+    />
+  );
+}
+
+function useLobbyUiModals(c: ReturnType<typeof useLobbyRouteController>): {
+  copied: boolean;
+  showRulesPanel: boolean;
+  guideMinimized: boolean;
+  rulesPanelTarget: RulesPanelTarget | undefined;
+  removing: LobbyPlayer | undefined;
+  leavingSeat: ResumableSeat | null;
+  openGuide: (target?: RulesPanelTarget) => void;
+  copyJoinLink: () => Promise<void>;
+  openLeaveDialog: () => void;
+  setRemovingId: (id: string | null) => void;
+  setLeavingSeat: (seat: ResumableSeat | null) => void;
+  setShowRulesPanel: (show: boolean) => void;
+  setGuideMinimized: (minimized: boolean) => void;
+} {
+  const { lobbyState } = c.gameHook;
+  const [copied, setCopied] = useState(false);
+  const [showRulesPanel, setShowRulesPanel] = useState(false);
+  const [guideMinimized, setGuideMinimized] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [leavingSeat, setLeavingSeat] = useState<ResumableSeat | null>(null);
+  const [rulesPanelTarget, setRulesPanelTarget] = useState<
+    RulesPanelTarget | undefined
+  >(undefined);
+
+  const openGuide = (target?: RulesPanelTarget): void => {
+    if (target || !showRulesPanel) setRulesPanelTarget(target);
+    setGuideMinimized(false);
+    setShowRulesPanel(true);
+  };
+
+  const guideTakesKeys = showRulesPanel && !guideMinimized;
+  const removing = findRemovablePlayer(lobbyState, c.currentPlayer, removingId);
+  useHotkeys(
+    buildLobbyHotkeys({
+      guideTakesKeys,
+      lobbyState,
+      currentPlayer: c.currentPlayer,
+      isConstructed: c.deck.isConstructed,
+      canClickBattler:
+        !c.deck.isBattlerLoading && !c.isStarting && !c.deck.deckUnchanged,
+      toggleGuide: () => {
+        if (guideTakesKeys) {
+          setShowRulesPanel(false);
+          return;
+        }
+        openGuide();
+      },
+      toggleReady: c.toggleReady,
+      onBattlerHotkey: c.deck.handleBattlerButtonClick,
+      requestStart: c.requestStart,
+    }),
+    Boolean(c.session) && !removing && !leavingSeat,
+  );
+  usePanelHoldsEnter(guideTakesKeys);
+
+  const copyJoinLink = async (): Promise<void> => {
+    if (!(await copyText(`${window.location.origin}/game/${c.gameId}/lobby`))) {
+      return;
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!session) {
-    return (
-      <div className="game-table h-dvh flex flex-col overflow-hidden">
-        <header className="shrink-0 py-3 frame-chrome bar-pad-both">
-          <div className="hidden sm:flex items-center justify-between">
-            <div>
-              <div className="flex items-baseline">
-                <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-2.5">—</span>
-                <span className="hero-subtitle text-base font-normal tracking-widest">
-                  an MtG format
-                </span>
-              </div>
-              <p className="hero-tagline">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate("/")}
-                className="btn btn-secondary py-2 px-4"
-              >
-                Home
-              </button>
-              <button
-                onClick={() => {
-                  setRulesPanelTarget(undefined);
-                  setShowRulesPanel(true);
-                }}
-                className="btn btn-secondary py-2 px-4"
-              >
-                Guide
-              </button>
-            </div>
-          </div>
-          <div className="sm:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-baseline whitespace-nowrap">
-                  <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                    Crucible
-                  </h1>
-                  <span className="hero-sep mx-1 text-xs">—</span>
-                  <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                    an MtG format
-                  </span>
-                </div>
-                <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                  Inspired by Roguelikes and Autobattlers
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => navigate("/")}
-                  className="btn btn-secondary py-1.5 px-3 text-sm"
-                >
-                  Home
-                </button>
-                <button
-                  onClick={() => {
-                    setRulesPanelTarget(undefined);
-                    setShowRulesPanel(true);
-                  }}
-                  className="btn btn-secondary py-1.5 px-3 text-sm"
-                >
-                  ?
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-        <div className="flex-1 flex min-h-0 game-surface">
-          <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-          <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-            <div className="zone-pack shell-scroll-row h-full min-h-0 flex items-center justify-center">
-              <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
-                <h2 className="text-lg font-semibold text-amber-200">
-                  Unable to Reconnect
-                </h2>
-                <p className="text-sm text-gray-200 mt-2 leading-snug">
-                  Your prior lobby session is no longer valid. Start a new game
-                  or join another lobby.
-                </p>
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => navigate("/play")}
-                    className="btn btn-primary flex-1 py-2"
-                  >
-                    Go to Play
-                  </button>
-                  <button
-                    onClick={() => navigate("/")}
-                    className="btn btn-secondary flex-1 py-2"
-                  >
-                    Home
-                  </button>
-                </div>
-              </div>
-            </div>
-          </main>
-          <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-        </div>
-        <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-          <LobbyFooterLinks />
-        </footer>
-        {showRulesPanel && (
-          <RulesPanel
-            onClose={() => setShowRulesPanel(false)}
-            initialDocId={rulesPanelTarget?.docId}
-            initialTab={rulesPanelTarget?.tab}
-            gameId={gameId}
-            playerName={currentPlayer?.name}
-            useUpgrades={undefined}
-          />
-        )}
-      </div>
+  const openLeaveDialog = (): void => {
+    if (!c.gameId || !lobbyState || !c.currentPlayer) return;
+    setLeavingSeat(
+      buildLeavingSeat({
+        gameId: c.gameId,
+        lobbyState,
+        currentPlayer: c.currentPlayer,
+        summaryBattlerId: c.deck.summaryBattlerId,
+        cubeLook: c.cubeLook,
+      }),
     );
-  }
+  };
 
-  if (!lobbyState) {
+  return {
+    copied,
+    showRulesPanel,
+    guideMinimized,
+    rulesPanelTarget,
+    removing,
+    leavingSeat,
+    openGuide,
+    copyJoinLink,
+    openLeaveDialog,
+    setRemovingId,
+    setLeavingSeat,
+    setShowRulesPanel,
+    setGuideMinimized,
+  };
+}
+
+function deriveLobbyHeaderAndOverlayMeta(
+  c: ReturnType<typeof useLobbyRouteController>,
+  ui: ReturnType<typeof useLobbyUiModals>,
+): {
+  canLeaveLobby: boolean;
+  guideDot: boolean;
+  spectateRequest:
+    | Parameters<typeof SpectateRequestModal>[0]["request"]
+    | undefined;
+  playerName: string | undefined;
+  useUpgrades: boolean | undefined;
+} {
+  const { lobbyState, spectateRequests } = c.gameHook;
+  return {
+    canLeaveLobby: Boolean(
+      c.session && c.gameId && lobbyState && c.currentPlayer && !c.isStarting,
+    ),
+    guideDot: ui.showRulesPanel && ui.guideMinimized,
+    spectateRequest: c.isStarting ? undefined : spectateRequests[0],
+    playerName: c.currentPlayer?.name,
+    useUpgrades: lobbyState?.use_upgrades,
+  };
+}
+
+export function Lobby(): ReactElement {
+  const c = useLobbyRouteController();
+  const {
+    lobbyState,
+    gameState,
+    isConnected,
+    actions,
+    send,
+    spectateRequests,
+  } = c.gameHook;
+  const [isGuidedMode, handleGuidedModeToggle] = useLobbyGuidedMode(
+    c.gameId,
+    c.sessionPlayerId,
+  );
+  const isBoard = useBoardDesktop();
+  const ui = useLobbyUiModals(c);
+  const meta = deriveLobbyHeaderAndOverlayMeta(c, ui);
+
+  const header = (
+    <LobbyHeader
+      canLeaveLobby={meta.canLeaveLobby}
+      guideDot={meta.guideDot}
+      onLeaveClick={ui.openLeaveDialog}
+      onOpenGuide={() => ui.openGuide()}
+    />
+  );
+
+  const overlays = (
+    <LobbyOverlays
+      removing={ui.removing}
+      leavingSeat={ui.leavingSeat}
+      spectateRequest={meta.spectateRequest}
+      showRulesPanel={ui.showRulesPanel}
+      guideMinimized={ui.guideMinimized}
+      rulesPanelTarget={ui.rulesPanelTarget}
+      gameId={c.gameId}
+      playerName={meta.playerName}
+      useUpgrades={meta.useUpgrades}
+      onKeepPlayer={() => ui.setRemovingId(null)}
+      onConfirmRemovePlayer={(playerId) => {
+        actions.kickPlayer(playerId);
+        ui.setRemovingId(null);
+      }}
+      onKeepSeat={() => ui.setLeavingSeat(null)}
+      onSeatClosed={(closedGameId) => {
+        clearTabSession(closedGameId);
+        ui.setLeavingSeat(null);
+        void c.navigate("/", { replace: true });
+      }}
+      onRespondSpectate={actions.spectateResponse}
+      onCloseRulesPanel={() => ui.setShowRulesPanel(false)}
+      onGuideMinimizedChange={ui.setGuideMinimized}
+    />
+  );
+
+  const showGate = shouldShowGateScreen({
+    seatKind: c.seatHook.seat.kind,
+    gameStatePresent: Boolean(gameState),
+    lobbyState,
+    isStarting: c.isStarting,
+  });
+  if (showGate || !lobbyState) {
     return (
-      <div className="game-table h-dvh flex flex-col overflow-hidden">
-        <header className="shrink-0 py-3 frame-chrome bar-pad-both">
-          <div className="hidden sm:flex items-center justify-between">
-            <div>
-              <div className="flex items-baseline">
-                <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-2.5">—</span>
-                <span className="hero-subtitle text-base font-normal tracking-widest">
-                  an MtG format
-                </span>
-              </div>
-              <p className="hero-tagline">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate("/")}
-                className="btn btn-secondary py-2 px-4"
-              >
-                Home
-              </button>
-              <button
-                onClick={() => {
-                  setRulesPanelTarget(undefined);
-                  setShowRulesPanel(true);
-                }}
-                className="btn btn-secondary py-2 px-4"
-              >
-                Guide
-              </button>
-            </div>
-          </div>
-          <div className="sm:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-baseline whitespace-nowrap">
-                  <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                    Crucible
-                  </h1>
-                  <span className="hero-sep mx-1 text-xs">—</span>
-                  <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                    an MtG format
-                  </span>
-                </div>
-                <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                  Inspired by Roguelikes and Autobattlers
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => navigate("/")}
-                  className="btn btn-secondary py-1.5 px-3 text-sm"
-                >
-                  Home
-                </button>
-                <button
-                  onClick={() => {
-                    setRulesPanelTarget(undefined);
-                    setShowRulesPanel(true);
-                  }}
-                  className="btn btn-secondary py-1.5 px-3 text-sm"
-                >
-                  ?
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-        <div className="flex-1 flex min-h-0 game-surface">
-          <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-          <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-            <div className="zone-pack shell-scroll-row h-full min-h-0 flex items-center justify-center">
-              {connectionError && !invalidSession ? (
-                <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
-                  <h2 className="text-lg font-semibold text-amber-200">
-                    {connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Lobby Unavailable"}
-                  </h2>
-                  <p className="text-sm text-gray-200 mt-2 leading-snug">
-                    {getAppErrorMessage(
-                      connectionError,
-                      "lobby-connection",
-                      "This lobby is no longer available. It may have ended or been cleared during a server restart.",
-                    )}
-                  </p>
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() => navigate("/play")}
-                      className="btn btn-primary flex-1 py-2"
-                    >
-                      Go to Play
-                    </button>
-                    <button
-                      onClick={() => navigate("/")}
-                      className="btn btn-secondary flex-1 py-2"
-                    >
-                      Home
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="modal-chrome border gold-border rounded-lg px-5 py-3 flex items-center gap-3">
-                  <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span className="text-sm text-gray-100">Loading lobby...</span>
-                </div>
-              )}
-            </div>
-          </main>
-          <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-        </div>
-        <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-          <LobbyFooterLinks />
-        </footer>
-        {showRulesPanel && (
-          <RulesPanel
-            onClose={() => setShowRulesPanel(false)}
-            initialDocId={rulesPanelTarget?.docId}
-            initialTab={rulesPanelTarget?.tab}
-            gameId={gameId}
-            playerName={currentPlayer?.name}
-            useUpgrades={undefined}
-          />
-        )}
-      </div>
+      <LobbyGateScreen
+        seat={c.seatHook.seat}
+        gameId={c.gameId}
+        header={header}
+        gameStatePresent={Boolean(gameState)}
+        lobbyState={lobbyState}
+        isStarting={c.isStarting}
+        isConnected={isConnected}
+        openingSteps={c.openingSteps}
+        spectateRequest={spectateRequests[0]}
+        onJoined={c.seatHook.adopt}
+        onClaim={(playerName) => {
+          void c.seatHook.claim(playerName);
+        }}
+        onTakeBack={c.seatHook.takeBack}
+        onRespondSpectate={actions.spectateResponse}
+        overlays={overlays}
+      />
     );
   }
 
   return (
-    <div className="game-table h-dvh flex flex-col overflow-hidden">
-      {!isConnected && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-          <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
-            <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span className="text-sm text-gray-100">Reconnecting...</span>
-          </div>
-        </div>
-      )}
-      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
-        <div className="hidden sm:flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline">
-              <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                Crucible
-              </h1>
-              <span className="hero-sep mx-2.5">—</span>
-              <span className="hero-subtitle text-base font-normal tracking-widest">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-secondary py-2 px-4"
-            >
-              Home
-            </button>
-            <button
-              onClick={() => {
-                setRulesPanelTarget(undefined);
-                setShowRulesPanel(true);
-              }}
-              className="btn btn-secondary py-2 px-4"
-            >
-              Guide
-            </button>
-          </div>
-        </div>
-        <div className="sm:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline whitespace-nowrap">
-                <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-1 text-xs">—</span>
-                <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                  an MtG format
-                </span>
-              </div>
-              <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => navigate("/")}
-                className="btn btn-secondary py-1.5 px-3 text-sm"
-              >
-                Home
-              </button>
-              <button
-                onClick={() => {
-                  setRulesPanelTarget(undefined);
-                  setShowRulesPanel(true);
-                }}
-                className="btn btn-secondary py-1.5 px-3 text-sm"
-              >
-                ?
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col sm:items-center sm:justify-center px-4 py-4 overflow-auto">
-            <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">
-              {lobbyState &&
-                (() => {
-                  const isHost = currentPlayer?.is_host ?? false;
-                  const isReady = currentPlayer?.is_ready ?? false;
-                  const puppetCount = lobbyState.puppet_count;
-                  const playerCap = lobbyState.target_player_count;
-                  const occupiedSlots = lobbyState.players.length + puppetCount;
-                  const playerCapIndex = EVEN_PLAYER_CAP_OPTIONS.findIndex(
-                    (value) => value === playerCap,
-                  );
-                  const previousPlayerCap =
-                    playerCapIndex > 0
-                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex - 1]
-                      : null;
-                  const nextPlayerCap =
-                    playerCapIndex >= 0 &&
-                    playerCapIndex < EVEN_PLAYER_CAP_OPTIONS.length - 1
-                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
-                      : null;
-                  const canDecreasePlayerCap =
-                    previousPlayerCap !== null &&
-                    previousPlayerCap >= occupiedSlots;
-                  const canIncreasePlayerCap = nextPlayerCap !== null;
-                  const availablePuppets = lobbyState.available_puppet_count;
-                  const canAddPuppet =
-                    availablePuppets !== null &&
-                    puppetCount < availablePuppets &&
-                    occupiedSlots < playerCap;
-                  const summaryBattlerId =
-                    lobbyState.play_mode === "limited"
-                      ? lobbyState.cube_id
-                      : currentPlayer?.battler_id ?? null;
-                  const canBrowseCards =
-                    lobbyState.play_mode === "limited" ||
-                    currentPlayer?.battler_status === "ready";
-
-                  const openGuide = (target?: RulesPanelTarget) => {
-                    setRulesPanelTarget(target);
-                    setShowRulesPanel(true);
-                  };
-
-                  const filledSlots = [
-                    ...lobbyState.players.map((player) => ({
-                      kind: "player" as const,
-                      key: player.player_id,
-                      player,
-                    })),
-                    ...Array.from({ length: puppetCount }).map((_, i) => ({
-                      kind: "puppet" as const,
-                      key: `puppet-${i}`,
-                      puppetIndex: i,
-                    })),
-                  ].slice(0, 8);
-                  const playerSlots = [
-                    ...filledSlots,
-                    ...Array.from({
-                      length: Math.max(0, playerCap - filledSlots.length),
-                    }).map((_, i) => ({
-                      kind: "open" as const,
-                      key: `open-${i}`,
-                    })),
-                  ];
-
-                  return (
-                    <>
-                      <div className="rounded-lg p-3 mb-3 text-center bg-black/35 border border-black/40">
-                        <div className="flex items-center justify-center gap-3">
-                          <span className="text-2xl font-mono font-bold text-amber-400 tracking-wider">
-                            {lobbyState.join_code}
-                          </span>
-                          <button
-                            onClick={copyJoinCode}
-                            className="btn btn-secondary text-xs py-0.5 px-2"
-                          >
-                            {copied ? "Copied!" : "Copy"}
-                          </button>
-                        </div>
-                        <div className="border-t border-black/40 mt-2 pt-2 grid grid-cols-[0.9fr_1.85fr_0.7fr_0.8fr] text-left">
-                          <div className="min-w-0 px-1.5 first:pl-0">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                              Mode
-                            </div>
-                            <div className="mt-0.5 truncate text-[11px] text-amber-400">
-                              {lobbyState.play_mode === "constructed" ? "Const." : "Limited"}
-                            </div>
-                          </div>
-                          <div className="min-w-0 border-l border-black/40 px-2">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                              {isConstructed ? "Deck" : "Cube"}
-                            </div>
-                            {summaryBattlerId ? (
-                              <a
-                                href={cubeCobraUrl(summaryBattlerId)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={summaryBattlerId}
-                                className="mt-0.5 block truncate text-[11px] text-amber-400 hover:text-amber-300 transition-colors"
-                              >
-                                {summaryBattlerId}
-                              </a>
-                            ) : (
-                              <div className="mt-0.5 truncate text-[11px] text-gray-500">
-                                Missing
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 border-l border-black/40 px-2">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                              Upgr.
-                            </div>
-                            <div className="mt-0.5 truncate text-[11px] text-amber-400">
-                              {lobbyState.use_upgrades ? "On" : "Off"}
-                            </div>
-                          </div>
-                          <div className="min-w-0 border-l border-black/40 pl-2 pr-0">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                              Browse
-                            </div>
-                            <button
-                              onClick={() => openGuide({ docId: "__cards__" })}
-                              disabled={!canBrowseCards}
-                              className="mt-0.5 block w-full truncate text-left text-[11px] text-amber-400 transition-colors hover:text-amber-300 disabled:text-gray-500 disabled:cursor-not-allowed"
-                            >
-                              Cards
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {lobbyState.play_mode === "constructed" && currentPlayer && (
-                        <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
-                          <h2 className="text-white font-medium text-sm">{isConstructed ? "Your Deck" : "Your Cube"}</h2>
-                          <div className="mt-3 flex gap-2">
-                            {hasLoadedBattler ? (
-                              <div
-                                title={battlerIdInput}
-                                className="w-full h-[42px] border border-black/40 rounded px-3 py-2 text-base bg-black/20 text-gray-300 overflow-hidden text-ellipsis whitespace-nowrap select-none cursor-default"
-                              >
-                                {battlerIdInput}
-                              </div>
-                            ) : (
-                              <input
-                                type="text"
-                                value={battlerIdInput}
-                                onChange={(event) => setBattlerIdInput(event.target.value)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" && !isBattlerLoading) {
-                                    submitBattler();
-                                  }
-                                }}
-                                placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
-                                disabled={isBattlerLoading}
-                                className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                              />
-                            )}
-                            <button
-                              onClick={handleBattlerButtonClick}
-                              disabled={isBattlerLoading}
-                              className="btn btn-primary btn-dark-border px-4 py-2 shrink-0"
-                            >
-                              {hasLoadedBattler ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    {isHost ? (
-                      <>
-                        <div className="flex items-center justify-center gap-1 rounded-md border border-black/40 bg-black/30 px-1.5 py-1 w-[calc(50%-0.25rem)]">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (previousPlayerCap !== null) {
-                                actions.setTargetPlayerCount(previousPlayerCap);
-                              }
-                            }}
-                            disabled={!canDecreasePlayerCap}
-                            aria-label="Decrease player count"
-                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
-                          >
-                            -
-                          </button>
-                          <span className="min-w-[3.5rem] text-center text-sm font-semibold text-white">
-                            {playerCap} players
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (nextPlayerCap !== null) {
-                                actions.setTargetPlayerCount(nextPlayerCap);
-                              }
-                            }}
-                            disabled={!canIncreasePlayerCap}
-                            aria-label="Increase player count"
-                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => actions.addPuppet()}
-                            disabled={!canAddPuppet}
-                            className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-                          >
-                            + Add Puppet
-                          </button>
-                          <button
-                            onClick={() =>
-                              openGuide({
-                                docId: "faq",
-                                tab: "why-are-my-opponents-cards-face-up",
-                              })
-                            }
-                            className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
-                            title="What are Puppets?"
-                          >
-                            ?
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-white">{playerCap} players</span>
-                        {puppetCount > 0 && (
-                          <button
-                            onClick={() =>
-                              openGuide({
-                                docId: "faq",
-                                tab: "why-are-my-opponents-cards-face-up",
-                              })
-                            }
-                            className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
-                          >
-                            What are Puppets?
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {playerSlots.map((slot) => {
-                      if (slot.kind === "player") {
-                        const { player } = slot;
-                        return (
-                          <div
-                            key={slot.key}
-                            className="bg-black/30 border border-black/40 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
-                          >
-                            <span
-                              className={`w-2 h-2 rounded-full shrink-0 ${
-                                player.is_ready ? "bg-green-500" : "bg-gray-500"
-                              }`}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-white text-sm truncate">
-                                {player.name}
-                              </div>
-                            </div>
-                            {player.player_id === session?.playerId && voiceChat.state.peers.length > 0 && (
-                              <MicToggle
-                                muted={voiceChat.state.isMuted}
-                                audioLevelKey="__self__"
-                                onClick={() => voiceChat.toggleSelfMute()}
-                              />
-                            )}
-                            {(() => {
-                              const peer = player.player_id !== session?.playerId
-                                ? voiceChat.state.peers.find(p => p.name === player.name)
-                                : null
-                              return peer ? (
-                                <MicToggle
-                                  muted={voiceChat.state.mutedPeers.has(player.name)}
-                                  connectionState={peer.connectionState}
-                                  audioLevelKey={player.name}
-                                  remoteMuted={voiceChat.state.remoteMutedPeers.has(player.name)}
-                                  onClick={() => voiceChat.togglePeerMute(player.name)}
-                                />
-                              ) : null
-                            })()}
-                            {player.is_host && (
-                              <span className="text-amber-400 text-xs shrink-0">
-                                Host
-                              </span>
-                            )}
-                            {isHost && !player.is_host && (
-                              <button
-                                onClick={() => actions.kickPlayer(player.player_id)}
-                                className="text-gray-500 hover:text-red-400 transition-colors shrink-0 text-xs"
-                                title="Remove player"
-                              >
-                                &times;
-                              </button>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      if (slot.kind === "puppet") {
-                        const isSearching = availablePuppets === null;
-                        const botAvailable =
-                          !isSearching && slot.puppetIndex < availablePuppets;
-                        return (
-                          <div
-                            key={slot.key}
-                            className={`bg-black/30 px-3 py-2.5 rounded-lg flex items-center gap-2 border border-dashed ${
-                              isSearching
-                                ? "border-amber-600/50"
-                                : botAvailable
-                                  ? "border-cyan-700"
-                                  : "border-red-700/50"
-                            }`}
-                          >
-                            {isSearching ? (
-                              <svg
-                                className="animate-spin h-3 w-3 text-amber-500 shrink-0"
-                                viewBox="0 0 24 24"
-                              >
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                  fill="none"
-                                />
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                />
-                              </svg>
-                            ) : (
-                              <span
-                                className={`w-2 h-2 rounded-full shrink-0 ${botAvailable ? "bg-cyan-600" : "bg-red-700/50"}`}
-                              />
-                            )}
-                            <span
-                              className={`text-sm italic ${isSearching ? "text-amber-400" : botAvailable ? "text-cyan-500" : "text-red-400/70"}`}
-                            >
-                              Puppet {slot.puppetIndex + 1}
-                            </span>
-                            {isHost && (
-                              <button
-                                onClick={() => actions.removePuppet()}
-                                className="text-gray-500 hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
-                                title="Remove puppet"
-                              >
-                                &times;
-                              </button>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={slot.key}
-                          className="bg-black/20 border border-dashed border-black/35 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
-                        >
-                          <span className="w-2 h-2 rounded-full shrink-0 bg-black/40" />
-                          <span className="text-gray-500 text-sm italic">
-                            required
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-3">
-                  <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
-                    <GuidedModeSwitch
-                      enabled={isGuidedMode}
-                      setEnabled={handleGuidedModeToggle}
-                    />
-                    <VoiceChatSwitch
-                      enabled={lobbyState.voice_chat_enabled}
-                      setEnabled={(v) => send('set_voice_chat', { enabled: v })}
-                      isHost={isHost}
-                    />
-                  </div>
-
-                  <div className={isHost ? "grid grid-cols-2 gap-2" : ""}>
-                    <button
-                      onClick={toggleReady}
-                      disabled={readyActionDisabled}
-                      className={`btn btn-dark-border w-full py-2 disabled:cursor-not-allowed ${
-                        isReady
-                          ? "bg-gray-600 text-white hover:bg-gray-500"
-                          : readyActionDisabled
-                            ? "bg-gray-700 text-gray-400"
-                            : "bg-green-600 text-white hover:bg-green-500"
-                      }`}
-                    >
-                      {isReady ? "Unready" : "Ready"}
-                    </button>
-
-                    {isHost && (
-                      <button
-                        onClick={() => {
-                          setStartingGame(true);
-                          actions.startGame();
-                        }}
-                        disabled={!lobbyState.can_start || startingGame}
-                        className="btn btn-primary btn-dark-border w-full py-2"
-                      >
-                        {startingGame ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <svg
-                              className="animate-spin h-5 w-5"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                                fill="none"
-                              />
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              />
-                            </svg>
-                            Starting...
-                          </span>
-                        ) : (
-                          "Start Game"
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                    </>
-                  );
-                })()}
-            </div>
-          </div>
-          <HintsBanner variant="rail" />
-        </main>
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-      </div>
-      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-        <LobbyFooterLinks />
-      </footer>
-      {showRulesPanel && (
-        <RulesPanel
-          onClose={() => setShowRulesPanel(false)}
-          initialDocId={rulesPanelTarget?.docId}
-          initialTab={rulesPanelTarget?.tab}
-          gameId={gameId}
-          playerName={currentPlayer?.name}
-          useUpgrades={lobbyState?.use_upgrades}
-        />
-      )}
-    </div>
+    <>
+      {!isConnected && <ReconnectingOverlay />}
+      <LobbyBody
+        isBoard={isBoard}
+        header={header}
+        lobbyState={lobbyState}
+        currentPlayer={c.currentPlayer}
+        sessionPlayerId={c.sessionPlayerId}
+        cubeLook={c.cubeLook}
+        summaryBattlerId={c.deck.summaryBattlerId}
+        voiceChat={c.voiceChat}
+        seatActions={{
+          addPuppet: actions.addPuppet,
+          removePuppet: actions.removePuppet,
+          kickPlayer: ui.setRemovingId,
+        }}
+        isGuidedMode={isGuidedMode}
+        onGuidedModeToggle={handleGuidedModeToggle}
+        onVoiceChatToggle={(enabled) => send("set_voice_chat", { enabled })}
+        onTargetPlayerCountChange={actions.setTargetPlayerCount}
+        onToggleReady={c.toggleReady}
+        onRequestStart={c.requestStart}
+        readyActionDisabled={c.readyActionDisabled}
+        startAwaitingServer={c.startAwaitingServer}
+        copied={ui.copied}
+        onCopyJoinLink={() => {
+          void ui.copyJoinLink();
+        }}
+        onOpenGuide={ui.openGuide}
+        deckId={c.deck.deckId}
+        hasLoadedBattler={c.deck.hasLoadedBattler}
+        showsDeck={c.deck.showsDeck}
+        isEditingDeck={c.deck.isEditingDeck}
+        isBattlerLoading={c.deck.isBattlerLoading}
+        deckUnchanged={c.deck.deckUnchanged}
+        battlerIdInput={c.deck.battlerIdInput}
+        onBattlerIdInputChange={c.deck.setBattlerIdInput}
+        onCancelEditDeck={() => c.deck.setEditingDeck(false)}
+        onEditDeck={c.deck.editDeck}
+        onSubmitBattler={c.deck.submitBattler}
+        onBattlerButtonClick={c.deck.handleBattlerButtonClick}
+        hostChange={c.hostStatus.hostChange}
+        awayHost={c.hostStatus.awayHost}
+        onDismissHostChange={() => c.setClosedHostChange(c.hostStatus.hostPass)}
+      />
+      {overlays}
+    </>
   );
 }

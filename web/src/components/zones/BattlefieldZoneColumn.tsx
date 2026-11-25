@@ -1,23 +1,30 @@
-import type { Zones, Card as CardType, ZoneName } from '../../types'
-import type { ZoneOwner } from '../../dnd/types'
-import { CompactZoneDisplay } from './CompactZoneDisplay'
+import type { ReactElement } from "react";
+import type { Zones, Card as CardType, ZoneName } from "../../types";
+import type { ZoneOwner } from "../../dnd/types";
+import { CompactZoneDisplay } from "./CompactZoneDisplay";
 
 const VALID_FROM_ZONES: ZoneName[] = [
-  'hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library',
-]
+  "hand",
+  "battlefield",
+  "graveyard",
+  "exile",
+  "sideboard",
+  "command_zone",
+  "library",
+];
 
 interface BattlefieldZoneColumnProps {
-  zones: Zones
-  isOpponent?: boolean
-  canManipulateOpponent?: boolean
-  rowHeight: number
-  columnWidth: number
-  onCardHover?: (cardId: string, zone: ZoneName) => void
-  onCardHoverEnd?: () => void
-  canPeekFaceDown?: boolean
-  selectedCardId?: string
-  onZoneClick?: (toZone: ZoneName, toOwner: ZoneOwner) => void
-  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
+  zones: Zones;
+  isOpponent?: boolean;
+  canManipulateOpponent?: boolean;
+  rowHeight: number;
+  columnWidth: number;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  canPeekFaceDown?: boolean;
+  selectedCardId?: string;
+  onZoneClick?: (toZone: ZoneName, toOwner: ZoneOwner) => void;
+  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void;
 }
 
 export function BattlefieldZoneColumn({
@@ -32,11 +39,11 @@ export function BattlefieldZoneColumn({
   selectedCardId,
   onZoneClick,
   onCardClick,
-}: BattlefieldZoneColumnProps) {
-  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+}: BattlefieldZoneColumnProps): ReactElement {
+  const zoneOwner: ZoneOwner = isOpponent ? "opponent" : "player";
   return (
     <div
-      className={`flex shrink-0 zone-column ${isOpponent ? 'flex-col-reverse' : 'flex-col'}`}
+      className={`flex shrink-0 zone-column ${isOpponent ? "flex-col-reverse" : "flex-col"}`}
       style={{ width: columnWidth }}
     >
       <CompactZoneDisplay
@@ -52,7 +59,11 @@ export function BattlefieldZoneColumn({
         onCardHoverEnd={onCardHoverEnd}
         canPeekFaceDown={canPeekFaceDown}
         selectedCardId={selectedCardId}
-        onZoneClick={onZoneClick ? () => onZoneClick('graveyard', zoneOwner) : undefined}
+        onZoneClick={
+          onZoneClick
+            ? (): void => onZoneClick("graveyard", zoneOwner)
+            : undefined
+        }
         onCardClick={onCardClick}
       />
       <CompactZoneDisplay
@@ -68,9 +79,11 @@ export function BattlefieldZoneColumn({
         onCardHoverEnd={onCardHoverEnd}
         canPeekFaceDown={canPeekFaceDown}
         selectedCardId={selectedCardId}
-        onZoneClick={onZoneClick ? () => onZoneClick('exile', zoneOwner) : undefined}
+        onZoneClick={
+          onZoneClick ? (): void => onZoneClick("exile", zoneOwner) : undefined
+        }
         onCardClick={onCardClick}
       />
     </div>
-  )
+  );
 }

@@ -3,6 +3,9 @@ import type {
   CardCatalogEntry,
   CreateGameResponse,
   JoinGameResponse,
+  LobbyState,
+  ResumableGame,
+  ResumableSeat,
   GameStatusResponse,
   SpectateRequestStatus,
   ShareGameResponse,
@@ -12,413 +15,763 @@ import type {
   UserBattler,
   GameSummary,
   FollowedBattler,
-} from '../types'
-import { AppError, responseToAppError } from '../utils/appError'
-import { getOrCreateDeviceId } from '../utils/deviceIdentity'
-import { hydrateCardCatalogEntries } from '../utils/catalogHydration'
+  CubeSummary,
+} from "../types";
+import { AppError, responseToAppError } from "../utils/appError";
+import { getOrCreateDeviceId } from "../utils/deviceIdentity";
+import { hydrateCardCatalogEntries } from "../utils/catalogHydration";
+import { readMigratedItem, removeStorageKeys } from "../utils/storage";
 
-const API_BASE = '/api'
-const DEVICE_ID_HEADER = 'X-MTB-Device-Id'
-const IDEMPOTENCY_KEY_HEADER = 'X-MTB-Idempotency-Key'
-const CREATE_RETRY_BASE_MS = 150
-const CREATE_RETRY_MAX_MS = 2000
-const CREATE_RETRY_MAX_ATTEMPTS = 5
-const CREATE_RETRY_MAX_TOTAL_MS = 12_000
+const API_BASE = "/api";
+const DEVICE_ID_HEADER = "X-MTB-Device-Id";
+const IDEMPOTENCY_KEY_HEADER = "X-MTB-Idempotency-Key";
+const CREATE_RETRY_BASE_MS = 150;
+const CREATE_RETRY_MAX_MS = 2000;
+const CREATE_RETRY_MAX_ATTEMPTS = 5;
+const CREATE_RETRY_MAX_TOTAL_MS = 12_000;
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function createIdempotencyKey(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
   }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function createRetryDelay(attempt: number): number {
-  const exp = Math.min(CREATE_RETRY_BASE_MS * (2 ** attempt), CREATE_RETRY_MAX_MS)
-  return Math.floor(Math.random() * exp)
+  const exp = Math.min(
+    CREATE_RETRY_BASE_MS * 2 ** attempt,
+    CREATE_RETRY_MAX_MS,
+  );
+  return Math.floor(Math.random() * exp);
 }
 
 function isRetryableStatus(status: number): boolean {
-  return status === 408 || status === 425 || status === 429 || status === 503 || status === 504 || status >= 500
+  return (
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    status === 503 ||
+    status === 504 ||
+    status >= 500
+  );
 }
 
-function withDeviceHeaders(baseHeaders: HeadersInit = {}): HeadersInit {
-  const deviceId = getOrCreateDeviceId()
-  if (!deviceId) return baseHeaders
-  return { ...baseHeaders, [DEVICE_ID_HEADER]: deviceId }
+function withDeviceHeaders(
+  baseHeaders: Record<string, string> = {},
+): Record<string, string> {
+  const deviceId = getOrCreateDeviceId();
+  if (!deviceId) return baseHeaders;
+  return { ...baseHeaders, [DEVICE_ID_HEADER]: deviceId };
 }
 
-async function throwResponseError(response: Response, context: Parameters<typeof responseToAppError>[1], fallback: string): Promise<never> {
-  throw await responseToAppError(response, context, fallback)
+async function throwResponseError(
+  response: Response,
+  context: Parameters<typeof responseToAppError>[1],
+  fallback: string,
+): Promise<never> {
+  throw await responseToAppError(response, context, fallback);
 }
 
 export interface GameOptions {
-  cubeId?: string
-  useUpgrades?: boolean
-  useVanguards?: boolean
-  targetPlayerCount?: number
-  puppetCount?: number
-  autoApproveSpectators?: boolean
-  guidedModeDefault?: boolean
-  playMode?: PlayMode
+  cubeId?: string;
+  useUpgrades?: boolean;
+  useVanguards?: boolean;
+  targetPlayerCount?: number;
+  puppetCount?: number;
+  autoApproveSpectators?: boolean;
+  guidedModeDefault?: boolean;
+  playMode?: PlayMode;
 }
 
-export async function createGame(
-  playerName: string,
-  options: GameOptions = {}
-): Promise<CreateGameResponse> {
-  const idempotencyKey = createIdempotencyKey()
-  const startedAt = Date.now()
-  const body = JSON.stringify({
+interface CreateGameRequestContext {
+  body: string;
+  idempotencyKey: string;
+  startedAt: number;
+}
+
+function buildCreateGameBody(playerName: string, options: GameOptions): string {
+  const payload = {
     player_name: playerName,
-    cube_id: options.cubeId ?? 'auto',
+    cube_id: options.cubeId ?? "auto",
     use_upgrades: options.useUpgrades ?? true,
     use_vanguards: options.useVanguards ?? false,
     target_player_count: options.targetPlayerCount ?? 4,
     puppet_count: options.puppetCount ?? 0,
     auto_approve_spectators: options.autoApproveSpectators ?? false,
     guided_mode_default: options.guidedModeDefault ?? false,
-    play_mode: options.playMode ?? 'limited',
-  })
+    play_mode: options.playMode ?? "limited",
+  };
+  return JSON.stringify(payload);
+}
 
-  for (let attempt = 0; attempt < CREATE_RETRY_MAX_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(`${API_BASE}/games`, {
-        method: 'POST',
-        headers: withDeviceHeaders({
-          'Content-Type': 'application/json',
-          [IDEMPOTENCY_KEY_HEADER]: idempotencyKey,
-        }),
-        credentials: 'include',
-        body,
-      })
+function hasRetryBudget(startedAt: number, attempt: number): boolean {
+  return (
+    attempt < CREATE_RETRY_MAX_ATTEMPTS - 1 &&
+    Date.now() - startedAt < CREATE_RETRY_MAX_TOTAL_MS
+  );
+}
 
-      if (response.ok) {
-        return response.json()
-      }
+function rethrowCreateGameError(err: unknown): never {
+  if (err instanceof Error) {
+    throw err;
+  }
+  throw new Error("Failed to create game", { cause: err });
+}
 
-      const elapsed = Date.now() - startedAt
-      const canRetry = isRetryableStatus(response.status)
-        && attempt < CREATE_RETRY_MAX_ATTEMPTS - 1
-        && elapsed < CREATE_RETRY_MAX_TOTAL_MS
-      if (!canRetry) {
-        await throwResponseError(response, 'create-game', 'Failed to create game')
-      }
-    } catch (err) {
-      if (err instanceof AppError) {
-        throw err
-      }
-      const elapsed = Date.now() - startedAt
-      const isAbortError = err instanceof DOMException && err.name === 'AbortError'
-      const canRetry = !isAbortError
-        && attempt < CREATE_RETRY_MAX_ATTEMPTS - 1
-        && elapsed < CREATE_RETRY_MAX_TOTAL_MS
-      if (!canRetry) {
-        if (err instanceof Error) {
-          throw err
-        }
-        throw new Error('Failed to create game')
-      }
+async function attemptCreateGame(
+  ctx: CreateGameRequestContext,
+  attempt: number,
+): Promise<CreateGameResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/games`, {
+      method: "POST",
+      headers: withDeviceHeaders({
+        "Content-Type": "application/json",
+        [IDEMPOTENCY_KEY_HEADER]: ctx.idempotencyKey,
+      }),
+      credentials: "include",
+      body: ctx.body,
+    });
+
+    if (response.ok) {
+      return response.json();
     }
 
-    await sleep(createRetryDelay(attempt))
+    if (
+      !isRetryableStatus(response.status) ||
+      !hasRetryBudget(ctx.startedAt, attempt)
+    ) {
+      await throwResponseError(
+        response,
+        "create-game",
+        "Failed to create game",
+      );
+    }
+  } catch (err) {
+    if (err instanceof AppError) {
+      throw err;
+    }
+    const isAbortError =
+      err instanceof DOMException && err.name === "AbortError";
+    if (isAbortError || !hasRetryBudget(ctx.startedAt, attempt)) {
+      rethrowCreateGameError(err);
+    }
   }
 
-  throw new Error('Failed to create game')
+  await sleep(createRetryDelay(attempt));
+  return attemptCreateGame(ctx, attempt + 1);
 }
 
-export async function joinGame(joinCode: string, playerName: string): Promise<JoinGameResponse> {
+export async function createGame(
+  playerName: string,
+  options: GameOptions = {},
+): Promise<CreateGameResponse> {
+  return attemptCreateGame(
+    {
+      body: buildCreateGameBody(playerName, options),
+      idempotencyKey: createIdempotencyKey(),
+      startedAt: Date.now(),
+    },
+    0,
+  );
+}
+
+export async function joinGame(
+  joinCode: string,
+  playerName: string,
+): Promise<JoinGameResponse> {
   const response = await fetch(`${API_BASE}/games/join`, {
-    method: 'POST',
-    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
+    method: "POST",
+    headers: withDeviceHeaders({ "Content-Type": "application/json" }),
+    credentials: "include",
     body: JSON.stringify({ join_code: joinCode, player_name: playerName }),
-  })
+  });
   if (!response.ok) {
-    await throwResponseError(response, 'join-game', 'Failed to join game')
+    await throwResponseError(response, "join-game", "Failed to join game");
   }
-  return response.json()
+  return response.json();
 }
 
-export async function startGame(gameId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/games/${gameId}/start`, {
-    method: 'POST',
-  })
+export async function startGame(
+  gameId: string,
+  sessionId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/games/${gameId}/start?session_id=${encodeURIComponent(sessionId)}`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok) {
-    await throwResponseError(response, 'game-action', 'Failed to start game')
+    await throwResponseError(response, "game-action", "Failed to start game");
   }
 }
 
-export async function rejoinGame(gameId: string, playerName: string): Promise<JoinGameResponse> {
+export async function rejoinGame(
+  gameId: string,
+  playerName: string,
+  seatToken: string | null,
+): Promise<JoinGameResponse> {
   const response = await fetch(`${API_BASE}/games/${gameId}/rejoin`, {
-    method: 'POST',
-    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
-    body: JSON.stringify({ player_name: playerName }),
-  })
+    method: "POST",
+    headers: withDeviceHeaders({ "Content-Type": "application/json" }),
+    credentials: "include",
+    body: JSON.stringify({ player_name: playerName, seat_token: seatToken }),
+  });
   if (!response.ok) {
-    await throwResponseError(response, 'rejoin-game', 'Failed to rejoin game')
+    await throwResponseError(response, "rejoin-game", "Failed to rejoin game");
   }
-  return response.json()
+  return response.json();
 }
 
-export async function getGameStatus(gameId: string): Promise<GameStatusResponse> {
-  const response = await fetch(`${API_BASE}/games/${gameId}/status`)
+export async function getLobby(gameId: string): Promise<LobbyState> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/lobby`);
   if (!response.ok) {
-    await throwResponseError(response, 'game-status', 'Failed to get game status')
+    await throwResponseError(
+      response,
+      "game-status",
+      "Failed to load the lobby",
+    );
   }
-  return response.json()
+  return response.json();
+}
+
+export async function closeSeat(
+  gameId: string,
+  playerName: string,
+  seatToken: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/close`, {
+    method: "POST",
+    headers: withDeviceHeaders({ "Content-Type": "application/json" }),
+    credentials: "include",
+    body: JSON.stringify({ player_name: playerName, seat_token: seatToken }),
+  });
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "default",
+      "Couldn't close it. Try again.",
+    );
+  }
+}
+
+export async function getResumableGames(
+  seats: ResumableSeat[],
+): Promise<ResumableGame[]> {
+  const response = await fetch(`${API_BASE}/games/resumable`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ seats }),
+  });
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "game-status",
+      "Failed to check for games in progress",
+    );
+  }
+  const data: { games: ResumableGame[] } = await response.json();
+  return data.games;
+}
+
+export async function getGameStatus(
+  gameId: string,
+): Promise<GameStatusResponse> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/status`);
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "game-status",
+      "Failed to get game status",
+    );
+  }
+  return response.json();
+}
+
+export async function getVoiceIceServers(
+  gameId: string,
+  sessionId: string,
+): Promise<RTCIceServer[]> {
+  const response = await fetch(
+    `${API_BASE}/games/${encodeURIComponent(gameId)}/voice/ice-servers?session_id=${encodeURIComponent(sessionId)}`,
+  );
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "default",
+      "Failed to load voice relay servers",
+    );
+  }
+  const data: { ice_servers?: RTCIceServer[] } = await response.json();
+  return Array.isArray(data.ice_servers) ? data.ice_servers : [];
 }
 
 export async function createSpectateRequest(
   gameId: string,
   targetPlayerName: string,
-  spectatorName: string
+  spectatorName: string,
 ): Promise<{ request_id: string }> {
   const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request`, {
-    method: 'POST',
-    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ target_player_name: targetPlayerName, spectator_name: spectatorName }),
-  })
+    method: "POST",
+    headers: withDeviceHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      target_player_name: targetPlayerName,
+      spectator_name: spectatorName,
+    }),
+  });
   if (!response.ok) {
-    await throwResponseError(response, 'spectate-request', 'Failed to create spectate request')
+    await throwResponseError(
+      response,
+      "spectate-request",
+      "Failed to create spectate request",
+    );
   }
-  return response.json()
+  return response.json();
 }
 
 export async function getSpectateRequestStatus(
   gameId: string,
-  requestId: string
+  requestId: string,
 ): Promise<SpectateRequestStatus> {
-  const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request/${requestId}`)
+  const response = await fetch(
+    `${API_BASE}/games/${gameId}/spectate-request/${requestId}`,
+  );
   if (!response.ok) {
-    await throwResponseError(response, 'spectate-status', 'Failed to get spectate status')
+    await throwResponseError(
+      response,
+      "spectate-status",
+      "Failed to get spectate status",
+    );
   }
-  return response.json()
+  return response.json();
+}
+
+export async function cancelSpectateRequest(
+  gameId: string,
+  requestId: string,
+): Promise<SpectateRequestStatus> {
+  const response = await fetch(
+    `${API_BASE}/games/${gameId}/spectate-request/${requestId}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "spectate-status",
+      "Failed to cancel the spectate request",
+    );
+  }
+  return response.json();
 }
 
 export interface GameCardsResponse {
-  cards: Card[]
-  upgrades: Card[]
+  cards: Card[];
+  upgrades: Card[];
 }
 
-export async function getGameCards(gameId: string, playerName?: string): Promise<GameCardsResponse> {
-  const query = playerName ? `?player_name=${encodeURIComponent(playerName)}` : ''
-  const response = await fetch(`${API_BASE}/games/${gameId}/cards${query}`)
+export async function getGameCards(
+  gameId: string,
+  playerName?: string,
+): Promise<GameCardsResponse> {
+  const query = playerName
+    ? `?player_name=${encodeURIComponent(playerName)}`
+    : "";
+  const response = await fetch(`${API_BASE}/games/${gameId}/cards${query}`);
   if (!response.ok) {
-    await throwResponseError(response, 'default', 'Failed to load card pool')
+    await throwResponseError(response, "default", "Failed to load card pool");
   }
-  const payload = await response.json() as { cards: CardCatalogEntry[]; upgrades: CardCatalogEntry[] }
+  const payload: {
+    cards: CardCatalogEntry[];
+    upgrades: CardCatalogEntry[];
+  } = await response.json();
   const mergedCatalog = Object.fromEntries(
-    [...payload.cards, ...payload.upgrades].map((card) => [card.scryfall_id, card]),
-  )
+    [...payload.cards, ...payload.upgrades].map((card) => [
+      card.scryfall_id,
+      card,
+    ]),
+  );
   return {
     cards: hydrateCardCatalogEntries(payload.cards, mergedCatalog),
     upgrades: hydrateCardCatalogEntries(payload.upgrades, mergedCatalog),
-  }
+  };
 }
 
-export async function getShareGame(gameId: string, playerName: string): Promise<ShareGameResponse> {
-  const response = await fetch(`${API_BASE}/games/${gameId}/share/${encodeURIComponent(playerName)}`)
+export async function getShareGame(
+  gameId: string,
+  playerName: string,
+): Promise<ShareGameResponse> {
+  const response = await fetch(
+    `${API_BASE}/games/${gameId}/share/${encodeURIComponent(playerName)}`,
+  );
   if (!response.ok) {
-    await throwResponseError(response, 'share-game', 'Failed to load shared game')
+    await throwResponseError(
+      response,
+      "share-game",
+      "Failed to load shared game",
+    );
   }
-  return response.json()
+  return response.json();
 }
 
 export async function getServerStatus(): Promise<ServerStatus> {
-  const response = await fetch(`${API_BASE}/server/status`)
+  const response = await fetch(`${API_BASE}/server/status`);
   if (!response.ok) {
-    await throwResponseError(response, 'default', 'Failed to load server status')
+    await throwResponseError(
+      response,
+      "default",
+      "Failed to load server status",
+    );
   }
-  return response.json()
+  return response.json();
 }
 
-const _lastWarmTimes = new Map<string, number>()
+const lastWarmTimes = new Map<string, number>();
 
 export function warmCubeCache(cubeId: string): void {
-  const now = Date.now()
-  if (now - (_lastWarmTimes.get(cubeId) ?? 0) < 30_000) return
-  _lastWarmTimes.set(cubeId, now)
+  const now = Date.now();
+  if (now - (lastWarmTimes.get(cubeId) ?? 0) < 30_000) return;
+  lastWarmTimes.set(cubeId, now);
   fetch(`${API_BASE}/games/cubes/warm`, {
-    method: 'POST',
-    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
+    method: "POST",
+    headers: withDeviceHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ cube_id: cubeId }),
-  }).catch(() => {})
+  }).catch(() => {});
 }
 
 // ── Auth ────────────────────────────────────────────────────────────
 
-export async function authRegister(username: string, password: string, email: string): Promise<AuthUser> {
-  const response = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ username, password, email }),
-  })
-  if (!response.ok) {
-    await throwResponseError(response, 'register', 'Failed to register')
-  }
-  return response.json()
+// The auth cookie is httpOnly, so the client keeps its own note of whether it holds a session.
+// With no note yet it still asks once, so sessions that predate the note keep working.
+const SIGNED_IN_KEY = "pitfight_signed_in";
+const LEGACY_SIGNED_IN_KEY = "mtb_signed_in";
+
+function rememberSignedIn(signedIn: boolean): void {
+  window.localStorage.setItem(SIGNED_IN_KEY, signedIn ? "1" : "0");
+  removeStorageKeys(window.localStorage, [LEGACY_SIGNED_IN_KEY]);
 }
 
-export async function authLogin(username: string, password: string): Promise<AuthUser> {
-  const response = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ username, password }),
-  })
+export async function authRegister(
+  username: string,
+  password: string,
+  email: string,
+): Promise<AuthUser> {
+  const response = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ username, password, email }),
+  });
   if (!response.ok) {
-    await throwResponseError(response, 'login', 'Failed to log in')
+    await throwResponseError(response, "register", "Failed to register");
   }
-  return response.json()
+  rememberSignedIn(true);
+  return response.json();
+}
+
+export async function authLogin(
+  username: string,
+  password: string,
+): Promise<AuthUser> {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "login", "Failed to log in");
+  }
+  rememberSignedIn(true);
+  return response.json();
 }
 
 export async function authLogout(): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+  const response = await fetch(`${API_BASE}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Something went wrong.");
+  }
+  rememberSignedIn(false);
 }
 
 export async function authGetMe(): Promise<AuthUser | null> {
+  if (
+    readMigratedItem(
+      window.localStorage,
+      SIGNED_IN_KEY,
+      LEGACY_SIGNED_IN_KEY,
+    ) === "0"
+  ) {
+    return null;
+  }
   try {
-    const response = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
-    if (!response.ok) return null
-    return response.json()
+    const response = await fetch(`${API_BASE}/auth/me`, {
+      credentials: "include",
+    });
+    if (response.status === 401) rememberSignedIn(false);
+    if (!response.ok) return null;
+    rememberSignedIn(true);
+    return response.json();
   } catch {
-    return null
+    return null;
   }
 }
 
 // ── Battlers ────────────────────────────────────────────────────────
 
-export async function getBattlers(offset = 0): Promise<{ battlers: UserBattler[]; has_more: boolean }> {
-  const response = await fetch(`${API_BASE}/battlers?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load battlers')
-  return response.json()
+export async function getBattlers(
+  offset = 0,
+): Promise<{ battlers: UserBattler[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/battlers?offset=${offset}`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load presets");
+  }
+  return response.json();
+}
+
+export async function getBattler(id: number): Promise<UserBattler> {
+  const response = await fetch(`${API_BASE}/battlers/${id}`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load preset");
+  }
+  return response.json();
 }
 
 export interface CreateBattlerRequest {
-  cube_id: string
-  display_name?: string
-  use_upgrades?: boolean
-  use_vanguards?: boolean
-  play_mode?: PlayMode
-  puppet_count?: number
-  target_player_count?: number
-  auto_approve_spectators?: boolean
-  guided_mode_default?: boolean
+  cube_id: string;
+  display_name?: string;
+  use_upgrades?: boolean;
+  use_vanguards?: boolean;
+  play_mode?: PlayMode;
+  puppet_count?: number;
+  target_player_count?: number;
+  auto_approve_spectators?: boolean;
+  guided_mode_default?: boolean;
 }
 
-export async function createBattler(data: CreateBattlerRequest): Promise<UserBattler> {
+export async function createBattler(
+  data: CreateBattlerRequest,
+): Promise<UserBattler> {
   const response = await fetch(`${API_BASE}/battlers`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(data),
-  })
-  if (!response.ok) await throwResponseError(response, 'create-battler', 'Failed to create battler')
-  return response.json()
+  });
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "create-battler",
+      "Failed to create preset",
+    );
+  }
+  return response.json();
 }
 
-export async function updateBattler(id: number, data: Partial<CreateBattlerRequest> & { position?: number }): Promise<UserBattler> {
+export async function updateBattler(
+  id: number,
+  data: Partial<CreateBattlerRequest> & { position?: number },
+): Promise<UserBattler> {
   const response = await fetch(`${API_BASE}/battlers/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(data),
-  })
-  if (!response.ok) await throwResponseError(response, 'update-battler', 'Failed to update battler')
-  return response.json()
+  });
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "update-battler",
+      "Failed to update preset",
+    );
+  }
+  return response.json();
 }
 
 export async function deleteBattler(id: number): Promise<void> {
   const response = await fetch(`${API_BASE}/battlers/${id}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  if (!response.ok) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
+    method: "DELETE",
+    credentials: "include",
+  });
+  // A preset already deleted, such as from another tab, is gone, which is what the caller asked for.
+  if (!response.ok && response.status !== 404) {
+    await throwResponseError(
+      response,
+      "delete-battler",
+      "Failed to delete preset",
+    );
+  }
+}
+
+export interface CubeGamesPage {
+  games: GameSummary[];
+  has_more: boolean;
+  total_games: number;
+  cube_name: string | null;
+  cube_image_uri: string | null;
 }
 
 export async function getBattlerGames(
   battlerId: number,
-  opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
-): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
-  const params = new URLSearchParams()
-  if (opts.offset) params.set('offset', String(opts.offset))
-  if (opts.playMode != null) params.set('play_mode', opts.playMode)
-  if (opts.useUpgrades != null) params.set('use_upgrades', String(opts.useUpgrades))
-  const qs = params.toString()
-  const response = await fetch(`${API_BASE}/battlers/${battlerId}/games${qs ? `?${qs}` : ''}`, { credentials: 'include' })
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
-  return response.json()
+  opts: {
+    offset?: number;
+    playMode?: string;
+    useUpgrades?: boolean;
+    mineOnly?: boolean;
+  } = {},
+): Promise<CubeGamesPage> {
+  const params = new URLSearchParams();
+  if (opts.offset) params.set("offset", String(opts.offset));
+  if (opts.playMode !== undefined) params.set("play_mode", opts.playMode);
+  if (opts.useUpgrades !== undefined) {
+    params.set("use_upgrades", String(opts.useUpgrades));
+  }
+  if (opts.mineOnly) params.set("mine_only", "true");
+  const qs = params.toString();
+  const response = await fetch(
+    `${API_BASE}/battlers/${battlerId}/games${qs ? `?${qs}` : ""}`,
+    { credentials: "include" },
+  );
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load games");
+  }
+  return response.json();
+}
+
+export async function getCubeSummary(cubeId: string): Promise<CubeSummary> {
+  const response = await fetch(
+    `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}`,
+    { credentials: "include" },
+  );
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load the cube");
+  }
+  return response.json();
 }
 
 export async function getCubeGames(
   cubeId: string,
   opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
-): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
-  const params = new URLSearchParams()
-  if (opts.offset) params.set('offset', String(opts.offset))
-  if (opts.playMode != null) params.set('play_mode', opts.playMode)
-  if (opts.useUpgrades != null) params.set('use_upgrades', String(opts.useUpgrades))
-  const qs = params.toString()
+): Promise<CubeGamesPage> {
+  const params = new URLSearchParams();
+  if (opts.offset) params.set("offset", String(opts.offset));
+  if (opts.playMode !== undefined) params.set("play_mode", opts.playMode);
+  if (opts.useUpgrades !== undefined) {
+    params.set("use_upgrades", String(opts.useUpgrades));
+  }
+  const qs = params.toString();
   const response = await fetch(
-    `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}/games${qs ? `?${qs}` : ''}`,
-  )
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
-  return response.json()
+    `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}/games${qs ? `?${qs}` : ""}`,
+  );
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load games");
+  }
+  return response.json();
 }
 
-export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
-  const response = await fetch(`${API_BASE}/battlers/my-games?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
-  return response.json()
+export async function getMyGames(
+  offset = 0,
+  q = "",
+): Promise<{
+  games: GameSummary[];
+  has_more: boolean;
+  total_games: number;
+  total_wins: number;
+}> {
+  const params = new URLSearchParams({ offset: String(offset) });
+  if (q) params.set("q", q);
+  const response = await fetch(`${API_BASE}/battlers/my-games?${params}`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load games");
+  }
+  return response.json();
 }
 
 // ── Follows ─────────────────────────────────────────────────────────
 
-export async function getFollowing(offset = 0): Promise<{ following: FollowedBattler[]; has_more: boolean }> {
-  const response = await fetch(`${API_BASE}/battlers/following?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load following')
-  return response.json()
+export async function getFollowing(
+  offset = 0,
+): Promise<{ following: FollowedBattler[]; has_more: boolean }> {
+  const response = await fetch(
+    `${API_BASE}/battlers/following?offset=${offset}`,
+    { credentials: "include" },
+  );
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load following");
+  }
+  return response.json();
 }
 
-export async function followCube(cubeId: string, displayName?: string): Promise<FollowedBattler> {
+export async function followCube(
+  cubeId: string,
+  displayName?: string,
+): Promise<FollowedBattler> {
   const response = await fetch(`${API_BASE}/battlers/follow`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ cube_id: cubeId, display_name: displayName || null }),
-  })
-  if (!response.ok) await throwResponseError(response, 'follow-cube', 'Failed to follow cube')
-  return response.json()
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      cube_id: cubeId,
+      display_name: displayName || null,
+    }),
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "follow-cube", "Failed to follow cube");
+  }
+  return response.json();
 }
 
 export async function unfollowCube(followId: number): Promise<void> {
   const response = await fetch(`${API_BASE}/battlers/follow/${followId}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  if (!response.ok) await throwResponseError(response, 'unfollow-cube', 'Failed to unfollow')
+    method: "DELETE",
+    credentials: "include",
+  });
+  // A follow already removed, such as from another tab, is gone, which is what the caller asked for.
+  if (!response.ok && response.status !== 404) {
+    await throwResponseError(response, "unfollow-cube", "Failed to unfollow");
+  }
 }
 
 // ── Discover ────────────────────────────────────────────────────────
 
 export interface DiscoverResult {
-  cube_id: string
-  cube_name?: string | null
-  cube_image_uri?: string | null
-  game_count: number
-  player_count: number
-  last_played: string | null
-  is_following: boolean
+  cube_id: string;
+  cube_name?: string | null;
+  cube_image_uri?: string | null;
+  game_count: number;
+  player_count: number;
+  last_played: string | null;
+  is_following: boolean;
 }
 
-export async function discoverCubes(offset = 0): Promise<{ results: DiscoverResult[]; has_more: boolean }> {
-  const response = await fetch(`${API_BASE}/discover?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load cubes')
-  return response.json()
+export async function discoverCubes(
+  offset = 0,
+  q = "",
+): Promise<{ results: DiscoverResult[]; has_more: boolean; total: number }> {
+  const params = new URLSearchParams({ offset: String(offset) });
+  if (q) params.set("q", q);
+  const response = await fetch(`${API_BASE}/discover?${params}`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    await throwResponseError(response, "default", "Failed to load cubes");
+  }
+  return response.json();
 }

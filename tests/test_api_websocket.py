@@ -1,19 +1,23 @@
 """WebSocket connection tests - focus on message shapes, not game logic."""
 
-import asyncio
-from typing import cast
-from unittest.mock import AsyncMock
+from collections.abc import Callable
+from typing import Any
 
 import pytest
-from fastapi import WebSocket
+from fastapi.testclient import TestClient
+from httpx import Response
 from starlette.websockets import WebSocketDisconnect
 
+import server.db.database as db_module
 import server.routers.ws as ws_module
-from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID
+from pitfight.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
+from server.db.models import GameRecord
 
 
 class TestWebSocketConnection:
-    def test_invalid_session_closes_connection(self, client, game_with_players, ws_receive_json):
+    def test_invalid_session_closes_connection(
+        self, client: TestClient, game_with_players: dict[str, Any], *, ws_receive_json: Callable[..., dict[str, Any]]
+    ) -> None:
         game_id = game_with_players["game_id"]
 
         with client.websocket_connect(f"/ws/{game_id}?session_id=invalid") as ws:
@@ -26,7 +30,9 @@ class TestWebSocketConnection:
 
         assert exc_info.value.code == 4001
 
-    def test_nonexistent_game_closes_connection(self, client, game_with_players, ws_receive_json):
+    def test_nonexistent_game_closes_connection(
+        self, client: TestClient, game_with_players: dict[str, Any], *, ws_receive_json: Callable[..., dict[str, Any]]
+    ) -> None:
         session_id = game_with_players["alice"]["session_id"]
 
         with client.websocket_connect(f"/ws/nonexistent?session_id={session_id}") as ws:
@@ -41,7 +47,9 @@ class TestWebSocketConnection:
 
 
 class TestLobbyWebSocket:
-    def test_connect_to_lobby_receives_lobby_state(self, client, game_with_players, ws_receive_json):
+    def test_connect_to_lobby_receives_lobby_state(
+        self, client: TestClient, game_with_players: dict[str, Any], *, ws_receive_json: Callable[..., dict[str, Any]]
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
 
@@ -53,14 +61,20 @@ class TestLobbyWebSocket:
             assert "players" in msg["payload"]
 
     def test_constructed_submit_battler_updates_lobby_state(
-        self, client, monkeypatch, card_factory, ws_receive_json, ws_receive_json_until
-    ):
-        def fake_get_cube_data(cube_id: str):
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        card_factory: Callable[..., Card],
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+    ) -> None:
+        def fake_get_cube_data(cube_id: str) -> list[Card]:
             if cube_id in {DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID}:
                 return []
             return [card_factory(f"{cube_id}_{i}") for i in range(100)]
 
-        monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+        monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
         create = client.post(
             "/api/games",
@@ -92,14 +106,20 @@ class TestLobbyWebSocket:
             assert statuses[-1] == "ready"
 
     def test_constructed_clear_battler_updates_lobby_state(
-        self, client, monkeypatch, card_factory, ws_receive_json, ws_receive_json_until
-    ):
-        def fake_get_cube_data(cube_id: str):
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        card_factory: Callable[..., Card],
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+    ) -> None:
+        def fake_get_cube_data(cube_id: str) -> list[Card]:
             if cube_id in {DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID}:
                 return []
             return [card_factory(f"{cube_id}_{i}") for i in range(100)]
 
-        monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+        monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
         create = client.post(
             "/api/games",
@@ -152,10 +172,17 @@ class TestLobbyWebSocket:
 
 
 class TestGameWebSocket:
-    def test_connect_to_started_game_receives_game_state(self, client, game_with_players, ws_receive_json):
+    def test_connect_to_started_game_receives_game_state(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             msg = ws_receive_json(ws)
@@ -166,10 +193,83 @@ class TestGameWebSocket:
             assert "phase" in msg["payload"]["state"]
             assert "self_player" in msg["payload"]["state"]
 
-    def test_unknown_action_receives_error(self, client, game_with_players, ws_receive_json, ws_receive_json_until):
+    def test_basic_lands_picked_in_build_survive_a_reconnect(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
+            ws_receive_json(ws)
+            ws.send_json({"action": "build_set_basics", "payload": {"basics": ["Plains", "Island"]}})
+            ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "game_state",
+                description="game_state after build_set_basics",
+            )
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
+            bootstrap = ws_receive_json(ws)
+
+        assert bootstrap["payload"]["state"]["self_player"]["chosen_basics"] == ["Plains", "Island"]
+
+    def test_basic_lands_picked_in_build_are_hidden_from_other_players_until_battle(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
+        game_id = game_with_players["game_id"]
+        alice_session_id = game_with_players["alice"]["session_id"]
+        bob_session_id = game_with_players["bob"]["session_id"]
+        start_lobby(game_id, alice_session_id)
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={alice_session_id}") as ws:
+            ws_receive_json(ws)
+            ws.send_json({"action": "build_set_basics", "payload": {"basics": ["Plains", "Island"]}})
+            ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "game_state",
+                description="game_state after build_set_basics",
+            )
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={bob_session_id}") as ws:
+            bootstrap = ws_receive_json(ws)
+        players = {p["name"]: p for p in bootstrap["payload"]["state"]["players"]}
+        assert players["Alice"]["chosen_basics"] == []
+
+        game = ws_module.game_manager.get_game(game_id)
+        assert game is not None
+        alice = ws_module.game_manager.get_player(game, game_with_players["alice"]["player_id"])
+        assert alice is not None
+        alice.phase = "battle"
+        bob_state = ws_module.game_manager.get_game_state(game_id, game_with_players["bob"]["player_id"])
+        assert bob_state is not None
+        players_in_battle = {p.name: p for p in bob_state.players}
+        assert players_in_battle["Alice"].chosen_basics == ["Plains", "Island"]
+
+    def test_unknown_action_receives_error(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
+        game_id = game_with_players["game_id"]
+        session_id = game_with_players["alice"]["session_id"]
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             ws_receive_json(ws)
@@ -184,7 +284,44 @@ class TestGameWebSocket:
             assert "payload" in msg
             assert msg["payload"]["code"] == "UNKNOWN_ACTION"
 
-    def test_start_game_broadcasts_game_state(self, client, game_with_players, ws_receive_json, ws_receive_json_until):
+    def test_upgrade_pick_outside_reward_done_grants_nothing(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
+        game_id = game_with_players["game_id"]
+        alice_ids = game_with_players["alice"]
+        start_lobby(game_id, alice_ids["session_id"])
+        game = ws_module.game_manager.get_game(game_id)
+        assert game is not None
+        alice = ws_module.game_manager.get_player(game, alice_ids["player_id"])
+        assert alice is not None
+        alice.phase = "reward"
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={alice_ids['session_id']}") as ws:
+            ws_receive_json(ws)
+            ws.send_json({"action": "reward_pick_upgrade", "payload": {"upgrade_id": game.available_upgrades[0].id}})
+            msg = ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "error",
+                description="error response for reward_pick_upgrade",
+            )
+
+        assert msg["payload"]["code"] == "UNKNOWN_ACTION"
+        assert alice.upgrades == []
+
+    def test_start_game_broadcasts_game_state(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+    ) -> None:
         game_id = game_with_players["game_id"]
         alice_session = game_with_players["alice"]["session_id"]
         bob_session = game_with_players["bob"]["session_id"]
@@ -252,27 +389,61 @@ class TestGameWebSocket:
                 assert msg_alice["type"] == "game_state"
                 assert msg_bob["type"] == "game_state"
 
-    def test_reconnect_after_snapshot_restore_uses_persisted_mapping(self, client, game_with_players, ws_receive_json):
+    def test_reconnect_after_snapshot_restore_uses_persisted_mapping(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         game_manager = ws_module.game_manager
         game_manager.mark_game_dirty(game_id)
         game_manager.persist_dirty_games()
-        game_manager._cleanup_game(game_id, preserve_snapshot=True)
+        game_manager.cleanup_game(game_id, preserve_snapshot=True)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             msg = ws_receive_json(ws)
             assert msg["type"] == "game_bootstrap"
 
-    def test_missing_runtime_mapping_rejects_invalid_session(self, client, game_with_players, ws_receive_json):
+    def test_evicting_an_idle_game_does_not_record_it_as_ended(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        monkeypatch: pytest.MonkeyPatch,
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
+        _ = client
+        game_id = game_with_players["game_id"]
+        start_lobby(game_id, game_with_players["alice"]["session_id"])
+        monkeypatch.setattr("server.services.game.snapshot_store.IDLE_EVICT_MINUTES", 0)
+
+        assert ws_module.game_manager.evict_cold_games() == 1
+
+        with db_module.SessionLocal() as session:
+            record = session.get(GameRecord, game_id)
+            assert record is not None
+            assert record.ended_at is None
+
+    def test_missing_runtime_mapping_rejects_invalid_session(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         game_manager = ws_module.game_manager
-        game_manager._clear_runtime_player_mappings_for_game(game_id)
+        game_manager._clear_runtime_player_mappings_for_game(game_id)  # noqa: SLF001 -- internal state inspected by test
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             message = ws_receive_json(ws)
@@ -284,40 +455,39 @@ class TestGameWebSocket:
 
         assert exc_info.value.code == 4001
 
-    def test_duplicate_build_ready_after_battle_transition_resyncs_instead_of_error(self, client, game_with_players):
+    def test_duplicate_build_ready_after_battle_transition_resyncs_instead_of_error(
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], Response],
+    ) -> None:
         game_id = game_with_players["game_id"]
-        alice_player_id = game_with_players["alice"]["player_id"]
-        client.post(f"/api/games/{game_id}/start")
+        alice_ids = game_with_players["alice"]
+        start_lobby(game_id, alice_ids["session_id"])
 
         game = ws_module.game_manager.get_game(game_id)
         assert game is not None
-        alice = ws_module.game_manager.get_player(game, alice_player_id)
+        alice = ws_module.game_manager.get_player(game, alice_ids["player_id"])
         assert alice is not None
-
         alice.phase = "battle"
 
-        broadcast_game_state = AsyncMock()
-        send_error = AsyncMock()
-        monkeypatch = pytest.MonkeyPatch()
-        monkeypatch.setattr(ws_module.connection_manager, "broadcast_game_state", broadcast_game_state)
-        monkeypatch.setattr(ws_module.connection_manager, "send_error", send_error)
-        try:
-            asyncio.run(
-                ws_module.handle_message(
-                    game_id,
-                    alice_player_id,
-                    {
-                        "action": "build_ready",
-                        "payload": {
-                            "basics": ["Plains", "Island", "Mountain"],
-                            "play_draw_preference": "play",
-                        },
+        with client.websocket_connect(f"/ws/{game_id}?session_id={alice_ids['session_id']}") as ws:
+            ws_receive_json(ws)
+            ws.send_json(
+                {
+                    "action": "build_ready",
+                    "payload": {
+                        "basics": ["Plains", "Island", "Mountain"],
+                        "play_draw_preference": "play",
                     },
-                    cast(WebSocket, AsyncMock(spec=WebSocket)),
-                )
+                }
             )
-        finally:
-            monkeypatch.undo()
-
-        broadcast_game_state.assert_awaited_once_with(game_id)
-        send_error.assert_not_called()
+            msg = ws_receive_json_until(
+                ws,
+                lambda message: message["type"] in {"game_state", "error"},
+                description="resync game_state after duplicate build_ready",
+            )
+            assert msg["type"] == "game_state"

@@ -3,10 +3,7 @@ export function shouldCloseSubmitPopoverOnOutsideClick(options: {
   clickedInsidePopover: boolean;
   clickedIgnoredElement: boolean;
 }): boolean {
-  const {
-    closeOnOutsideClick,
-    clickedInsidePopover,
-    clickedIgnoredElement,
-  } = options;
+  const { closeOnOutsideClick, clickedInsidePopover, clickedIgnoredElement } =
+    options;
   return closeOnOutsideClick && !clickedInsidePopover && !clickedIgnoredElement;
 }

@@ -1,3 +1,5 @@
+"""Structured API and WebSocket error codes and payload builders."""
+
 from __future__ import annotations
 
 from enum import StrEnum
@@ -12,10 +14,12 @@ class ErrorCode(StrEnum):
     NOT_AUTHENTICATED = "NOT_AUTHENTICATED"
     INVALID_SESSION = "INVALID_SESSION"
     GAME_NOT_FOUND = "GAME_NOT_FOUND"
+    GAME_IN_PROGRESS = "GAME_IN_PROGRESS"
     SPECTATE_TARGET_NOT_FOUND = "SPECTATE_TARGET_NOT_FOUND"
     SPECTATE_REQUEST_NOT_FOUND = "SPECTATE_REQUEST_NOT_FOUND"
     PLAYER_NOT_IN_GAME = "PLAYER_NOT_IN_GAME"
     PLAYER_ALREADY_CONNECTED = "PLAYER_ALREADY_CONNECTED"
+    SEAT_CLAIM_REQUIRED = "SEAT_CLAIM_REQUIRED"
     PLAYER_NAME_TAKEN = "PLAYER_NAME_TAKEN"
     INVALID_JOIN_CODE = "INVALID_JOIN_CODE"
     LOBBY_FULL = "LOBBY_FULL"
@@ -26,6 +30,7 @@ class ErrorCode(StrEnum):
     RUNTIME_RESET = "RUNTIME_RESET"
     KICKED = "KICKED"
     BATTLER_NOT_FOUND = "BATTLER_NOT_FOUND"
+    CUBE_NOT_FOUND = "CUBE_NOT_FOUND"
     FOLLOW_NOT_FOUND = "FOLLOW_NOT_FOUND"
     ALREADY_FOLLOWING = "ALREADY_FOLLOWING"
     USERNAME_TAKEN = "USERNAME_TAKEN"
@@ -42,6 +47,7 @@ class AppHTTPException(HTTPException):
         self,
         status_code: int,
         code: ErrorCode | str,
+        *,
         detail: str,
         headers: dict[str, str] | None = None,
     ) -> None:
@@ -52,6 +58,7 @@ class AppHTTPException(HTTPException):
 def api_error(
     status_code: int,
     code: ErrorCode | str,
+    *,
     detail: str,
     headers: dict[str, str] | None = None,
 ) -> AppHTTPException:

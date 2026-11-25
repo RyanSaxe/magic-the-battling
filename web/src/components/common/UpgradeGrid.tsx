@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { Card as CardType } from "../../types";
 import type { ZoneFrame } from "../../hooks/computeConstrainedLayout";
 import type { ZoneDims } from "../../hooks/cardSizeUtils";
@@ -11,6 +11,8 @@ interface UpgradeGridProps {
   fallbackDims: ZoneDims;
   frame?: ZoneFrame | null;
   renderOverlay?: (upgrade: CardType) => ReactNode;
+  selectedId?: string | null;
+  onSelect?: (upgradeId: string) => void;
 }
 
 export function UpgradeGrid({
@@ -18,7 +20,9 @@ export function UpgradeGrid({
   fallbackDims,
   frame,
   renderOverlay,
-}: UpgradeGridProps) {
+  selectedId,
+  onSelect,
+}: UpgradeGridProps): ReactElement {
   const dims = getUpgradeGridDims(upgrades.length, frame, fallbackDims);
 
   return (
@@ -31,6 +35,8 @@ export function UpgradeGrid({
           <UpgradeStack
             upgrade={upgrade}
             dimensions={{ width: dims.width, height: dims.height }}
+            selected={selectedId === upgrade.id}
+            onClick={onSelect && ((): void => onSelect(upgrade.id))}
           />
           {renderOverlay?.(upgrade)}
         </div>

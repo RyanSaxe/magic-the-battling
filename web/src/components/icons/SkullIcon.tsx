@@ -1,16 +1,21 @@
+import type { ReactElement } from "react";
+
 interface SkullIconProps {
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
 const sizes = {
   sm: 16,
   md: 24,
   lg: 32,
-}
+};
 
-export function SkullIcon({ size = 'md', className = '' }: SkullIconProps) {
-  const px = sizes[size]
+export function SkullIcon({
+  size = "md",
+  className = "",
+}: SkullIconProps): ReactElement {
+  const px = sizes[size];
   return (
     <svg
       width={px}
@@ -26,14 +31,14 @@ export function SkullIcon({ size = 'md', className = '' }: SkullIconProps) {
         stroke="#DC2626"
         strokeWidth="1.5"
       />
-      <circle cx="9" cy="11" r="2" fill="#1F2937" />
-      <circle cx="15" cy="11" r="2" fill="#1F2937" />
+      <circle cx="9" cy="11" r="2" fill="#1C1714" />
+      <circle cx="15" cy="11" r="2" fill="#1C1714" />
       <path
         d="M10 17V19M12 17V19M14 17V19"
-        stroke="#1F2937"
+        stroke="#1C1714"
         strokeWidth="1.5"
         strokeLinecap="round"
       />
     </svg>
-  )
+  );
 }

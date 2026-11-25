@@ -1,0 +1,311 @@
+"""POST /api/games/resumable: the lobbies and games a browser can return to with the seat tokens it holds."""
+
+from collections.abc import Callable
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+from httpx import Response
+
+import server.routers.ws as ws_module
+from server.db import database
+from server.db.models import CubeMetadata, GameRecord
+from server.main import app
+
+
+def _resumable(client: TestClient, *seats: tuple[str, str, str]) -> list[dict]:
+    body = {"seats": [{"game_id": g, "player_name": n, "seat_token": t} for g, n, t in seats]}
+    response = client.post("/api/games/resumable", json=body)
+    assert response.status_code == 200
+    return response.json()["games"]
+
+
+def test_lists_a_lobby_seat_only_with_its_token(client: TestClient, game_with_players: dict[str, Any]) -> None:
+    game_id = game_with_players["game_id"]
+
+    listed = _resumable(client, (game_id, "Alice", game_with_players["alice"]["seat_token"]))
+    wrong = _resumable(client, (game_id, "Alice", game_with_players["bob"]["seat_token"]))
+
+    assert [(g["game_id"], g["player_name"], g["kind"]) for g in listed] == [(game_id, "Alice", "lobby")]
+    assert wrong == []
+
+
+def test_lists_a_running_game_with_its_last_activity(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, game_with_players: dict[str, Any]
+) -> None:
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+
+    [listed] = _resumable(client, (game_id, "Bob", game_with_players["bob"]["seat_token"]))
+
+    assert listed["kind"] == "game"
+    assert listed["last_active_at"] is not None
+
+
+def test_lists_a_paused_game_without_loading_it(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, game_with_players: dict[str, Any]
+) -> None:
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    game_manager = ws_module.game_manager
+    game_manager.mark_game_dirty(game_id)
+    game_manager.persist_dirty_games()
+    game_manager.cleanup_game(game_id, preserve_snapshot=True)
+
+    [listed] = _resumable(client, (game_id, "Alice", game_with_players["alice"]["seat_token"]))
+
+    assert listed["kind"] == "game"
+    assert game_manager.get_game(game_id) is None
+
+
+def test_leaves_out_missing_games_and_finished_seats(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, game_with_players: dict[str, Any]
+) -> None:
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    game = ws_module.game_manager.get_game(game_id)
+    assert game is not None
+    next(p for p in game.players if p.name == "Bob").phase = "eliminated"
+
+    listed = _resumable(
+        client,
+        ("no-such-game", "Alice", "token"),
+        (game_id, "Bob", game_with_players["bob"]["seat_token"]),
+        (game_id, "Alice", game_with_players["alice"]["seat_token"]),
+    )
+
+    assert [g["player_name"] for g in listed] == ["Alice"]
+
+
+def _close(client: TestClient, game_id: str, *, name: str, seat_token: str) -> Response:
+    return client.post(f"/api/games/{game_id}/close", json={"player_name": name, "seat_token": seat_token})
+
+
+def test_closing_a_game_with_one_human_ends_it_for_good(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    game_manager = ws_module.game_manager
+    monkeypatch.setattr(game_manager, "_count_available_bots", lambda _pending: 1)
+    created = client.post(
+        "/api/games",
+        json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2, "puppet_count": 1},
+    ).json()
+    game_id, seat_token = created["game_id"], created["seat_token"]
+    assert start_lobby(game_id, created["session_id"]).status_code == 200
+    game_manager.mark_game_dirty(game_id)
+    game_manager.persist_dirty_games()
+
+    assert _resumable(client, (game_id, "Alice", seat_token))[0]["can_close"] is True
+    assert _close(client, game_id, name="Alice", seat_token=seat_token).status_code == 204
+
+    assert _resumable(client, (game_id, "Alice", seat_token)) == []
+    rejoin = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice", "seat_token": seat_token})
+    assert rejoin.status_code == 404
+    with database.SessionLocal() as session:
+        record = session.get(GameRecord, game_id)
+        assert record is not None
+        assert record.ended_at is not None
+
+
+def test_a_game_with_other_players_cannot_be_closed(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, game_with_players: dict[str, Any]
+) -> None:
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    seat_token = game_with_players["alice"]["seat_token"]
+
+    assert _close(client, game_id, name="Alice", seat_token=seat_token).status_code == 409
+
+    [listed] = _resumable(client, (game_id, "Alice", seat_token))
+    assert (listed["player_name"], listed["can_close"]) == ("Alice", False)
+
+
+def test_only_the_seat_holder_can_leave_a_lobby(client: TestClient, game_with_players: dict[str, Any]) -> None:
+    game_id = game_with_players["game_id"]
+    alice, bob = game_with_players["alice"]["seat_token"], game_with_players["bob"]["seat_token"]
+
+    assert _close(client, game_id, name="Alice", seat_token=bob).status_code == 403
+    assert _close(client, game_id, name="Alice", seat_token=alice).status_code == 204
+
+    lobby = client.get(f"/api/games/{game_id}/lobby").json()
+    assert [player["name"] for player in lobby["players"]] == ["Bob"]
+
+
+@pytest.fixture
+def named_cube(client: TestClient) -> None:
+    _ = client
+    db = database.SessionLocal()
+    try:
+        db.add(CubeMetadata(cube_id="test", name="Friday Cube", image_uri="https://img/friday"))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _move_bob_to_stage_four(game_id: str) -> None:
+    game = ws_module.game_manager.get_game(game_id)
+    assert game is not None
+    bob = next(p for p in game.players if p.name == "Bob")
+    bob.stage, bob.round, bob.poison = 4, 2, 3
+
+
+BOBS_SEAT_AT_STAGE_FOUR = {
+    "kind": "game",
+    "cube_id": "test",
+    "cube_name": "Friday Cube",
+    "cube_image_uri": "https://img/friday",
+    "play_mode": "limited",
+    "use_upgrades": True,
+    "player_count": 2,
+    "stage": 4,
+    "round": 2,
+    "poison": 3,
+    "can_close": False,
+}
+
+
+def test_describes_a_running_game_for_its_resume_banner(
+    named_cube: None,
+    start_lobby: Callable[[str, str], Response],
+    *,
+    client: TestClient,
+    game_with_players: dict[str, Any],
+) -> None:
+    _ = named_cube
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    _move_bob_to_stage_four(game_id)
+
+    [listed] = _resumable(client, (game_id, "Bob", game_with_players["bob"]["seat_token"]))
+
+    assert {key: listed[key] for key in BOBS_SEAT_AT_STAGE_FOUR} == BOBS_SEAT_AT_STAGE_FOUR
+
+
+def test_describes_a_paused_game_from_its_snapshot(
+    named_cube: None,
+    start_lobby: Callable[[str, str], Response],
+    *,
+    client: TestClient,
+    game_with_players: dict[str, Any],
+) -> None:
+    _ = named_cube
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    _move_bob_to_stage_four(game_id)
+    game_manager = ws_module.game_manager
+    game_manager.mark_game_dirty(game_id)
+    game_manager.persist_dirty_games()
+    game_manager.cleanup_game(game_id, preserve_snapshot=True)
+
+    [listed] = _resumable(client, (game_id, "Bob", game_with_players["bob"]["seat_token"]))
+
+    assert {key: listed[key] for key in BOBS_SEAT_AT_STAGE_FOUR} == BOBS_SEAT_AT_STAGE_FOUR
+    assert game_manager.get_game(game_id) is None
+
+
+def test_leaves_out_a_finished_seat_in_a_paused_game(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, game_with_players: dict[str, Any]
+) -> None:
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    game_manager = ws_module.game_manager
+    game = game_manager.get_game(game_id)
+    assert game is not None
+    next(p for p in game.players if p.name == "Bob").phase = "eliminated"
+    game_manager.mark_game_dirty(game_id)
+    game_manager.persist_dirty_games()
+    game_manager.cleanup_game(game_id, preserve_snapshot=True)
+
+    assert _resumable(client, (game_id, "Bob", game_with_players["bob"]["seat_token"])) == []
+
+
+def test_describes_a_lobby_seat_without_progress(
+    named_cube: None, client: TestClient, *, game_with_players: dict[str, Any]
+) -> None:
+    _ = named_cube
+    game_id = game_with_players["game_id"]
+
+    [listed] = _resumable(client, (game_id, "Alice", game_with_players["alice"]["seat_token"]))
+
+    assert listed["cube_name"] == "Friday Cube"
+    assert listed["player_count"] == 2
+    assert (listed["stage"], listed["round"], listed["poison"]) == (None, None, None)
+    assert listed["can_close"] is True
+
+
+@pytest.mark.parametrize("state", ["lobby", "running", "paused"])
+def test_an_account_lists_its_seat_on_every_device(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, state: str
+) -> None:
+    account = {"username": "seat_owner", "password": "password123"}
+    client.post("/api/auth/register", json={**account, "email": "seat_owner@test.com"})
+    created = client.post(
+        "/api/games", json={"player_name": "Kess", "cube_id": "test", "target_player_count": 2}
+    ).json()
+    TestClient(app).post("/api/games/join", json={"join_code": created["join_code"], "player_name": "Bob"})
+    game_id, first_token = created["game_id"], created["seat_token"]
+    if state != "lobby":
+        assert start_lobby(game_id, created["session_id"]).status_code == 200
+    if state == "paused":
+        ws_module.game_manager.mark_game_dirty(game_id)
+        ws_module.game_manager.persist_dirty_games()
+        ws_module.game_manager.cleanup_game(game_id, preserve_snapshot=True)
+    phone, stranger = TestClient(app), TestClient(app)
+    assert phone.post("/api/auth/login", json=account).status_code == 200
+    stranger.post("/api/auth/register", json={**account, "username": "stranger", "email": "stranger@test.com"})
+
+    [on_phone] = _resumable(phone)
+    assert (on_phone["game_id"], on_phone["player_name"], on_phone["can_close"]) == (game_id, "Kess", state == "lobby")
+    assert _resumable(stranger) == []
+    assert _resumable(TestClient(app)) == []
+
+    rejoined = phone.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Kess"})
+    assert rejoined.status_code == 200
+
+    [on_first] = _resumable(client, (game_id, "Kess", first_token))
+    assert (on_first["game_id"], on_first["can_close"]) == (game_id, state == "lobby")
+    [held] = _resumable(phone, (game_id, "Kess", rejoined.json()["seat_token"]))
+    assert held["can_close"] is (state == "lobby")
+
+
+@pytest.mark.parametrize("state", ["lobby", "goldfish", "paused goldfish", "shared"])
+def test_an_account_closes_its_seat_without_the_token(
+    start_lobby: Callable[[str, str], Response], client: TestClient, *, monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    account = {"username": "seat_owner", "password": "password123"}
+    client.post("/api/auth/register", json={**account, "email": "seat_owner@test.com"})
+    game_manager = ws_module.game_manager
+    monkeypatch.setattr(game_manager, "_count_available_bots", lambda _pending: 1)
+    puppets = 1 if "goldfish" in state else 0
+    created = client.post(
+        "/api/games", json={"player_name": "Kess", "cube_id": "test", "target_player_count": 2, "puppet_count": puppets}
+    ).json()
+    game_id = created["game_id"]
+    if state == "shared":
+        TestClient(app).post("/api/games/join", json={"join_code": created["join_code"], "player_name": "Bob"})
+    if state != "lobby":
+        assert start_lobby(game_id, created["session_id"]).status_code == 200
+    if state == "paused goldfish":
+        game_manager.mark_game_dirty(game_id)
+        game_manager.persist_dirty_games()
+        game_manager.cleanup_game(game_id, preserve_snapshot=True)
+    phone, stranger = TestClient(app), TestClient(app)
+    assert phone.post("/api/auth/login", json=account).status_code == 200
+    stranger.post("/api/auth/register", json={**account, "username": "stranger", "email": "stranger@test.com"})
+
+    for caller in (stranger, TestClient(app)):
+        refused = _close(caller, game_id, name="Kess", seat_token="")
+        assert (refused.status_code, refused.json()["code"]) == (403, "SEAT_CLAIM_REQUIRED")
+    [listed] = _resumable(phone)
+    assert listed["can_close"] is (state != "shared")
+
+    closed = _close(phone, game_id, name="Kess", seat_token="")
+
+    assert closed.status_code == (409 if state == "shared" else 204)
+    assert len(_resumable(phone)) == (1 if state == "shared" else 0)
+
+
+def test_refuses_more_than_ten_seats(client: TestClient) -> None:
+    seats = [{"game_id": f"g{i}", "player_name": "A", "seat_token": "t"} for i in range(11)]
+
+    assert client.post("/api/games/resumable", json={"seats": seats}).status_code == 422

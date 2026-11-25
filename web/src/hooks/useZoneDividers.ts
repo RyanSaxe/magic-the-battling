@@ -1,18 +1,18 @@
+/**
+ * React hook wiring interactive zone dividers to the pure divider visibility,
+ * clamping, and constraint-seed primitives in web/src/layout/.
+ */
 import { useRef, useCallback, useMemo } from "react";
 import {
-  deriveConstraintsFromLayout,
+  clampDividerFraction,
+  omitConstraintKey,
+  resolveVisibleDividers,
+  seedDragConstraints,
+  type CardLayoutConfig,
   type ZoneConstraints,
-} from "./computeConstrainedLayout";
+} from "../layout";
 import type { DividerDragCallbacks } from "./useDividerDrag";
-import type { CardLayoutConfig, CardLayoutResult } from "./useCardLayout";
-
-function omitKey<T extends object>(obj: T, key: keyof T): Partial<T> {
-  const copy = { ...obj };
-  delete copy[key];
-  return copy;
-}
-
-const MIN_ZONE_PX = 80;
+import type { LayoutDrag } from "./useLayoutDrag";
 
 export interface DividerCallbacks {
   topDivider: DividerDragCallbacks | null;
@@ -26,198 +26,167 @@ interface MeasuredConstraints extends Required<ZoneConstraints> {
   usableWidth?: number;
 }
 
-function clampFraction(value: number, containerPx: number): number {
-  const min = MIN_ZONE_PX / containerPx;
-  const max = 1 - min;
-  return Math.max(min, Math.min(max, value));
-}
-
 export function useZoneDividers(cfg: {
   containerHeight: number;
   containerWidth: number;
-  currentLayout: CardLayoutResult;
   layoutConfig: CardLayoutConfig;
   allowHorizontalResize?: boolean;
   measureInitialConstraints?: () => MeasuredConstraints | null;
+  renderedConstraints: Required<ZoneConstraints>;
   constraints: ZoneConstraints | null;
+  drag: LayoutDrag;
   onConstraintsChange: (c: ZoneConstraints) => void;
   onConstraintsClear: () => void;
 }): DividerCallbacks {
   const {
     containerHeight,
     containerWidth,
-    currentLayout,
     layoutConfig,
     allowHorizontalResize = true,
     measureInitialConstraints,
+    renderedConstraints,
     constraints,
+    drag,
     onConstraintsChange,
     onConstraintsClear,
   } = cfg;
 
-  const draftRef = useRef<ZoneConstraints>({});
-  const topDragSpaceRef = useRef(0);
-  const bottomSplitSpaceRef = useRef(0);
-  const leftDragSpaceRef = useRef(0);
+  const dragStartRef = useRef(0);
+  const dragDeltaRef = useRef(0);
+  const dragSpaceRef = useRef<Record<keyof ZoneConstraints, number>>({
+    topFraction: 0,
+    bottomLeftSplit: 0,
+    leftFraction: 0,
+  });
 
-  const topIds = layoutConfig.layout.top ?? [];
-  const blIds = layoutConfig.layout.bottomLeft ?? [];
-  const brIds = layoutConfig.layout.bottomRight ?? [];
+  const {
+    top: showTopDivider,
+    bottomLeftSplit: showBottomLeftSplit,
+    left: showLeftDivider,
+  } = resolveVisibleDividers(layoutConfig, allowHorizontalResize);
+  const availH = containerHeight - (layoutConfig.fixedHeight ?? 0);
 
-  const hasActiveTop = topIds.some((id) => (layoutConfig.zones[id]?.count ?? 0) > 0);
-  const hasActiveBottom =
-    blIds.some((id) => (layoutConfig.zones[id]?.count ?? 0) > 0) ||
-    brIds.some((id) => (layoutConfig.zones[id]?.count ?? 0) > 0);
-  const hasActiveBLMultiple =
-    blIds.filter((id) => (layoutConfig.zones[id]?.count ?? 0) > 0).length >= 2;
-  const hasActiveBR = brIds.some((id) => (layoutConfig.zones[id]?.count ?? 0) > 0);
-  const hasActiveBL = blIds.some((id) => (layoutConfig.zones[id]?.count ?? 0) > 0);
-
-  const showTopDivider = hasActiveTop && hasActiveBottom;
-  const showBottomLeftSplit = hasActiveBLMultiple;
-  const showLeftDivider = allowHorizontalResize && hasActiveBL && hasActiveBR;
-
-  const fixedHeight = layoutConfig.fixedHeight ?? 0;
-  const availH = containerHeight - fixedHeight;
-  const derivedConstraints = useMemo(
-    () =>
-      deriveConstraintsFromLayout(
-        currentLayout,
-        layoutConfig,
-        containerHeight,
-        containerWidth,
-      ),
-    [containerHeight, containerWidth, currentLayout, layoutConfig],
+  // A drag saves every divider on screen where it was drawn, so moving one
+  // leaves the others in place; fractions saved for dividers not shown stay.
+  const startDrag = useCallback(
+    (key: keyof ZoneConstraints) => {
+      dragStartRef.current = renderedConstraints[key];
+      dragDeltaRef.current = 0;
+      drag.start(
+        seedDragConstraints(constraints, renderedConstraints, {
+          top: showTopDivider,
+          bottomLeftSplit: showBottomLeftSplit,
+          left: showLeftDivider,
+        }),
+      );
+    },
+    [
+      constraints,
+      renderedConstraints,
+      showTopDivider,
+      showBottomLeftSplit,
+      showLeftDivider,
+      drag,
+    ],
   );
 
-  const makeTopDivider = useCallback(() => ({
-    onDragStart: () => {
-      const measured = constraints ? null : measureInitialConstraints?.();
-      const currentFraction =
-        constraints?.topFraction ??
-        measured?.topFraction ??
-        derivedConstraints.topFraction;
-      topDragSpaceRef.current = measured?.usableHeight ?? availH;
-      draftRef.current = { ...constraints, topFraction: currentFraction };
+  // The divider follows the pointer's distance from where the drag started, so
+  // pushing past the clamp and coming back returns it to where it was.
+  const dragTo = useCallback(
+    (key: keyof ZoneConstraints, deltaPx: number, dragSpace: number) => {
+      dragDeltaRef.current += deltaPx;
+      const start = dragStartRef.current;
+      drag.move(
+        key,
+        clampDividerFraction(
+          start + dragDeltaRef.current / dragSpace,
+          dragSpace,
+          start,
+        ),
+      );
     },
-    onDrag: (deltaPx: number) => {
-      const prev = draftRef.current.topFraction ?? 0.5;
-      const dragSpace = topDragSpaceRef.current || availH;
-      const next = clampFraction(prev + deltaPx / dragSpace, dragSpace);
-      draftRef.current = { ...draftRef.current, topFraction: next };
-      onConstraintsChange({ ...draftRef.current });
-    },
-    onDragEnd: () => {
-      onConstraintsChange({ ...draftRef.current });
-    },
-    onDoubleClick: () => {
-      const rest = omitKey(constraints ?? {}, "topFraction");
-      if (Object.keys(rest).length === 0) {
+    [drag],
+  );
+
+  const resetKey = useCallback(
+    (key: keyof ZoneConstraints) => {
+      const rest = omitConstraintKey(constraints, key);
+      if (rest === null) {
         onConstraintsClear();
       } else {
         onConstraintsChange(rest);
       }
     },
-  }), [
-    constraints,
-    derivedConstraints.topFraction,
-    availH,
-    measureInitialConstraints,
-    onConstraintsChange,
-    onConstraintsClear,
-  ]);
+    [constraints, onConstraintsChange, onConstraintsClear],
+  );
 
-  const makeBottomLeftSplitDivider = useCallback(() => ({
-    onDragStart: () => {
-      const measured = constraints ? null : measureInitialConstraints?.();
-      const topFraction =
-        constraints?.topFraction ??
-        measured?.topFraction ??
-        derivedConstraints.topFraction;
-      bottomSplitSpaceRef.current =
-        measured?.bottomInnerHeight ?? availH * (1 - topFraction);
-      draftRef.current = {
-        ...constraints,
-        bottomLeftSplit:
-          constraints?.bottomLeftSplit ??
-          measured?.bottomLeftSplit ??
-          derivedConstraints.bottomLeftSplit,
-      };
-    },
-    onDrag: (deltaPx: number) => {
-      const topFraction =
-        draftRef.current.topFraction ??
-        constraints?.topFraction ??
-        derivedConstraints.topFraction;
-      const bottomH = bottomSplitSpaceRef.current || availH * (1 - topFraction);
-      const prev = draftRef.current.bottomLeftSplit ?? 0.5;
-      const next = clampFraction(prev + deltaPx / bottomH, bottomH);
-      draftRef.current = { ...draftRef.current, bottomLeftSplit: next };
-      onConstraintsChange({ ...draftRef.current });
-    },
-    onDragEnd: () => {
-      onConstraintsChange({ ...draftRef.current });
-    },
-    onDoubleClick: () => {
-      const rest = omitKey(constraints ?? {}, "bottomLeftSplit");
-      if (Object.keys(rest).length === 0) {
-        onConstraintsClear();
-      } else {
-        onConstraintsChange(rest);
-      }
-    },
-  }), [
-    constraints,
-    derivedConstraints.bottomLeftSplit,
-    derivedConstraints.topFraction,
-    availH,
-    measureInitialConstraints,
-    onConstraintsChange,
-    onConstraintsClear,
-  ]);
+  const makeHandle = useCallback(
+    (
+      key: keyof ZoneConstraints,
+      readMeasuredSpace: (measured: MeasuredConstraints | null) => number,
+      fallbackSpace: () => number,
+    ): DividerDragCallbacks => ({
+      onDragStart: (): void => {
+        const measured = constraints
+          ? null
+          : (measureInitialConstraints?.() ?? null);
+        dragSpaceRef.current[key] = readMeasuredSpace(measured);
+        startDrag(key);
+      },
+      onDrag: (deltaPx: number): void => {
+        dragTo(key, deltaPx, dragSpaceRef.current[key] || fallbackSpace());
+      },
+      onDragEnd: drag.end,
+      onDoubleClick: () => resetKey(key),
+    }),
+    [
+      constraints,
+      measureInitialConstraints,
+      startDrag,
+      dragTo,
+      drag.end,
+      resetKey,
+    ],
+  );
 
-  const makeLeftDivider = useCallback(() => ({
-    onDragStart: () => {
-      const measured = constraints ? null : measureInitialConstraints?.();
-      leftDragSpaceRef.current = measured?.usableWidth ?? containerWidth;
-      draftRef.current = {
-        ...constraints,
-        leftFraction:
-          constraints?.leftFraction ??
-          measured?.leftFraction ??
-          derivedConstraints.leftFraction,
-      };
-    },
-    onDrag: (deltaPx: number) => {
-      const prev = draftRef.current.leftFraction ?? derivedConstraints.leftFraction;
-      const dragSpace = leftDragSpaceRef.current || containerWidth;
-      const next = clampFraction(prev + deltaPx / dragSpace, dragSpace);
-      draftRef.current = { ...draftRef.current, leftFraction: next };
-      onConstraintsChange({ ...draftRef.current });
-    },
-    onDragEnd: () => {
-      onConstraintsChange({ ...draftRef.current });
-    },
-    onDoubleClick: () => {
-      const rest = omitKey(constraints ?? {}, "leftFraction");
-      if (Object.keys(rest).length === 0) {
-        onConstraintsClear();
-      } else {
-        onConstraintsChange(rest);
-      }
-    },
-  }), [
-    constraints,
-    containerWidth,
-    derivedConstraints.leftFraction,
-    measureInitialConstraints,
-    onConstraintsChange,
-    onConstraintsClear,
-  ]);
+  const topFractionForSplit =
+    constraints?.topFraction ?? renderedConstraints.topFraction;
 
-  return useMemo(() => ({
-    topDivider: showTopDivider ? makeTopDivider() : null,
-    bottomLeftSplitDivider: showBottomLeftSplit ? makeBottomLeftSplitDivider() : null,
-    leftDivider: showLeftDivider ? makeLeftDivider() : null,
-  }), [showTopDivider, showBottomLeftSplit, showLeftDivider, makeTopDivider, makeBottomLeftSplitDivider, makeLeftDivider]);
+  return useMemo(
+    () => ({
+      topDivider: showTopDivider
+        ? makeHandle(
+            "topFraction",
+            (m) => m?.usableHeight ?? availH,
+            () => availH,
+          )
+        : null,
+      bottomLeftSplitDivider: showBottomLeftSplit
+        ? makeHandle(
+            "bottomLeftSplit",
+            (m) =>
+              m?.bottomInnerHeight ??
+              availH * (1 - renderedConstraints.topFraction),
+            () => availH * (1 - topFractionForSplit),
+          )
+        : null,
+      leftDivider: showLeftDivider
+        ? makeHandle(
+            "leftFraction",
+            (m) => m?.usableWidth ?? containerWidth,
+            () => containerWidth,
+          )
+        : null,
+    }),
+    [
+      showTopDivider,
+      showBottomLeftSplit,
+      showLeftDivider,
+      makeHandle,
+      availH,
+      containerWidth,
+      renderedConstraints.topFraction,
+      topFractionForSplit,
+    ],
+  );
 }

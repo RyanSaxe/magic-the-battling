@@ -1,107 +1,66 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import type { CSSProperties, ReactElement, RefObject } from "react";
 import { SHOWCASE_STAGES } from "../../constants/showcaseCards";
+import {
+  useCardShowcase,
+  type ShowcaseBounds,
+  type UpgradePhase,
+} from "../../hooks/pages/useCardShowcase";
 import type { Card as CardType } from "../../types";
 import { Card } from "../card/Card";
 import { BasicLandCard } from "../common/BasicLandCard";
 import { TreasureCard } from "../common/TreasureCard";
 import { UpgradeStack } from "../sidebar/UpgradeStack";
 
-const CYCLE_INTERVAL = 4000;
-const FADE_DURATION = 400;
-const MAX_HAND_SIZE = 5;
-const CARD_GAP = 12;
-const MOBILE_OVERLAP = 0.25;
+const ENLARGED_PHASES: ReadonlySet<UpgradePhase> = new Set([
+  "enlarge",
+  "slide-in",
+  "linger",
+  "glow",
+]);
+const STACK_PHASES: ReadonlySet<UpgradePhase> = new Set([
+  "glow",
+  "shrink",
+  "done",
+]);
 
-type UpgradePhase =
-  | "hidden"
-  | "enlarge"
-  | "slide-in"
-  | "linger"
-  | "glow"
-  | "shrink"
-  | "done";
-
-const UPGRADE_TIMINGS = {
-  startDelay: 500,
-  enlargeDuration: 500,
-  slideInDuration: 600,
-  lingerDuration: 1000,
-  glowDuration: 600,
-  shrinkDuration: 500,
-};
-
-function computeShowcaseSizes(
-  containerWidth: number,
-  viewportWidth: number,
-  viewportHeight: number,
-) {
-  const isMobile = viewportWidth < 640;
-  const availableWidth = Math.max(1, containerWidth - (isMobile ? 0 : 32));
-  const effectiveSlots = isMobile
-    ? MAX_HAND_SIZE - (MAX_HAND_SIZE - 1) * MOBILE_OVERLAP
-    : MAX_HAND_SIZE;
-  const maxWidthFromContainer = Math.floor(
-    Math.max(1, availableWidth - (isMobile ? 0 : CARD_GAP * (MAX_HAND_SIZE - 1))) /
-      effectiveSlots,
-  );
-  const maxHeightFromViewport = Math.round(
-    viewportHeight * (isMobile ? 0.28 : 0.38),
-  );
-  const cardHeight = Math.max(
-    1,
-    Math.min(
-      maxHeightFromViewport,
-      Math.round((maxWidthFromContainer * 7) / 5),
-    ),
-  );
-  const cardWidth = Math.round((cardHeight * 5) / 7);
-  const handGap = isMobile ? -Math.round(cardWidth * MOBILE_OVERLAP) : CARD_GAP;
-  const fieldHeight = Math.round(cardHeight * 0.55);
-  const fieldWidth = Math.round((fieldHeight * 5) / 7);
-
-  return {
-    hand: { width: cardWidth, height: cardHeight },
-    field: { width: fieldWidth, height: fieldHeight },
-    handGap,
-  };
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(value, max));
 }
 
-function useShowcaseSizes() {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+function keyedLands(lands: string[]): { key: string; name: string }[] {
+  const counts = new Map<string, number>();
+  return lands.map((name) => {
+    const count = (counts.get(name) ?? 0) + 1;
+    counts.set(name, count);
+    return { key: `${name}#${count}`, name };
+  });
+}
 
-  const calculateSizes = useCallback(() => {
-    const viewportWidth = window.innerWidth;
-    const containerWidth = containerRef.current?.clientWidth ?? viewportWidth;
-    return computeShowcaseSizes(
-      containerWidth,
-      viewportWidth,
-      window.innerHeight,
-    );
-  }, []);
-
-  const [sizes, setSizes] = useState(() =>
-    computeShowcaseSizes(window.innerWidth, window.innerWidth, window.innerHeight),
-  );
-
-  useEffect(() => {
-    const updateSizes = () => setSizes(calculateSizes());
-    updateSizes();
-
-    const container = containerRef.current;
-    const observer =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(updateSizes)
-        : null;
-    if (container && observer) observer.observe(container);
-
-    window.addEventListener("resize", updateSizes);
-    return () => {
-      window.removeEventListener("resize", updateSizes);
-      observer?.disconnect();
-    };
-  }, [calculateSizes]);
-
-  return { sizes, containerRef };
+function computeSourcePosition({
+  enlargedWidth,
+  enlargedHeight,
+  targetPosition,
+  bounds,
+}: {
+  enlargedWidth: number;
+  enlargedHeight: number;
+  targetPosition: { centerY: number; right: number } | null;
+  bounds: ShowcaseBounds | null;
+}): { top: number; left: number } {
+  const gap = window.innerWidth < 640 ? 8 : 16;
+  const centerY = targetPosition?.centerY ?? window.innerHeight / 2;
+  const rawTop = centerY - enlargedHeight / 2;
+  const rawLeft = targetPosition
+    ? targetPosition.right + gap
+    : window.innerWidth / 2;
+  return {
+    top: bounds
+      ? clamp(rawTop, bounds.top, bounds.bottom - enlargedHeight)
+      : rawTop,
+    left: bounds
+      ? clamp(rawLeft, bounds.left, bounds.right - enlargedWidth)
+      : rawLeft,
+  };
 }
 
 function UpgradeSourceCard({
@@ -109,25 +68,26 @@ function UpgradeSourceCard({
   dimensions,
   phase,
   targetPosition,
+  bounds,
 }: {
   card: CardType;
   dimensions: { width: number; height: number };
   phase: UpgradePhase;
   targetPosition: { centerY: number; right: number } | null;
-}) {
+  bounds: ShowcaseBounds | null;
+}): ReactElement {
   const isVisible = phase === "slide-in" || phase === "linger";
   const isFading = phase === "glow";
-
   const enlargedWidth = Math.round(dimensions.width * 1.5);
   const enlargedHeight = Math.round(dimensions.height * 1.5);
+  const { top, left } = computeSourcePosition({
+    enlargedWidth,
+    enlargedHeight,
+    targetPosition,
+    bounds,
+  });
 
-  const centerY = targetPosition?.centerY ?? window.innerHeight / 2;
-  const top = centerY - enlargedHeight / 2;
-  const left = targetPosition
-    ? targetPosition.right + 16
-    : window.innerWidth / 2;
-
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     top,
     left,
     width: enlargedWidth,
@@ -140,7 +100,7 @@ function UpgradeSourceCard({
 
   const className = [
     "upgrade-source",
-    (isVisible || isFading) && !isFading && "phase-slide-in",
+    isVisible && "phase-slide-in",
     isFading && "phase-fade-out",
   ]
     .filter(Boolean)
@@ -156,128 +116,113 @@ function UpgradeSourceCard({
   );
 }
 
-function totalUpgradeDuration() {
-  const t = UPGRADE_TIMINGS;
+function handCardTargetClass(
+  isTarget: boolean,
+  isEnlarged: boolean,
+  upgradePhase: UpgradePhase,
+): string {
+  if (!isTarget) return "";
+  return [
+    "upgrade-target",
+    isEnlarged && "phase-enlarge",
+    upgradePhase === "glow" && "phase-glow",
+    upgradePhase === "shrink" && "phase-shrink",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function handCardOverlapStyle({
+  handGap,
+  index,
+  elevated,
+  handLength,
+}: {
+  handGap: number;
+  index: number;
+  elevated: boolean;
+  handLength: number;
+}): CSSProperties | undefined {
+  if (handGap >= 0) return undefined;
+  return {
+    marginLeft: index > 0 ? handGap : undefined,
+    zIndex: elevated ? handLength + 1 : index,
+  };
+}
+
+function ShowcaseHandCard({
+  card,
+  index,
+  handLength,
+  dimensions,
+  handGap,
+  isTarget,
+  isEnlarged,
+  upgradePhase,
+  myrUpgraded,
+  targetCardRef,
+}: {
+  card: CardType;
+  index: number;
+  handLength: number;
+  dimensions: { width: number; height: number };
+  handGap: number;
+  isTarget: boolean;
+  isEnlarged: boolean;
+  upgradePhase: UpgradePhase;
+  myrUpgraded: boolean;
+  targetCardRef: RefObject<HTMLDivElement | null>;
+}): ReactElement {
   return (
-    t.startDelay +
-    t.enlargeDuration +
-    t.slideInDuration +
-    t.lingerDuration +
-    t.glowDuration +
-    t.shrinkDuration
+    <div
+      ref={isTarget ? targetCardRef : undefined}
+      className={handCardTargetClass(isTarget, isEnlarged, upgradePhase)}
+      style={handCardOverlapStyle({
+        handGap,
+        index,
+        elevated: isTarget && isEnlarged,
+        handLength,
+      })}
+    >
+      <Card
+        card={card}
+        dimensions={dimensions}
+        upgraded={isTarget && myrUpgraded}
+      />
+    </div>
   );
 }
 
-export function CardShowcase() {
-  const [currentStage, setCurrentStage] = useState(0);
-  const [fading, setFading] = useState(false);
-  const [upgradePhase, setUpgradePhase] = useState<UpgradePhase>("hidden");
-  const [myrUpgraded, setMyrUpgraded] = useState(false);
-  const [targetPosition, setTargetPosition] = useState<{
-    centerY: number;
-    right: number;
-  } | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const targetCardRef = useRef<HTMLDivElement | null>(null);
-  const { sizes, containerRef } = useShowcaseSizes();
-
-  const runUpgradeSequence = useCallback(() => {
-    const {
-      startDelay,
-      enlargeDuration,
-      slideInDuration,
-      lingerDuration,
-      glowDuration,
-      shrinkDuration,
-    } = UPGRADE_TIMINGS;
-    const t1 = startDelay;
-    const t2 = t1 + enlargeDuration;
-    const t3 = t2 + slideInDuration;
-    const t4 = t3 + lingerDuration;
-    const t5 = t4 + glowDuration;
-    const t6 = t5 + shrinkDuration;
-
-    setTimeout(() => setUpgradePhase("enlarge"), t1);
-    setTimeout(() => {
-      // Measure AFTER the enlarge CSS transition completes —
-      // getBoundingClientRect includes transforms, so no manual math needed
-      const rect = targetCardRef.current?.getBoundingClientRect();
-      if (rect) {
-        setTargetPosition({
-          centerY: rect.top + rect.height / 2,
-          right: rect.right,
-        });
-      }
-      setUpgradePhase("slide-in");
-    }, t2);
-    setTimeout(() => setUpgradePhase("linger"), t3);
-    setTimeout(() => {
-      setUpgradePhase("glow");
-      setMyrUpgraded(true);
-    }, t4);
-    setTimeout(() => setUpgradePhase("shrink"), t5);
-    setTimeout(() => setUpgradePhase("done"), t6);
-  }, []);
-
-  const goTo = useCallback(
-    (index: number) => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      setFading(true);
-      setUpgradePhase("hidden");
-      setMyrUpgraded(false);
-      setTimeout(() => {
-        setCurrentStage(index);
-        setFading(false);
-        if (index === 2) {
-          runUpgradeSequence();
-        }
-      }, FADE_DURATION);
-    },
-    [runUpgradeSequence],
-  );
-
-  // Auto-advance: schedule the next stage transition after fading completes
-  useEffect(() => {
-    if (fading) return;
-    const delay =
-      currentStage === 2
-        ? totalUpgradeDuration() + CYCLE_INTERVAL
-        : CYCLE_INTERVAL;
-    timerRef.current = setTimeout(() => {
-      goTo((currentStage + 1) % SHOWCASE_STAGES.length);
-    }, delay);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [currentStage, fading, goTo]);
-
-  const handleDotClick = (index: number) => {
-    if (index === currentStage) return;
-    goTo(index);
-  };
+export function CardShowcase(): ReactElement {
+  const {
+    sizes,
+    containerRef,
+    taglineRef,
+    dotsRef,
+    targetCardRef,
+    currentStage,
+    fading,
+    upgradePhase,
+    myrUpgraded,
+    targetPosition,
+    bounds,
+    showSourceCard,
+    handleDotClick,
+  } = useCardShowcase();
 
   const stage = SHOWCASE_STAGES[currentStage];
-  const isEnlarged =
-    upgradePhase === "enlarge" ||
-    upgradePhase === "slide-in" ||
-    upgradePhase === "linger" ||
-    upgradePhase === "glow";
-  const showSourceCard =
-    upgradePhase === "enlarge" ||
-    upgradePhase === "slide-in" ||
-    upgradePhase === "linger" ||
-    upgradePhase === "glow";
-  const showBattlefieldStack =
-    upgradePhase === "glow" ||
-    upgradePhase === "shrink" ||
-    upgradePhase === "done";
+  const isEnlarged = ENLARGED_PHASES.has(upgradePhase);
+  const showBattlefieldStack = STACK_PHASES.has(upgradePhase);
 
   return (
     <div
       ref={containerRef}
-      className="w-full max-w-full flex flex-col items-center gap-4 flex-1 justify-center"
+      className="w-full max-w-full flex flex-col items-center gap-3 flex-1 min-h-0 justify-center"
     >
-      <p className="text-amber-200/80 text-lg sm:text-xl italic font-medium tracking-wide">
+      <p
+        ref={taglineRef}
+        className="shrink-0 text-amber-200/80 text-lg sm:text-xl italic font-medium tracking-wide"
+      >
         {stage.tagline}
       </p>
 
@@ -287,53 +232,28 @@ export function CardShowcase() {
             className="flex items-end justify-center"
             style={{ gap: sizes.handGap >= 0 ? sizes.handGap : 0 }}
           >
-            {stage.hand.map((card, i) => {
-              const isTarget = stage.upgrade?.targetCardId === card.id;
-              const targetClass = isTarget
-                ? [
-                    "upgrade-target",
-                    isEnlarged && "phase-enlarge",
-                    upgradePhase === "glow" && "phase-glow",
-                    upgradePhase === "shrink" && "phase-shrink",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                : "";
-
-              return (
-                <div
-                  key={card.id}
-                  ref={isTarget ? targetCardRef : undefined}
-                  className={targetClass}
-                  style={{
-                    ...(sizes.handGap < 0 && i > 0
-                      ? { marginLeft: sizes.handGap }
-                      : undefined),
-                    ...(sizes.handGap < 0
-                      ? {
-                          zIndex:
-                            isTarget && isEnlarged
-                              ? stage.hand.length + 1
-                              : i,
-                        }
-                      : undefined),
-                  }}
-                >
-                  <Card
-                    card={card}
-                    dimensions={sizes.hand}
-                    upgraded={isTarget && myrUpgraded}
-                  />
-                </div>
-              );
-            })}
+            {stage.hand.map((card, i) => (
+              <ShowcaseHandCard
+                key={card.id}
+                card={card}
+                index={i}
+                handLength={stage.hand.length}
+                dimensions={sizes.hand}
+                handGap={sizes.handGap}
+                isTarget={stage.upgrade?.targetCardId === card.id}
+                isEnlarged={isEnlarged}
+                upgradePhase={upgradePhase}
+                myrUpgraded={myrUpgraded}
+                targetCardRef={targetCardRef}
+              />
+            ))}
           </div>
 
           <div className="flex items-center justify-center gap-2">
-            {stage.battlefield.lands.map((land, i) => (
+            {keyedLands(stage.battlefield.lands).map((land) => (
               <BasicLandCard
-                key={`${land}-${i}`}
-                name={land}
+                key={land.key}
+                name={land.name}
                 dimensions={sizes.field}
               />
             ))}
@@ -358,15 +278,15 @@ export function CardShowcase() {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {SHOWCASE_STAGES.map((_, i) => (
+      <div ref={dotsRef} className="shrink-0 flex gap-2">
+        {SHOWCASE_STAGES.map((stageItem, i) => (
           <button
-            key={i}
+            key={stageItem.tagline}
             onClick={() => handleDotClick(i)}
             className={`w-2.5 h-2.5 rounded-full transition-colors ${
               i === currentStage
                 ? "bg-amber-400"
-                : "bg-gray-600 hover:bg-gray-500"
+                : "bg-[var(--stone-light)] hover:bg-[var(--ivory)]/50"
             }`}
             aria-label={`Stage ${i + 1}`}
           />
@@ -379,6 +299,7 @@ export function CardShowcase() {
           dimensions={sizes.hand}
           phase={upgradePhase}
           targetPosition={targetPosition}
+          bounds={bounds}
         />
       )}
     </div>

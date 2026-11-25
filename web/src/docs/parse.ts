@@ -1,72 +1,81 @@
 export interface DocMeta {
-  title: string
-  phase?: string
-  order?: number
-  [key: string]: string | number | undefined
+  title: string;
+  phase?: string;
+  order?: number;
+  [key: string]: string | number | undefined;
 }
 
 export interface ParsedDoc {
-  meta: DocMeta
-  sections: Record<string, string>
-  sectionTitles: Record<string, string>
-  sectionOrder: string[]
-  body: string
+  meta: DocMeta;
+  sections: Record<string, string>;
+  sectionTitles: Record<string, string>;
+  sectionOrder: string[];
+  body: string;
 }
 
 export function parseDoc(raw: string): ParsedDoc {
-  const meta: DocMeta = { title: '' }
-  let body = raw
+  const meta: DocMeta = { title: "" };
+  let body = raw;
 
-  const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (fmMatch) {
     for (const line of fmMatch[1].split(/\r?\n/)) {
-      const kv = line.match(/^(\w+):\s*(.+)$/)
+      const kv = line.match(/^(\w+):\s*(.+)$/);
       if (kv) {
-        const val = kv[2].trim()
-        meta[kv[1]] = /^\d+$/.test(val) ? Number(val) : val
+        const val = kv[2].trim();
+        meta[kv[1]] = /^\d+$/.test(val) ? Number(val) : val;
       }
     }
-    body = fmMatch[2]
+    body = fmMatch[2];
   }
 
-  const sections: Record<string, string> = {}
-  const sectionTitles: Record<string, string> = {}
-  const sectionOrder: string[] = []
+  const sections: Record<string, string> = {};
+  const sectionTitles: Record<string, string> = {};
+  const sectionOrder: string[] = [];
 
-  const lines = body.split(/\r?\n/)
-  let activeHeading: string | null = null
-  let activeLines: string[] = []
+  const lines = body.split(/\r?\n/);
+  let activeHeading: string | null = null;
+  let activeLines: string[] = [];
 
-  const flushSection = () => {
+  const flushSection = (): void => {
     if (!activeHeading) {
-      return
+      return;
     }
-    sections[activeHeading] = activeLines.join('\n').trim()
-    sectionOrder.push(activeHeading)
-  }
+    sections[activeHeading] = activeLines.join("\n").trim();
+    sectionOrder.push(activeHeading);
+  };
 
   for (const line of lines) {
-    const headingMatch = line.match(/^##(?!#)\s*(.+?)\s*$/)
+    const headingMatch = line.match(/^##(?!#)\s*(.+?)\s*$/);
     if (headingMatch) {
-      flushSection()
-      const title = headingMatch[1].trim()
-      activeHeading = title.toLowerCase()
-      sectionTitles[activeHeading] = title
-      activeLines = []
-      continue
+      flushSection();
+      const title = headingMatch[1].trim();
+      activeHeading = title.toLowerCase();
+      sectionTitles[activeHeading] = title;
+      activeLines = [];
+      continue;
     }
     if (activeHeading) {
-      activeLines.push(line)
+      activeLines.push(line);
     }
   }
-  flushSection()
+  flushSection();
 
-  return { meta, sections, sectionTitles, sectionOrder, body }
+  return { meta, sections, sectionTitles, sectionOrder, body };
 }
 
 export function extractBullets(section: string): string[] {
   return section
-    .split('\n')
-    .filter((l) => l.startsWith('- '))
-    .map((l) => l.slice(2).trim())
+    .split("\n")
+    .filter((l) => l.startsWith("- "))
+    .map((l) => l.slice(2).trim());
+}
+
+const INPUT_BLOCK_RE = /^:::(touch|pointer)\n([\s\S]*?)^:::$/gm;
+
+export function selectInputBlocks(markdown: string, canHover: boolean): string {
+  const kept = canHover ? "pointer" : "touch";
+  return markdown.replace(INPUT_BLOCK_RE, (_, input: string, body: string) =>
+    input === kept ? body : "",
+  );
 }

@@ -1,28 +1,32 @@
-import { useState, useRef, useCallback, useEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaHouse } from "react-icons/fa6";
-import type { Phase } from "../constants/phases";
+import { type ReactNode, useRef, useCallback, useContext } from "react";
+import { getTimelinePhases, type Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
 import { GuideStateContext } from "../guided/guideState";
+import { useContentOverflows } from "../hooks/useContentOverflows";
+import { usePhaseTimelineSync } from "../hooks/ui/usePhaseTimelineSync";
 
-const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
+const PHASES = new Set<string>(["draft", "build", "battle", "reward"]);
 
 const PHASE_TIMELINE_LABELS: Record<Phase, string> = {
   draft: "draft",
   build: "build",
-  battle: "battle",
+  battle: "fight",
   reward: "advance",
 };
 
+// The current step reads as "you are here": a walnut tag with a gold rim, crimson in the Fight.
+const STEP_HERE =
+  "bg-[#352c25] text-[var(--gold-pale)] ring-1 ring-[var(--color-gold)]";
 const PHASE_ACTIVE_STYLE: Record<Phase, string> = {
-  draft: "bg-purple-500/30 text-purple-300 ring-1 ring-purple-400/60",
-  build: "bg-blue-500/30 text-blue-300 ring-1 ring-blue-400/60",
-  battle: "bg-red-500/30 text-red-300 ring-1 ring-red-400/60",
-  reward: "bg-amber-500/30 text-amber-300 ring-1 ring-amber-400/60",
+  draft: STEP_HERE,
+  build: STEP_HERE,
+  battle: "bg-[#441f1e] text-[#fecaca] ring-1 ring-[#d9534f]",
+  reward: STEP_HERE,
 };
+const STEP_ARROW =
+  "max-[360px]:hidden text-[var(--gold-border-opaque)] text-xs";
 const GUIDED_POPOVER_AUTO_CLOSE_MS = 10_000;
-const PHASE_POPOVER_FADE_OUT_MS = 220;
 
 type EndState = "eliminated" | "winner" | "game_over" | "awaiting_elimination";
 
@@ -39,194 +43,248 @@ interface PhaseTimelineProps {
   round: number;
   nextStage: number;
   nextRound: number;
+  inSuddenDeath?: boolean;
+  suddenDeathDecidesGame?: boolean;
   useUpgrades?: boolean;
   autoOpenPhase?: Phase | null;
   autoOpenDurationMs?: number;
   onAutoOpenHandled?: (phase: Phase) => void;
   onOpenRules?: (target?: RulesPanelTarget) => void;
-  hamburger?: React.ReactNode;
+  onStepClick?: () => void;
   title?: string;
-  headerClassName?: string;
-  rightActionsClassName?: string;
 }
 
 function isGamePhase(phase: string): phase is Phase {
-  return PHASES.includes(phase as Phase);
+  return PHASES.has(phase);
 }
 
-function RulesButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="btn btn-secondary text-xs sm:text-sm"
-      title="Guide"
-      data-guide-target="guide-button"
-    >
-      <span className="hidden sm:inline">Guide</span>
-      <span className="sm:hidden">?</span>
-    </button>
-  );
+function getStepLabel(options: {
+  phase: Phase;
+  currentPhase: Phase | EndState;
+  isEndReward: boolean;
+  endsInWinner: boolean;
+  title?: string;
+}): string {
+  if (options.isEndReward) {
+    if (options.title !== undefined) return options.title;
+    return isGamePhase(options.currentPhase)
+      ? PHASE_TIMELINE_LABELS[options.phase]
+      : END_STATE_LABELS[options.currentPhase];
+  }
+  if (options.endsInWinner && options.phase === "reward") {
+    return "winner";
+  }
+  return PHASE_TIMELINE_LABELS[options.phase];
 }
 
-function HomeButton({ iconOnly = false }: { iconOnly?: boolean }) {
-  const navigate = useNavigate();
-  return (
-    <button
-      onClick={() => navigate("/")}
-      className="btn btn-secondary text-xs sm:text-sm"
-      title="Home"
-    >
-      {iconOnly ? <FaHouse /> : "Home"}
-    </button>
-  );
+function getStepButtonClassName(options: {
+  phase: Phase;
+  isHighlighted: boolean;
+  isCompleted: boolean;
+  isUpcoming: boolean;
+}): string {
+  const activeClass = options.isHighlighted
+    ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 max-lg:ring-inset ${PHASE_ACTIVE_STYLE[options.phase]}`
+    : "phase-step-idle";
+  const completedClass =
+    options.isCompleted && !options.isHighlighted
+      ? "text-[var(--ivory-faint)] line-through decoration-[var(--gold-border-opaque)]"
+      : "";
+  const upcomingClass = options.isUpcoming ? "text-[var(--ivory-faint)]" : "";
+  return `phase-step text-xs sm:text-sm font-medium capitalize transition-colors ${activeClass} ${completedClass} ${upcomingClass}`;
 }
 
-export function PhaseTimeline({
+interface TimelineStepProps {
+  phase: Phase;
+  index: number;
+  currentIndex: number;
+  currentPhase: Phase | EndState;
+  isEnd: boolean;
+  endsInWinner: boolean;
+  welcomeGuideActive: boolean;
+  nextStage: number;
+  nextRound: number;
+  title?: string;
+  buttonRef: (node: HTMLButtonElement | null) => void;
+  stepRef: (node: HTMLDivElement | null) => void;
+  onPhaseClick: (phase: Phase) => void;
+}
+
+function TimelineStep({
+  phase,
+  index,
+  currentIndex,
   currentPhase,
-  stage,
-  round,
+  isEnd,
+  endsInWinner,
+  welcomeGuideActive,
   nextStage,
   nextRound,
-  useUpgrades = true,
-  autoOpenPhase = null,
-  autoOpenDurationMs = GUIDED_POPOVER_AUTO_CLOSE_MS,
-  onAutoOpenHandled,
-  onOpenRules,
-  hamburger,
   title,
-  headerClassName,
-  rightActionsClassName,
-}: PhaseTimelineProps) {
-  const guideState = useContext(GuideStateContext);
-  const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
-  const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
-  const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
-  const [isPopoverClosing, setIsPopoverClosing] = useState(false);
-  const autoCloseTimerRef = useRef<number | null>(null);
-  const closeAnimationTimerRef = useRef<number | null>(null);
-  const popoverPhaseRef = useRef<Phase | null>(null);
-  const phaseButtonRefs = useRef<Record<Phase, HTMLButtonElement | null>>({
-    draft: null,
-    build: null,
-    battle: null,
-    reward: null,
+  buttonRef,
+  stepRef,
+  onPhaseClick,
+}: TimelineStepProps): ReactNode {
+  const isEndReward = isEnd && phase === "reward";
+  const isHighlighted = (!isEnd && index === currentIndex) || isEndReward;
+  const label = getStepLabel({
+    phase,
+    currentPhase,
+    isEndReward,
+    endsInWinner,
+    title,
+  });
+  const className = getStepButtonClassName({
+    phase,
+    isHighlighted,
+    isCompleted: index < currentIndex,
+    isUpcoming: !isEnd && index > currentIndex,
   });
 
-  useEffect(() => {
-    popoverPhaseRef.current = popoverPhase;
-  }, [popoverPhase]);
-
-  const clearAutoCloseTimer = useCallback(() => {
-    if (autoCloseTimerRef.current !== null) {
-      window.clearTimeout(autoCloseTimerRef.current);
-      autoCloseTimerRef.current = null;
-    }
-  }, []);
-
-  const clearCloseAnimationTimer = useCallback(() => {
-    if (closeAnimationTimerRef.current !== null) {
-      window.clearTimeout(closeAnimationTimerRef.current);
-      closeAnimationTimerRef.current = null;
-    }
-  }, []);
-
-  const closePopoverImmediately = useCallback(() => {
-    clearAutoCloseTimer();
-    clearCloseAnimationTimer();
-    setIsPopoverClosing(false);
-    setPopoverPhase(null);
-    setPopoverAnchorRect(null);
-  }, [clearAutoCloseTimer, clearCloseAnimationTimer]);
-
-  const beginClosingPopover = useCallback(() => {
-    if (!popoverPhaseRef.current || closeAnimationTimerRef.current !== null) {
-      return;
-    }
-    clearAutoCloseTimer();
-    setIsPopoverClosing(true);
-    closeAnimationTimerRef.current = window.setTimeout(() => {
-      closeAnimationTimerRef.current = null;
-      setIsPopoverClosing(false);
-      setPopoverPhase(null);
-      setPopoverAnchorRect(null);
-    }, PHASE_POPOVER_FADE_OUT_MS);
-  }, [clearAutoCloseTimer]);
-
-  const openPopoverForPhase = useCallback(
-    (phase: Phase, autoCloseAfterMs?: number): boolean => {
-      const btn = phaseButtonRefs.current[phase];
-      if (!btn) {
-        return false;
-      }
-      clearAutoCloseTimer();
-      clearCloseAnimationTimer();
-      setIsPopoverClosing(false);
-      setPopoverAnchorRect(btn.getBoundingClientRect());
-      setPopoverPhase(phase);
-      if (autoCloseAfterMs && autoCloseAfterMs > 0) {
-        autoCloseTimerRef.current = window.setTimeout(() => {
-          if (popoverPhaseRef.current === phase) {
-            beginClosingPopover();
-          }
-          autoCloseTimerRef.current = null;
-        }, autoCloseAfterMs);
-      }
-      return true;
-    },
-    [beginClosingPopover, clearAutoCloseTimer, clearCloseAnimationTimer],
+  const phaseButton = (
+    <button
+      ref={buttonRef}
+      disabled={welcomeGuideActive || isEnd}
+      onClick={() => onPhaseClick(phase)}
+      data-guide-target={`timeline-phase-${phase}`}
+      className={className}
+    >
+      {label}
+    </button>
   );
+
+  if (phase === "reward") {
+    return (
+      <div ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+        <span className={STEP_ARROW}>→</span>
+        <div
+          className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+          data-guide-target="timeline-next-stage-round"
+        >
+          {phaseButton}
+          {!isEnd && !endsInWinner && (
+            <span className="max-[400px]:hidden text-xs sm:text-sm text-[var(--ivory-faint)]">
+              to{" "}
+              <span className="font-mono">
+                {nextStage}-{nextRound}
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+      <span className={STEP_ARROW}>→</span>
+      {phaseButton}
+    </div>
+  );
+}
+
+function resolveTimelineState(props: PhaseTimelineProps): {
+  activeGamePhase: Phase | null;
+  isEnd: boolean;
+  timelinePhases: Phase[];
+  endsInWinner: boolean;
+  currentIndex: number;
+  useUpgrades: boolean;
+  autoOpenPhase: Phase | null;
+  autoOpenDurationMs: number;
+} {
+  const activeGamePhase = isGamePhase(props.currentPhase)
+    ? props.currentPhase
+    : null;
+  const isEnd = activeGamePhase === null;
+  const inSuddenDeath = Boolean(props.inSuddenDeath);
+  const suddenDeathDecidesGame = Boolean(props.suddenDeathDecidesGame);
+  const timelinePhases = getTimelinePhases(inSuddenDeath && !isEnd);
+  return {
+    activeGamePhase,
+    isEnd,
+    timelinePhases,
+    endsInWinner: inSuddenDeath && suddenDeathDecidesGame && !isEnd,
+    currentIndex: activeGamePhase
+      ? timelinePhases.indexOf(activeGamePhase)
+      : timelinePhases.length,
+    useUpgrades: props.useUpgrades ?? true,
+    autoOpenPhase: props.autoOpenPhase ?? null,
+    autoOpenDurationMs:
+      props.autoOpenDurationMs ?? GUIDED_POPOVER_AUTO_CLOSE_MS,
+  };
+}
+
+export function PhaseTimeline(props: PhaseTimelineProps): ReactNode {
+  const {
+    currentPhase,
+    stage,
+    round,
+    nextStage,
+    nextRound,
+    onAutoOpenHandled,
+    onOpenRules,
+    onStepClick,
+    title,
+  } = props;
+  const {
+    activeGamePhase,
+    isEnd,
+    timelinePhases,
+    endsInWinner,
+    currentIndex,
+    useUpgrades,
+    autoOpenPhase,
+    autoOpenDurationMs,
+  } = resolveTimelineState(props);
+  const guideState = useContext(GuideStateContext);
+  const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
+  const stepsRowRef = useRef<HTMLDivElement | null>(null);
+  const stepsRef = useRef<HTMLDivElement | null>(null);
+  const stepsOverflow = useContentOverflows(stepsRowRef, stepsRef);
+
+  const {
+    popoverPhase,
+    popoverAnchorRect,
+    isPopoverClosing,
+    openPopoverForPhase,
+    beginClosingPopover,
+    closePopoverImmediately,
+    bindPhaseButtonRef,
+    bindPhaseStepRef,
+  } = usePhaseTimelineSync({
+    activeGamePhase,
+    stepsOverflow,
+    stepsRowRef,
+    autoOpenPhase,
+    autoOpenDurationMs,
+    onAutoOpenHandled,
+  });
 
   const handleClosePopover = useCallback(() => {
     beginClosingPopover();
   }, [beginClosingPopover]);
 
-  const handlePhaseClick = useCallback((phase: Phase) => {
-    if (welcomeGuideActive) {
-      return;
-    }
-    if (popoverPhase === phase) {
-      handleClosePopover();
-      return;
-    }
-    openPopoverForPhase(phase);
-  }, [handleClosePopover, openPopoverForPhase, popoverPhase, welcomeGuideActive]);
-
-  useEffect(() => {
-    if (!autoOpenPhase) return;
-    if (!isGamePhase(currentPhase)) return;
-    if (autoOpenPhase !== currentPhase) return;
-
-    let cancelled = false;
-    let retryId: number | null = null;
-    const openId = window.setTimeout(() => {
-      if (cancelled) return;
-      if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
-        onAutoOpenHandled?.(autoOpenPhase);
+  const handlePhaseClick = useCallback(
+    (phase: Phase) => {
+      if (welcomeGuideActive) {
         return;
       }
-      retryId = window.setTimeout(() => {
-        if (cancelled) return;
-        if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
-          onAutoOpenHandled?.(autoOpenPhase);
-        }
-      }, 0);
-    }, 0);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(openId);
-      if (retryId !== null) {
-        window.clearTimeout(retryId);
+      onStepClick?.();
+      if (popoverPhase === phase) {
+        handleClosePopover();
+        return;
       }
-    };
-  }, [autoOpenDurationMs, autoOpenPhase, currentPhase, onAutoOpenHandled, openPopoverForPhase]);
-
-  useEffect(() => {
-    return () => {
-      clearAutoCloseTimer();
-      clearCloseAnimationTimer();
-    };
-  }, [clearAutoCloseTimer, clearCloseAnimationTimer]);
+      openPopoverForPhase(phase);
+    },
+    [
+      handleClosePopover,
+      onStepClick,
+      openPopoverForPhase,
+      popoverPhase,
+      welcomeGuideActive,
+    ],
+  );
 
   const handleOpenDetailsFromPopover = useCallback(() => {
     const phase = popoverPhase;
@@ -237,91 +295,46 @@ export function PhaseTimeline({
   const handleOpenControlsFromPopover = useCallback(() => {
     const phase = popoverPhase;
     closePopoverImmediately();
-    onOpenRules?.(phase ? { docId: phase, tab: 'controls' } : undefined);
+    onOpenRules?.(phase ? { docId: phase, tab: "controls" } : undefined);
   }, [closePopoverImmediately, onOpenRules, popoverPhase]);
 
-  const headerCls = headerClassName ?? "py-1.5 pl-4 pr-1.5";
-  const resolvedRightActionsClassName = rightActionsClassName ?? "sm:-translate-x-2";
-
-  const isEnd = !isGamePhase(currentPhase);
-
   return (
-    <header className={`frame-chrome ${headerCls}`}>
-      <div className="flex items-center">
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-start min-w-0">
+    <>
+      {/* Below lg the top zone's label can sit under the current step, so the row rises 2px and the step's ring
+          turns inward. Every phase gets both, so the row stays put from phase to phase. */}
+      <div
+        ref={stepsRowRef}
+        className={`flex items-center flex-1 min-w-0 max-lg:-translate-y-0.5 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}
+      >
+        <div
+          ref={stepsRef}
+          className="flex items-center gap-1 sm:gap-1.5 max-[360px]:gap-[7px] shrink-0"
+        >
           <span
-            className="text-xs sm:text-sm text-gray-300 font-mono"
+            className="text-xs sm:text-sm text-[#e2d8cb] font-mono"
             data-guide-target="timeline-stage-round"
           >
             {stage}-{round}
           </span>
 
-          {PHASES.map((phase, index) => {
-            const currentIndex = isEnd ? PHASES.length : PHASES.indexOf(currentPhase as Phase);
-            const isActive = !isEnd && index === currentIndex;
-            const isCompleted = index < currentIndex;
-            const isUpcoming = !isEnd && index > currentIndex;
-            const isEndReward = isEnd && phase === "reward";
-            const phaseButton = (
-              <button
-                ref={(el) => { phaseButtonRefs.current[phase] = el; }}
-                disabled={welcomeGuideActive || isEnd}
-                onClick={() => handlePhaseClick(phase)}
-                data-guide-target={`timeline-phase-${phase}`}
-                className={`text-xs sm:text-sm font-medium capitalize transition-colors
-                  ${!isEnd ? "cursor-pointer" : "cursor-default"}
-                  ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
-                  ${isCompleted && !isEndReward ? "text-gray-500 line-through decoration-gray-600" : ""}
-                  ${isUpcoming ? "text-gray-500" : ""}
-                  ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
-                `}
-              >
-                {isEndReward ? (title ?? END_STATE_LABELS[currentPhase as EndState]) : PHASE_TIMELINE_LABELS[phase]}
-              </button>
-            );
-
-            if (phase === "reward") {
-              return (
-                <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
-                  <span className="text-gray-600 text-xs">→</span>
-                  <div
-                    className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
-                    data-guide-target="timeline-next-stage-round"
-                  >
-                    {phaseButton}
-                    {!isEnd && (
-                      <span className="text-xs sm:text-sm text-gray-500">
-                        to <span className="font-mono">{nextStage}-{nextRound}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
-                <span className="text-gray-600 text-xs">→</span>
-                {phaseButton}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className={`flex items-center gap-1.5 shrink-0 timeline-actions ${resolvedRightActionsClassName}`}>
-          {isEnd ? (
-            <HomeButton iconOnly />
-          ) : (
-            onOpenRules && <RulesButton onClick={() => onOpenRules()} />
-          )}
-          <div className="hidden sm:block">
-            {isEnd ? (
-              onOpenRules && <RulesButton onClick={() => onOpenRules()} />
-            ) : (
-              <HomeButton />
-            )}
-          </div>
-          {hamburger && <div className="shrink-0">{hamburger}</div>}
+          {timelinePhases.map((phase, index) => (
+            <TimelineStep
+              key={phase}
+              phase={phase}
+              index={index}
+              currentIndex={currentIndex}
+              currentPhase={currentPhase}
+              isEnd={isEnd}
+              endsInWinner={endsInWinner}
+              welcomeGuideActive={welcomeGuideActive}
+              nextStage={nextStage}
+              nextRound={nextRound}
+              title={title}
+              buttonRef={bindPhaseButtonRef(phase)}
+              stepRef={bindPhaseStepRef(phase)}
+              onPhaseClick={handlePhaseClick}
+            />
+          ))}
         </div>
       </div>
 
@@ -336,6 +349,6 @@ export function PhaseTimeline({
           onOpenControls={handleOpenControlsFromPopover}
         />
       )}
-    </header>
+    </>
   );
 }

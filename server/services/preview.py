@@ -1,3 +1,5 @@
+"""Headless Playwright renderer for shared game preview images."""
+
 import asyncio
 import hashlib
 import logging
@@ -36,7 +38,7 @@ def cache_key(data_json: str) -> str:
 
 
 class DiskCache:
-    def __init__(self, directory: Path, max_bytes: int = DISK_CACHE_MAX_BYTES):
+    def __init__(self, directory: Path, max_bytes: int = DISK_CACHE_MAX_BYTES) -> None:
         self._dir = directory
         self._max_bytes = max_bytes
         self._initialized = False
@@ -46,10 +48,11 @@ class DiskCache:
             return True
         try:
             self._dir.mkdir(parents=True, exist_ok=True)
-            self._initialized = True
-            return True
         except OSError:
             return False
+        else:
+            self._initialized = True
+            return True
 
     def _path(self, key: str) -> Path:
         return self._dir / f"{key}.png"
@@ -127,20 +130,21 @@ class PreviewService:
         try:
             if self._browser:
                 await self._browser.close()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 -- broad boundary catch
+            logger.debug("Ignoring preview browser cleanup error during restart")
         try:
             if self._playwright:
                 await self._playwright.stop()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 -- broad boundary catch
+            logger.debug("Ignoring preview browser cleanup error during restart")
         self._browser = None
         self._playwright = None
         await self._ensure_browser()
 
     async def _take_screenshot(self, embed_url: str) -> bytes:
         if not self._browser:
-            raise RuntimeError("Preview browser not started")
+            msg = "Preview browser not started"
+            raise RuntimeError(msg)
 
         context = await self._browser.new_context(
             viewport={"width": SCREENSHOT_WIDTH, "height": SCREENSHOT_HEIGHT},

@@ -1,7 +1,26 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { QuickGuide } from './QuickGuide'
 import {
-  DESKTOP_BREAKPOINT_PX,
+  useCallback,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import {
+  currentViewportBox,
+  isDesktopViewport,
+  useCollapsedPanelHeight,
+  useFloatingWindowPointerInteraction,
+} from "../hooks/ui/useFloatingWindowLayout";
+import {
+  useEscapeKey,
+  useLocalStorageSync,
+  useViewportSync,
+} from "../hooks/useDomEffects";
+import { QuickGuide } from "./QuickGuide";
+import { readMigratedItem } from "../utils/storage";
+import { FloatingWindow } from "./common/FloatingWindow";
+import {
   DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
   WINDOW_MARGIN_PX,
   clampDesktopPanelOrigin,
@@ -13,659 +32,571 @@ import {
   parseStoredWindowState,
   serializeStoredWindowState,
   type DesktopWindowState,
+  type StoredRulesPanelWindowState,
   type ViewportBox,
-} from './rulesPanelWindow'
+} from "./rulesPanelWindow";
 
 export interface RulesPanelTarget {
-  docId?: string
-  tab?: string
+  docId?: string;
+  tab?: string;
 }
 
 interface RulesPanelProps {
-  onClose: () => void
-  initialDocId?: string
-  initialTab?: string
-  gameId?: string
-  playerName?: string
-  useUpgrades?: boolean
-  useVanguards?: boolean
+  onClose: () => void;
+  /** The page owns this, so opening the Guide restores it, and a minimized one leaves the page's hotkeys on. */
+  minimized: boolean;
+  onMinimizedChange: (minimized: boolean) => void;
+  /** A panel is open over the minimized window, so Escape closes that panel and not the Guide. */
+  behindPanel?: boolean;
+  /** A new object each time a link is taken, so the same link again goes back to its page. */
+  target?: RulesPanelTarget;
+  gameId?: string;
+  playerName?: string;
+  useUpgrades?: boolean;
+  useVanguards?: boolean;
 }
 
 type InteractionState =
   | {
-      type: 'drag'
-      startPointerX: number
-      startPointerY: number
-      startX: number
-      startY: number
+      type: "drag";
+      startPointerX: number;
+      startPointerY: number;
+      startX: number;
+      startY: number;
     }
   | {
-      type: 'resize'
-      startPointerX: number
-      startPointerY: number
-      startWidth: number
-      startHeight: number
+      type: "resize";
+      startPointerX: number;
+      startPointerY: number;
+      startWidth: number;
+      startHeight: number;
     }
-  | null
+  | null;
 
-interface WindowControlButtonProps {
-  ariaLabel: string
-  title: string
-  colorClassName: string
-  onClick: () => void
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
-  disabled?: boolean
-}
+const WINDOW_STORAGE_KEY = "pitfight_rules_panel_window:v2";
+const LEGACY_WINDOW_STORAGE_KEYS = [
+  "mtb_rules_panel_window:v2",
+  "mtb_rules_panel_window:v1",
+] as const;
+const MOBILE_PANEL_TOP_GAP_PX = 48;
+const MOBILE_PANEL_BOTTOM_GAP_PX = 24;
+const MOBILE_PANEL_MIN_HEIGHT_PX = 280;
+const MOBILE_PANEL_MAX_WIDTH_PX = 720;
+const COLLAPSED_LABEL_FALLBACK = "Rules";
 
-const WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v2'
-const LEGACY_WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v1'
-const MOBILE_PANEL_TOP_GAP_PX = 48
-const MOBILE_PANEL_BOTTOM_GAP_PX = 24
-const MOBILE_PANEL_MIN_HEIGHT_PX = 280
-const MOBILE_PANEL_MAX_WIDTH_PX = 720
-const MOBILE_COLLAPSED_LABEL_FALLBACK = 'Rules'
-
-function isDesktopViewport(): boolean {
-  return typeof window !== 'undefined' && window.innerWidth >= DESKTOP_BREAKPOINT_PX
-}
-
-function currentViewportBox(): ViewportBox {
-  if (typeof window === 'undefined') {
-    return { width: 0, height: 0, left: 0, top: 0 }
-  }
-  const viewport = window.visualViewport
-  return viewport
-    ? {
-        width: Math.round(viewport.width),
-        height: Math.round(viewport.height),
-        left: Math.round(viewport.offsetLeft),
-        top: Math.round(viewport.offsetTop),
-      }
-    : {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        left: 0,
-        top: 0,
-      }
-}
-
-function sameWindowState(a: DesktopWindowState | null, b: DesktopWindowState | null): boolean {
-  return !!a && !!b &&
+function sameWindowState(
+  a: DesktopWindowState | null,
+  b: DesktopWindowState | null,
+): boolean {
+  return (
+    !!a &&
+    !!b &&
     a.width === b.width &&
     a.height === b.height &&
     a.x === b.x &&
     a.y === b.y
+  );
 }
 
 function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
+  return Math.min(Math.max(value, min), max);
 }
 
-function loadStoredWindowState() {
-  if (typeof window === 'undefined') {
-    return null
+function loadStoredWindowState(): StoredRulesPanelWindowState | null {
+  if (typeof window === "undefined") {
+    return null;
   }
   return parseStoredWindowState(
-    window.localStorage.getItem(WINDOW_STORAGE_KEY)
-    ?? window.localStorage.getItem(LEGACY_WINDOW_STORAGE_KEY),
-  )
+    readMigratedItem(
+      window.localStorage,
+      WINDOW_STORAGE_KEY,
+      LEGACY_WINDOW_STORAGE_KEYS,
+    ),
+  );
 }
 
 function resolveInitialDesktopWindowState(): DesktopWindowState | null {
   if (!isDesktopViewport()) {
-    return null
+    return null;
   }
-  const viewport = currentViewportBox()
-  const stored = loadStoredWindowState()
+  const viewport = currentViewportBox();
+  const stored = loadStoredWindowState();
   return clampDesktopWindowForMode(
     stored?.windowState ?? defaultDesktopWindowState(viewport),
     viewport,
-    stored?.isCollapsed ?? false,
-    DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
-  )
+    {
+      isCollapsed: false,
+      collapsedHeight: DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
+    },
+  );
 }
 
-function resolveInitialCollapsedState(): boolean {
-  return loadStoredWindowState()?.isCollapsed ?? false
+function applyPointerMove(options: {
+  previous: DesktopWindowState | null;
+  interaction: NonNullable<InteractionState>;
+  clientX: number;
+  clientY: number;
+  isCollapsed: boolean;
+  collapsedPanelHeight: number;
+}): DesktopWindowState {
+  const viewport = currentViewportBox();
+  const current = options.previous ?? defaultDesktopWindowState(viewport);
+  const { interaction } = options;
+
+  if (interaction.type === "drag") {
+    const nextX =
+      interaction.startX + (options.clientX - interaction.startPointerX);
+    const nextY =
+      interaction.startY + (options.clientY - interaction.startPointerY);
+
+    if (options.isCollapsed) {
+      const origin = clampDesktopPanelOrigin(
+        { x: nextX, y: nextY },
+        collapsedPanelSize(viewport, options.collapsedPanelHeight),
+        viewport,
+      );
+      return clampDesktopWindowForMode({ ...current, ...origin }, viewport, {
+        isCollapsed: true,
+        collapsedHeight: options.collapsedPanelHeight,
+      });
+    }
+
+    return clampDesktopWindowState(
+      { ...current, x: nextX, y: nextY },
+      viewport,
+    );
+  }
+
+  const width =
+    interaction.startWidth + (options.clientX - interaction.startPointerX);
+  const height =
+    interaction.startHeight + (options.clientY - interaction.startPointerY);
+  return clampDesktopWindowState({ ...current, width, height }, viewport);
 }
 
-function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: number) {
-  const panel = collapsedPanelSize(viewport, collapsedHeight)
-  return clampDesktopPanelOrigin(
-    Math.round(viewport.left + (viewport.width - panel.width) / 2),
-    viewport.top + WINDOW_MARGIN_PX,
-    panel,
-    viewport,
-  )
+interface GuideBodyProps {
+  visitCount: number;
+  target?: RulesPanelTarget;
+  gameId?: string;
+  playerName?: string;
+  useUpgrades?: boolean;
+  useVanguards?: boolean;
+  onLocationChange: (label: string) => void;
 }
 
-function WindowControlButton({
-  ariaLabel,
-  title,
-  colorClassName,
-  onClick,
-  onPointerDown,
-  disabled = false,
-}: WindowControlButtonProps) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      title={title}
-      onClick={onClick}
-      onPointerDown={onPointerDown}
-      disabled={disabled}
-      className={`h-3.5 w-3.5 rounded-full border border-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-opacity ${
-        disabled ? `${colorClassName} cursor-default opacity-45` : `${colorClassName} hover:opacity-90`
-      }`}
-    />
-  )
-}
-
-export function RulesPanel({
-  onClose,
-  initialDocId,
-  initialTab,
+function GuideBody({
+  visitCount,
+  target,
   gameId,
   playerName,
   useUpgrades,
   useVanguards,
-}: RulesPanelProps) {
-  const [isDesktop, setIsDesktop] = useState(() => isDesktopViewport())
-  const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(() =>
-    resolveInitialDesktopWindowState(),
-  )
-  const [isCollapsed, setIsCollapsed] = useState(() => resolveInitialCollapsedState())
-  const [navigationHint, setNavigationHint] = useState(MOBILE_COLLAPSED_LABEL_FALLBACK)
-  const [mobileCollapsedOrigin, setMobileCollapsedOrigin] = useState<{ x: number; y: number } | null>(null)
-  const [interaction, setInteraction] = useState<InteractionState>(null)
-  const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(DEFAULT_COLLAPSED_PANEL_HEIGHT_PX)
-  const collapsedPanelRef = useRef<HTMLDivElement | null>(null)
+  onLocationChange,
+}: GuideBodyProps): ReactNode {
+  return (
+    <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      <QuickGuide
+        key={visitCount}
+        initialDocId={target?.docId}
+        initialTab={target?.tab}
+        gameId={gameId}
+        playerName={playerName}
+        useUpgrades={useUpgrades}
+        useVanguards={useVanguards}
+        onLocationChange={onLocationChange}
+      />
+    </div>
+  );
+}
 
-  const stopInteraction = useCallback(() => {
-    setInteraction(null)
-  }, [])
+interface MobileRulesWindowProps {
+  viewport: ViewportBox;
+  isCollapsed: boolean;
+  collapsedLocation: string;
+  onDragStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onMinimize: () => void;
+  onRestore: () => void;
+  onReset: () => void;
+  onClose: () => void;
+  guideBody: ReactNode;
+}
 
-  const desktopViewport = isDesktop ? currentViewportBox() : null
-  const resolvedDesktopWindow = isDesktop && desktopViewport
-    ? clampDesktopWindowForMode(
-        desktopWindow ?? defaultDesktopWindowState(desktopViewport),
-        desktopViewport,
-        isCollapsed,
-        collapsedPanelHeight,
-      )
-    : null
-  const desktopPanel = resolvedDesktopWindow && desktopViewport
-    ? getDesktopPanelRect(resolvedDesktopWindow, desktopViewport, isCollapsed, collapsedPanelHeight)
-    : null
-  const mobileViewport = !isDesktop ? currentViewportBox() : null
-  const mobileCollapsedRect = mobileViewport
-    ? (() => {
-        const panel = collapsedPanelSize(mobileViewport, collapsedPanelHeight)
-        const origin = mobileCollapsedOrigin ?? defaultMobileCollapsedOrigin(mobileViewport, collapsedPanelHeight)
-        return {
-          width: panel.width,
-          height: panel.height,
-          ...clampDesktopPanelOrigin(origin.x, origin.y, panel, mobileViewport),
-        }
-      })()
-    : null
-
-  const syncDesktopWindow = useCallback((collapsed: boolean) => {
-    if (!isDesktopViewport()) {
-      return
-    }
-    const viewport = currentViewportBox()
-    setDesktopWindow((previous) => {
-      const fallback = previous ?? loadStoredWindowState()?.windowState ?? defaultDesktopWindowState(viewport)
-      const next = clampDesktopWindowForMode(fallback, viewport, collapsed, collapsedPanelHeight)
-      return sameWindowState(previous, next) ? previous : next
-    })
-  }, [collapsedPanelHeight])
-
-  const handleCollapse = useCallback(() => {
-    stopInteraction()
-    if (isDesktopViewport()) {
-      syncDesktopWindow(true)
-    }
-    setIsCollapsed(true)
-  }, [stopInteraction, syncDesktopWindow])
-
-  const handleRestore = useCallback(() => {
-    stopInteraction()
-    if (isDesktopViewport()) {
-      syncDesktopWindow(false)
-    }
-    setIsCollapsed(false)
-  }, [stopInteraction, syncDesktopWindow])
-
-  const resetWindow = useCallback(() => {
-    stopInteraction()
-    setIsCollapsed(false)
-    if (!isDesktopViewport()) {
-      return
-    }
-    setDesktopWindow(defaultDesktopWindowState(currentViewportBox()))
-  }, [stopInteraction])
-
-  const handleGreenControl = useCallback(() => {
-    if (isCollapsed) {
-      handleRestore()
-      return
-    }
-    resetWindow()
-  }, [handleRestore, isCollapsed, resetWindow])
-
-  const handleControlPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-  }, [])
-
-  const beginDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (isDesktop) {
-      if (!desktopPanel) {
-        return
-      }
-      event.preventDefault()
-      setInteraction({
-        type: 'drag',
-        startPointerX: event.clientX,
-        startPointerY: event.clientY,
-        startX: desktopPanel.x,
-        startY: desktopPanel.y,
-      })
-      return
-    }
-
-    if (!isCollapsed || !mobileCollapsedRect) {
-      return
-    }
-    event.preventDefault()
-    setInteraction({
-      type: 'drag',
-      startPointerX: event.clientX,
-      startPointerY: event.clientY,
-      startX: mobileCollapsedRect.x,
-      startY: mobileCollapsedRect.y,
-    })
-  }, [desktopPanel, isCollapsed, isDesktop, mobileCollapsedRect])
-
-  const beginResize = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!isDesktop || !desktopPanel || isCollapsed) {
-      return
-    }
-    event.preventDefault()
-    event.stopPropagation()
-    setInteraction({
-      type: 'resize',
-      startPointerX: event.clientX,
-      startPointerY: event.clientY,
-      startWidth: desktopPanel.width,
-      startHeight: desktopPanel.height,
-    })
-  }, [desktopPanel, isCollapsed, isDesktop])
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
-  useEffect(() => {
-    const syncViewport = () => {
-      const desktop = isDesktopViewport()
-      setIsDesktop(desktop)
-      if (!desktop) {
-        stopInteraction()
-        return
-      }
-      syncDesktopWindow(isCollapsed)
-    }
-
-    window.addEventListener('resize', syncViewport)
-    window.visualViewport?.addEventListener('resize', syncViewport)
-    window.visualViewport?.addEventListener('scroll', syncViewport)
-    return () => {
-      window.removeEventListener('resize', syncViewport)
-      window.visualViewport?.removeEventListener('resize', syncViewport)
-      window.visualViewport?.removeEventListener('scroll', syncViewport)
-    }
-  }, [isCollapsed, stopInteraction, syncDesktopWindow])
-
-  useLayoutEffect(() => {
-    if (!isCollapsed) {
-      return
-    }
-
-    const node = collapsedPanelRef.current
-    if (!node) {
-      return
-    }
-
-    const updateHeight = () => {
-      const nextHeight = Math.max(
-        DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
-        Math.ceil(node.getBoundingClientRect().height),
-      )
-      setCollapsedPanelHeight((previous) => (previous === nextHeight ? previous : nextHeight))
-    }
-
-    updateHeight()
-
-    if (typeof ResizeObserver === 'undefined') {
-      return
-    }
-
-    const observer = new ResizeObserver(() => {
-      updateHeight()
-    })
-    observer.observe(node)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [isCollapsed, navigationHint])
-
-  useEffect(() => {
-    if (!desktopWindow) {
-      return
-    }
-    try {
-      window.localStorage.setItem(
-        WINDOW_STORAGE_KEY,
-        serializeStoredWindowState({
-          windowState: desktopWindow,
-          isCollapsed,
-        }),
-      )
-    } catch {
-      // Best effort only.
-    }
-  }, [desktopWindow, isCollapsed])
-
-  useEffect(() => {
-    if (!interaction || (!isDesktop && !isCollapsed)) {
-      return
-    }
-
-    const previousUserSelect = document.body.style.userSelect
-    const previousCursor = document.body.style.cursor
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor = interaction.type === 'drag' ? 'grabbing' : 'se-resize'
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!isDesktop) {
-        if (interaction.type !== 'drag') {
-          return
-        }
-        const viewport = currentViewportBox()
-        const panel = collapsedPanelSize(viewport, collapsedPanelHeight)
-        const nextX = interaction.startX + (event.clientX - interaction.startPointerX)
-        const nextY = interaction.startY + (event.clientY - interaction.startPointerY)
-        setMobileCollapsedOrigin(
-          clampDesktopPanelOrigin(nextX, nextY, panel, viewport),
-        )
-        return
-      }
-
-      setDesktopWindow((previous) => {
-        const viewport = currentViewportBox()
-        const current = previous ?? defaultDesktopWindowState(viewport)
-
-        if (interaction.type === 'drag') {
-          const nextX = interaction.startX + (event.clientX - interaction.startPointerX)
-          const nextY = interaction.startY + (event.clientY - interaction.startPointerY)
-
-          if (isCollapsed) {
-            const origin = clampDesktopPanelOrigin(
-              nextX,
-              nextY,
-              collapsedPanelSize(viewport, collapsedPanelHeight),
-              viewport,
-            )
-            return clampDesktopWindowForMode(
-              {
-                ...current,
-                ...origin,
-              },
-              viewport,
-              true,
-              collapsedPanelHeight,
-            )
-          }
-
-          return clampDesktopWindowState(
-            {
-              ...current,
-              x: nextX,
-              y: nextY,
-            },
-            viewport,
-          )
-        }
-
-        const width = interaction.startWidth + (event.clientX - interaction.startPointerX)
-        const height = interaction.startHeight + (event.clientY - interaction.startPointerY)
-        return clampDesktopWindowState(
-          {
-            ...current,
-            width,
-            height,
-          },
-          viewport,
-        )
-      })
-    }
-
-    const handlePointerUp = () => {
-      setInteraction(null)
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-
-    return () => {
-      document.body.style.userSelect = previousUserSelect
-      document.body.style.cursor = previousCursor
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [collapsedPanelHeight, interaction, isCollapsed, isDesktop])
-
-  if (!isDesktop) {
-    if (!mobileViewport) {
-      return null
-    }
-
-    const expandedHeight = clamp(
-      mobileViewport.height - MOBILE_PANEL_TOP_GAP_PX - MOBILE_PANEL_BOTTOM_GAP_PX,
+function MobileRulesWindow({
+  viewport,
+  isCollapsed,
+  collapsedLocation,
+  onDragStart,
+  onMinimize,
+  onRestore,
+  onReset,
+  onClose,
+  guideBody,
+}: MobileRulesWindowProps): ReactNode {
+  const expandedHeight = clamp(
+    viewport.height - MOBILE_PANEL_TOP_GAP_PX - MOBILE_PANEL_BOTTOM_GAP_PX,
+    MOBILE_PANEL_MIN_HEIGHT_PX,
+    Math.max(
       MOBILE_PANEL_MIN_HEIGHT_PX,
-      Math.max(MOBILE_PANEL_MIN_HEIGHT_PX, mobileViewport.height - MOBILE_PANEL_BOTTOM_GAP_PX),
-    )
-    const expandedWidth = Math.min(MOBILE_PANEL_MAX_WIDTH_PX, mobileViewport.width - WINDOW_MARGIN_PX * 2)
-    const expandedLeft = mobileViewport.left + Math.round((mobileViewport.width - expandedWidth) / 2)
-    const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
-
-    return (
-      <div className="fixed inset-0 z-50 pointer-events-none">
-        <div
-          ref={isCollapsed ? collapsedPanelRef : null}
-          className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.55)] flex flex-col overflow-hidden ${
-            interaction ? 'transition-none' : 'transition-[left,top,width,height] duration-200 ease-out'
-          }`}
-          style={{
-            left: isCollapsed ? mobileCollapsedRect?.x : expandedLeft,
-            top: isCollapsed ? mobileCollapsedRect?.y : mobileViewport.top + MOBILE_PANEL_TOP_GAP_PX,
-            width: isCollapsed ? mobileCollapsedRect?.width : expandedWidth,
-            height: isCollapsed ? undefined : expandedHeight,
-            maxHeight: mobileViewport.height - WINDOW_MARGIN_PX * 2,
-          }}
-        >
-          <div
-            className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${
-              isCollapsed
-                ? interaction?.type === 'drag'
-                  ? 'cursor-grabbing'
-                  : 'cursor-grab'
-                : ''
-            }`}
-            onPointerDown={beginDrag}
-            style={{ touchAction: isCollapsed ? 'none' : undefined }}
-          >
-            <div className="flex items-center gap-2 shrink-0">
-              <WindowControlButton
-                ariaLabel="Close guide"
-                title="Close"
-                colorClassName="bg-[#ff5f57]"
-                onClick={onClose}
-                onPointerDown={handleControlPointerDown}
-              />
-              <WindowControlButton
-                ariaLabel="Minimize guide"
-                title="Minimize"
-                colorClassName="bg-[#febc2e]"
-                onClick={handleCollapse}
-                onPointerDown={handleControlPointerDown}
-                disabled={isCollapsed}
-              />
-              <WindowControlButton
-                ariaLabel={isCollapsed ? 'Open guide' : 'Reset guide window'}
-                title={isCollapsed ? 'Open' : 'Reset'}
-                colorClassName="bg-[#28c840]"
-                onClick={handleGreenControl}
-                onPointerDown={handleControlPointerDown}
-              />
-            </div>
-            <div className="absolute inset-x-0 flex justify-center pointer-events-none px-20">
-              <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-                Guide
-              </span>
-            </div>
-          </div>
-
-          {isCollapsed ? (
-            <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
-              <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
-                Current section
-              </span>
-              <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
-                {collapsedLocation}
-              </span>
-            </div>
-          ) : (
-            <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-              <QuickGuide
-                key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
-                initialDocId={initialDocId}
-                initialTab={initialTab}
-                gameId={gameId}
-                playerName={playerName}
-                useUpgrades={useUpgrades}
-                useVanguards={useVanguards}
-                onLocationChange={setNavigationHint}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (!desktopViewport || !desktopPanel) {
-    return null
-  }
-
-  const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
+      viewport.height - MOBILE_PANEL_BOTTOM_GAP_PX,
+    ),
+  );
+  const expandedWidth = Math.min(
+    MOBILE_PANEL_MAX_WIDTH_PX,
+    viewport.width - WINDOW_MARGIN_PX * 2,
+  );
+  const expandedLeft =
+    viewport.left + Math.round((viewport.width - expandedWidth) / 2);
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
-      <div
-        ref={isCollapsed ? collapsedPanelRef : null}
-        className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl flex flex-col overflow-hidden shadow-[0_36px_96px_rgba(0,0,0,0.72),0_14px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,236,181,0.08)] ${
-          interaction ? 'transition-none' : 'transition-[left,top,width,height] duration-200 ease-out'
-        }`}
+    // Minimized, a phone's Guide is the dot on its button. It stays laid out, so it opens at the same place.
+    <div
+      className="fixed inset-0 z-50 pointer-events-none"
+      style={{ visibility: isCollapsed ? "hidden" : undefined }}
+    >
+      <FloatingWindow
+        name="guide"
+        title="Guide"
+        collapsed={false}
+        draggable={false}
+        dragging={false}
+        onDragStart={onDragStart}
+        onMinimize={onMinimize}
+        onRestore={onRestore}
+        onReset={onReset}
+        onClose={onClose}
+        collapsedCaption="Current section"
+        collapsedText={collapsedLocation}
+        instant={false}
         style={{
-          left: desktopPanel.x,
-          top: desktopPanel.y,
-          width: desktopPanel.width,
-          height: isCollapsed ? undefined : desktopPanel.height,
-          maxWidth: Math.max(1, desktopViewport.width - WINDOW_MARGIN_PX * 2),
-          maxHeight: Math.max(1, desktopViewport.height - WINDOW_MARGIN_PX * 2),
+          left: expandedLeft,
+          top: viewport.top + MOBILE_PANEL_TOP_GAP_PX,
+          width: expandedWidth,
+          height: expandedHeight,
+          maxHeight: viewport.height - WINDOW_MARGIN_PX * 2,
         }}
       >
-        <div
-          className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${interaction?.type === 'drag' ? 'cursor-grabbing' : 'cursor-grab'}`}
-          onPointerDown={beginDrag}
-          style={{ touchAction: 'none' }}
-        >
-          <div className="flex items-center gap-2 shrink-0">
-            <WindowControlButton
-              ariaLabel="Close guide"
-              title="Close"
-              colorClassName="bg-[#ff5f57]"
-              onClick={onClose}
-              onPointerDown={handleControlPointerDown}
-            />
-            <WindowControlButton
-              ariaLabel="Minimize guide"
-              title="Minimize"
-              colorClassName="bg-[#febc2e]"
-              onClick={handleCollapse}
-              onPointerDown={handleControlPointerDown}
-              disabled={isCollapsed}
-            />
-            <WindowControlButton
-              ariaLabel={isCollapsed ? 'Open guide' : 'Reset guide window'}
-              title={isCollapsed ? 'Open' : 'Reset'}
-              colorClassName="bg-[#28c840]"
-              onClick={handleGreenControl}
-              onPointerDown={handleControlPointerDown}
-            />
-          </div>
-          <div className="absolute inset-x-0 flex justify-center pointer-events-none px-28">
-            <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-              Guide
-            </span>
-          </div>
-        </div>
+        {guideBody}
+      </FloatingWindow>
+    </div>
+  );
+}
 
-        {isCollapsed ? (
-          <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
-            <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
-              Current section
-            </span>
-            <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
-              {collapsedLocation}
-            </span>
-          </div>
-        ) : (
-          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-            <QuickGuide
-              key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
-              initialDocId={initialDocId}
-              initialTab={initialTab}
-              gameId={gameId}
-              playerName={playerName}
-              useUpgrades={useUpgrades}
-              useVanguards={useVanguards}
-              onLocationChange={setNavigationHint}
-            />
-          </div>
-        )}
+interface DesktopRulesWindowProps {
+  viewport: ViewportBox;
+  panel: DesktopWindowState;
+  isCollapsed: boolean;
+  collapsedPanelRef: RefObject<HTMLDivElement | null>;
+  collapsedLocation: string;
+  interaction: InteractionState;
+  onDragStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onResizeStart: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onMinimize: () => void;
+  onRestore: () => void;
+  onReset: () => void;
+  onClose: () => void;
+  guideBody: ReactNode;
+}
+
+function DesktopRulesWindow({
+  viewport,
+  panel,
+  isCollapsed,
+  collapsedPanelRef,
+  collapsedLocation,
+  interaction,
+  onDragStart,
+  onResizeStart,
+  onMinimize,
+  onRestore,
+  onReset,
+  onClose,
+  guideBody,
+}: DesktopRulesWindowProps): ReactNode {
+  return (
+    <div className="fixed inset-0 z-50 pointer-events-none">
+      <FloatingWindow
+        ref={isCollapsed ? collapsedPanelRef : null}
+        name="guide"
+        title="Guide"
+        collapsed={isCollapsed}
+        draggable
+        dragging={interaction?.type === "drag"}
+        onDragStart={onDragStart}
+        onMinimize={onMinimize}
+        onRestore={onRestore}
+        onReset={onReset}
+        onClose={onClose}
+        collapsedCaption="Current section"
+        collapsedText={collapsedLocation}
+        instant={Boolean(interaction)}
+        style={{
+          left: panel.x,
+          top: panel.y,
+          width: panel.width,
+          height: isCollapsed ? undefined : panel.height,
+          maxWidth: Math.max(1, viewport.width - WINDOW_MARGIN_PX * 2),
+          maxHeight: Math.max(1, viewport.height - WINDOW_MARGIN_PX * 2),
+        }}
+      >
+        {guideBody}
 
         {!isCollapsed && (
           <button
             type="button"
             aria-label="Resize guide window"
             title="Resize"
-            onPointerDown={beginResize}
+            onPointerDown={onResizeStart}
             className="absolute right-0 bottom-0 h-5 w-5 cursor-se-resize bg-transparent"
           />
         )}
-      </div>
+      </FloatingWindow>
     </div>
-  )
+  );
+}
+
+function resolveDesktopPanel(options: {
+  isDesktop: boolean;
+  desktopWindow: DesktopWindowState | null;
+  isCollapsed: boolean;
+  collapsedPanelHeight: number;
+}): { viewport: ViewportBox; panel: DesktopWindowState } | null {
+  if (!options.isDesktop) return null;
+  const viewport = currentViewportBox();
+  const mode = {
+    isCollapsed: options.isCollapsed,
+    collapsedHeight: options.collapsedPanelHeight,
+  };
+  const resolvedWindow = clampDesktopWindowForMode(
+    options.desktopWindow ?? defaultDesktopWindowState(viewport),
+    viewport,
+    mode,
+  );
+  return {
+    viewport,
+    panel: getDesktopPanelRect(resolvedWindow, viewport, mode),
+  };
+}
+
+function serializeDesktopWindowOrNull(
+  windowState: DesktopWindowState | null,
+  isCollapsed: boolean,
+): string | null {
+  if (!windowState) return null;
+  return serializeStoredWindowState({ windowState, isCollapsed });
+}
+
+function getInteractionCursor(
+  interaction: InteractionState,
+): "grabbing" | "se-resize" {
+  return interaction?.type === "drag" ? "grabbing" : "se-resize";
+}
+
+export function RulesPanel({
+  onClose,
+  minimized: isCollapsed,
+  onMinimizedChange,
+  behindPanel,
+  target,
+  gameId,
+  playerName,
+  useUpgrades,
+  useVanguards,
+}: RulesPanelProps): ReactNode {
+  const [visit, setVisit] = useState({ target, count: 0 });
+  if (target !== visit.target) setVisit({ target, count: visit.count + 1 });
+  const [isDesktop, setIsDesktop] = useState(() => isDesktopViewport());
+  const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(
+    () => resolveInitialDesktopWindowState(),
+  );
+  const [navigationHint, setNavigationHint] = useState(
+    COLLAPSED_LABEL_FALLBACK,
+  );
+  const [interaction, setInteraction] = useState<InteractionState>(null);
+  const collapsedPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const stopInteraction = useCallback(() => {
+    setInteraction(null);
+  }, []);
+
+  const collapsedPanelHeight = useCollapsedPanelHeight(
+    collapsedPanelRef,
+    isCollapsed,
+    [isDesktop, navigationHint],
+  );
+
+  const syncDesktopWindow = useCallback(
+    (collapsed: boolean) => {
+      if (!isDesktopViewport()) {
+        return;
+      }
+      const viewport = currentViewportBox();
+      setDesktopWindow((previous) => {
+        const fallback =
+          previous ??
+          loadStoredWindowState()?.windowState ??
+          defaultDesktopWindowState(viewport);
+        const next = clampDesktopWindowForMode(fallback, viewport, {
+          isCollapsed: collapsed,
+          collapsedHeight: collapsedPanelHeight,
+        });
+        return sameWindowState(previous, next) ? previous : next;
+      });
+    },
+    [collapsedPanelHeight],
+  );
+
+  useViewportSync(() => {
+    const desktop = isDesktopViewport();
+    setIsDesktop(desktop);
+    if (!desktop) {
+      stopInteraction();
+      return;
+    }
+    syncDesktopWindow(isCollapsed);
+  });
+
+  const desktopLayout = resolveDesktopPanel({
+    isDesktop,
+    desktopWindow,
+    isCollapsed,
+    collapsedPanelHeight,
+  });
+  const desktopPanel = desktopLayout?.panel ?? null;
+
+  const handleCollapse = useCallback(() => {
+    stopInteraction();
+    if (isDesktopViewport()) {
+      syncDesktopWindow(true);
+    }
+    onMinimizedChange(true);
+  }, [onMinimizedChange, stopInteraction, syncDesktopWindow]);
+
+  const handleRestore = useCallback(() => {
+    stopInteraction();
+    if (isDesktopViewport()) {
+      syncDesktopWindow(false);
+    }
+    onMinimizedChange(false);
+  }, [onMinimizedChange, stopInteraction, syncDesktopWindow]);
+
+  const resetWindow = useCallback(() => {
+    stopInteraction();
+    onMinimizedChange(false);
+    if (!isDesktopViewport()) {
+      return;
+    }
+    setDesktopWindow(defaultDesktopWindowState(currentViewportBox()));
+  }, [onMinimizedChange, stopInteraction]);
+
+  const beginDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!desktopPanel) {
+        return;
+      }
+      event.preventDefault();
+      setInteraction({
+        type: "drag",
+        startPointerX: event.clientX,
+        startPointerY: event.clientY,
+        startX: desktopPanel.x,
+        startY: desktopPanel.y,
+      });
+    },
+    [desktopPanel],
+  );
+
+  const beginResize = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!isDesktop || !desktopPanel || isCollapsed) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      setInteraction({
+        type: "resize",
+        startPointerX: event.clientX,
+        startPointerY: event.clientY,
+        startWidth: desktopPanel.width,
+        startHeight: desktopPanel.height,
+      });
+    },
+    [desktopPanel, isCollapsed, isDesktop],
+  );
+
+  useEscapeKey((event) => {
+    if (!event.defaultPrevented && !behindPanel) {
+      onClose();
+    }
+  });
+
+  useLocalStorageSync(
+    WINDOW_STORAGE_KEY,
+    serializeDesktopWindowOrNull(desktopWindow, isCollapsed),
+  );
+
+  useFloatingWindowPointerInteraction({
+    active: Boolean(interaction && isDesktop),
+    cursor: getInteractionCursor(interaction),
+    onMove: (event) => {
+      if (!interaction) return;
+      setDesktopWindow((previous) =>
+        applyPointerMove({
+          previous,
+          interaction,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          isCollapsed,
+          collapsedPanelHeight,
+        }),
+      );
+    },
+    onEnd: stopInteraction,
+  });
+
+  const collapsedLocation = navigationHint || COLLAPSED_LABEL_FALLBACK;
+  const guideBody = (
+    <GuideBody
+      visitCount={visit.count}
+      target={target}
+      gameId={gameId}
+      playerName={playerName}
+      useUpgrades={useUpgrades}
+      useVanguards={useVanguards}
+      onLocationChange={setNavigationHint}
+    />
+  );
+
+  if (!desktopLayout) {
+    return (
+      <MobileRulesWindow
+        viewport={currentViewportBox()}
+        isCollapsed={isCollapsed}
+        collapsedLocation={collapsedLocation}
+        onDragStart={beginDrag}
+        onMinimize={handleCollapse}
+        onRestore={handleRestore}
+        onReset={resetWindow}
+        onClose={onClose}
+        guideBody={guideBody}
+      />
+    );
+  }
+
+  return (
+    <DesktopRulesWindow
+      viewport={desktopLayout.viewport}
+      panel={desktopLayout.panel}
+      isCollapsed={isCollapsed}
+      collapsedPanelRef={collapsedPanelRef}
+      collapsedLocation={collapsedLocation}
+      interaction={interaction}
+      onDragStart={beginDrag}
+      onResizeStart={beginResize}
+      onMinimize={handleCollapse}
+      onRestore={handleRestore}
+      onReset={resetWindow}
+      onClose={onClose}
+      guideBody={guideBody}
+    />
+  );
 }

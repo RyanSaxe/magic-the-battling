@@ -1,13 +1,40 @@
-# ruff: noqa: PLC0415
+"""SQLAlchemy engine setup, session factory, and schema initialization."""
+
 import json
 import logging
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import ColumnElement, Connection, Index, create_engine, event, func, select, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import ConnectionPoolEntry
 
-from server.db.models import Base
+from pitfight.utils import json_helpers
+from server.db.models import LOWERCASE_UNIQUE_USER_INDEXES, Base
+
+SQLITE_BUSY_TIMEOUT_MS = 5000
+SQLITE_CACHE_SIZE_KIB = -16000
+
+
+def apply_sqlite_pragmas(dbapi_connection: DBAPIConnection, _connection_record: ConnectionPoolEntry) -> None:
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        cursor.execute("PRAGMA synchronous = NORMAL")
+        cursor.execute("PRAGMA temp_store = MEMORY")
+        cursor.execute(f"PRAGMA cache_size = {SQLITE_CACHE_SIZE_KIB}")
+    finally:
+        cursor.close()
+
+
+def configure_sqlite_pragmas(target_engine: Engine) -> None:
+    if target_engine.url.get_backend_name() != "sqlite":
+        return
+    if not event.contains(target_engine, "connect", apply_sqlite_pragmas):
+        event.listen(target_engine, "connect", apply_sqlite_pragmas)
+
 
 if db_path := os.getenv("DATABASE_PATH"):
     DATA_DIR = Path(db_path).parent
@@ -19,15 +46,16 @@ else:
     DATABASE_URL = f"sqlite:///{DATA_DIR}/mtb.db"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+configure_sqlite_pragmas(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def _get_columns(conn, table: str) -> set[str]:
+def _get_columns(conn: Connection, table: str) -> set[str]:
     result = conn.execute(text(f"PRAGMA table_info({table})"))
     return {row[1] for row in result}
 
 
-def _migrate(conn, table: str, column: str, col_type: str, default: str | None = None) -> None:
+def _migrate(conn: Connection, table: str, *, column: str, col_type: str, default: str | None = None) -> None:
     columns = _get_columns(conn, table)
     if column not in columns:
         ddl = f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
@@ -37,14 +65,14 @@ def _migrate(conn, table: str, column: str, col_type: str, default: str | None =
         conn.commit()
 
 
-def _migrate_rename_column(conn, table: str, old_col: str, new_col: str) -> None:
+def _migrate_rename_column(conn: Connection, table: str, *, old_col: str, new_col: str) -> None:
     columns = _get_columns(conn, table)
     if old_col in columns and new_col not in columns:
         conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {old_col} TO {new_col}"))
         conn.commit()
 
 
-def init_db():
+def init_db() -> None:
     _migrate_rename_column_pre_create()
     Base.metadata.create_all(bind=engine)
 
@@ -54,19 +82,57 @@ def init_db():
         conn.commit()
 
     with engine.connect() as conn:
-        _migrate(conn, "battle_snapshots", "poison", "INTEGER")
-        _migrate(conn, "player_game_history", "is_puppet", "BOOLEAN", "0")
-        _migrate(conn, "player_game_history", "source_history_id", "INTEGER")
-        _migrate(conn, "player_game_history", "poison_history_json", "TEXT")
-        _migrate(conn, "battle_snapshots", "play_draw_preference", "TEXT")
-        _migrate(conn, "games", "shared", "BOOLEAN", "0")
+        _migrate(conn, "battle_snapshots", column="poison", col_type="INTEGER")
+        _migrate(conn, "player_game_history", column="is_puppet", col_type="BOOLEAN", default="0")
+        _migrate(conn, "player_game_history", column="source_history_id", col_type="INTEGER")
+        _migrate(conn, "player_game_history", column="poison_history_json", col_type="TEXT")
+        _migrate(conn, "battle_snapshots", column="play_draw_preference", col_type="TEXT")
+        _migrate(conn, "games", column="shared", col_type="BOOLEAN", default="0")
 
-        _migrate(conn, "games", "cube_id", "TEXT")
-        _migrate(conn, "game_players", "user_id", "TEXT")
-        _migrate(conn, "player_game_history", "user_id", "TEXT")
+        _migrate(conn, "games", column="cube_id", col_type="TEXT")
+        _migrate(conn, "game_players", column="user_id", col_type="TEXT")
+        _migrate(conn, "game_players", column="seat_token_hash", col_type="TEXT")
+        _migrate(conn, "player_game_history", column="user_id", col_type="TEXT")
+        _migrate(conn, "player_game_history", column="final_poison", col_type="INTEGER")
+        _migrate(conn, "player_game_history", column="final_treasures", col_type="INTEGER")
+        _migrate(conn, "battle_snapshots", column="opponent_name", col_type="TEXT")
+        _migrate(conn, "battle_snapshots", column="sudden_death_build", col_type="INTEGER")
 
+    _add_lowercase_user_indexes()
     _backfill_game_cube_ids()
     _backfill_cube_metadata()
+
+
+def _add_lowercase_user_indexes() -> None:
+    """Add every index in LOWERCASE_UNIQUE_USER_INDEXES that's missing, or none if some accounts break one of them."""
+    with engine.connect() as conn:
+        existing = set(conn.execute(text("SELECT name FROM sqlite_master WHERE type = 'index'")).scalars())
+        missing = [index for index in LOWERCASE_UNIQUE_USER_INDEXES if index.name not in existing]
+        if not missing:
+            return
+        # pysqlite opens a transaction only before INSERT, UPDATE or DELETE, so without this the check and each
+        # CREATE INDEX would commit on their own.
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
+        clashes = {index.name: _count_case_clashes(conn, index) for index in missing}
+        if any(clashes.values()):
+            conn.rollback()
+            logging.getLogger(__name__).error(
+                "Did not create %s: some accounts differ only by case (%s). Sign-up and login still ignore case.",
+                " or ".join(str(name) for name in clashes),
+                ", ".join(f"{name}: {count} group(s)" for name, count in clashes.items()),
+            )
+            return
+        for index in missing:
+            index.create(conn)
+        conn.commit()
+
+
+def _count_case_clashes(conn: Connection, index: Index) -> int:
+    lowered = index.expressions[0]
+    if not isinstance(lowered, ColumnElement):
+        return 0
+    clashing = select(lowered).group_by(lowered).having(func.count(lowered) > 1).subquery()
+    return conn.execute(select(func.count()).select_from(clashing)).scalar_one()
 
 
 def _backfill_game_cube_ids() -> None:
@@ -98,10 +164,8 @@ def save_cube_metadata(cube_id: str) -> None:
     """Persist cube name and image from the CubeCobra JSON cache (no extra fetch if already cached)."""
     logger = logging.getLogger(__name__)
     try:
-        from mtb.utils.json_helpers import get_json
-
         url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
-        data = get_json(url)
+        data = json_helpers.get_json(url)
         name = data.get("name")
         image = data.get("image", {})
         image_uri = image.get("uri") if isinstance(image, dict) else None
@@ -114,7 +178,7 @@ def save_cube_metadata(cube_id: str) -> None:
                 {"cube_id": cube_id, "name": name, "image_uri": image_uri},
             )
             conn.commit()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- broad boundary catch
         logger.debug("Could not save cube metadata for %s", cube_id)
 
 
@@ -143,13 +207,12 @@ def _backfill_cube_metadata() -> None:
             return
 
         logger.info("Backfilling cube metadata for %d cube(s)", len(missing))
-        from mtb.utils.json_helpers import get_json
 
         count = 0
         for cube_id in missing:
             try:
                 url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
-                data = get_json(url)
+                data = json_helpers.get_json(url)
                 name = data.get("name")
                 image = data.get("image", {})
                 image_uri = image.get("uri") if isinstance(image, dict) else None
@@ -161,7 +224,7 @@ def _backfill_cube_metadata() -> None:
                     {"cube_id": cube_id, "name": name, "image_uri": image_uri},
                 )
                 count += 1
-            except Exception:
+            except Exception:  # noqa: BLE001 -- broad boundary catch
                 logger.warning("Failed to fetch metadata for cube %s", cube_id)
         conn.commit()
         if count:
@@ -171,5 +234,5 @@ def _backfill_cube_metadata() -> None:
 def _migrate_rename_column_pre_create() -> None:
     """Run column renames before SQLAlchemy creates tables, so existing DBs are migrated."""
     with engine.connect() as conn:
-        _migrate_rename_column(conn, "player_game_history", "is_bot", "is_puppet")
-        _migrate_rename_column(conn, "game_players", "is_bot", "is_puppet")
+        _migrate_rename_column(conn, "player_game_history", old_col="is_bot", new_col="is_puppet")
+        _migrate_rename_column(conn, "game_players", old_col="is_bot", new_col="is_puppet")

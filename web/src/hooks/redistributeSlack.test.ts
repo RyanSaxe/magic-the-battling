@@ -9,10 +9,7 @@ import {
   ZONE_LAYOUT_PADDING,
   type CardLayoutConfig,
 } from "./useCardLayout";
-import {
-  redistributeSlack,
-  resolveGrowPriority,
-} from "./redistributeSlack";
+import { redistributeSlack, resolveGrowPriority } from "./redistributeSlack";
 
 function runFullPipeline(
   config: CardLayoutConfig,
@@ -25,30 +22,30 @@ function runFullPipeline(
   initialConstraints: Required<ZoneConstraints>;
   finalConstraints: Required<ZoneConstraints>;
 } {
-  const initialConstraints = deriveConstraintsFromLayout(
-    computeLayout(containerW, containerH, config),
+  const initialConstraints = deriveConstraintsFromLayout({
+    unconstrained: computeLayout(containerW, containerH, config),
     config,
     containerH,
     containerW,
-  );
-  const baseline = computeConstrainedLayoutState(
+  });
+  const baseline = computeConstrainedLayoutState({
     containerW,
     containerH,
     config,
-    initialConstraints,
-  );
-  const { constraints: finalConstraints, iterations } = redistributeSlack(
-    initialConstraints,
+    constraints: initialConstraints,
+  });
+  const { constraints: finalConstraints, iterations } = redistributeSlack({
+    initial: initialConstraints,
     config,
     containerW,
     containerH,
-  );
-  const redistributed = computeConstrainedLayoutState(
+  });
+  const redistributed = computeConstrainedLayoutState({
     containerW,
     containerH,
     config,
-    finalConstraints,
-  );
+    constraints: finalConstraints,
+  });
   return {
     baseline,
     redistributed,
@@ -86,12 +83,12 @@ describe("redistributeSlack", () => {
         leftFraction: 0.7,
         bottomLeftSplit: 0.5,
       };
-      const { constraints, iterations } = redistributeSlack(
+      const { constraints, iterations } = redistributeSlack({
         initial,
         config,
-        1000,
-        600,
-      );
+        containerW: 1000,
+        containerH: 600,
+      });
       expect(constraints).toEqual(initial);
       expect(iterations).toBeLessThanOrEqual(2);
     });

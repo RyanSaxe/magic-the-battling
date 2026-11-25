@@ -1,34 +1,38 @@
-import { useEffect, useRef } from 'react'
+/**
+ * Keyboard shortcut binding hook using React 19.2 `useEffectEvent` so callers
+ * pass fresh hotkey maps without ref-sync effects.
+ */
+import { useEffect, useEffectEvent } from "react";
+import { enterMayAdvance, enterPressesControl } from "../utils/enterKey";
 
-type HotkeyMap = Record<string, () => void>
+type HotkeyMap = Record<string, () => void>;
 
-export function useHotkeys(hotkeys: HotkeyMap, enabled = true) {
-  const hotkeysRef = useRef(hotkeys)
+export function hotkeyFor(key: string): string {
+  return key === "Enter" ? "Enter" : key.toLowerCase();
+}
+
+const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return EDITABLE_TAGS.has(target.tagName) || target.isContentEditable;
+}
+
+export function useHotkeys(hotkeys: HotkeyMap, enabled = true): void {
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (isEditableTarget(e.target) || enterPressesControl(e)) return;
+
+    const action = hotkeys[hotkeyFor(e.key)];
+    if (!action) return;
+    e.preventDefault();
+    if (e.key === "Enter" && !enterMayAdvance(e)) return;
+    action();
+  });
 
   useEffect(() => {
-    hotkeysRef.current = hotkeys
-  })
-
-  useEffect(() => {
-    if (!enabled) return
-
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
-      const tag = target?.tagName
-      if (e.altKey || e.ctrlKey || e.metaKey) return
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
-        return
-      }
-
-      const key = e.key === 'Enter' ? 'Enter' : e.key.toLowerCase()
-      const action = hotkeysRef.current[key]
-      if (action) {
-        e.preventDefault()
-        action()
-      }
-    }
-
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [enabled])
+    if (!enabled) return undefined;
+    window.addEventListener("keydown", handleKeyDown);
+    return (): void => window.removeEventListener("keydown", handleKeyDown);
+  }, [enabled]);
 }

@@ -5,6 +5,7 @@ import {
   canInteractWithBattleZone,
   canUseBattleFaceDownAction,
   canUseBattleFlipAction,
+  hasBattleResultConflict,
 } from "./battleInteraction";
 
 describe("battle interaction policy", () => {
@@ -85,5 +86,37 @@ describe("battle interaction policy", () => {
       }),
     ).toBe(true);
     expect(canUseBattleFaceDownAction("opponent", true)).toBe(true);
+  });
+});
+
+describe("hasBattleResultConflict", () => {
+  it("reports a conflict while the two submissions disagree", () => {
+    expect(
+      hasBattleResultConflict({
+        mySubmission: "Bob",
+        opponentSubmission: "Alice",
+        isResolved: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("clears the conflict once the battle has resolved", () => {
+    expect(
+      hasBattleResultConflict({
+        mySubmission: "Bob",
+        opponentSubmission: "Alice",
+        isResolved: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not report a conflict before the opponent submits", () => {
+    expect(
+      hasBattleResultConflict({
+        mySubmission: "Bob",
+        opponentSubmission: undefined,
+        isResolved: false,
+      }),
+    ).toBe(false);
   });
 });

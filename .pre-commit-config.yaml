@@ -1,35 +1,104 @@
+# prek runs these before each commit, and CI runs `prek run --all-files`.
+# Formatters fix files rather than only reporting them.
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        # CI's checkout stages nothing, so check every file it is given.
+        args: [--enforce-all]
+
+  - repo: https://github.com/rvben/rumdl-pre-commit
+    rev: v0.3.6
+    hooks:
+      - id: rumdl-check
+        args: [--fix]
+
+  - repo: local
+    hooks:
+      - id: max-file-lines
+        name: max-file-lines
+        # Hard 1,000-line cap on source files; skips lockfiles, generated,
+        # minified, SVG, JSON, data and Markdown files.
+        entry: >-
+          python3 -c 'import pathlib, re, sys;
+          skip_ext = {".lock", ".svg", ".json", ".jsonc", ".csv", ".tsv", ".jsonl", ".ndjson", ".sql", ".xml", ".md", ".mdx", ".markdown", ".map", ".snap", ".po", ".pot"};
+          skip_re = re.compile(r"(^|/)([^/]+-lock\.[^/]+|[^/]+\.(min|generated|gen)\.[^/]+|[^/]+_pb2\.py|[^/]+\.pb\.go)$");
+          bad = [];
+          [bad.append((p, n)) for p in sys.argv[1:]
+           if pathlib.Path(p).suffix.lower() not in skip_ext and not skip_re.search(p)
+           and (n := sum(1 for _ in pathlib.Path(p).open("rb"))) > 1000];
+          [print(f"{p}: {n} lines (limit 1000) - split this file along a domain boundary.", file=sys.stderr) for p, n in bad];
+          sys.exit(1 if bad else 0)'
+        language: python
+        types: [text]
+
+  # Python: ruff and ty stay pinned in pyproject.toml / uv.lock.
   - repo: local
     hooks:
       - id: ruff
         name: ruff
-        entry: uvx ruff check --fix
+        entry: uv run ruff check --fix
         language: system
         types: [python]
 
       - id: ruff-format
         name: ruff-format
-        entry: uvx ruff format
+        entry: uv run ruff format
         language: system
         types: [python]
 
       - id: ty
         name: ty
-        entry: uvx ty check
+        entry: uv run ty check
         language: system
         types: [python]
         pass_filenames: false
 
-      - id: eslint
-        name: eslint
-        entry: bash -c 'cd web && npm run lint'
+      - id: uv-lock-check
+        name: uv-lock-check
+        entry: uv lock --check
         language: system
-        files: ^web/src/.*\.(ts|tsx)$
+        files: ^(pyproject\.toml|uv\.lock)$
         pass_filenames: false
 
-      - id: typecheck-web
-        name: typecheck-web
-        entry: bash -c 'cd web && npm run typecheck'
+  # Web: oxfmt and oxlint run from node_modules, at the versions in
+  # package-lock.json.
+  - repo: local
+    hooks:
+      - id: oxfmt
+        name: oxfmt
+        entry: >-
+          bash -c 'cd web && npx --no-install oxfmt --no-error-on-unmatched-pattern "${@#web/}"' --
         language: system
-        files: ^web/src/.*\.(ts|tsx)$
+        files: ^web/.*\.([cm]?[jt]sx?|css|html|json|ya?ml|toml)$
+        exclude: ^web/(dist|node_modules|package-lock\.json)
+
+      - id: oxlint
+        name: oxlint
+        entry: bash -c 'cd web && npx --no-install oxlint --type-aware --type-check --deny-warnings'
+        language: system
+        files: ^web/(.*\.([cm]?[jt]sx?)|\.oxlintrc\.json|tsconfig.*\.json)$
+        exclude: ^web/(dist|node_modules)/
         pass_filenames: false
+
+  # Shell
+  - repo: local
+    hooks:
+      - id: shfmt
+        name: shfmt
+        entry: shfmt --write --indent 2
+        language: system
+        types: [shell]
+        # shfmt has no zsh dialect.
+        exclude: \.zsh$
+
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: system
+        types: [shell]
+        exclude: \.zsh$

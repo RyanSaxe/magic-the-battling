@@ -1,0 +1,183 @@
+"""The lobby host role: kept through short absences, passed on when the host stays away."""
+
+import time
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+from starlette.testclient import WebSocketTestSession
+
+import server.routers.ws as ws_module
+
+GRACE_SECONDS = 0.05
+
+
+@pytest.fixture
+def short_grace(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("server.services.game.lobby_service.HOST_HANDOFF_GRACE_SECONDS", GRACE_SECONDS)
+
+
+def _lobby(client: TestClient, names: list[str]) -> tuple[str, dict[str, dict]]:
+    created = client.post(
+        "/api/games", json={"player_name": names[0], "cube_id": "test", "target_player_count": 4}
+    ).json()
+    seats = {names[0]: created}
+    for name in names[1:]:
+        seats[name] = client.post(
+            "/api/games/join", json={"join_code": created["join_code"], "player_name": name}
+        ).json()
+    return created["game_id"], seats
+
+
+def _connect(client: TestClient, game_id: str, *, seat: dict) -> AbstractContextManager[WebSocketTestSession]:
+    return client.websocket_connect(f"/ws/{game_id}?session_id={seat['session_id']}")
+
+
+def _host(client: TestClient, game_id: str) -> str:
+    players = client.get(f"/api/games/{game_id}/lobby").json()["players"]
+    return next(p["name"] for p in players if p["is_host"])
+
+
+def _hosted_by(name: str) -> Callable[[dict], bool]:
+    def predicate(message: dict) -> bool:
+        if message["type"] != "lobby_state":
+            return False
+        return any(p["name"] == name and p["is_host"] for p in message["payload"]["players"])
+
+    return predicate
+
+
+def test_lobby_players_show_who_is_away(client: TestClient, ws_receive_json: Callable[..., dict[str, Any]]) -> None:
+    game_id, seats = _lobby(client, ["Anya", "Boris"])
+
+    with _connect(client, game_id, seat=seats["Anya"]) as anya:
+        ws_receive_json(anya)
+        players = {p["name"]: p for p in client.get(f"/api/games/{game_id}/lobby").json()["players"]}
+
+    assert players["Anya"]["is_connected"] is True
+    assert players["Boris"]["is_connected"] is False
+
+
+def test_a_host_away_past_the_grace_hands_off_to_the_earliest_joined_connected_player(
+    client: TestClient,
+    short_grace: None,
+    *,
+    ws_receive_json: Callable[..., dict[str, Any]],
+    ws_receive_json_until: Callable[..., dict[str, Any]],
+) -> None:
+    _ = short_grace
+    game_id, seats = _lobby(client, ["Anya", "Boris", "Dmitri"])
+
+    with _connect(client, game_id, seat=seats["Dmitri"]) as dmitri:
+        ws_receive_json(dmitri)
+        with _connect(client, game_id, seat=seats["Anya"]) as anya:
+            ws_receive_json(anya)
+
+        ws_receive_json_until(dmitri, _hosted_by("Dmitri"), description="Dmitri as host")
+
+    assert _host(client, game_id) == "Dmitri"
+
+
+def test_a_host_back_within_the_grace_keeps_the_role(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, *, ws_receive_json: Callable[..., dict[str, Any]]
+) -> None:
+    monkeypatch.setattr("server.services.game.lobby_service.HOST_HANDOFF_GRACE_SECONDS", 0.5)
+    game_id, seats = _lobby(client, ["Anya", "Boris"])
+
+    with _connect(client, game_id, seat=seats["Boris"]) as boris:
+        ws_receive_json(boris)
+        with _connect(client, game_id, seat=seats["Anya"]) as anya:
+            ws_receive_json(anya)
+        with _connect(client, game_id, seat=seats["Anya"]) as anya:
+            ws_receive_json(anya)
+            time.sleep(0.7)
+            assert _host(client, game_id) == "Anya"
+
+
+def test_a_former_host_who_returns_stays_a_guest(
+    client: TestClient,
+    short_grace: None,
+    *,
+    ws_receive_json: Callable[..., dict[str, Any]],
+    ws_receive_json_until: Callable[..., dict[str, Any]],
+) -> None:
+    _ = short_grace
+    game_id, seats = _lobby(client, ["Anya", "Boris"])
+
+    with _connect(client, game_id, seat=seats["Boris"]) as boris:
+        ws_receive_json(boris)
+        with _connect(client, game_id, seat=seats["Anya"]) as anya:
+            ws_receive_json(anya)
+        ws_receive_json_until(boris, _hosted_by("Boris"), description="Boris as host")
+
+        with _connect(client, game_id, seat=seats["Anya"]) as anya:
+            ws_receive_json(anya)
+            assert _host(client, game_id) == "Boris"
+
+
+def test_with_nobody_else_connected_the_role_waits_for_the_next_player_to_connect(
+    client: TestClient, short_grace: None, *, ws_receive_json: Callable[..., dict[str, Any]]
+) -> None:
+    _ = short_grace
+    game_id, seats = _lobby(client, ["Anya", "Boris"])
+
+    with _connect(client, game_id, seat=seats["Anya"]) as anya:
+        ws_receive_json(anya)
+    time.sleep(GRACE_SECONDS * 4)
+    assert _host(client, game_id) == "Anya"
+
+    with _connect(client, game_id, seat=seats["Boris"]) as boris:
+        first_state = ws_receive_json(boris)
+
+    assert _hosted_by("Boris")(first_state)
+
+
+@pytest.mark.parametrize(("dmitri_connected", "expected_host"), [(True, "Dmitri"), (False, "Boris")])
+def test_removing_the_host_seat_passes_the_role_on(
+    client: TestClient,
+    ws_receive_json: Callable[..., dict[str, Any]],
+    *,
+    dmitri_connected: bool,
+    expected_host: str,
+) -> None:
+    game_id, seats = _lobby(client, ["Anya", "Boris", "Dmitri"])
+    anya_id = seats["Anya"]["player_id"]
+
+    if dmitri_connected:
+        with _connect(client, game_id, seat=seats["Dmitri"]) as dmitri:
+            ws_receive_json(dmitri)
+            ws_module.game_manager.remove_player_from_pending(game_id, anya_id)
+    else:
+        ws_module.game_manager.remove_player_from_pending(game_id, anya_id)
+
+    assert _host(client, game_id) == expected_host
+
+
+def test_the_lobby_names_the_previous_host_until_the_role_passes_again(
+    client: TestClient,
+    short_grace: None,
+    *,
+    ws_receive_json: Callable[..., dict[str, Any]],
+    ws_receive_json_until: Callable[..., dict[str, Any]],
+) -> None:
+    _ = short_grace
+    game_id, seats = _lobby(client, ["Anya", "Boris"])
+
+    def previous_host_id() -> str | None:
+        return client.get(f"/api/games/{game_id}/lobby").json()["previous_host_id"]
+
+    assert previous_host_id() is None
+    with _connect(client, game_id, seat=seats["Boris"]) as boris:
+        ws_receive_json(boris)
+        with _connect(client, game_id, seat=seats["Anya"]) as anya:
+            ws_receive_json(anya)
+        ws_receive_json_until(boris, _hosted_by("Boris"), description="Boris as host")
+
+        with _connect(client, game_id, seat=seats["Anya"]) as anya:
+            first_state = ws_receive_json(anya)
+            assert first_state["payload"]["previous_host_id"] == seats["Anya"]["player_id"]
+
+            ws_module.game_manager.remove_player_from_pending(game_id, seats["Boris"]["player_id"])
+            assert previous_host_id() == seats["Boris"]["player_id"]

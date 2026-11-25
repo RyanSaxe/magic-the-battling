@@ -3,53 +3,31 @@ import {
   getDefaultNewPlayerPreference,
   getGlobalGuidedModePreference,
   getNewPlayerPreferenceForGame,
+  findRememberedSeatByJoinCode,
+  forgetSeatForGame,
+  getRememberedSeat,
+  listReclaimableSeats,
   markPlayedBefore,
-  pickAutoReconnectPlayer,
+  rememberPlayerForGame,
   resolveNewPlayerPreferenceForGame,
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
-  type ReconnectStatusPlayer,
 } from "./deviceIdentity";
 
-const PLAYERS: ReconnectStatusPlayer[] = [
-  { name: "Alice", is_connected: false, is_puppet: false },
-  { name: "Bob", is_connected: true, is_puppet: false },
-  { name: "Puppet 1", is_connected: false, is_puppet: true },
-];
-
-describe("pickAutoReconnectPlayer", () => {
-  it("returns null when there is no remembered player", () => {
-    expect(pickAutoReconnectPlayer(null, PLAYERS)).toBeNull();
-  });
-
-  it("returns remembered player when disconnected", () => {
-    expect(pickAutoReconnectPlayer("Alice", PLAYERS)).toBe("Alice");
-  });
-
-  it("returns null when remembered player is currently connected", () => {
-    expect(pickAutoReconnectPlayer("Bob", PLAYERS)).toBeNull();
-  });
-
-  it("returns null when remembered player is missing", () => {
-    expect(pickAutoReconnectPlayer("Charlie", PLAYERS)).toBeNull();
-  });
-
-  it("never auto-reconnects puppet seats", () => {
-    expect(pickAutoReconnectPlayer("Puppet 1", PLAYERS)).toBeNull();
-  });
-});
-
-function createStorageMock() {
+function createStorageMock(): Pick<
+  Storage,
+  "getItem" | "setItem" | "removeItem" | "clear"
+> {
   const store = new Map<string, string>();
   return {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => {
+    getItem: (key: string): string | null => store.get(key) ?? null,
+    setItem: (key: string, value: string): void => {
       store.set(key, value);
     },
-    removeItem: (key: string) => {
+    removeItem: (key: string): void => {
       store.delete(key);
     },
-    clear: () => {
+    clear: (): void => {
       store.clear();
     },
   };
@@ -100,5 +78,80 @@ describe("new player preference", () => {
     markPlayedBefore();
     expect(getNewPlayerPreferenceForGame("missing")).toBeNull();
     expect(resolveNewPlayerPreferenceForGame("missing")).toBe(true);
+  });
+});
+
+describe("remembered seats", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", { localStorage: createStorageMock() });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the seat token and join code when the game is remembered again without them", () => {
+    rememberPlayerForGame("game-1", "Alice", {
+      seatToken: "token-1",
+      joinCode: "ABC123",
+    });
+    rememberPlayerForGame("game-1", "Alice");
+
+    expect(getRememberedSeat("game-1")).toMatchObject({
+      name: "Alice",
+      seatToken: "token-1",
+      joinCode: "ABC123",
+    });
+  });
+
+  it("replaces the seat token when a reclaim issues a new one", () => {
+    rememberPlayerForGame("game-1", "Alice", { seatToken: "token-1" });
+    rememberPlayerForGame("game-1", "Alice", { seatToken: "token-2" });
+
+    expect(getRememberedSeat("game-1")?.seatToken).toBe("token-2");
+  });
+
+  it("drops the token when the browser takes a different seat in the game", () => {
+    rememberPlayerForGame("game-1", "Alice", { seatToken: "token-1" });
+    rememberPlayerForGame("game-1", "Bob");
+
+    expect(getRememberedSeat("game-1")).toMatchObject({
+      name: "Bob",
+      seatToken: null,
+    });
+  });
+
+  it("finds a seat by its join code, whatever the case and spaces", () => {
+    rememberPlayerForGame("game-1", "Alice", {
+      seatToken: "token-1",
+      joinCode: "ABC123",
+    });
+
+    expect(findRememberedSeatByJoinCode(" abc123 ")?.gameId).toBe("game-1");
+    expect(findRememberedSeatByJoinCode("ZZZZZZ")).toBeNull();
+  });
+
+  it("lists only reclaimable seats, most recent first", () => {
+    vi.spyOn(Date, "now")
+      .mockReturnValueOnce(1)
+      .mockReturnValueOnce(2)
+      .mockReturnValueOnce(3);
+    rememberPlayerForGame("old", "Alice", { seatToken: "t-old" });
+    rememberPlayerForGame("no-token", "Alice");
+    rememberPlayerForGame("new", "Alice", { seatToken: "t-new" });
+
+    expect(listReclaimableSeats(10).map((seat) => seat.gameId)).toEqual([
+      "new",
+      "old",
+    ]);
+    expect(listReclaimableSeats(1).map((seat) => seat.gameId)).toEqual(["new"]);
+  });
+
+  it("forgets a seat", () => {
+    rememberPlayerForGame("game-1", "Alice", { seatToken: "token-1" });
+    forgetSeatForGame("game-1");
+
+    expect(getRememberedSeat("game-1")).toBeNull();
   });
 });

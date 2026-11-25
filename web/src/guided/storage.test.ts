@@ -7,17 +7,20 @@ import {
   skipAllGuidesForGame,
 } from "./storage";
 
-function createStorageMock() {
+function createStorageMock(): Pick<
+  Storage,
+  "getItem" | "setItem" | "removeItem" | "clear"
+> {
   const store = new Map<string, string>();
   return {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => {
+    getItem: (key: string): string | null => store.get(key) ?? null,
+    setItem: (key: string, value: string): void => {
       store.set(key, value);
     },
-    removeItem: (key: string) => {
+    removeItem: (key: string): void => {
       store.delete(key);
     },
-    clear: () => {
+    clear: (): void => {
       store.clear();
     },
   };
@@ -110,10 +113,7 @@ describe("guided storage", () => {
       "build",
       1,
     );
-    markGuideSeenForGame(
-      { gameId: "game-1", playerName: "Alice" },
-      "build",
-    );
+    markGuideSeenForGame({ gameId: "game-1", playerName: "Alice" }, "build");
 
     expect(
       getGuideProgressForGame({

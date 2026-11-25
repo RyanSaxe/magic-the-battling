@@ -4,11 +4,11 @@ import {
   comparePlayersForSidebar,
   getSidebarPlacementRank,
   getSidebarPlayerOrder,
+  isSidebarLastPlace,
+  suddenDeathDecidesGame,
 } from "./playerPlacement";
 
-function makePlayer(
-  overrides: Partial<PlayerView>,
-): PlayerView {
+function makePlayer(overrides: Partial<PlayerView>): PlayerView {
   return {
     name: "player",
     treasures: 0,
@@ -48,27 +48,91 @@ describe("player placement ordering", () => {
       makePlayer({ name: "Bravo", placement: 4 }),
     ];
 
-    expect(getSidebarPlayerOrder(players).map((player) => player.name)).toEqual([
-      "Alpha",
-      "Zulu",
-      "Bravo",
-    ]);
+    expect(getSidebarPlayerOrder(players).map((player) => player.name)).toEqual(
+      ["Alpha", "Zulu", "Bravo"],
+    );
     expect(getSidebarPlacementRank(players[1], players)).toBe(1);
     expect(getSidebarPlacementRank(players[0], players)).toBe(2);
     expect(getSidebarPlacementRank(players[2], players)).toBe(3);
   });
 
-  it("keeps alive players ahead of eliminated players and breaks alive ties by name", () => {
+  it("keeps alive players ahead of eliminated players and keeps join order on alive ties", () => {
     const players = [
       makePlayer({ name: "Charlie", placement: 0, poison: 3 }),
       makePlayer({ name: "Alpha", placement: 0, poison: 3 }),
       makePlayer({ name: "Bravo", placement: 4 }),
     ];
 
-    expect([...players].sort(comparePlayersForSidebar).map((player) => player.name)).toEqual([
-      "Alpha",
+    const ordered = [...players];
+    ordered.sort(comparePlayersForSidebar);
+    expect(ordered.map((player) => player.name)).toEqual([
       "Charlie",
+      "Alpha",
       "Bravo",
     ]);
+  });
+
+  it("gives alive players tied on poison the same place", () => {
+    const players = [
+      makePlayer({ name: "Zulu", poison: 0 }),
+      makePlayer({ name: "Alpha", poison: 0 }),
+      makePlayer({ name: "Charlie", poison: 1 }),
+      makePlayer({ name: "Bravo", poison: 1 }),
+      makePlayer({ name: "Delta", placement: 5 }),
+    ];
+
+    expect(
+      players.map((player) => getSidebarPlacementRank(player, players)),
+    ).toEqual([1, 1, 3, 3, 5]);
+  });
+});
+
+describe("isSidebarLastPlace", () => {
+  it("marks every player tied for the bottom rank as last", () => {
+    const players = [
+      makePlayer({ name: "Alpha", poison: 1 }),
+      makePlayer({ name: "Bravo", poison: 2 }),
+      makePlayer({ name: "Charlie", poison: 4 }),
+      makePlayer({ name: "Delta", poison: 4 }),
+    ];
+
+    expect(
+      players.map((player) => isSidebarLastPlace(player, players)),
+    ).toEqual([false, false, true, true]);
+  });
+
+  it("marks no one last while every player is tied", () => {
+    const players = [
+      makePlayer({ name: "Alpha" }),
+      makePlayer({ name: "Bravo" }),
+      makePlayer({ name: "Charlie" }),
+    ];
+
+    expect(
+      players.map((player) => isSidebarLastPlace(player, players)),
+    ).toEqual([false, false, false]);
+  });
+});
+
+describe("suddenDeathDecidesGame", () => {
+  it("is true when no one outside the sudden death is still alive", () => {
+    const players = [
+      makePlayer({ name: "Alpha", in_sudden_death: true }),
+      makePlayer({ name: "Bravo", in_sudden_death: true }),
+      makePlayer({ name: "Charlie", placement: 3 }),
+    ];
+
+    expect(suddenDeathDecidesGame(players)).toBe(true);
+  });
+
+  it("is false when another player is still alive", () => {
+    const players = [
+      makePlayer({ name: "Alpha", in_sudden_death: true }),
+      makePlayer({ name: "Bravo", in_sudden_death: true }),
+      makePlayer({ name: "Charlie", poison: 4 }),
+      makePlayer({ name: "Delta", placement: 4 }),
+    ];
+
+    expect(suddenDeathDecidesGame(players)).toBe(false);
   });
 });

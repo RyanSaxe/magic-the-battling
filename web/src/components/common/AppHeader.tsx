@@ -1,147 +1,245 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../contexts/authState'
-import { JoinGameModal } from '../home/JoinGameModal'
+import {
+  useCallback,
+  useState,
+  useRef,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+} from "react";
+import { Link, useInRouterContext, useNavigate } from "react-router-dom";
+import { useToast } from "../../contexts";
+import { useAuth } from "../../contexts/authState";
+import { useAsyncAction } from "../../hooks/useAsyncResource";
+import { useDocumentEvent } from "../../hooks/useDomEffects";
+import { useHotkeys } from "../../hooks/useHotkeys";
+import { JoinGameModal } from "../home/JoinGameModal";
+import { BoardBackdrop } from "./BoardBackdrop";
+import { BarLabel, BrandLockup, TopBar } from "./FrameBar";
+import { POPOVER_CHROME } from "./styles";
 
 interface AppHeaderProps {
-  renderRight: (opts: { compact: boolean }) => ReactNode
+  helpers?: ReactNode;
+  home?: ReactNode;
+  primary?: ReactNode;
+  account?: ReactNode;
+  ref?: Ref<HTMLElement>;
 }
 
-export function AppHeader({ renderRight }: AppHeaderProps) {
+const BRAND_HOME_LINK_CLASS =
+  "inline-flex items-center min-w-0 max-w-full rounded transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[var(--color-gold-bright)] focus-visible:outline-offset-2";
+
+function BrandHomeLink(): ReactElement {
+  const inRouter = useInRouterContext();
+  if (!inRouter) {
+    return (
+      <a
+        href="/"
+        aria-label="Pitfight Home"
+        title="Home"
+        className={BRAND_HOME_LINK_CLASS}
+      >
+        <BrandLockup />
+      </a>
+    );
+  }
   return (
-    <header className="shrink-0 py-3 frame-chrome bar-pad-both">
-      <div className="hidden sm:flex items-center justify-between">
-        <div>
-          <div className="flex items-baseline">
-            <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-              Crucible
-            </h1>
-            <span className="hero-sep mx-2.5">—</span>
-            <span className="hero-subtitle text-base font-normal tracking-widest">
-              an MtG format
-            </span>
-          </div>
-          <p className="hero-tagline">
-            Inspired by Roguelikes and Autobattlers
-          </p>
-        </div>
-        <div className="flex gap-2 items-center">
-          {renderRight({ compact: false })}
-        </div>
-      </div>
-      <div className="sm:hidden">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-baseline whitespace-nowrap">
-              <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                Crucible
-              </h1>
-              <span className="hero-sep mx-1 text-xs">—</span>
-              <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {renderRight({ compact: true })}
-          </div>
-        </div>
-      </div>
-    </header>
-  )
+    <Link
+      to="/"
+      aria-label="Pitfight Home"
+      title="Home"
+      className={BRAND_HOME_LINK_CLASS}
+    >
+      <BrandLockup />
+    </Link>
+  );
 }
 
-export function AuthHeaderButton({ compact }: { compact: boolean }) {
-  const navigate = useNavigate()
+/** The top bar on pages outside a game: the brand lockup, then the page's buttons by role. */
+export function AppHeader(props: AppHeaderProps): ReactElement {
+  return <TopBar lead={<BrandHomeLink />} {...props} />;
+}
+
+export function GuideButton({
+  onClick,
+  className = "",
+}: {
+  onClick: () => void;
+  className?: string;
+}): ReactElement {
   return (
     <button
-      onClick={() => navigate('/login')}
-      className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
+      onClick={onClick}
+      className={`btn btn-secondary btn-icon-phone ${className}`}
+      title="Guide"
+      data-guide-target="guide-button"
     >
-      Log in
+      <BarLabel desktop="Guide" phone="?" />
     </button>
-  )
+  );
 }
 
-export function UserMenuButton({ compact }: { compact: boolean }) {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const [open, setOpen] = useState(false)
-  const [showJoinModal, setShowJoinModal] = useState(false)
-  const [loggingOut, setLoggingOut] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+/** `onHome` runs before the page is left, for a screen that has something to undo first. */
+export function HomeButton({
+  to = "/",
+  className = "",
+  onHome,
+}: {
+  to?: string;
+  className?: string;
+  onHome?: () => void;
+}): ReactElement {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => {
+        onHome?.();
+        void navigate(to);
+      }}
+      className={`btn btn-secondary ${className}`}
+    >
+      Home
+    </button>
+  );
+}
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+/** The account menu: the username on desktop, ☰ on phones. */
+export function UserMenuButton(): ReactElement {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const { addToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  const performLogout = useCallback(
+    () =>
+      logout().then(
+        () => {
+          void navigate("/");
+        },
+        () => {
+          addToast("Something went wrong.", "error");
+        },
+      ),
+    [addToast, logout, navigate],
+  );
+  const { run: runLogout, pending: loggingOut } = useAsyncAction(performLogout);
+
+  useDocumentEvent("mousedown", (e) => {
+    const target = e.target;
+    if (!(target instanceof Node)) return;
+    if (
+      ref.current?.contains(target) ||
+      backdropRef.current?.contains(target)
+    ) {
+      return;
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const btnClass = compact
-    ? 'py-1.5 px-2 text-sm'
-    : 'py-2 px-3'
+    setOpen(false);
+  });
+  useHotkeys({ escape: () => setOpen(false) }, open);
 
   return (
     <>
       <div ref={ref} className="relative">
         <button
           onClick={() => setOpen(!open)}
-          className={`btn btn-secondary ${btnClass} flex items-center justify-center`}
+          className="btn btn-secondary btn-icon-phone inline-flex items-center justify-center gap-1"
           aria-label="Menu"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <span className="hidden sm:inline max-w-[12rem] truncate">
+            {user?.username}
+          </span>
+          <span className="hidden sm:inline text-[10px]" aria-hidden="true">
+            ▾
+          </span>
+          <svg
+            className="w-4 h-4 sm:hidden"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
         {open && (
-          <div className="absolute right-0 top-full mt-1 z-50 modal-chrome border gold-border rounded-lg shadow-2xl py-1 min-w-[160px]">
-            <div className="px-4 py-2 text-xs text-gray-500 border-b border-black/40">
+          <BoardBackdrop ref={backdropRef} onTap={() => setOpen(false)} />
+        )}
+        {open && (
+          <div
+            className={`absolute right-2 top-full mt-1 z-50 ${POPOVER_CHROME} py-1 min-w-[160px]`}
+          >
+            <div className="px-4 py-2 text-xs text-[var(--ivory-muted)] border-b gold-divider">
               {user?.username}
             </div>
             <button
-              onClick={() => { setOpen(false); navigate('/dashboard') }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              onClick={() => {
+                setOpen(false);
+                void navigate("/dashboard");
+              }}
+              className="w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
             >
               Dashboard
             </button>
             <button
-              onClick={() => { setOpen(false); navigate('/play') }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              onClick={() => {
+                setOpen(false);
+                void navigate("/dashboard/games");
+              }}
+              className="sm:hidden w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
+            >
+              Games
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                void navigate("/dashboard/discover");
+              }}
+              className="sm:hidden w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
+            >
+              Discover
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                void navigate("/play");
+              }}
+              className="w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
             >
               Play Game
             </button>
             <button
-              onClick={() => { setOpen(false); setShowJoinModal(true) }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              onClick={() => {
+                setOpen(false);
+                setShowJoinModal(true);
+              }}
+              className="w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
             >
               Join Game
             </button>
-            <div className="border-t border-black/40 my-1" />
+            <div className="border-t gold-divider my-1" />
             <button
               disabled={loggingOut}
-              onClick={async () => {
-                setOpen(false)
-                setLoggingOut(true)
-                try {
-                  await logout()
-                  navigate('/')
-                } finally {
-                  setLoggingOut(false)
-                }
+              onClick={() => {
+                setOpen(false);
+                void runLogout();
               }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:bg-white/10 hover:text-gray-200 transition-colors disabled:opacity-50"
+              className="w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors disabled:opacity-50"
             >
-              {loggingOut ? 'Logging out...' : 'Log Out'}
+              {loggingOut ? "Logging out..." : "Log Out"}
             </button>
           </div>
         )}
       </div>
-      {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+      {showJoinModal && (
+        <JoinGameModal onClose={() => setShowJoinModal(false)} />
+      )}
     </>
-  )
+  );
 }

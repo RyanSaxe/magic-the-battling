@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Card as CardType, LastResult, PlayerView } from "../../types";
-import type { RevealedPlayerTab } from "../../contexts/contextStripState";
-import { useContextStrip } from "../../contexts";
+import { useCallback, useState, type ReactNode } from "react";
+import { useObservedElement } from "../../hooks/pages/useObservedElement";
+import type { Card as CardType, PlayerView } from "../../types";
+import type { ScoutingTab } from "../../hooks/useGameSurfaces";
 import {
   CARD_ASPECT_RATIO,
   bestFitNoClip,
@@ -13,18 +13,35 @@ import {
   POISON_COUNTER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
-import { getPlayerPhaseStatusLabel } from "../../utils/format";
-import { buildAppliedUpgradeMap, getAppliedUpgrades, getUpgradeDisplayScope, getUnappliedUpgrades } from "../../utils/upgrades";
+import { POISON_TO_LOSE } from "../../constants/rules";
+import { StandingsRank } from "../common/StandingsRank";
+import { getLastResultWord, getPlayerActivity } from "../../utils/format";
+import {
+  getSidebarPlacementRank,
+  getStanding,
+  isSidebarLastPlace,
+} from "../../utils/playerPlacement";
+import {
+  SegmentedFilter,
+  type SegmentOption,
+} from "../dashboard/SegmentedFilter";
+import {
+  buildAppliedUpgradeMap,
+  getAppliedUpgrades,
+  getUpgradeDisplayScope,
+  getUnappliedUpgrades,
+} from "../../utils/upgrades";
 
 interface PlayerDetailPanelProps {
   player: PlayerView;
+  /** Everyone in the game, whom the player is ranked among. */
+  players: PlayerView[];
   currentPlayer: PlayerView;
   useUpgrades: boolean;
-  isMobile: boolean;
-  activeTab: RevealedPlayerTab;
-  onTabChange: (tab: RevealedPlayerTab) => void;
-  onClose: () => void;
-  isOpen?: boolean;
+  activeTab: ScoutingTab;
+  onTabChange: (tab: ScoutingTab) => void;
+  /** Inside a phone's drawer, where scouting takes the list's place, a Back button returns to the list. */
+  onBack?: () => void;
 }
 
 const DEFAULT_CARD_DIMS: ZoneDims = {
@@ -34,136 +51,164 @@ const DEFAULT_CARD_DIMS: ZoneDims = {
   columns: 1,
 };
 
-function getLastResultLabel(
-  result: LastResult | null,
-  inSuddenDeath: boolean,
-): string {
-  if (inSuddenDeath) return "Sudden death";
-  if (result === "win") return "Win";
-  if (result === "draw") return "Draw";
-  if (result === "loss") return "Loss";
-  return "No result yet";
-}
-
-function getPlayerStatus(player: PlayerView): string {
-  if (player.is_most_recent_ghost) return "Recent ghost";
-  if (player.is_ghost) return "Ghost";
-  if (player.is_puppet) return "Puppet";
-  return `${player.stage}-${player.round} @ ${getPlayerPhaseStatusLabel(player.phase, player.build_ready)}`;
+function getState(
+  player: PlayerView,
+  players: PlayerView[],
+): { title: string; detail: string; tone?: "ready" | "out" } {
+  const standing = getStanding(player);
+  const gameOver = players.some(
+    ({ phase }) => phase === "winner" || phase === "game_over",
+  );
+  if (standing === "ghost") {
+    return {
+      title: "Ghost",
+      detail: gameOver
+        ? "No longer fights"
+        : "Out, fights on with their last build",
+    };
+  }
+  if (standing === "out") {
+    return { title: "Out", detail: "No longer fights", tone: "out" };
+  }
+  if (player.is_puppet) {
+    return player.in_sudden_death
+      ? {
+          title: "Sudden Death",
+          detail: "Puppet, loser is eliminated",
+          tone: "out",
+        }
+      : { title: "Puppet", detail: "Replays a past game" };
+  }
+  const round = `Round ${player.stage}-${player.round}`;
+  const activity = getPlayerActivity(player) ?? "Game Over";
+  if (player.in_sudden_death) {
+    return {
+      title: "Sudden Death",
+      detail: `${activity} · ${round}`,
+      tone: "out",
+    };
+  }
+  const ready = player.phase === "build" && player.build_ready;
+  return { title: activity, detail: round, tone: ready ? "ready" : undefined };
 }
 
 function countLabel(count: number): string {
   return `${count} card${count === 1 ? "" : "s"}`;
 }
 
-function OverviewToken({
-  value,
-  imageSrc,
-  badgeClassName,
+/** A token beside its count, so the count doesn't cover the art. */
+function TokenCount({
+  image,
+  count,
+  outOf,
+  label,
 }: {
-  value: number;
-  imageSrc: string;
-  badgeClassName: string;
-}) {
+  image: string;
+  count: number;
+  outOf?: number;
+  label: string;
+}): ReactNode {
   return (
-    <div className="relative">
-      <img
-        src={imageSrc}
-        alt=""
-        className="h-[72px] block shadow-lg"
-        style={{ borderRadius: "var(--card-border-radius)" }}
-      />
-      <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/80 px-1.5 py-0.5 text-xs font-bold leading-none ${badgeClassName}`}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function OverviewTokenRow({
-  poison,
-  treasures,
-}: {
-  poison: number;
-  treasures: number;
-}) {
-  return (
-    <div className="flex items-start justify-center gap-5">
-      <div className="relative">
-        <OverviewToken
-          value={poison}
-          imageSrc={POISON_COUNTER_IMAGE}
-          badgeClassName="text-purple-300"
-        />
-      </div>
-      <div className="relative">
-        <OverviewToken
-          value={treasures}
-          imageSrc={TREASURE_TOKEN_IMAGE}
-          badgeClassName="text-amber-300"
-        />
-      </div>
-    </div>
-  );
-}
-
-function OverviewInfoTable({
-  rows,
-}: {
-  rows: { label: string; value: string }[];
-}) {
-  return (
-    <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10">
-      {rows.map((row, index) => (
-        <div
-          key={row.label}
-          className={`grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-2 ${
-            index > 0 ? "border-t border-[color:rgba(212,175,55,0.12)]" : ""
-          }`}
-        >
-          <dt className="text-[11px] font-medium text-gray-400">
-            {row.label}
-          </dt>
-          <dd className="min-w-0 text-right text-sm text-amber-50">
-            <span className="block truncate">
-              {row.value}
-            </span>
-          </dd>
+    <div className="scouting-cell scouting-token-count">
+      <img src={image} alt="" className="scouting-token" />
+      <div>
+        <div className="scouting-count">
+          {count}
+          {outOf && <span className="scouting-out-of">/{outOf}</span>}
         </div>
-      ))}
-    </dl>
+        <div className="scouting-key">{label}</div>
+      </div>
+    </div>
   );
 }
 
-function getLikelihoodValue(
-  pairingProbability: number | null,
-): string | null {
-  if (pairingProbability === null) return null;
-  return `${Math.round(pairingProbability * 100)}%`;
+function NextFightCell({
+  odds,
+  oddsUnknown,
+}: {
+  odds: number;
+  oddsUnknown: boolean;
+}): ReactNode {
+  return (
+    <div className="scouting-cell">
+      <div className="scouting-key">Next fight</div>
+      {oddsUnknown ? (
+        <div className="scouting-value scouting-none">Not known yet</div>
+      ) : (
+        <div className="scouting-value">
+          {Math.round(odds * 100)}%
+          <span className="scouting-note">to face you</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
-function getOverviewRows({
+function Standings({
   player,
-  lastResultLabel,
-  showPairingChance,
+  players,
+  isSelf,
+  viewerFighting,
 }: {
   player: PlayerView;
-  lastResultLabel: string;
-  showPairingChance: boolean;
-}): { label: string; value: string }[] {
-  const rows = [
-    { label: "Last result", value: lastResultLabel },
-    { label: "Currently at", value: getPlayerStatus(player) },
-  ];
+  players: PlayerView[];
+  isSelf: boolean;
+  viewerFighting: boolean;
+}): ReactNode {
+  const { title, detail, tone } = getState(player, players);
+  const result = player.last_result;
+  const odds = isSelf ? null : player.pairing_probability;
+  // The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death, which fixes the pairing.
+  const oddsUnknown = viewerFighting && !player.in_sudden_death;
+  const hiddenInFight = viewerFighting && !isSelf;
 
-  if (showPairingChance) {
-    rows.splice(1, 0, {
-      label: "Likelihood to battle",
-      value: getLikelihoodValue(player.pairing_probability) ?? "-",
-    });
-  }
-
-  return rows;
+  return (
+    <div className={`scouting-standings${isSelf ? " is-self" : ""}`}>
+      <div className="scouting-standing">
+        <StandingsRank
+          className="scouting-rank"
+          rank={getSidebarPlacementRank(player, players)}
+          isLast={isSidebarLastPlace(player, players)}
+        />
+        <div className="scouting-state">
+          <div className={`scouting-state-title${tone ? ` is-${tone}` : ""}`}>
+            {title}
+          </div>
+          <div className="scouting-state-detail">{detail}</div>
+        </div>
+      </div>
+      {!hiddenInFight && (
+        <div className="scouting-pair">
+          <TokenCount
+            image={POISON_COUNTER_IMAGE}
+            count={player.poison}
+            outOf={player.poison < POISON_TO_LOSE ? POISON_TO_LOSE : undefined}
+            label="Poison"
+          />
+          <TokenCount
+            image={TREASURE_TOKEN_IMAGE}
+            count={player.treasures}
+            label="Treasure"
+          />
+        </div>
+      )}
+      <div className="scouting-pair">
+        <div className="scouting-cell">
+          <div className="scouting-key">Last fight</div>
+          {result ? (
+            <div className={`scouting-value player-card-result-${result}`}>
+              {getLastResultWord(result)}
+            </div>
+          ) : (
+            <div className="scouting-value scouting-none">None yet</div>
+          )}
+        </div>
+        {odds !== null && (
+          <NextFightCell odds={odds} oddsUnknown={oddsUnknown} />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function SectionHeading({
@@ -172,14 +217,14 @@ function SectionHeading({
 }: {
   title: string;
   count?: number;
-}) {
+}): ReactNode {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">
+      <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ivory-muted)]">
         {title}
       </span>
       {count !== undefined && (
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[10px] text-[var(--ivory-muted)]">
           {countLabel(count)}
         </span>
       )}
@@ -213,97 +258,67 @@ function AdaptiveCardSection({
   minWidth?: number;
   minColumns?: number;
   measureKey?: string;
-}) {
+}): ReactNode {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_CARD_DIMS);
-  const observerRef = useRef<ResizeObserver | null>(null);
-  const measureRef = useRef<(() => void) | null>(null);
 
-  const resolveBestFit = useCallback((
-    width: number,
-    height: number,
-  ) => {
-    const next = bestFitNoClip(cards.length, width, height, 8, maxWidth, minWidth);
-
-    if (cards.length < minColumns || next.columns >= minColumns) {
-      return next;
-    }
-
-    const columns = Math.min(cards.length, minColumns);
-    const rows = Math.ceil(cards.length / columns);
-    const widthByColumns = Math.floor((width - 8 * Math.max(0, columns - 1)) / columns);
-    const widthByRows = Math.floor(
-      (height - 8 * Math.max(0, rows - 1)) / (rows * CARD_ASPECT_RATIO),
-    );
-    const forcedWidth = Math.max(
-      1,
-      Math.floor(Math.min(maxWidth, widthByColumns, widthByRows)),
-    );
-
-    return {
-      width: forcedWidth,
-      height: Math.round(forcedWidth * CARD_ASPECT_RATIO),
-      rows,
-      columns,
-    };
-  }, [cards.length, maxWidth, minColumns, minWidth]);
-
-  const bodyRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      observerRef.current?.disconnect();
-      observerRef.current = null;
-      measureRef.current = null;
-
-      if (!node) return;
-
-      const measure = () => {
-        const width = Math.max(node.clientWidth, 0);
-        const height = Math.max(node.clientHeight, 0);
-        const next = resolveBestFit(width, height);
-        setDims((prev) =>
-          prev.width === next.width &&
-          prev.height === next.height &&
-          prev.rows === next.rows &&
-          prev.columns === next.columns
-            ? prev
-            : next,
-        );
-      };
-      measureRef.current = measure;
-
-      measure();
-
-      const observer = new ResizeObserver(() => {
-        measure();
+  const resolveBestFit = useCallback(
+    (width: number, height: number) => {
+      const next = bestFitNoClip({
+        count: cards.length,
+        availWidth: width,
+        availHeight: height,
+        gap: 8,
+        maxWidth,
+        preferredMinWidth: minWidth,
       });
 
-      observer.observe(node);
-      observerRef.current = observer;
+      if (cards.length < minColumns || next.columns >= minColumns) {
+        return next;
+      }
+
+      const columns = Math.min(cards.length, minColumns);
+      const rows = Math.ceil(cards.length / columns);
+      const widthByColumns = Math.floor(
+        (width - 8 * Math.max(0, columns - 1)) / columns,
+      );
+      const widthByRows = Math.floor(
+        (height - 8 * Math.max(0, rows - 1)) / (rows * CARD_ASPECT_RATIO),
+      );
+      const forcedWidth = Math.max(
+        1,
+        Math.floor(Math.min(maxWidth, widthByColumns, widthByRows)),
+      );
+
+      return {
+        width: forcedWidth,
+        height: Math.round(forcedWidth * CARD_ASPECT_RATIO),
+        rows,
+        columns,
+      };
     },
-    [resolveBestFit],
+    [cards.length, maxWidth, minColumns, minWidth],
   );
 
-  useEffect(() => {
-    return () => {
-      observerRef.current?.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    let frameOne = 0;
-    let frameTwo = 0;
-
-    frameOne = requestAnimationFrame(() => {
-      measureRef.current?.();
-      frameTwo = requestAnimationFrame(() => {
-        measureRef.current?.();
-      });
-    });
-
-    return () => {
-      cancelAnimationFrame(frameOne);
-      cancelAnimationFrame(frameTwo);
-    };
-  }, [measureKey, resolveBestFit]);
+  const bodyRef = useObservedElement<HTMLDivElement>(
+    (node) => {
+      const width = Math.max(node.clientWidth, 0);
+      const height = Math.max(node.clientHeight, 0);
+      const next = resolveBestFit(width, height);
+      setDims((prev) =>
+        prev.width === next.width &&
+        prev.height === next.height &&
+        prev.rows === next.rows &&
+        prev.columns === next.columns
+          ? prev
+          : next,
+      );
+    },
+    {
+      deps: [resolveBestFit],
+      remeasureFrames: true,
+      remeasureKey: measureKey,
+    },
+  );
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
@@ -315,7 +330,7 @@ function AdaptiveCardSection({
         data-guide-target={guideTarget}
       >
         {cards.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[color:rgba(212,175,55,0.25)] bg-black/10 px-4 text-center text-sm text-gray-500">
+          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[color:rgba(212,175,55,0.25)] px-4 text-center text-sm text-[var(--ivory-muted)]">
             {emptyText}
           </div>
         ) : (
@@ -353,46 +368,59 @@ function AdaptiveCardSection({
   );
 }
 
-function DetailTabButton({
-  isActive,
-  label,
-  onClick,
+const DETAIL_TABS: SegmentOption<ScoutingTab>[] = [
+  { value: "seen", label: "Seen in Fight" },
+  { value: "overview", label: "Overview" },
+];
+
+function OverviewUpgradesSection({
+  useUpgrades,
+  upgrades,
 }: {
-  isActive: boolean;
-  label: string;
-  onClick: () => void;
-}) {
+  useUpgrades: boolean;
+  upgrades: CardType[];
+}): ReactNode {
+  if (!useUpgrades) return null;
+  if (upgrades.length === 0) {
+    return (
+      <section>
+        <SectionHeading title="Upgrades" />
+        <div className="mt-1 border-t gold-divider" />
+        <p className="pt-3 text-center text-sm text-[var(--ivory-muted)]">
+          None applied
+        </p>
+      </section>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-        isActive
-          ? "border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]"
-          : "border border-transparent bg-black/10 text-gray-400 hover:text-gray-200"
-      }`}
-    >
-      {label}
-    </button>
+    <AdaptiveCardSection
+      title="Upgrades"
+      cards={upgrades}
+      showUpgradeTargets
+      emptyText="No upgrades applied."
+      maxWidth={128}
+      minWidth={36}
+    />
   );
 }
 
+/** What a player has shown: the cards seen in their last fight, or an overview of their state. */
 export function PlayerDetailPanel({
   player,
+  players,
   currentPlayer,
   useUpgrades,
-  isMobile,
   activeTab,
   onTabChange,
-  onClose,
-  isOpen = true,
-}: PlayerDetailPanelProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const { state } = useContextStrip();
-  const [renderOpen, setRenderOpen] = useState(false);
-
+  onBack,
+}: PlayerDetailPanelProps): ReactNode {
   const isViewingSelf = player.name === currentPlayer.name;
-  const upgradeDisplayScope = getUpgradeDisplayScope(isViewingSelf, currentPlayer.phase);
+  const viewerFighting = currentPlayer.phase === "battle";
+  const seenHidden = viewerFighting && !isViewingSelf;
+  const upgradeDisplayScope = getUpgradeDisplayScope(
+    isViewingSelf,
+    currentPlayer.phase,
+  );
   const appliedUpgrades = getAppliedUpgrades(player.upgrades);
   const pendingUpgrades = getUnappliedUpgrades(currentPlayer.upgrades);
   const allUpgrades = isViewingSelf
@@ -403,152 +431,72 @@ export function PlayerDetailPanel({
     upgradeDisplayScope,
   );
   const companionIds = new Set(player.command_zone.map((card) => card.id));
-  const lastResultLabel = getLastResultLabel(player.last_result, player.in_sudden_death);
-  const showPairingChance =
-    player.name !== currentPlayer.name && player.pairing_probability !== null;
-  const overviewRows = getOverviewRows({
-    player,
-    lastResultLabel,
-    showPairingChance,
-  });
-
-  useEffect(() => {
-    if (isMobile || !isOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const panel = panelRef.current;
-      if (!panel || !target) return;
-      if (target.closest("[data-card-preview-modal='true']")) return;
-      if (panel.contains(target)) return;
-      const sidebarRoot = panel.closest("[data-guide-target='sidebar-panel']");
-      if (sidebarRoot instanceof HTMLElement && sidebarRoot.contains(target)) return;
-      onClose();
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && state.previewCard === null) onClose();
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isMobile, isOpen, onClose, state.previewCard]);
-
-  useEffect(() => {
-    if (isMobile) return;
-
-    const frame = requestAnimationFrame(() => {
-      setRenderOpen(isOpen);
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [isMobile, isOpen]);
-
-  const overviewContent = (
-    <div className="flex h-full flex-col gap-3">
-      <OverviewTokenRow poison={player.poison} treasures={player.treasures} />
-
-      <SectionHeading title="Overview" />
-      <div className="-mt-1">
-        <OverviewInfoTable rows={overviewRows} />
-      </div>
-
-      {useUpgrades && allUpgrades.length > 0 && (
-        <AdaptiveCardSection
-          title="Upgrades"
-          cards={allUpgrades}
-          showUpgradeTargets
-          emptyText="No upgrades applied."
-          maxWidth={92}
-          minWidth={44}
-        />
-      )}
-    </div>
-  );
-
-  const seenContent = (
-    <AdaptiveCardSection
-      title="Seen in Battle"
-      cards={player.most_recently_revealed_cards}
-      companionIds={companionIds}
-      upgradedCardIds={upgradedCardIds}
-      appliedUpgradesByCardId={appliedUpgradesByCardId}
-      emptyText="Nothing was revealed in battle yet."
-      guideTarget="sidebar-seen-in-battle"
-      maxWidth={104}
-      minColumns={isMobile ? 1 : 2}
-      measureKey={`${player.name}:${activeTab}:${isOpen ? "open" : "closed"}`}
-    />
-  );
-
-  const shell = (
-    <div className="flex h-full flex-col overflow-hidden" data-guide-target="sidebar-revealed-details">
-      <div className="border-b gold-divider px-4 pb-3 pt-4">
-        <div className="flex items-center gap-3">
-          {isMobile && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="shrink-0 text-sm text-gray-400 hover:text-white"
-            >
-              &larr; Back
-            </button>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-base font-medium text-amber-50">
-              <span className="text-gray-300">scouting </span>
-              <span className="text-[var(--color-gold)]">{player.name}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-center px-4 pb-3 pt-3">
-        <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
-          <DetailTabButton
-            isActive={activeTab === "seen"}
-            label="Seen in Battle"
-            onClick={() => onTabChange("seen")}
-          />
-          <DetailTabButton
-            isActive={activeTab === "overview"}
-            label="Overview"
-            onClick={() => onTabChange("overview")}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">
-        {activeTab === "overview" ? overviewContent : seenContent}
-      </div>
-    </div>
-  );
-
-  if (isMobile) {
-    return <div className="flex-1 min-h-0">{shell}</div>;
-  }
+  const showOverview = seenHidden || activeTab === "overview";
 
   return (
     <div
-      ref={panelRef}
-      data-guide-target="sidebar-detail-drawer"
-      aria-hidden={!isOpen}
-      className={`absolute inset-y-0 z-[30] overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
-        isOpen ? "pointer-events-auto" : "pointer-events-none"
-      }`}
-      style={{
-        right: "calc(100% - 8px)",
-        width: "var(--sidebar-width)",
-        boxShadow: renderOpen ? "-6px 0 12px -2px rgba(0, 0, 0, 0.3)" : "none",
-        clipPath: "inset(0 0 0 -20px)",
-        transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 8px))",
-        transition: "transform 220ms ease-out, box-shadow 220ms ease-out",
-      }}
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+      data-guide-target="sidebar-revealed-details"
     >
-      {shell}
+      {onBack && (
+        <div className="border-b gold-divider px-4 pb-3 pt-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="btn-secondary shrink-0 rounded-md px-2.5 py-0.5 text-sm"
+            >
+              &larr; Back
+            </button>
+            <div className="min-w-0 flex-1 truncate text-base font-medium text-[var(--color-gold)]">
+              {player.name}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!seenHidden && (
+        <div className="flex justify-center px-4 pb-3 pt-3">
+          <SegmentedFilter
+            label="Scouting view"
+            options={DETAIL_TABS}
+            value={activeTab}
+            onChange={onTabChange}
+          />
+        </div>
+      )}
+
+      <div
+        className={`flex flex-col flex-1 min-h-0 px-4 pb-4 ${seenHidden ? "pt-3" : ""}`}
+      >
+        {showOverview ? (
+          <div className="scouting-overview flex h-full min-h-0 flex-col">
+            <Standings
+              player={player}
+              players={players}
+              isSelf={isViewingSelf}
+              viewerFighting={viewerFighting}
+            />
+            <OverviewUpgradesSection
+              useUpgrades={useUpgrades}
+              upgrades={allUpgrades}
+            />
+          </div>
+        ) : (
+          <AdaptiveCardSection
+            title="Seen in Fight"
+            cards={player.most_recently_revealed_cards}
+            companionIds={companionIds}
+            upgradedCardIds={upgradedCardIds}
+            appliedUpgradesByCardId={appliedUpgradesByCardId}
+            emptyText="Nothing was revealed in a fight yet."
+            guideTarget="sidebar-seen-in-battle"
+            maxWidth={104}
+            minColumns={onBack ? 1 : 2}
+            measureKey={`${player.name}:${activeTab}`}
+          />
+        )}
+      </div>
     </div>
   );
 }

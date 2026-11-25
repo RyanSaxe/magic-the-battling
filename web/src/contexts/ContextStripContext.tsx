@@ -1,34 +1,49 @@
-import { useState, useCallback, type ReactNode } from 'react'
-import type { Card } from '../types'
-import { ContextStripContext } from './contextStripState'
-import type { RevealedPlayerTab } from './contextStripState'
+import {
+  useState,
+  useCallback,
+  useMemo,
+  type ReactElement,
+  type ReactNode,
+} from "react";
+import type { Card } from "../types";
+import { ContextStripContext } from "./contextStripState";
 
-export function ContextStripProvider({ children }: { children: ReactNode }) {
-  const [previewCard, setPreviewCardState] = useState<Card | null>(null)
-  const [previewAppliedUpgrades, setPreviewAppliedUpgrades] = useState<Card[]>([])
-  const [revealedPlayerName, setRevealedPlayerName] = useState<string | null>(null)
-  const [revealedPlayerTab, setRevealedPlayerTab] = useState<RevealedPlayerTab>('seen')
+export function ContextStripProvider({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement {
+  const [previewCard, setPreviewCardState] = useState<Card | null>(null);
+  const [previewAppliedUpgrades, setPreviewAppliedUpgrades] = useState<Card[]>(
+    [],
+  );
+  const [previewCounters, setPreviewCounters] =
+    useState<Record<string, number>>();
 
-  const setPreviewCard = useCallback((card: Card | null, appliedUpgrades?: Card[]) => {
-    setPreviewCardState(card)
-    setPreviewAppliedUpgrades(appliedUpgrades ?? [])
-  }, [])
+  const setPreviewCard = useCallback(
+    (
+      card: Card | null,
+      appliedUpgrades?: Card[],
+      counters?: Record<string, number>,
+    ) => {
+      setPreviewCardState(card);
+      setPreviewAppliedUpgrades(appliedUpgrades ?? []);
+      setPreviewCounters(counters);
+    },
+    [],
+  );
 
-  const setRevealedPlayer = useCallback((name: string | null, tab: RevealedPlayerTab = 'seen') => {
-    setRevealedPlayerName(name)
-    setRevealedPlayerTab(tab)
-  }, [])
+  const value = useMemo(
+    () => ({
+      state: { previewCard, previewAppliedUpgrades, previewCounters },
+      setPreviewCard,
+    }),
+    [previewCard, previewAppliedUpgrades, previewCounters, setPreviewCard],
+  );
 
   return (
-    <ContextStripContext.Provider
-      value={{
-        state: { previewCard, previewAppliedUpgrades, revealedPlayerName, revealedPlayerTab },
-        setPreviewCard,
-        setRevealedPlayerName: setRevealedPlayer,
-        setRevealedPlayerTab,
-      }}
-    >
+    <ContextStripContext.Provider value={value}>
       {children}
     </ContextStripContext.Provider>
-  )
+  );
 }

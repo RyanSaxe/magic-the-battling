@@ -1,136 +1,107 @@
-import { useState, useEffect } from "react";
+import { useState, type ReactElement } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FaDiscord } from "react-icons/fa6";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
-import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
-import { useAuth } from "../contexts/authState";
-import { prefetchLegendaryName } from "../utils/prefetchName";
+import { AppHeader } from "../components/common/AppHeader";
+import { BarLabel } from "../components/common/FrameBar";
+import { PageFrame } from "../components/common/PageFrame";
+import {
+  CloseSeatDialog,
+  ResumeGamesDialog,
+  ResumeShelf,
+} from "../components/ResumeGame";
+import { useHomeSession } from "../hooks/pages/useAuthSession";
+import type { ResumableSeat } from "../hooks/useResumableGames";
+import { LINK } from "../components/common/styles";
 
-export function Home() {
+export function Home(): ReactElement | null {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, seats, markSeatClosed } = useHomeSession();
   const [showJoinModal, setShowJoinModal] = useState(false);
-
-  useEffect(() => {
-    prefetchLegendaryName();
-  }, []);
-
-  useEffect(() => {
-    if (!loading && user) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [loading, user, navigate]);
+  const [showAllGames, setShowAllGames] = useState(false);
+  const [seatToClose, setSeatToClose] = useState<ResumableSeat | null>(null);
 
   if (loading || user) return null;
 
   return (
-    <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
-        <div className="hidden sm:flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline">
-              <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                Crucible
-              </h1>
-              <span className="hero-sep mx-2.5">—</span>
-              <span className="hero-subtitle text-base font-normal tracking-widest">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="btn btn-secondary py-2 px-4"
-            >
-              Join Game
-            </button>
-            <button
-              onClick={() => navigate("/play")}
-              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
-            >
-              Play Game
-            </button>
-          </div>
-        </div>
-        <div className="sm:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline whitespace-nowrap">
-                <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-1 text-xs">—</span>
-                <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                  an MtG format
-                </span>
-              </div>
-              <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
+    <>
+      <PageFrame
+        header={
+          <AppHeader
+            helpers={
+              <>
+                <button
+                  onClick={() => {
+                    void navigate("/login");
+                  }}
+                  className="btn btn-secondary hidden sm:inline-block"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => setShowJoinModal(true)}
+                  className="btn btn-secondary"
+                >
+                  <BarLabel desktop="Join Game" phone="Join" />
+                </button>
+              </>
+            }
+            primary={
               <button
-                onClick={() => setShowJoinModal(true)}
-                className="btn btn-secondary py-1.5 px-3 text-sm"
+                onClick={() => {
+                  void navigate("/play");
+                }}
+                className="btn btn-primary font-semibold animate-gentle-glow"
               >
-                Join
+                <BarLabel desktop="Play Game" phone="Play" />
               </button>
-              <button
-                onClick={() => navigate("/play")}
-                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
-              >
-                Play
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-
-        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-          <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4 pb-6">
-            <CardShowcase />
-            <p className="text-gray-400 text-sm mt-6">
-              <Link to="/login" className="text-amber-400 hover:text-amber-300">
-                Log in
-              </Link>
-              {" or "}
-              <Link to="/register" className="text-amber-400 hover:text-amber-300">
-                create an account
-              </Link>
-              {" to track your games"}
-            </p>
-          </div>
-        </main>
-
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-      </div>
-
-      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-        <div className="flex items-center justify-between">
-          <a
-            href="https://discord.gg/2NAjcWXNKn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
-          >
-            <FaDiscord className="w-4 h-4" />
-            Join Discord
-          </a>
-          <CubeCobraPrimerLink />
-        </div>
-      </footer>
+            }
+          />
+        }
+        scroll={false}
+        contentClassName="items-center justify-center p-4 overflow-hidden"
+        shelf={
+          <ResumeShelf
+            seats={seats}
+            onCloseSeat={setSeatToClose}
+            onShowAll={() => setShowAllGames(true)}
+          />
+        }
+      >
+        <CardShowcase />
+        {/* Phones only, where the bar has no room for Log in. */}
+        <p className="sm:hidden shrink-0 text-[var(--ivory-muted)] text-sm mt-3 text-center">
+          <Link to="/login" className={LINK}>
+            Log in
+          </Link>
+          {" or "}
+          <Link to="/register" className={LINK}>
+            create an account
+          </Link>
+          {" to track your games"}
+        </p>
+      </PageFrame>
 
       {showJoinModal && (
         <JoinGameModal onClose={() => setShowJoinModal(false)} />
       )}
-    </div>
+      {showAllGames && (
+        <ResumeGamesDialog
+          seats={seats}
+          onClose={() => setShowAllGames(false)}
+          onCloseSeat={setSeatToClose}
+        />
+      )}
+      {seatToClose && (
+        <CloseSeatDialog
+          seat={seatToClose}
+          onKeep={() => setSeatToClose(null)}
+          onClosed={() => {
+            markSeatClosed(seatToClose.gameId);
+            setSeatToClose(null);
+          }}
+        />
+      )}
+    </>
   );
 }

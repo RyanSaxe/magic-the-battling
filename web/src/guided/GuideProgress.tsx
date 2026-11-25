@@ -1,21 +1,28 @@
+import type { ReactElement } from "react";
+
 interface GuideProgressProps {
   current: number;
   total: number;
 }
 
-export function GuideProgress({ current, total }: GuideProgressProps) {
+function progressDotClass(index: number, current: number): string {
+  if (index === current) return "bg-amber-400";
+  if (index < current) return "bg-amber-400/40";
+  return "bg-white/20";
+}
+
+export function GuideProgress({
+  current,
+  total,
+}: GuideProgressProps): ReactElement {
   return (
-    <div className="flex items-center gap-1.5" role="progressbar" aria-valuenow={current + 1} aria-valuemin={1} aria-valuemax={total}>
+    <div className="flex items-center gap-1.5">
+      <progress className="sr-only" value={current + 1} max={total} />
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}
-          className={`inline-block w-1.5 h-1.5 rounded-full transition-colors duration-200 ${
-            i === current
-              ? "bg-amber-400"
-              : i < current
-                ? "bg-amber-400/40"
-                : "bg-white/20"
-          }`}
+          aria-hidden="true"
+          className={`inline-block w-1.5 h-1.5 rounded-full transition-colors duration-200 ${progressDotClass(i, current)}`}
         />
       ))}
     </div>

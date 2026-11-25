@@ -1,157 +1,286 @@
-import { useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { FaDiscord } from 'react-icons/fa6'
-import { useAuth } from '../contexts/authState'
-import { AppHeader } from '../components/common/AppHeader'
-import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
-import { unknownToAppError } from '../utils/appError'
+import {
+  useCallback,
+  useRef,
+  useState,
+  type ComponentPropsWithRef,
+  type ReactElement,
+} from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useAuth } from "../contexts/authState";
+import { useAsyncAction } from "../hooks/useAsyncResource";
+import { AppHeader, HomeButton } from "../components/common/AppHeader";
+import { PageFrame } from "../components/common/PageFrame";
+import { SurfaceCard } from "../components/common/SurfaceCard";
+import { unknownToAppError } from "../utils/appError";
+import {
+  FIELD_ERROR,
+  FIELD_HINT,
+  FIELD_LABEL,
+  LINK,
+  TEXT_INPUT,
+} from "../components/common/styles";
 
-export function Register() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const returnTo = searchParams.get('returnTo') || '/'
-  const { register } = useAuth()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [email, setEmail] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+// The server's rule, USERNAME_RE in server/schemas/auth.py.
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,30}$/;
+const USERNAME_HINT = "3-30 characters: letters, numbers, underscores";
+const PASSWORD_HINT = "At least 8 characters";
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-    setError('')
-    setLoading(true)
-    try {
-      await register(username, password, email)
-      navigate(returnTo)
-    } catch (err) {
-      setError(unknownToAppError(err, 'register', 'Registration failed').message)
-    } finally {
-      setLoading(false)
-    }
+interface RegisterValues {
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+interface RegisterReasons {
+  username: string | null;
+  email: string | null;
+  password: string | null;
+  confirmPassword: string | null;
+}
+
+function usernameReason(username: string): string | null {
+  if (!username) return "Enter a username";
+  return USERNAME_PATTERN.test(username) ? null : USERNAME_HINT;
+}
+
+function confirmPasswordReason(
+  password: string,
+  confirmPassword: string,
+): string | null {
+  if (confirmPassword === password) return null;
+  return confirmPassword
+    ? "Passwords don't match"
+    : "Enter your password again";
+}
+
+function reasonsNotReady(values: RegisterValues): RegisterReasons {
+  return {
+    username: usernameReason(values.username),
+    email: values.email ? null : "Enter your email",
+    password: values.password.length >= 8 ? null : PASSWORD_HINT,
+    confirmPassword: confirmPasswordReason(
+      values.password,
+      values.confirmPassword,
+    ),
+  };
+}
+
+type RegisterField = "username" | "email" | "password" | "confirmPassword";
+
+function fieldForRegisterError(code: string, message: string): RegisterField {
+  if (code === "EMAIL_IN_USE" || /\bemail\b/i.test(message)) return "email";
+  if (code === "USERNAME_TAKEN" || /\busername\b/i.test(message)) {
+    return "username";
   }
+  if (/\bpassword\b/i.test(message)) return "password";
+  return "confirmPassword";
+}
+
+type FieldProps = ComponentPropsWithRef<"input"> & {
+  id: string;
+  label: string;
+  hint?: string;
+  /** Shown in place of the hint, and marks the field invalid. */
+  reason: string | null;
+  alert?: boolean;
+  wrapperClassName: string;
+};
+
+function Field({
+  id,
+  label,
+  hint,
+  reason,
+  alert,
+  wrapperClassName,
+  ...inputProps
+}: FieldProps): ReactElement {
+  const message = reason ?? hint;
+  return (
+    <div className={wrapperClassName}>
+      <label htmlFor={id} className={FIELD_LABEL}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className={TEXT_INPUT}
+        aria-invalid={reason ? true : undefined}
+        aria-describedby={message ? `${id}-message` : undefined}
+        {...inputProps}
+      />
+      {message && (
+        <p
+          id={`${id}-message`}
+          role={alert && reason ? "alert" : undefined}
+          className={reason ? FIELD_ERROR : FIELD_HINT}
+        >
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface RegisterFieldMeta {
+  reason: string | null;
+  alert: boolean;
+  onFocus: () => void;
+  onBlur: () => void;
+}
+
+export function Register(): ReactElement {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("returnTo") || "/";
+  const { register } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [serverError, setServerError] = useState<{
+    field: RegisterField;
+    message: string;
+  } | null>(null);
+  // How many fields, from the top, the player has left or skipped past. An empty field explains itself only after
+  // that, so a new form isn't covered in reasons.
+  const [fieldsPassed, setFieldsPassed] = useState(0);
+  const focusedRef = useRef(false);
+
+  const reasons = reasonsNotReady({
+    username,
+    email,
+    password,
+    confirmPassword,
+  });
+  const ready = Object.values(reasons).every((reason) => reason === null);
+
+  const fieldMeta = (
+    field: RegisterField,
+    index: number,
+    value: string,
+  ): RegisterFieldMeta => {
+    const localReason = value || index < fieldsPassed ? reasons[field] : null;
+    const serverReason =
+      serverError?.field === field ? serverError.message : null;
+    return {
+      reason: localReason ?? serverReason,
+      alert: serverError?.field === field,
+      onFocus: (): void => setFieldsPassed((passed) => Math.max(passed, index)),
+      onBlur: (): void =>
+        setFieldsPassed((passed) => Math.max(passed, index + 1)),
+    };
+  };
+
+  const { run: submitRegister, pending: loading } = useAsyncAction(
+    useCallback(async () => {
+      setServerError(null);
+      try {
+        await register(username, password, email);
+        void navigate(returnTo);
+      } catch (err) {
+        const appError = unknownToAppError(
+          err,
+          "register",
+          "Registration failed",
+        );
+        setServerError({
+          field: fieldForRegisterError(appError.code, appError.message),
+          message: appError.message,
+        });
+      }
+    }, [register, username, password, email, navigate, returnTo]),
+  );
+
+  const handleSubmit = (e: React.FormEvent): void => {
+    e.preventDefault();
+    void submitRegister();
+  };
 
   return (
-    <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <AppHeader renderRight={({ compact }) => (
+    <PageFrame
+      header={<AppHeader home={<HomeButton />} />}
+      center
+      contentClassName="items-center"
+    >
+      <SurfaceCard
+        as="form"
+        onSubmit={handleSubmit}
+        onChange={() => setServerError(null)}
+      >
+        <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>
+
+        <Field
+          ref={(el): void => {
+            if (el && !focusedRef.current) {
+              focusedRef.current = true;
+              el.focus();
+            }
+          }}
+          id="username"
+          label="Username"
+          hint={USERNAME_HINT}
+          {...fieldMeta("username", 0, username)}
+          wrapperClassName="mb-4"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          maxLength={30}
+        />
+
+        <Field
+          id="email"
+          label="Email"
+          {...fieldMeta("email", 1, email)}
+          wrapperClassName="mb-4"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        <Field
+          id="password"
+          label="Password"
+          hint={PASSWORD_HINT}
+          {...fieldMeta("password", 2, password)}
+          wrapperClassName="mb-4"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        <Field
+          id="confirm-password"
+          label="Confirm Password"
+          {...fieldMeta("confirmPassword", 3, confirmPassword)}
+          wrapperClassName="mb-6"
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+        />
+
         <button
-          onClick={() => navigate('/')}
-          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
+          type="submit"
+          disabled={loading || !ready}
+          className="btn btn-primary w-full py-2 font-semibold disabled:opacity-50"
         >
-          Home
+          {loading ? "Creating account..." : "Create Account"}
         </button>
-      )} />
 
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-
-        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-          <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4">
-            <form
-              onSubmit={handleSubmit}
-              className="w-full max-w-sm modal-chrome border gold-border rounded-lg p-6 felt-raised-panel"
-            >
-              <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>
-
-              {error && (
-                <p className="text-red-400 text-sm mb-4 bg-red-900/20 border border-red-800/40 rounded px-3 py-2">{error}</p>
-              )}
-
-              <div className="mb-4">
-                <label htmlFor="username" className="block text-gray-300 text-sm mb-1">Username</label>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  autoFocus
-                  required
-                  minLength={3}
-                  maxLength={30}
-                  pattern="[a-zA-Z0-9_]+"
-                  title="Letters, numbers, and underscores only"
-                />
-                <p className="text-gray-500 text-xs mt-1">3-30 characters: letters, numbers, underscores</p>
-              </div>
-
-              <div className="mb-4">
-                <label htmlFor="email" className="block text-gray-300 text-sm mb-1">Email</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-
-              <div className="mb-4">
-                <label htmlFor="password" className="block text-gray-300 text-sm mb-1">Password</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                  minLength={8}
-                />
-                <p className="text-gray-500 text-xs mt-1">At least 8 characters</p>
-              </div>
-
-              <div className="mb-6">
-                <label htmlFor="confirm-password" className="block text-gray-300 text-sm mb-1">Confirm Password</label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                  minLength={8}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || !username || !email || !password || password.length < 8 || password !== confirmPassword}
-                className="btn btn-primary w-full py-2 font-semibold disabled:opacity-50"
-              >
-                {loading ? 'Creating account...' : 'Create Account'}
-              </button>
-
-              <p className="text-center text-gray-400 text-sm mt-4">
-                Already have an account?{' '}
-                <Link to={`/login${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className="text-amber-400 hover:text-amber-300">Log in</Link>
-              </p>
-            </form>
-          </div>
-        </main>
-
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-      </div>
-
-      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-        <div className="flex items-center justify-between">
-          <a
-            href="https://discord.gg/2NAjcWXNKn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
+        <p className="text-center text-[var(--ivory-muted)] text-sm mt-4">
+          Already have an account?{" "}
+          <Link
+            to={`/login${returnTo === "/" ? "" : `?returnTo=${encodeURIComponent(returnTo)}`}`}
+            className={LINK}
           >
-            <FaDiscord className="w-4 h-4" />
-            Join Discord
-          </a>
-          <CubeCobraPrimerLink />
-        </div>
-      </footer>
-    </div>
-  )
+            Log in
+          </Link>
+        </p>
+      </SurfaceCard>
+    </PageFrame>
+  );
 }

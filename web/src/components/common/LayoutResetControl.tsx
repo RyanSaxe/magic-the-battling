@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { useGameShellMode, type GameShellMode } from "../../hooks/useGameShellMode";
+import { useState, type ReactElement } from "react";
+import {
+  useGameShellMode,
+  type GameShellMode,
+} from "../../hooks/useGameShellMode";
+import { POPOVER_CHROME } from "./styles";
 
 interface LayoutResetControlProps {
   phaseLabel: string;
@@ -13,7 +17,10 @@ interface LayoutResetControlProps {
   message?: string;
 }
 
-function positionClasses(position: "top-right" | "bottom-right", shellMode: GameShellMode) {
+function positionClasses(
+  position: "top-right" | "bottom-right",
+  shellMode: GameShellMode,
+): { wrapper: string; popover: string } {
   if (position === "bottom-right") {
     return {
       wrapper: "absolute right-2 bottom-2 z-40 pointer-events-auto",
@@ -21,9 +28,10 @@ function positionClasses(position: "top-right" | "bottom-right", shellMode: Game
     };
   }
 
-  const wrapper = shellMode === "big"
-    ? "absolute right-0 top-0 -translate-y-[calc(100%+0.5rem)] z-40 pointer-events-auto"
-    : "absolute right-2 top-2 z-40 pointer-events-auto";
+  const wrapper =
+    shellMode === "big"
+      ? "absolute right-0 top-0 -translate-y-[calc(100%+0.5rem)] z-40 pointer-events-auto"
+      : "absolute right-2 top-2 z-40 pointer-events-auto";
 
   return {
     wrapper,
@@ -41,48 +49,53 @@ export function LayoutResetControl({
   onConfirm,
   position = "top-right",
   message,
-}: LayoutResetControlProps) {
+}: LayoutResetControlProps): ReactElement {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const shellMode = useGameShellMode();
   const { wrapper, popover } = positionClasses(position, shellMode);
 
   return (
-    <div className={wrapper} onClick={(e) => e.stopPropagation()}>
+    <div
+      role="presentation"
+      className={wrapper}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="relative">
         <button
           type="button"
-          className="modal-chrome border gold-border rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100/85 hover:text-white shadow-lg"
+          className="btn-secondary rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.12em]"
           onClick={() => setConfirmOpen((open) => !open)}
         >
           Reset Layout
         </button>
         {confirmOpen && (
           <div
-            className={`${popover} w-64 modal-chrome border gold-border rounded-lg shadow-xl px-3 py-2 text-left`}
+            className={`${popover} w-64 ${POPOVER_CHROME} px-3 py-2 text-left`}
           >
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-200">
               Reset {phaseLabel}
             </div>
-            {isInherited && originStage != null && originRound != null && (
-              <div className="mt-2 text-xs text-gray-300">
-                Current layout is inherited from Stage {originStage}, Round {originRound}.
+            {isInherited && originStage !== null && originRound !== null && (
+              <div className="mt-2 text-xs text-[var(--ivory-muted)]">
+                Current layout is inherited from Stage {originStage}, Round{" "}
+                {originRound}.
               </div>
             )}
-            <div className="mt-2 text-xs leading-snug text-gray-200">
+            <div className="mt-2 text-xs leading-snug text-[var(--ivory)]">
               {message ??
                 `This resets Stage ${currentStage}, Round ${currentRound} and all future ${phaseLabel.toLowerCase()} layouts on this device.`}
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
               <button
                 type="button"
-                className="text-xs text-gray-400 hover:text-white"
+                className="btn-secondary rounded-md px-2.5 py-1 text-xs"
                 onClick={() => setConfirmOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded-md border gold-border bg-[#2a2320] px-2.5 py-1 text-xs text-amber-100 hover:text-white"
+                className="btn-secondary rounded-md px-2.5 py-1 text-xs"
                 onClick={() => {
                   onConfirm();
                   setConfirmOpen(false);

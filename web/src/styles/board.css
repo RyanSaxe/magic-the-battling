@@ -1,0 +1,877 @@
+/* Card base styles */
+.card {
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal);
+  border-radius: var(--card-border-radius);
+  touch-action: manipulation;
+}
+
+.card img {
+  border-radius: var(--card-border-radius);
+}
+
+.card.tapped {
+  transition: transform var(--transition-spring);
+}
+
+.card.selected {
+  outline: 2px solid #22d3ee;
+  outline-offset: -2px;
+}
+
+.card:focus-visible,
+.card-slot:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: -2px;
+  box-shadow: 0 0 12px var(--color-gold-glow);
+}
+
+.card.dragging {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.card.upgraded::after,
+.card.companion::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.card.upgraded::after {
+  box-shadow: inset 0 0 0 2px #fbbf24;
+}
+
+.card.companion::after {
+  box-shadow: inset 0 0 0 2px #a855f7;
+}
+
+.card.upgraded.companion::after {
+  box-shadow:
+    inset 0 0 0 2px #fbbf24,
+    inset 0 0 0 4px #a855f7;
+}
+
+.card.selected.upgraded::after,
+.card.selected.companion::after,
+.card.selected.upgraded.companion::after {
+  box-shadow: none;
+}
+
+.card-counters {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.counter-chip {
+  border-radius: 2px;
+  background: var(--chrome);
+  box-shadow: inset 0 0 0 1px var(--gold-border-opaque);
+  color: var(--ivory);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.preview-counters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 95vw;
+  margin-top: 10px;
+}
+
+.preview-counters .counter-chip {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.card.unrevealed-upgrade::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 11;
+  border: 2px dashed #fbbf24;
+  animation: unrevealed-upgrade-pulse 2s ease-in-out infinite;
+}
+
+.card.selected.unrevealed-upgrade::before {
+  border: none;
+}
+
+@keyframes unrevealed-upgrade-pulse {
+  0%,
+  100% {
+    border-color: rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    border-color: rgba(251, 191, 36, 0.9);
+  }
+}
+
+/* Card on table has shadow for depth */
+.card-on-table {
+  box-shadow:
+    2px 4px 8px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Zone styles */
+.zone {
+  transition:
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+  border: 2px dashed transparent;
+}
+
+.zone.drop-valid {
+  box-shadow: inset 0 0 30px rgba(34, 197, 94, 0.3);
+  border-color: rgba(34, 197, 94, 0.6);
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.zone.drop-invalid {
+  box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* Battlefield - open area */
+.battlefield {
+  background: radial-gradient(ellipse at center, #1e4840, #122a28);
+}
+
+.battle-layout {
+  position: relative;
+  box-shadow:
+    inset 0 0 0 2px rgba(212, 175, 55, 0.48),
+    inset 0 1px 0 rgba(255, 236, 181, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.48);
+}
+
+.battle-layout .zone-hand,
+.battle-layout .battlefield,
+.battle-side-cell {
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.battle-side-column {
+  box-sizing: border-box;
+  position: relative;
+  background: var(--zone-column-bg);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.battle-side-column::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: linear-gradient(
+    to right,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
+  pointer-events: none;
+}
+
+.battle-side-column-opponent {
+  border-top: 0;
+}
+
+.battle-side-column-player {
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.battle-side-column-player::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
+  pointer-events: none;
+}
+
+.battle-side-cell {
+  box-sizing: border-box;
+  background: #3a3431;
+  position: relative;
+}
+
+.battle-side-column
+  > .battle-side-dropzone
+  ~ .battle-side-dropzone
+  .battle-side-cell {
+  border-top: 0;
+}
+
+.battle-side-column
+  > .battle-side-dropzone
+  ~ .battle-side-dropzone
+  .battle-side-cell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
+  pointer-events: none;
+}
+
+.battle-side-dropzone {
+  border: 0;
+}
+
+.battle-side-dropzone.zone.drop-valid {
+  outline: 2px dashed rgba(34, 197, 94, 0.6);
+  outline-offset: -2px;
+}
+
+.battle-side-dropzone.zone.drop-invalid {
+  outline: 2px dashed rgba(239, 68, 68, 0.6);
+  outline-offset: -2px;
+}
+
+.battle-side-dropzone.zone.drop-valid > .battle-side-cell {
+  box-shadow: inset 0 0 30px rgba(34, 197, 94, 0.3);
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.battle-side-dropzone.zone.drop-invalid > .battle-side-cell {
+  box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.3);
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+.battle-hand-separator-bottom {
+  position: relative;
+}
+
+.battle-hand-separator-top {
+  position: relative;
+}
+
+.battle-hand-separator-bottom::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-dark) 0 50%,
+    var(--seam-ridge-light) 50% 100%
+  );
+  pointer-events: none;
+}
+
+.battle-hand-separator-top::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--seam-ridge-light) 0 50%,
+    var(--seam-ridge-dark) 50% 100%
+  );
+  pointer-events: none;
+}
+
+.battle-side-label {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a9a4a2;
+  line-height: 1;
+}
+
+/* Zone piles (graveyard, exile) */
+.zone-pile {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  padding: 4px;
+  transition: transform var(--transition-normal);
+}
+
+.zone-pile:hover {
+  transform: scale(1.02);
+}
+
+/* Hand zone - horizontal row */
+.hand-zone {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  /* A hovered card rises over its neighbours, never over a window or panel. */
+  isolation: isolate;
+}
+
+.hand-zone > :hover,
+.hand-zone > :focus-within {
+  z-index: 100 !important;
+}
+
+/* Counter badges */
+.counter-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-gold);
+}
+
+/* Loading skeleton shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--chrome-modal) 0%,
+    var(--stone) 50%,
+    var(--chrome-modal) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Button improvements */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  border: none;
+}
+
+/* A 30px button in a 44px target, for the rows of controls in a cube's banner */
+.btn.btn-pill {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 11px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn.btn-pill::before {
+  content: "";
+  position: absolute;
+  inset: -7px min(0px, (100% - 44px) / 2);
+}
+
+.btn.btn-pill-square {
+  width: 30px;
+  margin-inline: 7px;
+  padding: 0;
+  font-size: 14px;
+}
+
+.btn.btn-pill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn.setup-next {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.lobby-actions .btn.setup-next {
+  flex-direction: column;
+  gap: 0;
+  font-size: 14px;
+  line-height: 17px;
+}
+
+.setup-next small {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+}
+
+/* Join Game is in the top bar from 640px */
+@media (width >= 640px) {
+  .btn.play-join {
+    display: none;
+  }
+}
+
+.btn.setup-submit {
+  flex: none;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* Beside Cards in the banner on short phones */
+@media (width < 640px) and (height < 640px) {
+  .lobby-deck.is-loaded .btn.setup-submit {
+    position: relative;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .lobby-deck.is-loaded .btn.setup-submit::before {
+    content: "";
+    position: absolute;
+    inset: -7px 0;
+  }
+}
+
+/* Start Game before it can start: walnut, solid beside the dashed open seats */
+.btn.setup-waiting:disabled {
+  background: #2e2623;
+  color: var(--ivory-muted);
+  box-shadow: inset 0 1px 0 #ffecb514;
+  cursor: default;
+}
+
+@media (width < 375px) {
+  .cube-banner-strip .btn.btn-pill:not(.btn-pill-square) {
+    padding: 0 7px;
+  }
+}
+
+@media (width < 360px) {
+  .btn.btn-pill-square {
+    margin-inline: 5px;
+  }
+
+  .setup-next small {
+    font-size: 10px;
+  }
+}
+
+/* Every bar button is 30px tall. Icon buttons such as ☰ are 30px squares, and .btn-icon-phone ones are squares
+   only below 640px, where their label shortens to an icon. Display is left to each button so it can hide on phones. */
+.frame-bar .btn {
+  height: 30px;
+  min-width: 30px;
+  padding: 0 10px;
+  line-height: 1;
+  font-size: 13px;
+}
+
+.frame-bar .btn-icon {
+  width: 30px;
+  padding: 0;
+}
+
+@media (width < 640px) {
+  .frame-bar .btn-icon-phone {
+    width: 30px;
+    padding: 0;
+  }
+}
+
+/* Applied only while the timeline steps don't fit beside the header buttons, so they scroll instead of running
+   under them. scroll-padding marks the faded strip as covered, so focus and the current-step scroll avoid it. */
+.phase-timeline-scroll {
+  --timeline-fade: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-padding-right: var(--timeline-fade);
+  /* A scroll container clips overflow on both axes, which would cut the active step's 1px ring. */
+  padding-block: 1px;
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--timeline-fade)),
+    transparent
+  );
+}
+
+.phase-timeline-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Lets the last step scroll clear of the fade. */
+.phase-timeline-scroll::after {
+  content: "";
+  flex: 0 0 var(--timeline-fade);
+}
+
+/* A step that isn't the current one borrows padding from the gap around it, so its hover fill doesn't move the
+   row. */
+.phase-step-idle {
+  padding: 0.125rem 0.25rem;
+  margin: -0.125rem -0.25rem;
+  border-radius: 4px;
+}
+
+/* Tapping a step opens its help, so where there's a pointer the step lights up like a menu item. */
+@media (hover: hover) {
+  .phase-step:enabled {
+    cursor: pointer;
+  }
+
+  .phase-step:enabled:hover {
+    background-color: var(--stone);
+  }
+}
+
+@keyframes fade-hint {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-fade-hint {
+  animation: fade-hint 8s ease-in-out forwards;
+}
+
+@keyframes toast-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  8% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-toast-fade {
+  animation: toast-fade 5s ease-in-out forwards;
+}
+
+.btn-primary {
+  background: linear-gradient(
+    135deg,
+    var(--color-gold) 0%,
+    var(--color-gold-dark) 100%
+  );
+  color: #1a1a1a;
+  --btn-raise-edge: rgba(255, 248, 220, 0.45);
+}
+
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #e0bd48 0%, #b59746 100%);
+  }
+}
+
+.btn-primary:active:not(:disabled) {
+  background: linear-gradient(135deg, #bfa02f 0%, #8f7430 100%);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.guided-tooltip .btn:disabled {
+  opacity: 1;
+}
+
+/* Moves on the table (Treasure, Untap, Pass, rolls and upgrades) take .btn-game. They look like secondary buttons,
+   and keep their own class so they can be restyled together. */
+.btn-secondary,
+.btn-game {
+  background: var(--btn-secondary-fill);
+  color: var(--ivory);
+}
+
+@media (hover: hover) {
+  .btn-secondary:hover:not(:disabled),
+  .btn-game:hover:not(:disabled) {
+    background: var(--btn-secondary-fill-hover);
+  }
+}
+
+.btn-secondary:active:not(:disabled),
+.btn-game:active:not(:disabled) {
+  background: var(--btn-secondary-fill-pressed);
+}
+
+.btn-game:disabled {
+  background: color-mix(in srgb, var(--btn-secondary-fill) 55%, transparent);
+  color: color-mix(in srgb, var(--ivory) 42%, transparent);
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--mana-red) 0%, #a61a22 100%);
+  color: white;
+  --btn-raise-edge: rgba(255, 236, 224, 0.24);
+}
+
+@media (hover: hover) {
+  .btn-danger:hover:not(:disabled) {
+    background: linear-gradient(135deg, #e02b35 0%, #b82029 100%);
+  }
+}
+
+.btn-danger:active:not(:disabled) {
+  background: linear-gradient(135deg, #b01821 0%, #8a131a 100%);
+}
+
+/* An upgrade is waiting to be applied or revealed */
+.btn-pending::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--color-gold-bright);
+  vertical-align: middle;
+}
+
+@media (width < 640px) {
+  .btn-dot-phone {
+    position: relative;
+  }
+
+  .btn-dot-phone::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-gold-bright);
+  }
+}
+
+.btn-success {
+  background: var(--success);
+  color: white;
+  --btn-raise-edge: rgba(255, 248, 224, 0.22);
+}
+
+@media (hover: hover) {
+  .btn-success:hover:not(:disabled) {
+    background: var(--success-hover);
+  }
+}
+
+.btn-success:active:not(:disabled) {
+  background: var(--success-pressed);
+}
+
+.btn-success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Small buttons, such as the game actions on cards and in the sidebar, keep their own sizes by taking a colour class
+   without .btn, so the raise follows those colour classes too. A segmented control's chosen option takes the same
+   raise. */
+.btn,
+.btn-secondary,
+.btn-game,
+.segmented-option[aria-checked="true"] {
+  box-shadow:
+    inset 0 1px 0 var(--btn-raise-edge),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.btn:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
+.btn-game:active:not(:disabled) {
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.btn:disabled,
+.btn-secondary:disabled,
+.btn-game:disabled {
+  box-shadow: none;
+}
+
+/* The controls over a Build card are sized against the card, so they shrink with one too narrow to hold them. */
+.card-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  container-type: size;
+  pointer-events: none;
+}
+
+/* Upgrade, Apply and Set Companion. Full size from an 85px card up, with padding that stays light on the smallest one. */
+.card-pill {
+  position: absolute;
+  bottom: 8.5cqh;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0.5em 1em;
+  font-size: min(0.75rem, 14.1cqw);
+  line-height: 1.3333;
+  white-space: nowrap;
+}
+
+/* A companion's card stacks two pills, so both are tighter, and Upgrade clears the one below. */
+.card-pill-raised {
+  bottom: calc(4cqh + min(0.75rem, 14.1cqw) * 1.8333 + max(2px, 1.5cqh));
+  padding: 0.25em 0.8em;
+}
+
+.card-pill-companion {
+  bottom: 4cqh;
+  padding: 0.25em 0.65em;
+  letter-spacing: normal;
+}
+
+/* The purple of the companion's ring, deep enough for ivory text. */
+.card-pill-companion.is-set {
+  background: #6b21a8;
+  color: var(--ivory);
+}
+
+.card-pill-companion.is-set:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.card-pill-companion .label-long {
+  display: none;
+}
+
+/* Without the tighter tracking, "Companion" leaves a 45px card. */
+@container (max-width: 84px) {
+  .card-pill-companion {
+    padding-inline: 0.38em;
+    letter-spacing: -0.045em;
+  }
+}
+
+@container (min-width: 110px) {
+  .card-pill-companion .label-long {
+    display: inline;
+  }
+
+  .card-pill-companion .label-short {
+    display: none;
+  }
+}
+
+/* Drag overlay */
+.drag-overlay {
+  cursor: grabbing;
+  transform: rotate(5deg) scale(1.05);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Prevent scroll/touch behavior during drag */
+[data-dnd-kit-draggable] {
+  touch-action: none;
+}
+
+/* An invisible tap area around a small control, 44px unless --touch-area-w/-h say otherwise.
+   --touch-area-left and --touch-area-top move it off centre, to keep it clear of a neighbour
+   or inside a clipping parent.
+   Only on touch screens (same query as utils/inputMode.ts), so mouse hover is unchanged.
+   z-index keeps later siblings from covering the area. */
+@media (hover: none) {
+  .touch-area {
+    position: relative;
+    z-index: 1;
+  }
+
+  .touch-area::before {
+    content: "";
+    position: absolute;
+    top: var(--touch-area-top, calc(50% - var(--touch-area-h, 44px) / 2));
+    left: var(--touch-area-left, calc(50% - var(--touch-area-w, 44px) / 2));
+    width: var(--touch-area-w, 44px);
+    height: var(--touch-area-h, 44px);
+  }
+
+  /* The life buttons' areas reach outward over a mic beside them, which keeps its own taps. */
+  .mobile-life-bar button:not(.touch-area) {
+    z-index: 2;
+  }
+}

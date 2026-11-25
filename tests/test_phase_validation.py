@@ -1,14 +1,19 @@
 """Tests for phase validation in WebSocket message handling."""
 
-import pytest
+from collections.abc import Callable
+from typing import Any
 
-from mtb.models.game import Player
-from server.routers.ws import ACTION_REQUIRED_PHASES, _validate_action_phase
+import pytest
+from fastapi.testclient import TestClient
+
+from pitfight.models.game import Player
+from pitfight.models.types import Phase
+from server.routers.ws_actions import ACTION_REQUIRED_PHASES, validate_action_phase
 
 
 class TestValidateActionPhase:
     @pytest.fixture
-    def player(self):
+    def player(self) -> Player:
         return Player(name="TestPlayer", phase="build")
 
     @pytest.mark.parametrize(
@@ -19,6 +24,7 @@ class TestValidateActionPhase:
             ("draft_done", "draft"),
             ("build_move", "build"),
             ("build_swap", "build"),
+            ("build_set_basics", "build"),
             ("build_ready", "build"),
             ("build_unready", "build"),
             ("build_apply_upgrade", "build"),
@@ -27,14 +33,13 @@ class TestValidateActionPhase:
             ("battle_submit_result", "battle"),
             ("battle_update_card_state", "battle"),
             ("battle_update_life", "battle"),
-            ("reward_pick_upgrade", "reward"),
             ("reward_apply_upgrade", "reward"),
             ("reward_done", "reward"),
         ],
     )
-    def test_action_accepts_correct_phase(self, action, phase):
+    def test_action_accepts_correct_phase(self, action: str, phase: Phase) -> None:
         player = Player(name="Test", phase=phase)
-        assert _validate_action_phase(action, player) is None
+        assert validate_action_phase(action, player) is None
 
     @pytest.mark.parametrize(
         ("action", "required_phase", "wrong_phase"),
@@ -49,30 +54,30 @@ class TestValidateActionPhase:
             ("battle_move", "battle", "build"),
             ("battle_reveal_upgrade", "battle", "build"),
             ("battle_submit_result", "battle", "draft"),
-            ("reward_pick_upgrade", "reward", "build"),
             ("reward_done", "reward", "draft"),
         ],
     )
-    def test_action_rejects_wrong_phase(self, action, required_phase, wrong_phase):
+    def test_action_rejects_wrong_phase(self, action: str, required_phase: str, *, wrong_phase: Phase) -> None:
         player = Player(name="Test", phase=wrong_phase)
-        error = _validate_action_phase(action, player)
+        error = validate_action_phase(action, player)
         assert error is not None
         assert required_phase in error
         assert wrong_phase in error
         assert action in error
 
-    def test_unknown_action_returns_none(self, player):
-        assert _validate_action_phase("unknown_action", player) is None
-        assert _validate_action_phase("set_ready", player) is None
-        assert _validate_action_phase("start_game", player) is None
+    def test_unknown_action_returns_none(self, player: Player) -> None:
+        assert validate_action_phase("unknown_action", player) is None
+        assert validate_action_phase("set_ready", player) is None
+        assert validate_action_phase("start_game", player) is None
 
-    def test_action_required_phases_covers_all_game_actions(self):
+    def test_action_required_phases_covers_all_game_actions(self) -> None:
         expected_actions = {
             "draft_swap",
             "draft_roll",
             "draft_done",
             "build_move",
             "build_swap",
+            "build_set_basics",
             "build_ready",
             "build_unready",
             "build_apply_upgrade",
@@ -84,7 +89,6 @@ class TestValidateActionPhase:
             "battle_update_card_state",
             "battle_update_life",
             "battle_pass_turn",
-            "reward_pick_upgrade",
             "reward_apply_upgrade",
             "reward_done",
         }
@@ -93,11 +97,17 @@ class TestValidateActionPhase:
 
 class TestPhaseValidationIntegration:
     def test_build_action_during_build_phase_succeeds(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
-    ):
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], object],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
@@ -120,11 +130,17 @@ class TestPhaseValidationIntegration:
             assert msg["type"] == "game_state"
 
     def test_build_move_rejects_second_rapid_move_when_one_slot_open(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
-    ):
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], object],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             bootstrap = ws_receive_json(ws)
@@ -188,11 +204,17 @@ class TestPhaseValidationIntegration:
             assert len(final_self["sideboard"]) == baseline_sideboard_count - 1
 
     def test_draft_action_during_build_phase_rejected(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
-    ):
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], object],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
@@ -220,11 +242,17 @@ class TestPhaseValidationIntegration:
             assert "build" in msg["payload"]["message"]
 
     def test_battle_action_during_build_phase_rejected(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
-    ):
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], object],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
@@ -247,11 +275,17 @@ class TestPhaseValidationIntegration:
             assert "build" in msg["payload"]["message"]
 
     def test_reward_action_during_build_phase_rejected(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
-    ):
+        self,
+        client: TestClient,
+        game_with_players: dict[str, Any],
+        *,
+        ws_receive_json: Callable[..., dict[str, Any]],
+        ws_receive_json_until: Callable[..., dict[str, Any]],
+        start_lobby: Callable[[str, str], object],
+    ) -> None:
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
@@ -259,8 +293,8 @@ class TestPhaseValidationIntegration:
 
             ws.send_json(
                 {
-                    "action": "reward_pick_upgrade",
-                    "payload": {"upgrade_id": "fake"},
+                    "action": "reward_done",
+                    "payload": {},
                 }
             )
 

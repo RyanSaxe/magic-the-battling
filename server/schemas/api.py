@@ -1,18 +1,45 @@
-from typing import Literal
+"""Pydantic models for HTTP and WebSocket game, lobby, and share payloads."""
 
-from pydantic import BaseModel, Field, field_validator
+from datetime import datetime
+from typing import Annotated, Literal
 
-from mtb.models.cards import Card
-from mtb.models.game import BattleResolution
-from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
+from pydantic import AfterValidator, BaseModel, Field, field_validator
+from pydantic_core import PydanticCustomError
+
+from pitfight.models.cards import Card
+from pitfight.models.game import BattleResolution
+from pitfight.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
+from server.services.spectate_requests import SpectateStatus
 
 LastResult = Literal["win", "loss", "draw"]
 CubeLoadingStatus = Literal["loading", "ready", "error"]
 BattlerLoadingStatus = Literal["missing", "loading", "ready", "error"]
+LobbyStartStatus = Literal["open", "starting", "started", "failed"]
+
+MAX_PLAYER_NAME_LENGTH = 32
+
+
+def _validate_player_name(value: str) -> str:
+    # PydanticCustomError keeps the message free of pydantic's "Value error, " prefix, since clients show it as is.
+    name = value.strip()
+    if not name:
+        msg = "player_name_blank"
+        raise PydanticCustomError(msg, "Player name is required.")
+    if len(name) > MAX_PLAYER_NAME_LENGTH:
+        msg = "player_name_too_long"
+        raise PydanticCustomError(
+            msg,
+            "Player name must be {max_length} characters or fewer.",
+            {"max_length": MAX_PLAYER_NAME_LENGTH},
+        )
+    return name
+
+
+PlayerName = Annotated[str, AfterValidator(_validate_player_name)]
 
 
 class CreateGameRequest(BaseModel):
-    player_name: str
+    player_name: PlayerName
     cube_id: str = "auto"
     use_upgrades: bool = True
     use_vanguards: bool = False
@@ -33,21 +60,66 @@ class CreateGameResponse(BaseModel):
     join_code: str
     session_id: str
     player_id: str
+    seat_token: str
 
 
 class JoinGameRequest(BaseModel):
     join_code: str
-    player_name: str
+    player_name: PlayerName
+
+    @field_validator("join_code")
+    @classmethod
+    def _strip_join_code(cls, value: str) -> str:
+        return value.strip()
 
 
 class RejoinGameRequest(BaseModel):
     player_name: str
+    seat_token: str | None = None
 
 
 class JoinGameResponse(BaseModel):
     game_id: str
     session_id: str
     player_id: str
+    seat_token: str
+
+
+class CloseSeatRequest(BaseModel):
+    player_name: str
+    seat_token: str
+
+
+class ResumableSeat(BaseModel):
+    game_id: str
+    player_name: str
+    seat_token: str
+
+
+class ResumableRequest(BaseModel):
+    seats: list[ResumableSeat] = Field(max_length=10)
+
+
+class ResumableGame(BaseModel):
+    game_id: str
+    player_name: str
+    kind: Literal["lobby", "game"]
+    last_active_at: datetime | None = None
+    cube_id: str
+    cube_name: str | None = None
+    cube_image_uri: str | None = None
+    play_mode: PlayMode
+    use_upgrades: bool
+    player_count: int
+    can_close: bool = False
+    # A lobby has no stage, round or poison yet.
+    stage: int | None = None
+    round: int | None = None
+    poison: int | None = None
+
+
+class ResumableResponse(BaseModel):
+    games: list[ResumableGame]
 
 
 class StartGameResponse(BaseModel):
@@ -147,6 +219,7 @@ class PlayerView(BaseModel):
 
 class SelfPlayerView(PlayerView):
     hand: list[CardRef]
+    hand_slots: list[str | None]
     sideboard: list[CardRef]
     command_zone: list[CardRef] = Field(default_factory=list)
     current_pack: list[CardRef] | None = None
@@ -208,6 +281,7 @@ class LobbyPlayer(BaseModel):
     name: str
     is_ready: bool = False
     is_host: bool = False
+    is_connected: bool = False
     battler_id: str | None = None
     battler_status: BattlerLoadingStatus | None = None
     battler_error: str | None = None
@@ -219,6 +293,8 @@ class LobbyStateResponse(BaseModel):
     players: list[LobbyPlayer]
     can_start: bool
     is_started: bool
+    start_status: LobbyStartStatus = "open"
+    start_error: str | None = None
     target_player_count: int = 4
     puppet_count: int = 0
     cube_loading_status: CubeLoadingStatus = "loading"
@@ -228,6 +304,8 @@ class LobbyStateResponse(BaseModel):
     use_upgrades: bool = True
     guided_mode_default: bool = False
     voice_chat_enabled: bool = False
+    auto_approve_spectators: bool = False
+    previous_host_id: str | None = None
     play_mode: PlayMode = "limited"
 
 
@@ -251,6 +329,7 @@ class BuildMoveAction(BaseModel):
     card_id: str
     source: BuildSource
     destination: BuildSource
+    slot: int | None = None
 
 
 class BuildSubmitAction(BaseModel):
@@ -274,11 +353,6 @@ class BattleUpdateLifeAction(BaseModel):
     action: str = "update_life"
     target: str  # "you" or "opponent"
     life: int
-
-
-class RewardPickUpgradeAction(BaseModel):
-    action: str = "pick_upgrade"
-    upgrade_id: str
 
 
 class RewardApplyUpgradeAction(BaseModel):
@@ -326,7 +400,7 @@ class SpectateRequestResponse(BaseModel):
 
 
 class SpectateRequestStatus(BaseModel):
-    status: Literal["pending", "approved", "denied"]
+    status: SpectateStatus
     session_id: str | None = None
     player_id: str | None = None
 
@@ -334,6 +408,9 @@ class SpectateRequestStatus(BaseModel):
 class GameCardsResponse(BaseModel):
     cards: list[CardCatalogEntry]
     upgrades: list[CardCatalogEntry]
+
+
+ShareSnapshotVisibility = Literal["full", "hand_hidden", "hidden"]
 
 
 class SharePlayerSnapshot(BaseModel):
@@ -348,12 +425,15 @@ class SharePlayerSnapshot(BaseModel):
     treasures: int
     poison: int
     vanguard: Card | None = None
+    visibility: ShareSnapshotVisibility = "full"
+    sudden_death_build: int | None = None
 
 
 class SharePlayerData(BaseModel):
     name: str
     final_placement: int | None
     final_poison: int
+    final_treasures: int | None = None
     is_puppet: bool
     snapshots: list[SharePlayerSnapshot]
 
@@ -364,6 +444,7 @@ class ShareGameResponse(BaseModel):
     created_at: str
     use_upgrades: bool
     cube_id: str | None = None
+    in_progress: bool = False
     players: list[SharePlayerData]
 
 
@@ -398,3 +479,7 @@ class ServerStatusResponse(BaseModel):
     new_games_blocked: bool
     scheduled_for_utc: str | None = None
     estimated_recovery_minutes: int | None = None
+
+
+class VoiceIceServersResponse(BaseModel):
+    ice_servers: list[dict[str, str | list[str]]]

@@ -1,16 +1,21 @@
+import type { ReactElement } from "react";
+
 interface TreasureIconProps {
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
 const sizes = {
   sm: 16,
   md: 24,
   lg: 32,
-}
+};
 
-export function TreasureIcon({ size = 'md', className = '' }: TreasureIconProps) {
-  const px = sizes[size]
+export function TreasureIcon({
+  size = "md",
+  className = "",
+}: TreasureIconProps): ReactElement {
+  const px = sizes[size];
   return (
     <svg
       width={px}
@@ -34,5 +39,5 @@ export function TreasureIcon({ size = 'md', className = '' }: TreasureIconProps)
         strokeLinecap="round"
       />
     </svg>
-  )
+  );
 }

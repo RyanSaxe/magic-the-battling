@@ -1,8 +1,10 @@
+"""Environment-driven runtime limits, timeouts, and security settings."""
+
 import os
 import sys
 
 
-def _env_bool(name: str, default: bool) -> bool:
+def _env_bool(name: str, *, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -45,7 +47,7 @@ def _env_str(name: str, default: str = "") -> str:
 
 def _is_local_dev() -> bool:
     if os.getenv("MTB_LOCAL_DEV") is not None:
-        return _env_bool("MTB_LOCAL_DEV", False)
+        return _env_bool("MTB_LOCAL_DEV", default=False)
 
     env_name = _env_str("MTB_ENV").lower()
     if env_name in {"dev", "development", "local", "test"}:
@@ -56,24 +58,27 @@ def _is_local_dev() -> bool:
     return "pytest" in sys.modules
 
 
-_DEFAULT_AUTH_SECRET_KEY = "local-dev-secret-key-change-before-production"
+_DEFAULT_AUTH_SECRET_KEY = "local-dev-secret-key-change-before-production"  # noqa: S105 -- non-secret constant name
 _BLOCKED_PRODUCTION_AUTH_SECRETS = {
     "dev-secret-change-in-production",
     _DEFAULT_AUTH_SECRET_KEY,
 }
 
 
-def _resolve_auth_secret_key() -> str:
+def resolve_auth_secret_key(*, local_dev: bool | None = None) -> str:
+    is_local = _is_local_dev() if local_dev is None else local_dev
     configured = _env_str("MTB_AUTH_SECRET_KEY")
     if configured:
-        if not IS_LOCAL_DEV and configured in _BLOCKED_PRODUCTION_AUTH_SECRETS:
-            raise RuntimeError("MTB_AUTH_SECRET_KEY must be set to a deployment-specific secret outside local dev")
+        if not is_local and configured in _BLOCKED_PRODUCTION_AUTH_SECRETS:
+            msg = "MTB_AUTH_SECRET_KEY must be set to a deployment-specific secret outside local dev"
+            raise RuntimeError(msg)
         return configured
 
-    if IS_LOCAL_DEV:
+    if is_local:
         return _DEFAULT_AUTH_SECRET_KEY
 
-    raise RuntimeError("MTB_AUTH_SECRET_KEY must be set outside local development")
+    msg = "MTB_AUTH_SECRET_KEY must be set outside local development"
+    raise RuntimeError(msg)
 
 
 SNAPSHOT_INTERVAL_SEC = _env_float("MTB_SNAPSHOT_INTERVAL_SEC", 5.0, min_value=1.0)
@@ -96,10 +101,17 @@ SPECTATE_REQUEST_TTL_MINUTES = _env_int("MTB_SPECTATE_REQUEST_TTL_MINUTES", 30, 
 
 STALE_GAME_CLEANUP_HOURS = _env_int("MTB_STALE_GAME_CLEANUP_HOURS", 48, min_value=1)
 
+# Fly sets FLY_APP_NAME on every Machine, and its proxy sets Fly-Client-IP on each request it forwards.
+BEHIND_FLY_PROXY = bool(_env_str("FLY_APP_NAME"))
+
 OPS_API_TOKEN = os.getenv("MTB_OPS_TOKEN", "")
-RESTORE_ACTIVE_GAME_SNAPSHOTS = _env_bool("MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS", True)
+RESTORE_ACTIVE_GAME_SNAPSHOTS = _env_bool("MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS", default=True)
 
 IS_LOCAL_DEV = _is_local_dev()
-AUTH_SECRET_KEY = _resolve_auth_secret_key()
+AUTH_SECRET_KEY = resolve_auth_secret_key(local_dev=IS_LOCAL_DEV)
 AUTH_COOKIE_SECURE = not IS_LOCAL_DEV
 AUTH_TOKEN_EXPIRE_HOURS = _env_int("MTB_AUTH_TOKEN_EXPIRE_HOURS", 168, min_value=1)
+
+CLOUDFLARE_TURN_KEY_ID = _env_str("MTB_CLOUDFLARE_TURN_KEY_ID")
+CLOUDFLARE_TURN_API_TOKEN = _env_str("MTB_CLOUDFLARE_TURN_API_TOKEN")
+CLOUDFLARE_TURN_TTL_SECONDS = _env_int("MTB_CLOUDFLARE_TURN_TTL_SECONDS", 86400, min_value=60)

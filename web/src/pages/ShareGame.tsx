@@ -1,269 +1,186 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getShareGame } from '../api/client'
-import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '../types'
-import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
-import { buildSharePlayerViews, getSharePlayerRowBadge } from '../utils/share'
-import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
-import { useGameShellMode } from '../hooks/useGameShellMode'
-import { useElementHeight } from '../hooks/useElementHeight'
-import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
-import { CardPreviewContext, CardPreviewModal } from '../components/card'
-import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
-import { useHotkeys } from '../hooks/useHotkeys'
-import { getSidebarPlayerOrder } from '../utils/playerPlacement'
+import {
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  type ReactElement,
+  type RefObject,
+} from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import type {
+  ShareGameResponse,
+  SharePlayerData,
+  SharePlayerSnapshot,
+  Card as CardType,
+  PlayerView,
+} from "../types";
+import { ShareRoundDetail } from "../components/share/ShareRoundDetail";
+import {
+  buildSharePlayerViews,
+  getShareBoardSnapshot,
+  getSharePlayerRowBadge,
+  getShareRoundLabel,
+  getShareRoundValue,
+  parseShareRoundValue,
+  type SharePlayerRowBadge,
+} from "../utils/share";
+import { useShareGameData } from "../hooks/pages/useShareGame";
+import { useDocumentEvent, useEscapeKey } from "../hooks/useDomEffects";
+import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
+import { useGameShellMode } from "../hooks/useGameShellMode";
+import { useElementHeight } from "../hooks/useElementHeight";
+import type { ZoneConstraints } from "../hooks/computeConstrainedLayout";
+import { CardPreviewContext, CardPreviewModal } from "../components/card";
+import { PLAYER_ROW_STACK_CLASS, PlayerRow } from "../components/PlayerList";
+import { useHotkeys } from "../hooks/useHotkeys";
+import { getSidebarPlayerOrder } from "../utils/playerPlacement";
+import { AppHeader, HomeButton } from "../components/common/AppHeader";
+import { BoardBackdrop } from "../components/common/BoardBackdrop";
+import { BottomBar } from "../components/common/FrameBar";
+import { PageFrame } from "../components/common/PageFrame";
+import { SidePanel } from "../components/common/SidePanel";
+import { SurfaceCard } from "../components/common/SurfaceCard";
+import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
+import { NoticeFrame } from "../components/common/NoticeFrame";
+import type { AppError } from "../utils/appError";
+import { POPOVER_CHROME } from "../components/common/styles";
 
 interface RoundOption {
-  label: string
-  value: string
+  label: string;
+  shortLabel: string;
+  value: string;
 }
 
 function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
   return rounds.map((snap) => ({
-    label: `Stage ${snap.stage} - Round ${snap.round}`,
-    value: `${snap.stage}_${snap.round}`,
-  }))
+    label: getShareRoundLabel(snap),
+    shortLabel: getShareRoundLabel(snap, true),
+    value: getShareRoundValue(snap),
+  }));
 }
 
 function getLatestRoundValue(rounds: SharePlayerSnapshot[]): string {
-  const latest = rounds[rounds.length - 1]
-  return latest ? `${latest.stage}_${latest.round}` : ''
+  const latest = rounds[rounds.length - 1];
+  return latest ? getShareRoundValue(latest) : "";
+}
+
+function scrollToCenter(option: HTMLButtonElement | null): void {
+  option?.scrollIntoView({ block: "center" });
+}
+
+function resolveShareStatus(options: {
+  sharePlayer: SharePlayerData | undefined;
+  playerName: string;
+  selectedPlayer: string;
+  selectedRound: string;
+}): SharePlayerRowBadge {
+  if (options.sharePlayer) {
+    return getSharePlayerRowBadge(
+      options.sharePlayer,
+      options.selectedPlayer,
+      options.selectedRound,
+    );
+  }
+  return options.playerName === options.selectedPlayer ? "viewing" : "dead";
 }
 
 function RoundPopover({
   options,
   selectedRound,
+  anchorRef,
   onSelect,
   onClose,
 }: {
-  options: RoundOption[]
-  selectedRound: string
-  onSelect: (value: string) => void
-  onClose: () => void
-}) {
-  const ref = useRef<HTMLDivElement>(null)
+  options: RoundOption[];
+  selectedRound: string;
+  /** Holds the popover and its button, which toggles it on the click. */
+  anchorRef: RefObject<HTMLDivElement | null>;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+}): ReactElement {
+  const backdropRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
+  useDocumentEvent("mousedown", (e) => {
+    if (
+      e.target instanceof Node &&
+      (anchorRef.current?.contains(e.target) ||
+        backdropRef.current?.contains(e.target))
+    ) {
+      return;
     }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [onClose])
+    onClose();
+  });
+
+  useEscapeKey(onClose, { target: "document" });
 
   return (
-    <div
-      ref={ref}
-      className="absolute bottom-full mb-2 left-0 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
-    >
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => {
-            onSelect(opt.value)
-            onClose()
-          }}
-          className={`text-sm py-1.5 px-3 rounded text-left transition-colors ${
-            opt.value === selectedRound
-              ? 'bg-amber-600/80 text-white'
-              : 'text-gray-300 hover:bg-gray-700/60'
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  )
+    <>
+      <BoardBackdrop ref={backdropRef} onTap={onClose} />
+      <div
+        className={`absolute bottom-full mb-4 left-2 z-50 ${POPOVER_CHROME} p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[calc(100dvh-2*var(--frame-bar-height)-1rem)] overflow-y-auto`}
+      >
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            ref={opt.value === selectedRound ? scrollToCenter : undefined}
+            onClick={() => {
+              onSelect(opt.value);
+              onClose();
+            }}
+            className={`menu-item text-sm py-1.5 px-3 rounded text-left transition-colors ${
+              opt.value === selectedRound
+                ? "text-[var(--gold-pale)]"
+                : "text-[var(--ivory-muted)]"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
 }
 
-export function ShareGame() {
-  const { gameId, playerName } = useParams<{ gameId: string; playerName: string }>()
-  const navigate = useNavigate()
-  const sizes = useViewportCardSizes()
-  const shellMode = useGameShellMode()
-  const [data, setData] = useState<ShareGameResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [selectedRound, setSelectedRound] = useState('')
-  const [selectedPlayer, setSelectedPlayer] = useState('')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [roundPopoverOpen, setRoundPopoverOpen] = useState(false)
-  const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
-  const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
-  const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
-  const [headerRef] = useElementHeight()
-  const [bottomBarRef] = useElementHeight()
-  const usesOverlaySidebar = shellMode !== 'big'
-  const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen
-  const isSmallShell = shellMode === 'small'
-  const usesCompactHeader = shellMode === 'mobile'
-  const headerChromeClassName =
-    shellMode === 'big'
-      ? 'shrink-0 py-3 frame-chrome bar-pad-left'
-      : 'shrink-0 py-3 frame-chrome bar-pad-both'
-  const bottomBarPaddingClass =
-    shellMode === 'small' ? 'bar-pad-both' : 'bar-pad-main'
-  const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
-    setPreviewCardState(card)
-    setPreviewUpgrades(appliedUpgrades ?? [])
-  }, [])
-  const setDeckConstraintsForView = useCallback((viewKey: string, constraints: ZoneConstraints) => {
-    setDeckConstraintsByView((prev) => ({ ...prev, [viewKey]: constraints }))
-  }, [])
-  const clearDeckConstraintsForView = useCallback((viewKey: string) => {
-    setDeckConstraintsByView((prev) => {
-      if (!(viewKey in prev)) return prev
-      const next = { ...prev }
-      delete next[viewKey]
-      return next
-    })
-  }, [])
+const NOT_FOUND_CODES = new Set([
+  "GAME_NOT_FOUND",
+  "PLAYER_NOT_IN_GAME",
+  "SHARE_DATA_NOT_FOUND",
+]);
 
-  useEffect(() => {
-    if (!gameId || !playerName) return
-    getShareGame(gameId, playerName)
-      .then((res) => {
-        setData(res)
-        setSelectedPlayer(res.owner_name)
-        const ownerPlayer = res.players.find((player) => player.name === res.owner_name)
-        const referenceSnapshots = ownerPlayer?.snapshots ?? res.players[0]?.snapshots ?? []
-        setSelectedRound(getLatestRoundValue(referenceSnapshots))
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [gameId, playerName])
+function shareErrorTitle(error: AppError): string {
+  if (error.code === "GAME_IN_PROGRESS") return "Game in progress";
+  if (NOT_FOUND_CODES.has(error.code)) return "Game not found";
+  return "Couldn't load this game";
+}
 
-  const ownerPlayer = data?.players.find((p) => p.name === data.owner_name)
-  const referenceSnapshots = ownerPlayer?.snapshots ?? data?.players[0]?.snapshots ?? []
-  const latestRoundValue = getLatestRoundValue(referenceSnapshots)
-  const selectedRoundExists = referenceSnapshots.some(
-    (snapshot) => `${snapshot.stage}_${snapshot.round}` === selectedRound,
-  )
-  const effectiveSelectedRound = selectedRoundExists ? selectedRound : latestRoundValue
-  const playerViews = buildSharePlayerViews(data, effectiveSelectedRound)
-  const sortedPlayerViews = getSidebarPlayerOrder(playerViews)
-  const shareHotkeys: Record<string, () => void> = {}
-  if (shellMode === 'big' && !previewCard && !roundPopoverOpen) {
-    sortedPlayerViews.slice(0, 8).forEach((player, index) => {
-      shareHotkeys[String(index + 1)] = () => {
-        setSelectedPlayer(player.name)
-      }
-    })
-  }
-
-  useHotkeys(shareHotkeys, true)
-
-  const handleCloseRoundPopover = useCallback(() => setRoundPopoverOpen(false), [])
-
-  if (loading) {
-    return (
-      <div className="h-dvh flex items-center justify-center bg-gray-900 text-gray-400">
-        Loading game...
-      </div>
-    )
-  }
-
-  if (error || !data) {
-    return (
-      <div className="h-dvh flex flex-col items-center justify-center bg-gray-900 text-gray-400 gap-4">
-        <p>{error || 'Game not found'}</p>
-        <button
-          className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-500"
-          onClick={() => navigate('/')}
-        >
-          Go Home
-        </button>
-      </div>
-    )
-  }
-
-  const sharePlayersByName = new Map(data.players.map((player) => [player.name, player] as const))
-  const roundOptions = buildRoundOptions(referenceSnapshots)
-
-  const currentPlayerData = data.players.find((p) => p.name === selectedPlayer)
-  const currentSnapshot = currentPlayerData
-    ? currentPlayerData.snapshots.find((s) => `${s.stage}_${s.round}` === effectiveSelectedRound)
-    : null
-  const currentIndex = roundOptions.findIndex((o) => o.value === effectiveSelectedRound)
-  const hasPrev = currentIndex > 0
-  const hasNext = currentIndex < roundOptions.length - 1
-  const currentRoundLabel = roundOptions.find((o) => o.value === effectiveSelectedRound)?.label ?? 'No rounds'
-  const roundLayoutStateKey = currentSnapshot
-    ? `round:${selectedPlayer}:${currentSnapshot.stage}:${currentSnapshot.round}`
-    : null
-  const roundResizeState = roundLayoutStateKey
-    ? {
-        constraints: deckConstraintsByView[roundLayoutStateKey] ?? null,
-        setConstraints: (constraints: ZoneConstraints) => {
-          setDeckConstraintsForView(roundLayoutStateKey, constraints)
-        },
-        clearConstraints: () => {
-          clearDeckConstraintsForView(roundLayoutStateKey)
-        },
-      }
-    : undefined
-
-  const renderContent = () => {
-    if (roundOptions.length === 0) {
-      return (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
-            <h2 className="text-lg font-semibold text-amber-200">No Round Data</h2>
-            <p className="text-sm text-gray-200 mt-2 leading-snug">
-              No round data is available for this game.
-            </p>
-          </div>
-        </div>
-      )
-    }
-
-    if (currentSnapshot) {
-      return (
-        <div className="flex-1 min-h-0 flex flex-col">
-          <ShareRoundDetail
-            snapshot={currentSnapshot}
-            useUpgrades={data.use_upgrades}
-            enableResize
-            isMobile={sizes.isMobile}
-            layoutStateKey={roundLayoutStateKey ?? undefined}
-            resizeState={roundResizeState}
-            showLayoutReset
-          />
-        </div>
-      )
-    }
-
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
-          <p className="text-sm text-gray-200 leading-snug">
-            {currentPlayerData
-              ? 'This player was not in the game during this round.'
-              : 'Select a player to view their deck.'}
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  const renderSidebarContent = () => (
+function ShareSidebarList({
+  data,
+  playerViews,
+  sortedPlayerViews,
+  selectedPlayer,
+  effectiveSelectedRound,
+  onSelectPlayer,
+}: {
+  data: ShareGameResponse;
+  playerViews: PlayerView[];
+  sortedPlayerViews: PlayerView[];
+  selectedPlayer: string;
+  effectiveSelectedRound: string;
+  onSelectPlayer: (name: string) => void;
+}): ReactElement {
+  const sharePlayersByName = new Map(
+    data.players.map((player) => [player.name, player] as const),
+  );
+  return (
     <div className="px-3 py-0">
       <div className={PLAYER_ROW_STACK_CLASS}>
         {sortedPlayerViews.map((pv) => {
-          const sharePlayer = sharePlayersByName.get(pv.name)
-          const shareStatus = sharePlayer
-            ? getSharePlayerRowBadge(sharePlayer, selectedPlayer, effectiveSelectedRound)
-            : (pv.name === selectedPlayer ? 'viewing' : 'dead')
-
+          const shareStatus = resolveShareStatus({
+            sharePlayer: sharePlayersByName.get(pv.name),
+            playerName: pv.name,
+            selectedPlayer,
+            selectedRound: effectiveSelectedRound,
+          });
           return (
             <PlayerRow
               key={pv.name}
@@ -273,181 +190,391 @@ export function ShareGame() {
               isSelected={pv.name === selectedPlayer}
               variant="share"
               shareStatus={shareStatus}
-              onClick={() => {
-                setSelectedPlayer(pv.name)
-                if (usesOverlaySidebar) setSidebarOpen(false)
-              }}
+              // Mid-game a rank would read as a final standing that doesn't exist yet.
+              showPlacement={!data.in_progress || pv.placement > 0}
+              onClick={() => onSelectPlayer(pv.name)}
             />
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
+}
+
+function ShareMainContent({
+  hasRounds,
+  currentPlayerData,
+  currentSnapshot,
+  effectiveSelectedRound,
+  useUpgrades,
+  isMobile,
+  roundLayoutStateKey,
+  roundResizeState,
+}: {
+  hasRounds: boolean;
+  currentPlayerData: SharePlayerData | undefined;
+  currentSnapshot: SharePlayerSnapshot | null;
+  effectiveSelectedRound: string;
+  useUpgrades: boolean;
+  isMobile: boolean;
+  roundLayoutStateKey: string | null;
+  roundResizeState:
+    | {
+        constraints: ZoneConstraints | null;
+        setConstraints: (constraints: ZoneConstraints) => void;
+        clearConstraints: () => void;
+      }
+    | undefined;
+}): ReactElement {
+  if (!hasRounds) {
+    return (
+      <div className="flex-1 flex items-center justify-center px-4">
+        <SurfaceCard>
+          <h2 className="text-lg font-semibold text-amber-200">
+            No Round Data
+          </h2>
+          <p className="text-sm text-[var(--ivory)] mt-2 leading-snug">
+            No round data is available for this game.
+          </p>
+        </SurfaceCard>
+      </div>
+    );
+  }
+
+  if (currentPlayerData && currentSnapshot) {
+    return (
+      <div className="flex-1 min-h-0 flex flex-col">
+        <ShareRoundDetail
+          player={currentPlayerData}
+          snapshot={currentSnapshot}
+          useUpgrades={useUpgrades}
+          enableResize
+          isMobile={isMobile}
+          layoutStateKey={roundLayoutStateKey ?? undefined}
+          resizeState={roundResizeState}
+          showLayoutReset
+        />
+      </div>
+    );
+  }
+
+  const absentMessage = parseShareRoundValue(effectiveSelectedRound)
+    ?.sudden_death_build
+    ? "This player did not fight in this Sudden Death."
+    : "This player was not in the game during this round.";
+  return (
+    <div className="flex-1 flex items-center justify-center px-4">
+      <SurfaceCard>
+        <p className="text-sm text-[var(--ivory)] leading-snug">
+          {currentPlayerData
+            ? absentMessage
+            : "Select a player to view their deck."}
+        </p>
+      </SurfaceCard>
+    </div>
+  );
+}
+
+function buildShareHotkeys(options: {
+  enabled: boolean;
+  sortedPlayerViews: PlayerView[];
+  setSelectedPlayer: (name: string) => void;
+}): Record<string, () => void> {
+  const hotkeys: Record<string, () => void> = {};
+  if (!options.enabled) return hotkeys;
+  options.sortedPlayerViews.slice(0, 8).forEach((player, index) => {
+    hotkeys[String(index + 1)] = (): void => {
+      options.setSelectedPlayer(player.name);
+    };
+  });
+  return hotkeys;
+}
+
+function deriveShareRoundNav(options: {
+  referenceSnapshots: SharePlayerSnapshot[];
+  effectiveSelectedRound: string;
+  shellMode: ReturnType<typeof useGameShellMode>;
+}): {
+  roundOptions: RoundOption[];
+  currentIndex: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+  currentRoundLabel: string;
+} {
+  const roundOptions = buildRoundOptions(options.referenceSnapshots);
+  const currentIndex = roundOptions.findIndex(
+    (o) => o.value === options.effectiveSelectedRound,
+  );
+  const currentRoundOption = roundOptions[currentIndex];
+  const currentRoundLabel =
+    (options.shellMode === "mobile"
+      ? currentRoundOption?.shortLabel
+      : currentRoundOption?.label) ?? "No rounds";
+  return {
+    roundOptions,
+    currentIndex,
+    hasPrev: currentIndex > 0,
+    hasNext: currentIndex < roundOptions.length - 1,
+    currentRoundLabel,
+  };
+}
+
+function ShareFooterBar({
+  bottomBarRef,
+  roundOptions,
+  currentIndex,
+  hasPrev,
+  hasNext,
+  currentRoundLabel,
+  effectiveSelectedRound,
+  roundPopoverOpen,
+  setRoundPopoverOpen,
+  setSelectedRound,
+}: {
+  bottomBarRef: (node: HTMLDivElement | null) => void;
+  roundOptions: RoundOption[];
+  currentIndex: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+  currentRoundLabel: string;
+  effectiveSelectedRound: string;
+  roundPopoverOpen: boolean;
+  setRoundPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedRound: (round: string) => void;
+}): ReactElement {
+  const roundAnchorRef = useRef<HTMLDivElement>(null);
+  const handleCloseRoundPopover = useCallback(
+    () => setRoundPopoverOpen(false),
+    [setRoundPopoverOpen],
+  );
+  return (
+    <BottomBar
+      ref={bottomBarRef}
+      secondary={
+        <div ref={roundAnchorRef} className="relative">
+          <button
+            className="btn btn-secondary"
+            disabled={roundOptions.length === 0}
+            onClick={() => setRoundPopoverOpen((o) => !o)}
+          >
+            {currentRoundLabel}
+          </button>
+          {roundPopoverOpen && roundOptions.length > 0 && (
+            <RoundPopover
+              anchorRef={roundAnchorRef}
+              options={roundOptions}
+              selectedRound={effectiveSelectedRound}
+              onSelect={setSelectedRound}
+              onClose={handleCloseRoundPopover}
+            />
+          )}
+        </div>
+      }
+      main={
+        <>
+          <button
+            className="btn btn-secondary disabled:opacity-30"
+            disabled={!hasPrev}
+            onClick={() => {
+              if (hasPrev) {
+                setSelectedRound(roundOptions[currentIndex - 1].value);
+              }
+            }}
+          >
+            Prev
+          </button>
+          <button
+            className="btn btn-secondary disabled:opacity-30"
+            disabled={!hasNext}
+            onClick={() => {
+              if (hasNext) {
+                setSelectedRound(roundOptions[currentIndex + 1].value);
+              }
+            }}
+          >
+            Next
+          </button>
+        </>
+      }
+    />
+  );
+}
+
+function ShareGameLoaded({
+  data,
+  setSelectedRound,
+  selectedPlayer,
+  setSelectedPlayer,
+  sortedPlayerViews,
+  playerViews,
+  referenceSnapshots,
+  effectiveSelectedRound,
+  shellMode,
+  isMobile,
+  roundPopoverOpen,
+  setRoundPopoverOpen,
+  previewCard,
+  previewUpgrades,
+  setPreviewCard,
+}: {
+  data: ShareGameResponse;
+  setSelectedRound: (round: string) => void;
+  selectedPlayer: string;
+  setSelectedPlayer: (player: string) => void;
+  sortedPlayerViews: PlayerView[];
+  playerViews: PlayerView[];
+  referenceSnapshots: SharePlayerSnapshot[];
+  effectiveSelectedRound: string;
+  shellMode: ReturnType<typeof useGameShellMode>;
+  isMobile: boolean;
+  roundPopoverOpen: boolean;
+  setRoundPopoverOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  previewCard: CardType | null;
+  previewUpgrades: CardType[];
+  setPreviewCard: (card: CardType | null, appliedUpgrades?: CardType[]) => void;
+}): ReactElement {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [deckConstraintsByView, setDeckConstraintsByView] = useState<
+    Record<string, ZoneConstraints>
+  >({});
+  const [headerRef] = useElementHeight();
+  const [bottomBarRef] = useElementHeight();
+  const usesOverlaySidebar = shellMode !== "big";
+  const previewContextValue = useMemo(
+    () => ({ setPreviewCard }),
+    [setPreviewCard],
+  );
+
+  const setDeckConstraintsForView = useCallback(
+    (viewKey: string, constraints: ZoneConstraints) => {
+      setDeckConstraintsByView((prev) => ({ ...prev, [viewKey]: constraints }));
+    },
+    [],
+  );
+  const clearDeckConstraintsForView = useCallback((viewKey: string) => {
+    setDeckConstraintsByView((prev) => {
+      if (!(viewKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[viewKey];
+      return next;
+    });
+  }, []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  const nav = deriveShareRoundNav({
+    referenceSnapshots,
+    effectiveSelectedRound,
+    shellMode,
+  });
+  const currentPlayerData = data.players.find((p) => p.name === selectedPlayer);
+  const currentSnapshot = currentPlayerData
+    ? getShareBoardSnapshot(currentPlayerData, effectiveSelectedRound)
+    : null;
+  const roundLayoutStateKey = currentSnapshot
+    ? `round:${selectedPlayer}:${getShareRoundValue(currentSnapshot)}`
+    : null;
+  const roundResizeState = roundLayoutStateKey
+    ? {
+        constraints: deckConstraintsByView[roundLayoutStateKey] ?? null,
+        setConstraints: (constraints: ZoneConstraints): void => {
+          setDeckConstraintsForView(roundLayoutStateKey, constraints);
+        },
+        clearConstraints: (): void => {
+          clearDeckConstraintsForView(roundLayoutStateKey);
+        },
+      }
+    : undefined;
+
+  const sidebarList = (
+    <ShareSidebarList
+      data={data}
+      playerViews={playerViews}
+      sortedPlayerViews={sortedPlayerViews}
+      selectedPlayer={selectedPlayer}
+      effectiveSelectedRound={effectiveSelectedRound}
+      onSelectPlayer={(name) => {
+        setSelectedPlayer(name);
+        if (usesOverlaySidebar) setSidebarOpen(false);
+      }}
+    />
+  );
 
   return (
-    <CardPreviewContext.Provider value={{ setPreviewCard }}>
-    <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
-      {/* Header */}
-      <header ref={headerRef} className={headerChromeClassName}>
-        {!usesCompactHeader ? (
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline">
-              <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                Crucible
-              </h1>
-              <span className="hero-sep mx-2.5">—</span>
-              <span className="hero-subtitle text-base font-normal tracking-widest">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {data.cube_id && (
-              <a
-                href={`https://cubecobra.com/cube/overview/${encodeURIComponent(data.cube_id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-amber-400 hover:text-amber-300 transition-colors mr-1"
-              >
-                CubeCobra
-              </a>
-            )}
-            <button
-              onClick={() => navigate('/')}
-              className="btn btn-secondary py-2 px-4"
-            >
-              Home
-            </button>
-          </div>
-        </div>
-        ) : (
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline whitespace-nowrap">
-                <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-1 text-xs">—</span>
-                <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                  an MtG format
-                </span>
-              </div>
-              <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => navigate('/')}
-                className="btn btn-secondary py-1.5 px-3 text-sm"
-              >
-                Home
-              </button>
-            </div>
-          </div>
+    <CardPreviewContext.Provider value={previewContextValue}>
+      <PageFrame
+        header={
+          <AppHeader
+            ref={headerRef}
+            helpers={
+              data.cube_id && (
+                <a
+                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(data.cube_id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary hidden sm:inline-flex items-center"
+                >
+                  CubeCobra ↗
+                </a>
+              )
+            }
+            home={<HomeButton />}
+            account={
+              usesOverlaySidebar && (
+                <button
+                  onClick={() => setSidebarOpen((o) => !o)}
+                  className="btn btn-secondary btn-icon"
+                  aria-label="Players"
+                >
+                  ☰
+                </button>
+              )
+            }
+          />
+        }
+        scroll={false}
+        aside={
+          usesOverlaySidebar ? undefined : (
+            <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
+              <div className="overflow-y-auto flex-1 pt-3">{sidebarList}</div>
+            </aside>
+          )
+        }
+        footer={
+          <ShareFooterBar
+            bottomBarRef={bottomBarRef}
+            roundOptions={nav.roundOptions}
+            currentIndex={nav.currentIndex}
+            hasPrev={nav.hasPrev}
+            hasNext={nav.hasNext}
+            currentRoundLabel={nav.currentRoundLabel}
+            effectiveSelectedRound={effectiveSelectedRound}
+            roundPopoverOpen={roundPopoverOpen}
+            setRoundPopoverOpen={setRoundPopoverOpen}
+            setSelectedRound={setSelectedRound}
+          />
+        }
+      >
+        <ShareMainContent
+          hasRounds={nav.roundOptions.length > 0}
+          currentPlayerData={currentPlayerData}
+          currentSnapshot={currentSnapshot}
+          effectiveSelectedRound={effectiveSelectedRound}
+          useUpgrades={data.use_upgrades}
+          isMobile={isMobile}
+          roundLayoutStateKey={roundLayoutStateKey}
+          roundResizeState={roundResizeState}
+        />
+        {usesOverlaySidebar && (
+          <SidePanel
+            open={sidebarOpen}
+            title="Players"
+            onClose={closeSidebar}
+            closeOnBoardTap
+          >
+            <div className="overflow-y-auto flex-1 pt-3">{sidebarList}</div>
+          </SidePanel>
         )}
-      </header>
-
-      {/* Main + Sidebar */}
-      <div className="flex-1 flex min-h-0 game-surface">
-        {shellMode === 'mobile' && (
-          <div className="w-[4px] shrink-0 frame-chrome" />
-        )}
-        <main className="flex-1 flex flex-col min-h-0 min-w-0 p-[2px] zone-divider-bg">
-          <div className="zone-pack flex-1 min-h-0 flex flex-col">
-            {renderContent()}
-          </div>
-        </main>
-
-        {usesOverlaySidebar ? (
-          <>
-            {overlaySidebarOpen && (
-              <div
-                className="fixed inset-0 bg-black/50 z-40"
-                onClick={() => setSidebarOpen(false)}
-              />
-            )}
-            <div
-              className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${
-                overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'
-              }`}
-            >
-              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
-                <div className="px-3 py-2 text-sm font-medium text-gray-400">
-                  Players
-                </div>
-                <div className="overflow-y-auto flex-1">
-                  {renderSidebarContent()}
-                </div>
-              </aside>
-            </div>
-          </>
-        ) : (
-          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
-            <div className="overflow-y-auto flex-1">
-              {renderSidebarContent()}
-            </div>
-          </aside>
-        )}
-        {shellMode === 'mobile' && (
-          <div className="w-[4px] shrink-0 frame-chrome" />
-        )}
-        {isSmallShell && (
-          <div className="w-10 shrink-0 frame-chrome" />
-        )}
-      </div>
-
-      {/* Bottom Bar */}
-      <div ref={bottomBarRef} className="shrink-0 frame-chrome">
-        <div className={`flex items-center justify-between py-1.5 sm:py-2 ${bottomBarPaddingClass} timeline-actions`}>
-          <div className="relative">
-            <button
-              className="btn btn-secondary text-sm py-1.5 px-3"
-              disabled={roundOptions.length === 0}
-              onClick={() => setRoundPopoverOpen((o) => !o)}
-            >
-              {currentRoundLabel}
-            </button>
-            {roundPopoverOpen && roundOptions.length > 0 && (
-              <RoundPopover
-                options={roundOptions}
-                selectedRound={effectiveSelectedRound}
-                onSelect={setSelectedRound}
-                onClose={handleCloseRoundPopover}
-              />
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
-              disabled={!hasPrev}
-              onClick={() => hasPrev && setSelectedRound(roundOptions[currentIndex - 1].value)}
-            >
-              Prev
-            </button>
-            <button
-              className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
-              disabled={!hasNext}
-              onClick={() => hasNext && setSelectedRound(roundOptions[currentIndex + 1].value)}
-            >
-              Next
-            </button>
-            {usesOverlaySidebar && (
-              <button
-                onClick={() => setSidebarOpen((o) => !o)}
-                className="btn btn-secondary py-1.5 px-2 text-sm"
-                aria-label="Players"
-              >
-                ☰
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      </PageFrame>
       {previewCard && (
         <CardPreviewModal
           card={previewCard}
@@ -455,7 +582,126 @@ export function ShareGame() {
           onClose={() => setPreviewCard(null)}
         />
       )}
-    </div>
     </CardPreviewContext.Provider>
-  )
+  );
+}
+
+function deriveShareBoardState(
+  data: ShareGameResponse | null,
+  selectedRound: string,
+): {
+  referenceSnapshots: SharePlayerSnapshot[];
+  effectiveSelectedRound: string;
+  playerViews: PlayerView[];
+  sortedPlayerViews: PlayerView[];
+} {
+  const ownerPlayer = data?.players.find((p) => p.name === data.owner_name);
+  const referenceSnapshots =
+    ownerPlayer?.snapshots ?? data?.players[0]?.snapshots ?? [];
+  const latestRoundValue = getLatestRoundValue(referenceSnapshots);
+  const selectedRoundExists = referenceSnapshots.some(
+    (snapshot) => getShareRoundValue(snapshot) === selectedRound,
+  );
+  const effectiveSelectedRound = selectedRoundExists
+    ? selectedRound
+    : latestRoundValue;
+  const playerViews = buildSharePlayerViews(data, effectiveSelectedRound);
+  const sortedPlayerViews = getSidebarPlayerOrder(playerViews);
+  return {
+    referenceSnapshots,
+    effectiveSelectedRound,
+    playerViews,
+    sortedPlayerViews,
+  };
+}
+
+export function ShareGame(): ReactElement {
+  const { gameId, playerName } = useParams<{
+    gameId: string;
+    playerName: string;
+  }>();
+  const navigate = useNavigate();
+  const sizes = useViewportCardSizes();
+  const shellMode = useGameShellMode();
+  const {
+    data,
+    error,
+    loading,
+    selectedRound,
+    setSelectedRound,
+    selectedPlayer,
+    setSelectedPlayer,
+  } = useShareGameData(gameId, playerName);
+  const [roundPopoverOpen, setRoundPopoverOpen] = useState(false);
+  const [previewCard, setPreviewCardState] = useState<CardType | null>(null);
+  const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([]);
+
+  const setPreviewCard = useCallback(
+    (card: CardType | null, appliedUpgrades?: CardType[]) => {
+      setPreviewCardState(card);
+      setPreviewUpgrades(appliedUpgrades ?? []);
+    },
+    [],
+  );
+
+  const board = deriveShareBoardState(data, selectedRound);
+
+  useHotkeys(
+    buildShareHotkeys({
+      enabled: shellMode === "big" && !previewCard && !roundPopoverOpen,
+      sortedPlayerViews: board.sortedPlayerViews,
+      setSelectedPlayer,
+    }),
+    true,
+  );
+
+  if (loading) {
+    return (
+      <NoticeFrame>
+        <BusyNotice label="Loading game..." />
+      </NoticeFrame>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <NoticeFrame>
+        <StatusNotice
+          title={error ? shareErrorTitle(error) : "Game not found"}
+          actions={
+            <button
+              onClick={() => {
+                void navigate("/");
+              }}
+              className="btn btn-secondary flex-1 py-2"
+            >
+              Home
+            </button>
+          }
+        >
+          {error?.message ?? "This game is no longer available to share."}
+        </StatusNotice>
+      </NoticeFrame>
+    );
+  }
+
+  return (
+    <ShareGameLoaded
+      data={data}
+      setSelectedRound={setSelectedRound}
+      selectedPlayer={selectedPlayer}
+      setSelectedPlayer={setSelectedPlayer}
+      sortedPlayerViews={board.sortedPlayerViews}
+      playerViews={board.playerViews}
+      referenceSnapshots={board.referenceSnapshots}
+      effectiveSelectedRound={board.effectiveSelectedRound}
+      shellMode={shellMode}
+      isMobile={sizes.isMobile}
+      roundPopoverOpen={roundPopoverOpen}
+      setRoundPopoverOpen={setRoundPopoverOpen}
+      previewCard={previewCard}
+      previewUpgrades={previewUpgrades}
+      setPreviewCard={setPreviewCard}
+    />
+  );
 }

@@ -1,10 +1,12 @@
+import { readMigratedItem } from "../utils/storage";
 import type {
   GuidedGuideId,
   GuideProgressState,
   GuideStorageIdentity,
 } from "./types";
 
-const GUIDED_PROGRESS_KEY = "mtb_guided_progress";
+const GUIDED_PROGRESS_KEY = "pitfight_guided_progress";
+const LEGACY_GUIDED_PROGRESS_KEY = "mtb_guided_progress";
 const MAX_TRACKED_SESSIONS = 100;
 
 interface StoredProgressEntry {
@@ -19,47 +21,70 @@ interface StoredProgressEntry {
 type StoredProgress = Record<string, StoredProgressEntry>;
 
 function canUseStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  return (
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+  );
 }
 
 function buildScopeKey(gameId: string, playerKey?: string | null): string {
   return `${gameId}::${playerKey ?? "anonymous"}`;
 }
 
+const KNOWN_GUIDE_IDS = new Map<string, GuidedGuideId>([
+  ["welcome", "welcome"],
+  ["build", "build"],
+  ["build_play_draw", "build_play_draw"],
+  ["battle", "battle"],
+  ["battle_result_submit", "battle_result_submit"],
+  ["reward", "reward"],
+  ["reward_stage_end", "reward_stage_end"],
+  ["draft", "draft"],
+  ["hint_treasure_producer", "hint_treasure_producer"],
+  ["hint_treasure_cap", "hint_treasure_cap"],
+  ["hint_build_unapplied_upgrade", "hint_build_unapplied_upgrade"],
+  ["hint_battle_unrevealed_upgrade", "hint_battle_unrevealed_upgrade"],
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseActiveGuide(
+  value: unknown,
+): { id: string; step: number } | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.id === "string" && typeof value.step === "number") {
+    return { id: value.id, step: value.step };
+  }
+  return undefined;
+}
+
 function normalizeEntry(value: unknown): StoredProgressEntry | null {
   if (Array.isArray(value)) {
     return {
       seen: value.filter(
-        (entry): entry is string => typeof entry === "string" && entry.length > 0,
+        (entry): entry is string =>
+          typeof entry === "string" && entry.length > 0,
       ),
     };
   }
 
-  if (!value || typeof value !== "object") {
+  if (!isRecord(value)) {
     return null;
   }
 
-  const seen = Array.isArray((value as { seen?: unknown }).seen)
-    ? (value as { seen: unknown[] }).seen.filter(
-      (entry): entry is string => typeof entry === "string" && entry.length > 0,
-    )
+  const rawSeen = value.seen;
+  const seen = Array.isArray(rawSeen)
+    ? rawSeen.filter(
+        (entry): entry is string =>
+          typeof entry === "string" && entry.length > 0,
+      )
     : [];
-  const skippedAll = (value as { skipped_all?: unknown }).skipped_all;
-  const activeGuideValue = (value as { active_guide?: unknown }).active_guide;
-  const activeGuide = activeGuideValue
-    && typeof activeGuideValue === "object"
-    && typeof (activeGuideValue as { id?: unknown }).id === "string"
-    && typeof (activeGuideValue as { step?: unknown }).step === "number"
-      ? {
-          id: (activeGuideValue as { id: string }).id,
-          step: (activeGuideValue as { step: number }).step,
-        }
-      : undefined;
 
   return {
     seen,
-    skipped_all: skippedAll === true ? true : undefined,
-    active_guide: activeGuide,
+    skipped_all: value.skipped_all === true ? true : undefined,
+    active_guide: parseActiveGuide(value.active_guide),
   };
 }
 
@@ -67,11 +92,15 @@ function readProgress(): StoredProgress {
   if (!canUseStorage()) return {};
 
   try {
-    const raw = window.localStorage.getItem(GUIDED_PROGRESS_KEY);
+    const raw = readMigratedItem(
+      window.localStorage,
+      GUIDED_PROGRESS_KEY,
+      LEGACY_GUIDED_PROGRESS_KEY,
+    );
     if (!raw) return {};
 
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) {
       return {};
     }
 
@@ -94,7 +123,9 @@ function pruneProgress(progress: StoredProgress): StoredProgress {
     return progress;
   }
 
-  return Object.fromEntries(entries.slice(entries.length - MAX_TRACKED_SESSIONS));
+  return Object.fromEntries(
+    entries.slice(entries.length - MAX_TRACKED_SESSIONS),
+  );
 }
 
 function writeProgress(progress: StoredProgress): void {
@@ -123,10 +154,11 @@ function readEntry(
     ? buildScopeKey(identity.gameId, identity.legacyPlayerId)
     : null;
 
-  return progress[primaryKey]
-    ?? (legacyKey ? progress[legacyKey] : undefined)
-    ?? progress[buildScopeKey(identity.gameId)]
-    ?? { seen: [] };
+  return (
+    progress[primaryKey] ??
+    (legacyKey ? progress[legacyKey] : undefined) ??
+    progress[buildScopeKey(identity.gameId)] ?? { seen: [] }
+  );
 }
 
 function resolveWriteScope(identity: GuideStorageIdentity): string | null {
@@ -157,14 +189,23 @@ export function getGuideProgressForGame(
   identity: GuideStorageIdentity,
 ): GuideProgressState {
   const entry = readEntry(readProgress(), identity);
-  const activeGuide = entry.active_guide
-    ? {
-        guideId: entry.active_guide.id as GuidedGuideId,
-        stepIndex: entry.active_guide.step,
-      }
-    : null;
+  const activeGuideId = entry.active_guide
+    ? KNOWN_GUIDE_IDS.get(entry.active_guide.id)
+    : undefined;
+  const activeGuide =
+    entry.active_guide && activeGuideId
+      ? {
+          guideId: activeGuideId,
+          stepIndex: entry.active_guide.step,
+        }
+      : null;
+  const seenGuides = new Set<GuidedGuideId>();
+  for (const id of entry.seen) {
+    const known = KNOWN_GUIDE_IDS.get(id);
+    if (known) seenGuides.add(known);
+  }
   return {
-    seenGuides: new Set(entry.seen as GuidedGuideId[]),
+    seenGuides,
     skippedAll: entry.skipped_all === true,
     activeGuide,
   };

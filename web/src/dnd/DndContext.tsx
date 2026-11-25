@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 import {
   DndContext as DndKitContext,
   DragOverlay,
@@ -23,30 +23,48 @@ const panelFirstPointerWithin: CollisionDetection = (args) => {
   const collisions = pointerWithin(args);
   if (collisions.length <= 1) return collisions;
   const panelHit = collisions.find((c) => String(c.id).startsWith("panel:"));
-  return panelHit ? [panelHit, ...collisions.filter((c) => c !== panelHit)] : collisions;
+  return panelHit
+    ? [panelHit, ...collisions.filter((c) => c !== panelHit)]
+    : collisions;
 };
+
+export interface CardMoveEvent {
+  card: Card;
+  fromZone: ZoneName;
+  toZone: ZoneName;
+  fromOwner: ZoneOwner;
+  toOwner: ZoneOwner;
+}
+
+export type CardMoveCallback = (move: CardMoveEvent) => void;
 
 interface GameDndProviderProps {
   children: ReactNode;
-  onCardMove?: (
-    card: Card,
-    fromZone: ZoneName,
-    toZone: ZoneName,
-    fromOwner: ZoneOwner,
-    toOwner: ZoneOwner,
-  ) => void;
+  onCardMove?: CardMoveCallback;
   validDropZones?: (fromZone: ZoneName) => ZoneName[];
+}
+
+function isDragData(value: unknown): value is DragData {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "card" in value &&
+    "fromZone" in value &&
+    "fromZoneId" in value
+  );
 }
 
 export function GameDndProvider({
   children,
   onCardMove,
   validDropZones,
-}: GameDndProviderProps) {
+}: GameDndProviderProps): ReactElement {
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [activeFromZone, setActiveFromZone] = useState<ZoneName | null>(null);
   const [activeFromZoneId, setActiveFromZoneId] = useState<string | null>(null);
-  const [activeDraggableId, setActiveDraggableId] = useState<string | null>(null);
+  const [activeDraggableId, setActiveDraggableId] = useState<string | null>(
+    null,
+  );
   const [activeFaceDown, setActiveFaceDown] = useState(false);
 
   const mouseSensor = useSensor(MouseSensor, {
@@ -72,63 +90,68 @@ export function GameDndProvider({
 
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
 
-  function handleDragStart(event: DragStartEvent) {
-    const data = event.active.data.current as DragData | undefined;
-    if (data) {
-      setActiveCard(data.card);
-      setActiveFromZone(data.fromZone);
-      setActiveFromZoneId(data.fromZoneId);
+  function resetActiveDrag(): void {
+    setActiveCard(null);
+    setActiveFromZone(null);
+    setActiveFromZoneId(null);
+    setActiveDraggableId(null);
+    setActiveFaceDown(false);
+  }
+
+  function handleDragStart(event: DragStartEvent): void {
+    const rawData: unknown = event.active.data.current;
+    if (isDragData(rawData)) {
+      setActiveCard(rawData.card);
+      setActiveFromZone(rawData.fromZone);
+      setActiveFromZoneId(rawData.fromZoneId);
       setActiveDraggableId(String(event.active.id));
-      setActiveFaceDown(data.faceDown ?? false);
+      setActiveFaceDown(rawData.faceDown ?? false);
     }
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { over } = event;
-
-    if (over && activeCard && activeFromZone) {
-      const toZoneId = over.id as string;
-      const { zone: toZone, owner: toOwner } = parseZoneId(toZoneId);
-
-      const dragData = event.active.data.current as DragData | undefined;
-      const fromZoneId = dragData?.fromZoneId || "";
-      const { zone: fromZone, owner: fromOwner } = parseZoneId(fromZoneId);
-
-      const isSameZone = fromZone === toZone && fromOwner === toOwner;
-      if (!isSameZone) {
-        const isValidDrop =
-          !validDropZones || validDropZones(activeFromZone).includes(toZone);
-        if (isValidDrop && onCardMove) {
-          onCardMove(activeCard, activeFromZone, toZone, fromOwner, toOwner);
-        }
-      }
+  function dispatchDrop(overId: string, rawData: unknown): void {
+    if (!activeCard || !activeFromZone || !onCardMove) return;
+    const { zone: toZone, owner: toOwner } = parseZoneId(overId);
+    const fromZoneId = isDragData(rawData) ? rawData.fromZoneId : "";
+    const { zone: fromZone, owner: fromOwner } = parseZoneId(fromZoneId);
+    if (fromZone === toZone && fromOwner === toOwner) return;
+    if (validDropZones && !validDropZones(activeFromZone).includes(toZone)) {
+      return;
     }
-
-    setActiveCard(null);
-    setActiveFromZone(null);
-    setActiveFromZoneId(null);
-    setActiveDraggableId(null);
-    setActiveFaceDown(false);
+    onCardMove({
+      card: activeCard,
+      fromZone: activeFromZone,
+      toZone,
+      fromOwner,
+      toOwner,
+    });
   }
 
-  function handleDragCancel() {
-    setActiveCard(null);
-    setActiveFromZone(null);
-    setActiveFromZoneId(null);
-    setActiveDraggableId(null);
-    setActiveFaceDown(false);
+  function handleDragEnd(event: DragEndEvent): void {
+    if (event.over) {
+      dispatchDrop(String(event.over.id), event.active.data.current);
+    }
+    resetActiveDrag();
   }
+
+  const contextValue = useMemo(
+    () => ({
+      activeCard,
+      activeFromZone,
+      activeFromZoneId,
+      activeDraggableId,
+    }),
+    [activeCard, activeFromZone, activeFromZoneId, activeDraggableId],
+  );
 
   return (
-    <GameDndContext.Provider
-      value={{ activeCard, activeFromZone, activeFromZoneId, activeDraggableId }}
-    >
+    <GameDndContext.Provider value={contextValue}>
       <DndKitContext
         sensors={sensors}
         collisionDetection={panelFirstPointerWithin}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
+        onDragCancel={resetActiveDrag}
       >
         {children}
         <DragOverlay dropAnimation={null} style={{ zIndex: 9999 }}>

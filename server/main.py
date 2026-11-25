@@ -1,11 +1,14 @@
+"""FastAPI application entrypoint, lifespan hooks, middleware, and static serving."""
+
 import logging
 import os
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -18,9 +21,10 @@ from server.db.database import init_db
 from server.errors import AppHTTPException, ErrorCode
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
-from server.routers import auth, battlers, discover, games, ops, share_preview, ws
+from server.routers import auth, battlers, discover, games, ops, share_preview, voice, ws
 from server.runtime_config import MAX_SESSIONS_TOTAL, RESTORE_ACTIVE_GAME_SNAPSHOTS, SESSION_TTL_MINUTES
 from server.schemas.api import ServerStatusResponse
+from server.services.default_cube import start_loading_default_cube
 from server.services.game_manager import game_manager
 from server.services.ops_manager import ops_manager
 from server.services.preview import preview_service
@@ -43,17 +47,18 @@ def _route_template(request: Request) -> str:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     init_db()
     ops_manager.load()
     if RESTORE_ACTIVE_GAME_SNAPSHOTS:
-        game_manager.restore_all_snapshots()
+        await game_manager.restore_all_snapshots()
     else:
         logging.getLogger(__name__).info("Active game snapshot restore disabled by MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS")
     if _preview_disabled():
         logging.getLogger(__name__).info("Preview service disabled by MTB_DISABLE_PREVIEW")
     start_monitoring()
     await game_manager.start_background_tasks()
+    start_loading_default_cube()
     yield
     removed_sessions = session_manager.cleanup(SESSION_TTL_MINUTES, MAX_SESSIONS_TOTAL)
     if removed_sessions:
@@ -65,7 +70,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Crucible",
+    title="Pitfight",
     description="Real-time multiplayer Magic: The Gathering draft format",
     version="0.1.0",
 )
@@ -83,7 +88,7 @@ def _http_error_payload(exc: HTTPException) -> dict[str, str]:
 
 
 @app.exception_handler(HTTPException)
-async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
+async def handle_http_exception(_request: Request, exc: HTTPException) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content=_http_error_payload(exc),
@@ -92,7 +97,7 @@ async def handle_http_exception(request: Request, exc: HTTPException) -> JSONRes
 
 
 @app.exception_handler(RequestValidationError)
-async def handle_validation_exception(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def handle_validation_exception(_request: Request, exc: RequestValidationError) -> JSONResponse:
     first_error = exc.errors()[0].get("msg") if exc.errors() else "Request validation failed"
     return JSONResponse(
         status_code=422,
@@ -108,7 +113,7 @@ _REDIRECT_EXEMPT_PATHS = {"/health", "/api/ops/mode"}
 
 
 @app.middleware("http")
-async def redirect_to_canonical_host(request: Request, call_next):
+async def redirect_to_canonical_host(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     if not _CANONICAL_HOST:
         return await call_next(request)
     host = (request.headers.get("host") or "").split(":")[0]
@@ -119,7 +124,7 @@ async def redirect_to_canonical_host(request: Request, call_next):
 
 
 @app.middleware("http")
-async def observe_http_requests(request: Request, call_next):
+async def observe_http_requests(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     start = perf_counter()
     request_id = request.headers.get("x-request-id", uuid4().hex[:12])
     method = request.method
@@ -129,7 +134,7 @@ async def observe_http_requests(request: Request, call_next):
         response = await call_next(request)
     except Exception:
         duration_ms = (perf_counter() - start) * 1000
-        record_http_latency(method, path, 500, duration_ms)
+        record_http_latency(method, path, status=500, duration_ms=duration_ms)
         logger.exception(
             "HTTP latency: request_id=%s method=%s path=%s status=%d duration_ms=%.2f",
             request_id,
@@ -143,7 +148,7 @@ async def observe_http_requests(request: Request, call_next):
     duration_ms = (perf_counter() - start) * 1000
     status = response.status_code
     response.headers.setdefault("x-request-id", request_id)
-    record_http_latency(method, path, status, duration_ms)
+    record_http_latency(method, path, status=status, duration_ms=duration_ms)
     logger.info(
         "HTTP latency: request_id=%s method=%s path=%s status=%d duration_ms=%.2f",
         request_id,
@@ -173,18 +178,19 @@ app.include_router(auth.router)
 app.include_router(battlers.router)
 app.include_router(discover.router)
 app.include_router(games.router)
+app.include_router(voice.router)
 app.include_router(ws.router)
 app.include_router(share_preview.router)
 app.include_router(ops.router)
 
 
 @app.get("/health")
-def health_check():
+def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/server/status", response_model=ServerStatusResponse)
-def server_status():
+@app.get("/api/server/status")
+def server_status() -> ServerStatusResponse:
     snapshot = ops_manager.get_snapshot()
     return ServerStatusResponse(
         mode=snapshot.mode,
@@ -203,29 +209,34 @@ if static_dir.exists():
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
     @app.get("/favicon.svg")
-    async def favicon():
+    async def favicon() -> Response:
         return FileResponse(static_dir / "favicon.svg")
 
     @app.get("/og-image.png")
-    async def og_image():
+    async def og_image() -> Response:
         return FileResponse(static_dir / "og-image.png", media_type="image/png")
 
     @app.get("/icon-192.png")
-    async def icon_192():
+    async def icon_192() -> Response:
         return FileResponse(static_dir / "icon-192.png", media_type="image/png")
 
     @app.get("/icon-512.png")
-    async def icon_512():
+    async def icon_512() -> Response:
         return FileResponse(static_dir / "icon-512.png", media_type="image/png")
 
+    @app.get("/icon-512-maskable.png")
+    async def icon_512_maskable() -> Response:
+        return FileResponse(static_dir / "icon-512-maskable.png", media_type="image/png")
+
     @app.get("/apple-touch-icon.png")
-    async def apple_touch_icon():
+    async def apple_touch_icon() -> Response:
         return FileResponse(static_dir / "apple-touch-icon.png", media_type="image/png")
 
     @app.get("/site.webmanifest")
-    async def webmanifest():
+    async def webmanifest() -> Response:
         return FileResponse(static_dir / "site.webmanifest", media_type="application/manifest+json")
 
     @app.get("/{path:path}")
-    async def spa_fallback(path: str):
-        return FileResponse(static_dir / "index.html")
+    async def spa_fallback(path: str, request: Request) -> Response:
+        _ = path
+        return share_preview.serve_index(request)

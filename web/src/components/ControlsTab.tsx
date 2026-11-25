@@ -1,13 +1,14 @@
-import { DOCS } from '../docs'
-import { DocRenderer } from './DocRenderer'
-import { PHASE_HOTKEYS } from '../constants/hotkeys'
-import { HotkeyRow } from './HotkeyRow'
+import type { ReactNode } from "react";
+import { DOCS } from "../docs";
+import { DocRenderer } from "./DocRenderer";
+import { PHASE_HOTKEYS } from "../constants/hotkeys";
+import { HotkeyRow } from "./HotkeyRow";
 
-export function ControlsTab({ phase }: { phase: string }) {
-  const doc = DOCS.find((d) => d.parsed.meta.phase === phase)
-  const controlsMarkdown = doc?.parsed.sections['controls']
-  const hotkeys = PHASE_HOTKEYS[phase] ?? []
-  const hoverHotkeys = PHASE_HOTKEYS[`${phase}-hover`] ?? []
+export function ControlsTab({ phase }: { phase: string }): ReactNode {
+  const doc = DOCS.find((d) => d.parsed.meta.phase === phase);
+  const controlsMarkdown = doc?.parsed.sections["controls"];
+  const hotkeys = PHASE_HOTKEYS[phase] ?? [];
+  const hoverHotkeys = PHASE_HOTKEYS[`${phase}-hover`] ?? [];
 
   return (
     <div className="space-y-4">
@@ -15,7 +16,7 @@ export function ControlsTab({ phase }: { phase: string }) {
 
       {hotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h3 className="text-xs font-medium text-[var(--ivory-muted)] uppercase tracking-wide mb-2">
             Keyboard Shortcuts
           </h3>
           <div className="space-y-1.5">
@@ -28,7 +29,7 @@ export function ControlsTab({ phase }: { phase: string }) {
 
       {hoverHotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h3 className="text-xs font-medium text-[var(--ivory-muted)] uppercase tracking-wide mb-2">
             When Hovering a Card
           </h3>
           <div className="space-y-1.5">
@@ -39,5 +40,5 @@ export function ControlsTab({ phase }: { phase: string }) {
         </div>
       )}
     </div>
-  )
+  );
 }

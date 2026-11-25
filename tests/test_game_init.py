@@ -1,10 +1,12 @@
+from collections.abc import Callable
+
 import pytest
 
-from mtb.models.cards import Battler
-from mtb.models.game import Config, create_game, set_battler, set_player_battlers
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Config, create_game, set_battler, set_player_battlers
 
 
-def test_create_game_exact_players():
+def test_create_game_exact_players() -> None:
     names = ["Alice", "Bob"]
     game = create_game(names, num_players=2)
 
@@ -13,17 +15,19 @@ def test_create_game_exact_players():
     assert all(player.game is game for player in game.players)
 
 
-def test_create_game_too_many_names():
-    with pytest.raises(ValueError):
+def test_create_game_too_many_names() -> None:
+    with pytest.raises(ValueError, match=r".+"):
         create_game(["Alice", "Bob"], num_players=1)
 
 
-def test_create_game_not_enough_players():
+def test_create_game_not_enough_players() -> None:
     with pytest.raises(NotImplementedError):
         create_game(["Alice"], num_players=2)
 
 
-def test_set_battler_selects_available_upgrades(card_factory, upgrade_factory):
+def test_set_battler_selects_available_upgrades(
+    card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]
+) -> None:
     game = create_game(["Alice"], num_players=1)
     upgrades = [upgrade_factory(f"upgrade{i}") for i in range(10)]
     battler = Battler(cards=[card_factory(f"c{i}") for i in range(20)], upgrades=upgrades, vanguards=[])
@@ -35,7 +39,9 @@ def test_set_battler_selects_available_upgrades(card_factory, upgrade_factory):
     assert all(u in upgrades for u in game.available_upgrades)
 
 
-def test_set_battler_with_fewer_upgrades_than_max(card_factory, upgrade_factory):
+def test_set_battler_with_fewer_upgrades_than_max(
+    card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]
+) -> None:
     game = create_game(["Alice"], num_players=1)
     upgrades = [upgrade_factory("u1"), upgrade_factory("u2")]
     battler = Battler(cards=[card_factory(f"c{i}") for i in range(20)], upgrades=upgrades, vanguards=[])
@@ -45,7 +51,7 @@ def test_set_battler_with_fewer_upgrades_than_max(card_factory, upgrade_factory)
     assert len(game.available_upgrades) == 2
 
 
-def test_set_battler_deals_starting_pool(card_factory):
+def test_set_battler_deals_starting_pool(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(30)]
     battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
@@ -59,7 +65,7 @@ def test_set_battler_deals_starting_pool(card_factory):
     assert len(game.get_battler().cards) == 30 - (2 * pool_size)
 
 
-def test_set_battler_populates_hand_empty(card_factory):
+def test_set_battler_populates_hand_empty(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     cards = [card_factory(f"c{i}", elo=float(i * 10)) for i in range(7)]
 
@@ -71,7 +77,7 @@ def test_set_battler_populates_hand_empty(card_factory):
     assert len(alice.sideboard) == 7
 
 
-def test_set_battler_assigns_shared_battler_to_all_players(card_factory):
+def test_set_battler_assigns_shared_battler_to_all_players(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice", "Bob"], num_players=2)
     battler = Battler(cards=[card_factory(f"c{i}") for i in range(30)], upgrades=[], vanguards=[])
 
@@ -80,7 +86,7 @@ def test_set_battler_assigns_shared_battler_to_all_players(card_factory):
     assert all(player.battler is battler for player in game.players)
 
 
-def test_set_player_battlers_keeps_distinct_constructed_battlers(card_factory):
+def test_set_player_battlers_keeps_distinct_constructed_battlers(card_factory: Callable[..., Card]) -> None:
     config = Config(play_mode="constructed", starting_pool_size=0)
     game = create_game(["Alice", "Bob"], num_players=2, config=config)
     alice_battler = Battler(cards=[card_factory(f"a{i}") for i in range(20)], upgrades=[], vanguards=[])
@@ -93,7 +99,7 @@ def test_set_player_battlers_keeps_distinct_constructed_battlers(card_factory):
     assert game.players[1].battler is bob_battler
 
 
-def test_config_normalizes_legacy_draft_play_mode():
+def test_config_normalizes_legacy_draft_play_mode() -> None:
     config = Config.model_validate({"play_mode": "draft"})
 
     assert config.play_mode == "limited"
