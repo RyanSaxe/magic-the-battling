@@ -1,71 +1,23 @@
-"""WebSocket and HTTP bot client that drives synthetic Pitfight games to completion."""
+"""Bot phase driver that plays Pitfight lobby, draft, build, battle, and reward actions."""
 
 from __future__ import annotations
 
 import asyncio
-import gzip
 import json
-import random
-import secrets
 import time
+from collections.abc import Callable
 from typing import Any
-from urllib.parse import urlencode, urlparse, urlunparse
-
-import httpx
-import websockets
 
 from server.perf.models import (
     BASIC_LANDS,
-    CREATE_RETRY_BASE_SEC,
-    CREATE_RETRY_MAX_SEC,
-    IDEMPOTENCY_KEY_HEADER,
     PASSIVE_PHASES,
-    RETRYABLE_CREATE_STATUSES,
     TERMINAL_PHASES,
-    WS_CONNECT_RETRY_BASE_SEC,
-    WS_CONNECT_RETRY_MAX_SEC,
     GameFlowError,
     GameResult,
-    HarnessConfig,
-    IdleHotGame,
     PhaseContext,
     WebSocketProto,
 )
-
-
-def ws_url_for(base_url: str, *, game_id: str, session_id: str) -> str:
-    parsed = urlparse(base_url)
-    scheme = "wss" if parsed.scheme == "https" else "ws"
-    query = urlencode({"session_id": session_id})
-    return urlunparse((scheme, parsed.netloc, f"/ws/{game_id}", "", query, ""))
-
-
-def decode_ws_message(raw: str | bytes) -> dict[str, Any]:
-    if isinstance(raw, bytes):
-        try:
-            text = gzip.decompress(raw).decode("utf-8")
-        except OSError:
-            text = raw.decode("utf-8")
-    else:
-        text = raw
-
-    parsed = json.loads(text)
-    if not isinstance(parsed, dict):
-        msg = "websocket payload is not an object"
-        raise GameFlowError(msg)
-    return parsed
-
-
-def remaining_timeout(deadline: float) -> float:
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        raise TimeoutError("game exceeded timeout")
-    return remaining
-
-
-def retry_delay_sec(attempt: int, *, base_sec: float, max_sec: float) -> float:
-    exp = min(max_sec, base_sec * (2**attempt))
-    return random.random() * exp
+from server.perf.transport import decode_ws_message, remaining_timeout
 
 
 async def recv_ws_message(ctx: PhaseContext) -> dict[str, Any]:
@@ -132,14 +84,31 @@ async def send_action_and_wait_state(
     action: str,
     *,
     payload: dict[str, Any] | None = None,
+    until: Callable[[dict[str, Any]], bool] | None = None,
 ) -> dict[str, Any]:
     await maybe_apply_action_jitter(ctx)
     started = time.perf_counter()
+    if ctx.action_clock is not None:
+        ctx.action_clock.last_action_sent_at = started
     await send_ws_action(ctx.ws, action, payload=payload)
-    state = await wait_for_game_state(ctx)
+    while True:
+        state = await wait_for_game_state(ctx)
+        if until is None or until(state):
+            break
     latency_ms = (time.perf_counter() - started) * 1000.0
     ctx.result.record_action(action, latency_ms)
     return state
+
+
+def _phase_of(state: dict[str, Any]) -> str:
+    return str((state.get("self_player") or {}).get("phase", ""))
+
+
+def _is_upgrade_pending(self_player: dict[str, Any], upgrade_id: str) -> bool:
+    for upgrade in self_player.get("upgrades", []):
+        if str(upgrade.get("id")) == upgrade_id:
+            return upgrade.get("upgrade_target_id") is None and upgrade.get("upgrade_target") is None
+    return False
 
 
 def choose_swap_target(self_player: dict[str, Any]) -> tuple[str, str]:
@@ -168,7 +137,15 @@ async def draft_swap_once(ctx: PhaseContext, state: dict[str, Any]) -> dict[str,
         "player_card_id": player_card_id,
         "destination": destination,
     }
-    return await send_action_and_wait_state(ctx, "draft_swap", payload=payload)
+    return await send_action_and_wait_state(
+        ctx,
+        "draft_swap",
+        payload=payload,
+        until=lambda s: (
+            _phase_of(s) != "draft"
+            or all(str(card.get("id")) != pack_card_id for card in (s["self_player"].get("current_pack") or []))
+        ),
+    )
 
 
 async def play_draft_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
@@ -176,12 +153,15 @@ async def play_draft_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str
     state = await draft_swap_once(ctx, state)
 
     treasures = int(state["self_player"].get("treasures", 0))
-    if treasures <= 0:
-        raise GameFlowError("draft_roll requested but player has no treasures")
-    state = await send_action_and_wait_state(ctx, "draft_roll")
+    if treasures > 0:
+        state = await send_action_and_wait_state(
+            ctx,
+            "draft_roll",
+            until=lambda s: _phase_of(s) != "draft" or int(s["self_player"].get("treasures", 0)) < treasures,
+        )
+        state = await draft_swap_once(ctx, state)
 
-    state = await draft_swap_once(ctx, state)
-    return await send_action_and_wait_state(ctx, "draft_done")
+    return await send_action_and_wait_state(ctx, "draft_done", until=lambda s: _phase_of(s) != "draft")
 
 
 async def apply_pending_build_upgrades(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
@@ -197,11 +177,17 @@ async def apply_pending_build_upgrades(ctx: PhaseContext, state: dict[str, Any])
         hand = self_player.get("hand", [])
         if not hand:
             raise GameFlowError("cannot apply build upgrade: hand is empty")
+        upgrade_id = str(pending[0]["id"])
         payload = {
-            "upgrade_id": str(pending[0]["id"]),
+            "upgrade_id": upgrade_id,
             "target_card_id": str(hand[0]["id"]),
         }
-        state = await send_action_and_wait_state(ctx, "build_apply_upgrade", payload=payload)
+        state = await send_action_and_wait_state(
+            ctx,
+            "build_apply_upgrade",
+            payload=payload,
+            until=lambda s, uid=upgrade_id: _phase_of(s) != "build" or not _is_upgrade_pending(s["self_player"], uid),
+        )
 
 
 async def play_build_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
@@ -214,24 +200,40 @@ async def play_build_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str
         sideboard = self_player.get("sideboard", [])
         if not sideboard:
             raise GameFlowError("cannot fill hand: sideboard is empty")
+        card_id = str(sideboard[0]["id"])
         payload = {
-            "card_id": str(sideboard[0]["id"]),
+            "card_id": card_id,
             "source": "sideboard",
             "destination": "hand",
         }
-        state = await send_action_and_wait_state(ctx, "build_move", payload=payload)
+        state = await send_action_and_wait_state(
+            ctx,
+            "build_move",
+            payload=payload,
+            until=lambda s, cid=card_id: (
+                _phase_of(s) != "build" or any(str(c.get("id")) == cid for c in (s["self_player"].get("hand") or []))
+            ),
+        )
 
     state = await apply_pending_build_upgrades(ctx, state)
 
     self_player = state["self_player"]
     if self_player.get("hand") and self_player.get("sideboard"):
+        card_a_id = str(self_player["hand"][0]["id"])
         payload = {
-            "card_a_id": str(self_player["hand"][0]["id"]),
+            "card_a_id": card_a_id,
             "source_a": "hand",
             "card_b_id": str(self_player["sideboard"][0]["id"]),
             "source_b": "sideboard",
         }
-        state = await send_action_and_wait_state(ctx, "build_swap", payload=payload)
+        state = await send_action_and_wait_state(
+            ctx,
+            "build_swap",
+            payload=payload,
+            until=lambda s, cid=card_a_id: (
+                _phase_of(s) != "build" or all(str(c.get("id")) != cid for c in (s["self_player"].get("hand") or []))
+            ),
+        )
 
     basics = ctx.rng.sample(list(BASIC_LANDS), 3)
     hand_order = [str(card["id"]) for card in state["self_player"].get("hand", [])]
@@ -240,20 +242,41 @@ async def play_build_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str
         "play_draw_preference": "play",
         "hand_order": hand_order,
     }
-    return await send_action_and_wait_state(ctx, "build_ready", payload=payload)
+    return await send_action_and_wait_state(
+        ctx,
+        "build_ready",
+        payload=payload,
+        until=lambda s: _phase_of(s) != "build" or bool(s["self_player"].get("build_ready")),
+    )
 
 
 async def ensure_current_battle(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
     candidate = state
     for _ in range(4):
-        if candidate.get("current_battle"):
+        if candidate.get("current_battle") or _phase_of(candidate) != "battle":
             return candidate
         candidate = await wait_for_game_state(ctx)
     raise GameFlowError("battle phase reached without current_battle payload")
 
 
+def _choose_battle_winner(state: dict[str, Any]) -> str:
+    self_name = str(state["self_player"]["name"])
+    battle = state.get("current_battle") or {}
+    opponent_name = str(battle.get("opponent_name") or "")
+    if not opponent_name or opponent_name == self_name:
+        return self_name
+    for player in state.get("players") or []:
+        if player.get("name") == opponent_name:
+            if player.get("is_ghost") or player.get("is_puppet"):
+                return self_name
+            return min(self_name, opponent_name)
+    return self_name
+
+
 async def play_battle_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
     state = await ensure_current_battle(ctx, state)
+    if _phase_of(state) != "battle":
+        return state
 
     while True:
         battle = state.get("current_battle") or {}
@@ -261,23 +284,44 @@ async def play_battle_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[st
         hand = your_zones.get("hand") or []
         if not hand:
             break
-        payload = {
-            "card_id": str(hand[0]["id"]),
-            "from_zone": "hand",
-            "to_zone": "battlefield",
-        }
-        state = await send_action_and_wait_state(ctx, "battle_move", payload=payload)
+        card_id = str(hand[0]["id"])
+        payload = {"card_id": card_id, "from_zone": "hand", "to_zone": "battlefield"}
+        state = await send_action_and_wait_state(
+            ctx,
+            "battle_move",
+            payload=payload,
+            until=lambda s, cid=card_id: (
+                _phase_of(s) != "battle"
+                or all(
+                    str(c.get("id")) != cid
+                    for c in (((s.get("current_battle") or {}).get("your_zones") or {}).get("hand") or [])
+                )
+            ),
+        )
 
     for _ in range(2):
-        payload = {
-            "action_type": "create_treasure",
-            "card_id": "",
-            "data": {},
-        }
-        state = await send_action_and_wait_state(ctx, "battle_update_card_state", payload=payload)
+        prev_tokens = len(((state.get("current_battle") or {}).get("your_zones") or {}).get("spawned_tokens") or [])
+        payload = {"action_type": "create_treasure", "card_id": "", "data": {}}
+        state = await send_action_and_wait_state(
+            ctx,
+            "battle_update_card_state",
+            payload=payload,
+            until=lambda s, prev=prev_tokens: (
+                _phase_of(s) != "battle"
+                or len(((s.get("current_battle") or {}).get("your_zones") or {}).get("spawned_tokens") or []) > prev
+            ),
+        )
 
-    winner_name = str(state["self_player"]["name"])
-    return await send_action_and_wait_state(ctx, "battle_submit_result", payload={"result": winner_name})
+    self_name = str(state["self_player"]["name"])
+    winner_name = _choose_battle_winner(state)
+    return await send_action_and_wait_state(
+        ctx,
+        "battle_submit_result",
+        payload={"result": winner_name},
+        until=lambda s: (
+            _phase_of(s) != "battle" or self_name in ((s.get("current_battle") or {}).get("result_submissions") or {})
+        ),
+    )
 
 
 async def play_reward_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
@@ -285,11 +329,16 @@ async def play_reward_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[st
     available_upgrades = state.get("available_upgrades") or []
     if bool(self_player.get("is_stage_increasing")) and available_upgrades:
         choice = ctx.rng.choice(available_upgrades)
-        return await send_action_and_wait_state(ctx, "reward_done", payload={"upgrade_id": str(choice["id"])})
-    return await send_action_and_wait_state(ctx, "reward_done")
+        return await send_action_and_wait_state(
+            ctx,
+            "reward_done",
+            payload={"upgrade_id": str(choice["id"])},
+            until=lambda s: _phase_of(s) != "reward",
+        )
+    return await send_action_and_wait_state(ctx, "reward_done", until=lambda s: _phase_of(s) != "reward")
 
 
-async def enter_game_from_lobby(ctx: PhaseContext) -> dict[str, Any]:
+async def enter_game_from_lobby(ctx: PhaseContext, *, is_host: bool = True) -> dict[str, Any]:
     ready_sent = False
     start_sent = False
 
@@ -305,7 +354,7 @@ async def enter_game_from_lobby(ctx: PhaseContext) -> dict[str, Any]:
             ready_sent = True
             continue
 
-        if can_start and not start_sent:
+        if is_host and can_start and not start_sent:
             start_sent = True
             await maybe_apply_action_jitter(ctx)
             start_sent_at = time.perf_counter()
@@ -323,129 +372,37 @@ _PHASE_HANDLERS = {
 }
 
 
+def _is_waiting_for_others(state: dict[str, Any]) -> bool:
+    self_player = state.get("self_player") or {}
+    phase = str(self_player.get("phase", ""))
+    if phase in PASSIVE_PHASES:
+        return True
+    if phase == "build" and bool(self_player.get("build_ready")):
+        return True
+    if phase == "battle":
+        submissions = (state.get("current_battle") or {}).get("result_submissions") or {}
+        if str(self_player.get("name", "")) in submissions:
+            return True
+    return False
+
+
 async def play_until_terminal(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
     current = state
     while True:
-        self_player = current.get("self_player") or {}
-        phase = str(self_player.get("phase", ""))
+        phase = _phase_of(current)
         if phase in TERMINAL_PHASES:
             return current
+        if _is_waiting_for_others(current):
+            current = await wait_for_game_state(ctx)
+            continue
 
         handler = _PHASE_HANDLERS.get(phase)
         if handler is not None:
             current = await handler(ctx, current)
             continue
-        if phase in PASSIVE_PHASES:
-            current = await wait_for_game_state(ctx)
-            continue
 
         msg = f"unsupported phase encountered: {phase or '<empty>'}"
         raise GameFlowError(msg)
-
-
-def build_create_game_payload(player_name: str, cfg: HarnessConfig) -> dict[str, Any]:
-    return {
-        "player_name": player_name,
-        "cube_id": cfg.cube_id,
-        "use_upgrades": cfg.use_upgrades,
-        "target_player_count": cfg.puppet_count + 1,
-        "puppet_count": cfg.puppet_count,
-        "auto_approve_spectators": False,
-    }
-
-
-async def _sleep_retry_or_timeout(
-    *,
-    deadline: float,
-    attempt: int,
-    base_sec: float,
-    max_sec: float,
-    exhausted_message: str,
-) -> None:
-    remaining = remaining_timeout(deadline)
-    delay = retry_delay_sec(attempt, base_sec=base_sec, max_sec=max_sec)
-    if delay >= remaining:
-        raise TimeoutError(exhausted_message)
-    await asyncio.sleep(delay)
-
-
-async def create_game_with_retry(
-    client: httpx.AsyncClient,
-    cfg: HarnessConfig,
-    *,
-    player_name: str,
-    deadline: float,
-    idempotency_key: str,
-) -> tuple[str, str, float]:
-    create_started = time.perf_counter()
-    create_attempt = 0
-    create_payload = build_create_game_payload(player_name, cfg)
-
-    while True:
-        create_attempt += 1
-        try:
-            response = await client.post(
-                "/api/games",
-                json=create_payload,
-                headers={IDEMPOTENCY_KEY_HEADER: idempotency_key},
-            )
-        except httpx.HTTPError as exc:
-            await _sleep_retry_or_timeout(
-                deadline=deadline,
-                attempt=create_attempt,
-                base_sec=CREATE_RETRY_BASE_SEC,
-                max_sec=CREATE_RETRY_MAX_SEC,
-                exhausted_message=f"create_game retries exhausted: {exc}",
-            )
-            continue
-
-        if response.status_code in RETRYABLE_CREATE_STATUSES:
-            detail = response.text.strip()
-            await _sleep_retry_or_timeout(
-                deadline=deadline,
-                attempt=create_attempt,
-                base_sec=CREATE_RETRY_BASE_SEC,
-                max_sec=CREATE_RETRY_MAX_SEC,
-                exhausted_message=f"create_game retry window exhausted ({response.status_code}: {detail})",
-            )
-            continue
-
-        response.raise_for_status()
-        payload = response.json()
-        return (
-            str(payload["game_id"]),
-            str(payload["session_id"]),
-            (time.perf_counter() - create_started) * 1000.0,
-        )
-
-
-async def connect_ws_with_retry(
-    *,
-    ws_uri: str,
-    deadline: float,
-) -> tuple[WebSocketProto, float]:
-    ws_started = time.perf_counter()
-    ws_attempt = 0
-
-    while True:
-        ws_attempt += 1
-        try:
-            ws = await websockets.connect(
-                ws_uri,
-                max_size=None,
-                open_timeout=min(30.0, remaining_timeout(deadline)),
-                close_timeout=5,
-            )
-        except Exception as exc:
-            await _sleep_retry_or_timeout(
-                deadline=deadline,
-                attempt=ws_attempt,
-                base_sec=WS_CONNECT_RETRY_BASE_SEC,
-                max_sec=WS_CONNECT_RETRY_MAX_SEC,
-                exhausted_message=f"ws connect retries exhausted: {exc}",
-            )
-            continue
-        return ws, (time.perf_counter() - ws_started) * 1000.0
 
 
 def _to_int(value: object) -> int | None:
@@ -470,123 +427,3 @@ def record_terminal_state(result: GameResult, state: dict[str, Any]) -> None:
     result.success = phase in TERMINAL_PHASES
     if not result.success:
         result.error = f"terminal phase not reached (final phase: {phase})"
-
-
-async def run_one_game(
-    client: httpx.AsyncClient,
-    cfg: HarnessConfig,
-    *,
-    game_index: int,
-    timeout_sec: float,
-) -> GameResult:
-    result = GameResult(index=game_index)
-    game_started_at = time.perf_counter()
-    player_name = f"PerfPlayer-{game_index:05d}-{cfg.seed}"
-    deadline = time.monotonic() + timeout_sec
-    idempotency_key = f"perf-{cfg.seed}-{game_index}-{secrets.token_urlsafe(6)}"
-
-    ws: WebSocketProto | None = None
-    try:
-        game_id, session_id, create_ms = await create_game_with_retry(
-            client,
-            cfg,
-            player_name=player_name,
-            deadline=deadline,
-            idempotency_key=idempotency_key,
-        )
-        result.create_game_ms = create_ms
-        result.game_id = game_id
-
-        ws_uri = ws_url_for(cfg.base_url, game_id=game_id, session_id=session_id)
-        ws, ws_connect_ms = await connect_ws_with_retry(ws_uri=ws_uri, deadline=deadline)
-        result.ws_connect_ms = ws_connect_ms
-
-        ctx = PhaseContext(
-            ws=ws,
-            deadline=deadline,
-            result=result,
-            rng=random.Random(cfg.seed + game_index),
-            ws_action_jitter_ms=cfg.ws_action_jitter_ms,
-        )
-        state = await enter_game_from_lobby(ctx)
-        state = await play_until_terminal(ctx, state)
-        record_terminal_state(result, state)
-    except TimeoutError as exc:
-        result.error = f"timeout: {exc}"
-    except httpx.HTTPStatusError as exc:
-        result.error = f"http {exc.response.status_code}: {exc.response.text.strip()}"
-    except GameFlowError as exc:
-        result.error = str(exc)
-    except Exception as exc:
-        result.error = f"unexpected: {exc}"
-    finally:
-        result.duration_sec = time.perf_counter() - game_started_at
-        if ws is not None:
-            try:
-                await ws.close()
-            except Exception:
-                pass
-    return result
-
-
-async def run_one_idle_hot_game(
-    client: httpx.AsyncClient,
-    cfg: HarnessConfig,
-    *,
-    hot_index: int,
-    timeout_sec: float,
-) -> IdleHotGame:
-    deadline = time.monotonic() + timeout_sec
-    player_name = f"IdleHot-{hot_index:05d}-{cfg.seed}"
-    idempotency_key = f"idle-hot-{cfg.seed}-{hot_index}-{secrets.token_urlsafe(6)}"
-
-    game_id, session_id, _ = await create_game_with_retry(
-        client,
-        cfg,
-        player_name=player_name,
-        deadline=deadline,
-        idempotency_key=idempotency_key,
-    )
-
-    ws_uri = ws_url_for(cfg.base_url, game_id=game_id, session_id=session_id)
-    ws, _ = await connect_ws_with_retry(ws_uri=ws_uri, deadline=deadline)
-
-    ctx = PhaseContext(
-        ws=ws,
-        deadline=deadline,
-        result=GameResult(index=hot_index, game_id=game_id),
-        rng=random.Random((cfg.seed * 17) + hot_index),
-        ws_action_jitter_ms=cfg.ws_action_jitter_ms,
-    )
-
-    try:
-        state = await enter_game_from_lobby(ctx)
-    except Exception:
-        try:
-            await ws.close()
-        except Exception:
-            pass
-        raise
-
-    self_player = state.get("self_player") or {}
-    phase = str(self_player.get("phase") or "")
-    if phase in TERMINAL_PHASES:
-        try:
-            await ws.close()
-        except Exception:
-            pass
-        raise GameFlowError(f"idle hot game reached terminal phase immediately: {phase}")
-
-    return IdleHotGame(game_id=game_id, session_id=session_id, ws=ws, phase=phase or None)
-
-
-async def close_idle_hot_games(games: list[IdleHotGame]) -> None:
-    async def _close_one(game: IdleHotGame) -> None:
-        try:
-            await game.ws.close()
-        except Exception:
-            pass
-
-    if not games:
-        return
-    await asyncio.gather(*(_close_one(game) for game in games), return_exceptions=True)
