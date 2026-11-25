@@ -321,9 +321,8 @@ def find_resumable_games(
 @router.post("/cubes/warm")
 async def warm_cube_cache(request: WarmCubeRequest) -> dict[str, str]:
     logger.info("warming cube cache: %s", request.cube_id)
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, get_cube_data, request.cube_id)
-    await loop.run_in_executor(None, database.save_cube_metadata, request.cube_id)
+    await asyncio.to_thread(get_cube_data, request.cube_id)
+    await asyncio.to_thread(database.save_cube_metadata, request.cube_id)
     logger.info("warming complete: %s", request.cube_id)
     return {"status": "ok"}
 
@@ -421,17 +420,34 @@ async def rejoin_game(
     The caller must hold the seat's token or be logged in as the account that took it. The new session's
     socket replaces any socket still open on the seat.
     """
-    if not game_manager.has_game(game_id):
+    if not await game_manager.has_game_async(game_id):
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
+    user_id = str(current_user.id) if current_user else None
     async with game_manager.get_action_lock(game_id):
+        if game_manager.get_pending_game(game_id) is None and game_manager.get_game(game_id) is None:
+            await game_manager.restore_game_from_snapshot_async(game_id)
         try:
-            claim = game_manager.reclaim_seat(
-                game_id,
-                request.player_name,
-                seat_token=request.seat_token,
-                user_id=str(current_user.id) if current_user else None,
+            can_offload = (
+                game_manager.get_pending_game(game_id) is None
+                and game_manager.get_game(game_id) is not None
+                and game_manager.get_player_id_by_name(game_id, request.player_name) is not None
             )
+            if can_offload:
+                claim = await asyncio.to_thread(
+                    game_manager.reclaim_seat,
+                    game_id,
+                    request.player_name,
+                    seat_token=request.seat_token,
+                    user_id=user_id,
+                )
+            else:
+                claim = game_manager.reclaim_seat(
+                    game_id,
+                    request.player_name,
+                    seat_token=request.seat_token,
+                    user_id=user_id,
+                )
         except SeatClaimRefusedError as refused:
             status, code, detail = _SEAT_REFUSAL_ERRORS[refused.refusal]
             raise api_error(status, code, detail=detail) from None
@@ -459,10 +475,12 @@ async def close_seat(
     """
     if ops_manager.is_maintenance():
         raise api_error(503, ErrorCode.SERVER_MAINTENANCE, detail="Server maintenance in progress. Try again shortly.")
-    if not game_manager.has_game(game_id):
+    if not await game_manager.has_game_async(game_id):
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     async with game_manager.get_action_lock(game_id):
+        if game_manager.get_pending_game(game_id) is None and game_manager.get_game(game_id) is None:
+            await game_manager.restore_game_from_snapshot_async(game_id)
         try:
             player_id = game_manager.close_seat(
                 game_id,
@@ -523,7 +541,6 @@ async def start_game(
     game_id: str,
     *,
     session_id: str | None = None,
-    db: Annotated[Session, Depends(get_db)],
 ) -> StartGameResponse:
     if ops_manager.blocks_new_games():
         msg = "Server is updating. New games are temporarily blocked."
@@ -543,7 +560,7 @@ async def start_game(
         await game_manager.start_lobby(
             game_id,
             session.player_id,
-            db=db,
+            persist=True,
             on_change=lambda: connection_manager.broadcast_lobby_state(game_id),
         )
     except LobbyStartRefusedError as exc:
