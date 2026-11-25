@@ -20,6 +20,13 @@
   outline-offset: -2px;
 }
 
+.card:focus-visible,
+.card-slot:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: -2px;
+  box-shadow: 0 0 12px var(--color-gold-glow);
+}
+
 .card.dragging {
   opacity: 0;
   pointer-events: none;
@@ -338,7 +345,8 @@
   isolation: isolate;
 }
 
-.hand-zone > :hover {
+.hand-zone > :hover,
+.hand-zone > :focus-within {
   z-index: 100 !important;
 }
 

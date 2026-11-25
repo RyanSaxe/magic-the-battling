@@ -7,6 +7,7 @@ import { CARD_BACK_IMAGE, BASIC_LANDS } from "../../constants/assets";
 import { canHover } from "../../utils/inputMode";
 import { registerTap } from "../../utils/doubleTap";
 import { fitCounters } from "../../utils/counters";
+import { enterPressesControl } from "../../utils/enterKey";
 
 interface CardProps {
   card: CardType;
@@ -215,9 +216,40 @@ export function Card({
     onMouseLeave: interactiveOnMouseLeave,
     onContextMenu: interactiveOnContextMenu,
     onTouchEnd: interactiveOnTouchEnd,
+    onKeyDown: interactiveOnKeyDown,
+    onClick: interactiveOnClick,
     style: interactiveExternalStyle,
     ...restInteractiveProps
   } = interactiveProps ?? {};
+
+  const hasClickAction =
+    !disabled && (Boolean(onClick) || Boolean(interactiveOnClick));
+  const cardLabel = effectiveFaceDown ? "Face-down card" : card.name;
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    interactiveOnClick?.(e);
+    onClick?.();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    interactiveOnKeyDown?.(e);
+    if (disabled || e.defaultPrevented) return;
+    if (e.target !== e.currentTarget) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+    const isEnter = e.key === "Enter";
+    const isSpace = e.key === " " || e.key === "Spacebar";
+    if (!isEnter && !isSpace) return;
+    if (isEnter && !enterPressesControl(e.nativeEvent)) return;
+
+    e.preventDefault();
+    if (onClick) {
+      onClick();
+    } else if (interactiveOnClick) {
+      e.currentTarget.click();
+    }
+  };
 
   // iOS does not reliably fire dblclick, so touch screens count taps instead. Each tap
   // still clicks, so the second tap undoes the first tap's selection, as a double click does.
@@ -251,6 +283,12 @@ export function Card({
         className={baseClasses}
         data-guide-card-id={card.id}
         data-card-id={trackDomId ? card.id : undefined}
+        role={hasClickAction ? "button" : undefined}
+        tabIndex={hasClickAction ? 0 : undefined}
+        aria-label={hasClickAction ? cardLabel : undefined}
+        aria-pressed={
+          hasClickAction && selected !== undefined ? selected : undefined
+        }
         style={{
           ...interactiveExternalStyle,
           ...interactiveStyle,
@@ -259,7 +297,10 @@ export function Card({
           boxShadow,
           transform: interactiveTransform,
         }}
-        onClick={disabled ? undefined : onClick}
+        onClick={hasClickAction ? handleClick : undefined}
+        onKeyDown={
+          hasClickAction || interactiveOnKeyDown ? handleKeyDown : undefined
+        }
         onDoubleClick={disabled || !canHover ? undefined : onDoubleClick}
         onTouchEnd={detectsDoubleTap ? handleTouchEnd : interactiveOnTouchEnd}
         onContextMenu={(e) => {

@@ -2,7 +2,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
+import { useHotkeys } from "../../hooks/useHotkeys";
 import type { Card as CardType } from "../../types";
+import { CardSlot } from "../common/CardSlot";
 import { Card } from "./Card";
 import { CardPreviewContext } from "./CardPreviewContext";
 import { CardPreviewModal } from "./CardPreviewModal";
@@ -129,4 +131,128 @@ it("shows a name too long for the card as its number, and every counter in full 
   fireEvent.click(screen.getByTitle("Preview card"));
   expect(screen.getAllByText("\u22121/\u22121")).toHaveLength(2);
   expect(screen.queryByText("3 Indestructible Shield")).not.toBeNull();
+});
+
+function CardWithPhaseEnter({
+  onSelect,
+  onAdvance,
+}: {
+  onSelect: () => void;
+  onAdvance: () => void;
+}) {
+  const [selected, setSelected] = useState(false);
+  useHotkeys({ Enter: onAdvance });
+  return (
+    <Card
+      card={ANCIENT_TOMB}
+      selected={selected}
+      onClick={() => {
+        setSelected((s) => !s);
+        onSelect();
+      }}
+    />
+  );
+}
+
+it("makes interactive cards keyboard-focusable and activates on Enter and Space without scrolling", () => {
+  const onSelect = vi.fn();
+  const { rerender } = render(<Card card={ANCIENT_TOMB} onClick={onSelect} />);
+
+  const cardButton = screen.getByRole("button", { name: "Ancient Tomb" });
+  expect(cardButton.tabIndex).toBe(0);
+
+  cardButton.focus();
+  const enterNotPrevented = fireEvent.keyDown(cardButton, { key: "Enter" });
+  expect(enterNotPrevented).toBe(false);
+  expect(onSelect).toHaveBeenCalledTimes(1);
+
+  const spaceNotPrevented = fireEvent.keyDown(cardButton, { key: " " });
+  expect(spaceNotPrevented).toBe(false);
+  expect(onSelect).toHaveBeenCalledTimes(2);
+
+  rerender(<Card card={ANCIENT_TOMB} onClick={onSelect} faceDown />);
+  expect(screen.getByRole("button", { name: "Face-down card" })).toBeTruthy();
+
+  rerender(<Card card={ANCIENT_TOMB} />);
+  expect(screen.queryByRole("button")).toBeNull();
+
+  rerender(<Card card={ANCIENT_TOMB} onClick={onSelect} disabled />);
+  expect(screen.queryByRole("button")).toBeNull();
+});
+
+it("triggers the focused card on Enter without firing global phase Enter, and still advances after a mouse click", () => {
+  const onSelect = vi.fn();
+  const onAdvance = vi.fn();
+  render(<CardWithPhaseEnter onSelect={onSelect} onAdvance={onAdvance} />);
+
+  const cardButton = screen.getByRole("button", { name: "Ancient Tomb" });
+  const nativeMatches = cardButton.matches.bind(cardButton);
+  let focusVisible = true;
+  cardButton.matches = (selector: string) =>
+    selector === ":focus-visible" ? focusVisible : nativeMatches(selector);
+
+  // Keyboard focus: Enter activates the card and does not submit the phase.
+  cardButton.focus();
+  fireEvent.keyDown(cardButton, { key: "Enter" });
+  expect(onSelect).toHaveBeenCalledTimes(1);
+  expect(onAdvance).not.toHaveBeenCalled();
+
+  // Space also activates the card and never submits the phase.
+  fireEvent.keyDown(cardButton, { key: " " });
+  expect(onSelect).toHaveBeenCalledTimes(2);
+  expect(onAdvance).not.toHaveBeenCalled();
+
+  // Mouse click focuses without :focus-visible: Enter submits the phase without toggling the card.
+  cardButton.blur();
+  focusVisible = false;
+  fireEvent.pointerDown(cardButton);
+  cardButton.focus();
+  fireEvent.keyDown(cardButton, { key: "Enter" });
+  expect(onSelect).toHaveBeenCalledTimes(2);
+  expect(onAdvance).toHaveBeenCalledTimes(1);
+});
+
+it("does not trigger card onClick when Enter or Space is pressed on a nested button", () => {
+  const onSelect = vi.fn();
+  const onPreview = vi.fn();
+  render(
+    <CardPreviewContext.Provider value={{ setPreviewCard: onPreview }}>
+      <Card card={ANCIENT_TOMB} selected onClick={onSelect} />
+    </CardPreviewContext.Provider>,
+  );
+
+  const previewButton = screen.getByTitle("Preview card");
+  previewButton.focus();
+  fireEvent.keyDown(previewButton, { key: "Enter" });
+  fireEvent.keyDown(previewButton, { key: " " });
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
+it("makes interactive CardSlot keyboard-focusable and activates on Enter and Space without advancing", () => {
+  const onSlotClick = vi.fn();
+  const onAdvance = vi.fn();
+
+  function SlotWithPhaseEnter() {
+    useHotkeys({ Enter: onAdvance });
+    return (
+      <CardSlot
+        label="+\nCard"
+        dimensions={{ width: 80, height: 112 }}
+        onClick={onSlotClick}
+      />
+    );
+  }
+
+  render(<SlotWithPhaseEnter />);
+  const slot = screen.getByRole("button", { name: "Empty hand slot" });
+  expect(slot.tabIndex).toBe(0);
+
+  slot.focus();
+  expect(fireEvent.keyDown(slot, { key: "Enter" })).toBe(false);
+  expect(onSlotClick).toHaveBeenCalledTimes(1);
+  expect(onAdvance).not.toHaveBeenCalled();
+
+  expect(fireEvent.keyDown(slot, { key: " " })).toBe(false);
+  expect(onSlotClick).toHaveBeenCalledTimes(2);
+  expect(onAdvance).not.toHaveBeenCalled();
 });
