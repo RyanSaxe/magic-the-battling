@@ -4,12 +4,7 @@ from __future__ import annotations
 
 from server.perf.bot_client import (
     apply_pending_build_upgrades,
-    build_create_game_payload,
     choose_swap_target,
-    close_idle_hot_games,
-    connect_ws_with_retry,
-    create_game_with_retry,
-    decode_ws_message,
     draft_swap_once,
     ensure_current_battle,
     enter_game_from_lobby,
@@ -21,15 +16,10 @@ from server.perf.bot_client import (
     play_until_terminal,
     record_terminal_state,
     recv_ws_message,
-    remaining_timeout,
-    retry_delay_sec,
-    run_one_game,
-    run_one_idle_hot_game,
     send_action_and_wait_state,
     send_ws_action,
     wait_for_game_state,
     wait_for_lobby_or_game_state,
-    ws_url_for,
 )
 from server.perf.cli import (
     main,
@@ -42,6 +32,7 @@ from server.perf.cli import (
 from server.perf.metrics import (
     ProcessSampler,
     build_report,
+    check_regression_thresholds,
     choose_timeout_seconds,
     format_stats_line,
     percentile,
@@ -67,6 +58,7 @@ from server.perf.models import (
     VALID_PUPPET_COUNTS,
     WS_CONNECT_RETRY_BASE_SEC,
     WS_CONNECT_RETRY_MAX_SEC,
+    ActionClock,
     GameFlowError,
     GameResult,
     HarnessConfig,
@@ -90,7 +82,25 @@ from server.perf.runner import (
     run_with_managed_server,
     wait_for_health,
 )
+from server.perf.scenarios import (
+    close_idle_hot_games,
+    run_one_game,
+    run_one_idle_hot_game,
+    run_one_multiplayer_table,
+)
 from server.perf.seeding import resolve_db_source, seed_puppet_histories
+from server.perf.transport import (
+    build_create_game_payload,
+    connect_ws_with_retry,
+    create_game_with_retry,
+    create_lobby_with_retry,
+    decode_ws_message,
+    join_game_with_retry,
+    remaining_timeout,
+    request_spectate_with_retry,
+    retry_delay_sec,
+    ws_url_for,
+)
 
 __all__ = [
     "BASIC_LANDS",
@@ -107,6 +117,7 @@ __all__ = [
     "VALID_PUPPET_COUNTS",
     "WS_CONNECT_RETRY_BASE_SEC",
     "WS_CONNECT_RETRY_MAX_SEC",
+    "ActionClock",
     "GameFlowError",
     "GameResult",
     "HarnessConfig",
@@ -121,12 +132,14 @@ __all__ = [
     "build_report",
     "calibrate_timeout",
     "cap_overrides_for",
+    "check_regression_thresholds",
     "choose_swap_target",
     "choose_timeout_seconds",
     "clear_runtime_state",
     "close_idle_hot_games",
     "connect_ws_with_retry",
     "create_game_with_retry",
+    "create_lobby_with_retry",
     "decode_ws_message",
     "draft_swap_once",
     "ensure_current_battle",
@@ -134,6 +147,7 @@ __all__ = [
     "execute_sweeps",
     "fetch_server_status",
     "format_stats_line",
+    "join_game_with_retry",
     "main",
     "main_async",
     "maybe_apply_action_jitter",
@@ -152,6 +166,7 @@ __all__ = [
     "record_terminal_state",
     "recv_ws_message",
     "remaining_timeout",
+    "request_spectate_with_retry",
     "resolve_db_source",
     "retry_delay_sec",
     "rss_window_dict",
@@ -159,6 +174,7 @@ __all__ = [
     "run_harness",
     "run_one_game",
     "run_one_idle_hot_game",
+    "run_one_multiplayer_table",
     "run_sweep",
     "run_with_fresh_server_per_sweep",
     "run_with_managed_server",

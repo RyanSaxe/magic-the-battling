@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sqlite3
 from contextlib import closing
@@ -9,8 +10,10 @@ from server.perf.load_harness import (
     GameResult,
     HarnessConfig,
     cap_overrides_for,
+    check_regression_thresholds,
     choose_timeout_seconds,
     main,
+    main_async,
     parse_args,
     parse_hot_sweep,
     parse_sweep,
@@ -460,3 +463,68 @@ def test_fly_activity_report_compatibility_and_formatting():
     assert "Fly Activity Report | app=magic-the-battling" in text
     assert "Fly Buffer Log Summary" in text
     assert summary["event_counts"] == {"game_started": 1}
+
+
+def test_parse_args_multiplayer_and_spectator_flags():
+    cfg = parse_args(["--multiplayer-tables", "2,4", "--players-per-table", "4", "--spectators-per-game", "3"])
+    assert cfg.multiplayer_tables == [2, 4]
+    assert cfg.players_per_table == 4
+    assert cfg.spectators_per_game == 3
+    assert cfg.sweep_games == []
+    assert cfg.max_requested_ws_connections == 4 * (4 + 3)
+
+
+def test_parse_args_keeps_default_goldfish_sweep_when_games_and_multiplayer_omitted():
+    cfg = parse_args([])
+    assert cfg.sweep_games == [10]
+    assert cfg.multiplayer_tables == []
+    assert cfg.spectators_per_game == 0
+
+
+def test_parse_args_validates_new_flags():
+    with pytest.raises(ValueError, match="players-per-table"):
+        parse_args(["--players-per-table", "1"])
+    with pytest.raises(ValueError, match="spectators-per-game"):
+        parse_args(["--spectators-per-game", "-1"])
+    with pytest.raises(ValueError, match="max-p95-ms"):
+        parse_args(["--max-p95-ms", "0"])
+    with pytest.raises(ValueError, match="max-rss-mb"):
+        parse_args(["--max-rss-mb", "-5"])
+
+
+def test_check_regression_thresholds_detects_p95_and_rss_breaches():
+    cfg = parse_args(["--games", "1", "--max-p95-ms", "50", "--max-rss-mb", "300"])
+    report = {
+        "sweeps": [
+            {
+                "label": "multiplayer-tables-2x4-spec-3",
+                "action_latency_stats_ms": {"p95": 65.4},
+                "spectator_message_latency_ms": {"p95": 72.1},
+                "server_rss_window_mb": {"peak": 340.5},
+            },
+        ],
+    }
+    breaches = check_regression_thresholds(cfg, report)
+    assert len(breaches) == 3
+    assert "multiplayer-tables-2x4-spec-3" in breaches[0]
+    assert "action p95=65.40ms > 50.00ms" in breaches[0]
+    assert "spectator p95=72.10ms > 50.00ms" in breaches[1]
+    assert "peak=340.50MB > 300.00MB" in breaches[2]
+
+
+def test_main_async_exits_nonzero_and_logs_breach(caplog):
+    async def fake_run_harness(_cfg):
+        return {
+            "sweeps": [
+                {
+                    "label": "load-games-10",
+                    "action_latency_stats_ms": {"p95": 120.0},
+                    "server_rss_window_mb": {"peak": 180.0},
+                },
+            ],
+        }
+
+    exit_code = asyncio.run(main_async(["--games", "10", "--max-p95-ms", "100"], runner=fake_run_harness))
+    assert exit_code == 3
+    assert "load-games-10" in caplog.text
+    assert "action p95=120.00ms > 100.00ms" in caplog.text

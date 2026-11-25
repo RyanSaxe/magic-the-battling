@@ -1,4 +1,4 @@
-"""RSS sampling, run aggregation, timeout scaling, and summary formatting."""
+"""RSS sampling, run aggregation, timeout scaling, threshold checks, and summary formatting."""
 
 from __future__ import annotations
 
@@ -204,6 +204,9 @@ def summarize_run(
     server_rss_window_mb: dict[str, float | int | None] | None,
     preload_server_status: dict[str, Any] | None,
     preload_rss_window_mb: dict[str, float | int | None] | None,
+    scenario: str = "goldfish",
+    players_per_game: int = 1,
+    puppet_count: int | None = None,
 ) -> RunSummary:
     completed = len(results)
     succeeded = sum(1 for result in results if result.success)
@@ -223,27 +226,28 @@ def summarize_run(
         for action, latencies in result.action_latencies_by_type_ms.items():
             by_action.setdefault(action, []).extend(latencies)
 
-    action_by_type = {action: stats_dict(latencies) for action, latencies in sorted(by_action.items())}
-    throughput = (succeeded / wall_time_sec) if wall_time_sec > 0 else 0.0
+    spectator_latencies = [lat for result in results for lat in result.spectator_latencies_ms]
+    spectator_messages = sum(result.spectator_messages_received for result in results)
+    spectator_stats = stats_dict(spectator_latencies) if (cfg.spectators_per_game > 0 or spectator_latencies) else None
 
     return RunSummary(
         label=label,
         games=games,
         concurrency=concurrency,
         idle_hot_games=idle_hot_games,
-        puppet_count=cfg.puppet_count,
+        puppet_count=cfg.puppet_count if puppet_count is None else puppet_count,
         timeout_per_game_sec=timeout_per_game_sec,
         wall_time_sec=wall_time_sec,
         completed=completed,
         succeeded=succeeded,
         failed=failed,
-        throughput_games_per_sec=throughput,
+        throughput_games_per_sec=(succeeded / wall_time_sec) if wall_time_sec > 0 else 0.0,
         duration_stats_sec=stats_dict([r.duration_sec for r in results]),
         create_game_stats_ms=stats_dict([r.create_game_ms for r in results if r.create_game_ms is not None]),
         ws_connect_stats_ms=stats_dict([r.ws_connect_ms for r in results if r.ws_connect_ms is not None]),
         start_game_stats_ms=stats_dict([r.start_game_ms for r in results if r.start_game_ms is not None]),
         action_latency_stats_ms=stats_dict([lat for r in results for lat in r.action_latencies_ms]),
-        action_latency_by_type_ms=action_by_type,
+        action_latency_by_type_ms={action: stats_dict(latencies) for action, latencies in sorted(by_action.items())},
         failure_reasons=dict(failure_reasons),
         final_phase_counts=dict(final_phase_counts),
         terminal_stage_round_counts=dict(terminal_stage_round_counts),
@@ -252,6 +256,11 @@ def summarize_run(
         server_rss_per_game_mb=_compute_rss_per_game(server_rss_window_mb, succeeded),
         preload_server_status=preload_server_status,
         preload_rss_window_mb=preload_rss_window_mb,
+        scenario=scenario,
+        players_per_game=players_per_game,
+        spectators_per_game=cfg.spectators_per_game,
+        spectator_messages_received=spectator_messages,
+        spectator_message_latency_ms=spectator_stats,
     )
 
 
@@ -268,6 +277,9 @@ def build_report(
             "base_url": cfg.base_url,
             "sweep_games": cfg.sweep_games,
             "hot_game_counts": cfg.hot_game_counts,
+            "multiplayer_tables": cfg.multiplayer_tables,
+            "players_per_table": cfg.players_per_table,
+            "spectators_per_game": cfg.spectators_per_game,
             "concurrency_override": cfg.concurrency_override,
             "puppet_count": cfg.puppet_count,
             "cube_id": cfg.cube_id,
@@ -281,12 +293,72 @@ def build_report(
             "fresh_server_per_sweep": cfg.fresh_server_per_sweep,
             "rss_sample_interval_sec": cfg.rss_sample_interval_sec,
             "ws_action_jitter_ms": cfg.ws_action_jitter_ms,
+            "max_p95_ms": cfg.max_p95_ms,
+            "max_rss_mb": cfg.max_rss_mb,
         },
         "calibration": asdict(calibration_result),
         "timeout_per_game_sec": timeout_per_game_sec,
         "runtime_resets": runtime_reset_results,
         "sweeps": [asdict(item) for item in sweeps],
     }
+
+
+def _sweep_peak_rss_mb(sweep: dict[str, Any]) -> float | None:
+    window = sweep.get("server_rss_window_mb")
+    if isinstance(window, dict) and window.get("peak") is not None:
+        return float(window["peak"])
+    rss_stats = sweep.get("server_rss_mb")
+    if isinstance(rss_stats, dict) and rss_stats.get("max") is not None:
+        return float(rss_stats["max"])
+    return None
+
+
+def _check_sweep_p95(
+    label: str,
+    stats: object,
+    *,
+    metric_name: str,
+    max_p95_ms: float,
+) -> str | None:
+    if not isinstance(stats, dict):
+        return None
+    p95 = stats.get("p95")
+    if p95 is None:
+        return None
+    p95_val = float(p95)
+    if p95_val > max_p95_ms:
+        return f"sweep '{label}' breached --max-p95-ms ({metric_name}={p95_val:.2f}ms > {max_p95_ms:.2f}ms)"
+    return None
+
+
+def _check_single_sweep_thresholds(cfg: HarnessConfig, sweep: dict[str, Any]) -> list[str]:
+    breaches: list[str] = []
+    label = str(sweep.get("label", "<unknown>"))
+    if cfg.max_p95_ms is not None:
+        for key, metric in (
+            ("action_latency_stats_ms", "action p95"),
+            ("spectator_message_latency_ms", "spectator p95"),
+        ):
+            if breach := _check_sweep_p95(label, sweep.get(key), metric_name=metric, max_p95_ms=cfg.max_p95_ms):
+                breaches.append(breach)
+    if cfg.max_rss_mb is not None:
+        peak_rss = _sweep_peak_rss_mb(sweep)
+        if peak_rss is not None and peak_rss > cfg.max_rss_mb:
+            breaches.append(
+                f"sweep '{label}' breached --max-rss-mb (peak={peak_rss:.2f}MB > {cfg.max_rss_mb:.2f}MB)",
+            )
+    return breaches
+
+
+def check_regression_thresholds(cfg: HarnessConfig, report: dict[str, Any]) -> list[str]:
+    if cfg.max_p95_ms is None and cfg.max_rss_mb is None:
+        return []
+
+    breaches: list[str] = []
+    for sweep in report.get("sweeps", []):
+        if isinstance(sweep, dict):
+            breaches.extend(_check_single_sweep_thresholds(cfg, sweep))
+    return breaches
 
 
 def _fmt_float(value: float | int | None) -> str:
@@ -322,6 +394,12 @@ def _format_rss_window(label: str, window: dict[str, float | int | None] | None)
 
 
 def _append_summary_metadata(lines: list[str], summary: RunSummary) -> None:
+    if summary.spectators_per_game > 0:
+        lines.append(
+            f"spectators/game={summary.spectators_per_game} spectator_messages={summary.spectator_messages_received}",
+        )
+    if summary.spectator_message_latency_ms:
+        lines.append(f"spectator latency ms: {format_stats_line(summary.spectator_message_latency_ms)}")
     if summary.final_phase_counts:
         pairs = ", ".join(f"{phase}:{count}" for phase, count in sorted(summary.final_phase_counts.items()))
         lines.append(f"terminal phases: {pairs}")
@@ -356,8 +434,8 @@ def print_summary(summary: RunSummary) -> None:
     lines = [
         "",
         f"=== {summary.label} ===",
-        f"games={summary.games} concurrency={summary.concurrency} "
-        f"idle_hot_games={summary.idle_hot_games} "
+        f"scenario={summary.scenario} games={summary.games} concurrency={summary.concurrency} "
+        f"players/game={summary.players_per_game} idle_hot_games={summary.idle_hot_games} "
         f"puppet_count={summary.puppet_count} timeout/game={summary.timeout_per_game_sec:.1f}s "
         f"wall={summary.wall_time_sec:.2f}s throughput={summary.throughput_games_per_sec:.2f} games/s",
         f"completed={summary.completed} succeeded={summary.succeeded} failed={summary.failed}",

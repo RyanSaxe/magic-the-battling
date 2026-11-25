@@ -7,9 +7,11 @@ import asyncio
 import json
 import logging
 import sys
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+from server.perf.metrics import check_regression_thresholds
 from server.perf.models import DEFAULT_BACKEND_PORT, DEFAULT_BASE_URL, VALID_PUPPET_COUNTS, HarnessConfig
 from server.perf.runner import run_harness
 
@@ -52,11 +54,28 @@ def parse_hot_sweep(raw: str | None, fallback_hot_games: int) -> list[int]:
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run concurrent end-to-end goldfish load tests against real game engine flows.",
+        description="Run concurrent end-to-end goldfish, multiplayer, and spectator load tests.",
     )
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"Backend base URL (default: {DEFAULT_BASE_URL})")
-    parser.add_argument("--games", type=int, default=10, help="Number of games to run for a single sweep")
+    parser.add_argument("--games", type=int, default=None, help="Number of games to run for a single sweep")
     parser.add_argument("--sweep", default=None, help="Comma-separated game counts, e.g. 1,10,100,1000")
+    parser.add_argument(
+        "--multiplayer-tables",
+        default=None,
+        help="Comma-separated multi-human table counts (no puppets), e.g. 2 or 2,4",
+    )
+    parser.add_argument(
+        "--players-per-table",
+        type=int,
+        default=4,
+        help="Human players per multiplayer table (valid: 2..8; default: 4)",
+    )
+    parser.add_argument(
+        "--spectators-per-game",
+        type=int,
+        default=0,
+        help="WebSocket spectators attached per active game (default: 0)",
+    )
     parser.add_argument(
         "--hot-games",
         type=int,
@@ -182,6 +201,18 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=0.0,
         help="Random per-WS-action jitter up to this many milliseconds (harness only)",
     )
+    parser.add_argument(
+        "--max-p95-ms",
+        type=float,
+        default=None,
+        help="Optional regression threshold for p95 action/spectator latency in milliseconds",
+    )
+    parser.add_argument(
+        "--max-rss-mb",
+        type=float,
+        default=None,
+        help="Optional regression threshold for peak server RSS in MB",
+    )
     parser.add_argument("--json", action="store_true", help="Print final report as JSON")
     parser.add_argument("--json-output", default=None, help="Write final report JSON to this path")
     parser.add_argument(
@@ -194,19 +225,31 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _validate_args(args: argparse.Namespace) -> None:
-    if args.games <= 0:
+def _validate_numeric_bounds(args: argparse.Namespace) -> None:
+    if args.games is not None and args.games <= 0:
         raise ValueError("--games must be positive")
     if args.hot_games < 0:
         raise ValueError("--hot-games must be non-negative")
+    if args.players_per_table < 2 or args.players_per_table > 8:
+        raise ValueError("--players-per-table must be between 2 and 8")
+    if args.spectators_per_game < 0:
+        raise ValueError("--spectators-per-game must be non-negative")
     if args.concurrency is not None and args.concurrency <= 0:
         raise ValueError("--concurrency must be positive")
     if args.backend_port < 1 or args.backend_port > 65535:
         raise ValueError("--backend-port must be between 1 and 65535")
+
+
+def _validate_args(args: argparse.Namespace) -> None:
+    _validate_numeric_bounds(args)
     if args.rss_sample_interval_sec <= 0:
         raise ValueError("--rss-sample-interval-sec must be positive")
     if args.ws_action_jitter_ms < 0:
         raise ValueError("--ws-action-jitter-ms must be non-negative")
+    if args.max_p95_ms is not None and args.max_p95_ms <= 0:
+        raise ValueError("--max-p95-ms must be positive")
+    if args.max_rss_mb is not None and args.max_rss_mb <= 0:
+        raise ValueError("--max-rss-mb must be positive")
     if args.fresh_server_per_sweep and not args.db_copy:
         raise ValueError("--fresh-server-per-sweep requires --db-copy")
 
@@ -216,8 +259,17 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
     args = parser.parse_args(argv)
     _validate_args(args)
 
-    sweep = parse_sweep(args.sweep, args.games)
+    multiplayer_tables = (
+        _parse_int_list(args.multiplayer_tables, flag_name="multiplayer-tables", min_value=1, bound_label="positive")
+        if args.multiplayer_tables is not None
+        else []
+    )
+    if args.games is None and args.sweep is None and multiplayer_tables:
+        sweep: list[int] = []
+    else:
+        sweep = parse_sweep(args.sweep, args.games if args.games is not None else 10)
     hot_sweep = parse_hot_sweep(args.hot_sweep, args.hot_games)
+
     return HarnessConfig(
         base_url=args.base_url.rstrip("/"),
         sweep_games=sweep,
@@ -246,6 +298,11 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         ws_action_jitter_ms=args.ws_action_jitter_ms,
         json_output=args.json,
         json_output_path=args.json_output,
+        multiplayer_tables=multiplayer_tables,
+        players_per_table=args.players_per_table,
+        spectators_per_game=args.spectators_per_game,
+        max_p95_ms=args.max_p95_ms,
+        max_rss_mb=args.max_rss_mb,
     )
 
 
@@ -256,7 +313,11 @@ def write_json_report(report: dict[str, Any], output_path: str) -> None:
     logger.info("[harness] wrote json report: %s", path)
 
 
-async def main_async(argv: list[str] | None = None) -> int:
+async def main_async(
+    argv: list[str] | None = None,
+    *,
+    runner: Callable[[HarnessConfig], Awaitable[dict[str, Any]]] = run_harness,
+) -> int:
     try:
         cfg = parse_args(argv)
     except ValueError as exc:
@@ -264,7 +325,7 @@ async def main_async(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        report = await run_harness(cfg)
+        report = await runner(cfg)
     except Exception as exc:
         logger.error("[harness] failed: %s", exc)
         return 1
@@ -273,6 +334,12 @@ async def main_async(argv: list[str] | None = None) -> int:
         sys.stdout.write(f"{json.dumps(report, indent=2)}\n")
     if cfg.json_output_path:
         write_json_report(report, cfg.json_output_path)
+
+    breaches = check_regression_thresholds(cfg, report)
+    if breaches:
+        for breach in breaches:
+            logger.error("[harness] threshold breach: %s", breach)
+        return 3
     return 0
 
 

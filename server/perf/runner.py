@@ -20,11 +20,6 @@ from typing import Any
 
 import httpx
 
-from server.perf.bot_client import (
-    close_idle_hot_games,
-    run_one_game,
-    run_one_idle_hot_game,
-)
 from server.perf.metrics import (
     ProcessSampler,
     build_report,
@@ -41,6 +36,12 @@ from server.perf.models import (
     IdleHotGame,
     RunSummary,
     cap_overrides_for,
+)
+from server.perf.scenarios import (
+    close_idle_hot_games,
+    run_one_game,
+    run_one_idle_hot_game,
+    run_one_multiplayer_table,
 )
 from server.perf.seeding import resolve_db_source, seed_puppet_histories
 
@@ -126,7 +127,12 @@ class ManagedServer:
         if self.config.db_copy:
             self._prepare_temp_db(env)
         if self.config.disable_caps:
-            env.update(cap_overrides_for(self.config.max_requested_loaded_games))
+            env.update(
+                cap_overrides_for(
+                    self.config.max_requested_loaded_games,
+                    max_ws_connections=self.config.max_requested_ws_connections,
+                ),
+            )
         env["MTB_COMPRESS_WS"] = "0" if self.config.disable_ws_gzip else "1"
         env["MTB_FAKE_CUBE_DATA"] = "1" if self.config.mock_cube_data else "0"
         # Perf runs do not exercise share-preview screenshots; disable preview startup for stability.
@@ -155,7 +161,7 @@ class ManagedServer:
             start_new_session=True,
         )
         await wait_for_health(self.base_url, self.config.startup_timeout_sec, process=self.process)
-        if self.temp_db_path is not None:
+        if self.temp_db_path is not None and self.config.sweep_games:
             target_elo = FAKE_MODE_TARGET_ELO if self.config.mock_cube_data else None
             seeded = seed_puppet_histories(
                 self.temp_db_path,
@@ -234,6 +240,7 @@ async def _run_concurrent_games(
     games: int,
     concurrency: int,
     timeout_per_game_sec: float,
+    scenario: str,
 ) -> list[GameResult]:
     semaphore = asyncio.Semaphore(concurrency)
     progress_every = max(1, games // 20)
@@ -241,6 +248,8 @@ async def _run_concurrent_games(
 
     async def _worker(idx: int) -> GameResult:
         async with semaphore:
+            if scenario == "multiplayer":
+                return await run_one_multiplayer_table(client, cfg, table_index=idx, timeout_sec=timeout_per_game_sec)
             return await run_one_game(client, cfg, game_index=idx, timeout_sec=timeout_per_game_sec)
 
     tasks = [asyncio.create_task(_worker(idx)) for idx in range(games)]
@@ -253,6 +262,18 @@ async def _run_concurrent_games(
     return results
 
 
+def _sweep_label(cfg: HarnessConfig, *, games: int, idle_hot_games: int, scenario: str) -> str:
+    if scenario == "multiplayer":
+        base = f"multiplayer-tables-{games}x{cfg.players_per_table}"
+    elif idle_hot_games > 0:
+        base = f"load-games-{games}-hot-{idle_hot_games}"
+    else:
+        base = f"load-games-{games}"
+    if cfg.spectators_per_game > 0:
+        return f"{base}-spec-{cfg.spectators_per_game}"
+    return base
+
+
 async def run_sweep(
     *,
     cfg: HarnessConfig,
@@ -261,10 +282,13 @@ async def run_sweep(
     idle_hot_games: int,
     timeout_per_game_sec: float,
     sampler: ProcessSampler | None,
+    scenario: str = "goldfish",
 ) -> RunSummary:
+    extra_conns = cfg.players_per_table if scenario == "multiplayer" else 1
+    conn_factor = extra_conns + cfg.spectators_per_game
     limits = httpx.Limits(
-        max_connections=max(200, concurrency * 2),
-        max_keepalive_connections=max(100, concurrency),
+        max_connections=max(200, concurrency * conn_factor * 2),
+        max_keepalive_connections=max(100, concurrency * conn_factor),
     )
     timeout = httpx.Timeout(30.0, connect=15.0, read=30.0, write=30.0, pool=30.0)
 
@@ -274,7 +298,7 @@ async def run_sweep(
     idle_games: list[IdleHotGame] = []
 
     async with httpx.AsyncClient(base_url=cfg.base_url, timeout=timeout, limits=limits) as client:
-        if idle_hot_games > 0:
+        if idle_hot_games > 0 and scenario == "goldfish":
             idle_games, preload_status, preload_rss_window = await preload_idle_hot_games(
                 client,
                 cfg,
@@ -300,6 +324,7 @@ async def run_sweep(
                 games=games,
                 concurrency=concurrency,
                 timeout_per_game_sec=timeout_per_game_sec,
+                scenario=scenario,
             )
         finally:
             await close_idle_hot_games(idle_games)
@@ -312,9 +337,8 @@ async def run_sweep(
         rss_stats = sampler.slice_stats(start_mark)
         rss_window = sampler.slice_window(start_mark)
 
-    label = f"load-games-{games}" if idle_hot_games <= 0 else f"load-games-{games}-hot-{idle_hot_games}"
     summary = summarize_run(
-        label=label,
+        label=_sweep_label(cfg, games=games, idle_hot_games=idle_hot_games, scenario=scenario),
         cfg=cfg,
         games=games,
         concurrency=concurrency,
@@ -326,17 +350,24 @@ async def run_sweep(
         server_rss_window_mb=rss_window,
         preload_server_status=preload_status,
         preload_rss_window_mb=preload_rss_window,
+        scenario=scenario,
+        players_per_game=cfg.players_per_table if scenario == "multiplayer" else 1,
+        puppet_count=0 if scenario == "multiplayer" else cfg.puppet_count,
     )
     print_summary(summary)
     return summary
 
 
-async def calibrate_timeout(cfg: HarnessConfig, concurrency: int) -> tuple[float, Any]:
+async def calibrate_timeout(cfg: HarnessConfig, concurrency: int) -> tuple[float, GameResult]:
     calibration_timeout = cfg.game_timeout_sec or cfg.calibration_timeout_sec
-    limits = httpx.Limits(max_connections=20, max_keepalive_connections=20)
+    limits = httpx.Limits(max_connections=32, max_keepalive_connections=32)
     timeout = httpx.Timeout(30.0, connect=15.0, read=30.0, write=30.0, pool=30.0)
+    use_multiplayer = not cfg.sweep_games and bool(cfg.multiplayer_tables)
     async with httpx.AsyncClient(base_url=cfg.base_url, timeout=timeout, limits=limits) as client:
-        result = await run_one_game(client, cfg, game_index=0, timeout_sec=calibration_timeout)
+        if use_multiplayer:
+            result = await run_one_multiplayer_table(client, cfg, table_index=0, timeout_sec=calibration_timeout)
+        else:
+            result = await run_one_game(client, cfg, game_index=0, timeout_sec=calibration_timeout)
 
     if not result.success:
         msg = result.error or "calibration game failed"
@@ -393,17 +424,28 @@ async def _maybe_reset_runtime(
         logger.info("[harness] note: skipping %s runtime reset; ops token unavailable.", label)
 
 
+def _planned_sweeps(cfg: HarnessConfig) -> list[tuple[str, int, int]]:
+    plans: list[tuple[str, int, int]] = [
+        ("goldfish", idle_hot_games, games) for idle_hot_games in cfg.hot_game_counts for games in cfg.sweep_games
+    ]
+    plans.extend(("multiplayer", 0, tables) for tables in cfg.multiplayer_tables)
+    return plans
+
+
 async def execute_sweeps(
     cfg: HarnessConfig,
     sampler: ProcessSampler | None,
     *,
     ops_token: str | None,
 ) -> dict[str, Any]:
-    first_concurrency = cfg.concurrency_for(cfg.sweep_games[0])
-    timeout_per_game_sec, calibration_result = await calibrate_timeout(
-        cfg,
-        concurrency=first_concurrency + cfg.hot_game_counts[0],
-    )
+    plans = _planned_sweeps(cfg)
+    first_scenario, first_hot, first_count = plans[0]
+    first_concurrency = cfg.concurrency_for(first_count)
+    if first_scenario == "multiplayer":
+        cal_concurrency = first_concurrency * cfg.players_per_table
+    else:
+        cal_concurrency = first_concurrency + first_hot
+    timeout_per_game_sec, calibration_result = await calibrate_timeout(cfg, concurrency=cal_concurrency)
 
     sweeps: list[RunSummary] = []
     runtime_reset_results: list[dict[str, Any]] = []
@@ -414,13 +456,12 @@ async def execute_sweeps(
         runtime_reset_results=runtime_reset_results,
     )
 
-    sweep_pairs = [(idle_hot_games, games) for idle_hot_games in cfg.hot_game_counts for games in cfg.sweep_games]
-    for idx, (idle_hot_games, games) in enumerate(sweep_pairs):
+    for idx, (scenario, idle_hot_games, games) in enumerate(plans):
         if idx > 0:
             await _maybe_reset_runtime(
                 cfg,
                 ops_token=ops_token,
-                label=f"pre-sweep-games-{games}-hot-{idle_hot_games}",
+                label=f"pre-sweep-{scenario}-{games}-hot-{idle_hot_games}",
                 runtime_reset_results=runtime_reset_results,
             )
 
@@ -429,7 +470,7 @@ async def execute_sweeps(
             cfg,
             calibration_result,
             timeout_per_game_sec=timeout_per_game_sec,
-            concurrency=concurrency,
+            concurrency=concurrency * (cfg.players_per_table if scenario == "multiplayer" else 1),
             idle_hot_games=idle_hot_games,
         )
         sweeps.append(
@@ -440,6 +481,7 @@ async def execute_sweeps(
                 idle_hot_games=idle_hot_games,
                 timeout_per_game_sec=planned_timeout,
                 sampler=sampler,
+                scenario=scenario,
             ),
         )
 
@@ -492,24 +534,26 @@ async def run_with_fresh_server_per_sweep(cfg: HarnessConfig) -> dict[str, Any]:
     if cfg.base_url != DEFAULT_BASE_URL:
         logger.info("[harness] --db-copy uses a managed local server; ignoring --base-url=%s", cfg.base_url)
 
-    first_concurrency = cfg.concurrency_for(cfg.sweep_games[0])
+    plans = _planned_sweeps(cfg)
+    first_scenario, first_hot, first_count = plans[0]
+    first_concurrency = cfg.concurrency_for(first_count)
+    cal_concurrency = (
+        first_concurrency * cfg.players_per_table if first_scenario == "multiplayer" else first_concurrency + first_hot
+    )
+
     async with ManagedServer(cfg) as managed:
         cfg.base_url = managed.base_url
         cfg.ops_token = managed.ops_token
-        timeout_per_game_sec, calibration_result = await calibrate_timeout(
-            cfg,
-            concurrency=first_concurrency + cfg.hot_game_counts[0],
-        )
+        timeout_per_game_sec, calibration_result = await calibrate_timeout(cfg, concurrency=cal_concurrency)
 
     sweeps: list[RunSummary] = []
-    sweep_pairs = [(idle_hot_games, games) for idle_hot_games in cfg.hot_game_counts for games in cfg.sweep_games]
-    for idle_hot_games, games in sweep_pairs:
+    for scenario, idle_hot_games, games in plans:
         concurrency = cfg.concurrency_for(games)
         planned_timeout = timeout_for_sweep(
             cfg,
             calibration_result,
             timeout_per_game_sec=timeout_per_game_sec,
-            concurrency=concurrency,
+            concurrency=concurrency * (cfg.players_per_table if scenario == "multiplayer" else 1),
             idle_hot_games=idle_hot_games,
         )
         async with _managed_server_with_sampler(cfg) as (_managed, sampler):
@@ -520,6 +564,7 @@ async def run_with_fresh_server_per_sweep(cfg: HarnessConfig) -> dict[str, Any]:
                 idle_hot_games=idle_hot_games,
                 timeout_per_game_sec=planned_timeout,
                 sampler=sampler,
+                scenario=scenario,
             )
         sweeps.append(sweep_summary)
 

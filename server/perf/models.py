@@ -35,6 +35,11 @@ class WebSocketProto(Protocol):
 
 
 @dataclass
+class ActionClock:
+    last_action_sent_at: float | None = None
+
+
+@dataclass
 class GameResult:
     index: int
     success: bool = False
@@ -50,12 +55,19 @@ class GameResult:
     actions_sent: int = 0
     action_latencies_ms: list[float] = field(default_factory=list)
     action_latencies_by_type_ms: dict[str, list[float]] = field(default_factory=dict)
+    spectator_messages_received: int = 0
+    spectator_latencies_ms: list[float] = field(default_factory=list)
 
     def record_action(self, action: str, latency_ms: float) -> None:
         self.actions_sent += 1
         self.action_latencies_ms.append(latency_ms)
         bucket = self.action_latencies_by_type_ms.setdefault(action, [])
         bucket.append(latency_ms)
+
+    def record_spectator_message(self, latency_ms: float | None = None) -> None:
+        self.spectator_messages_received += 1
+        if latency_ms is not None:
+            self.spectator_latencies_ms.append(latency_ms)
 
 
 @dataclass
@@ -85,6 +97,11 @@ class RunSummary:
     server_rss_per_game_mb: dict[str, float | int | None] | None = None
     preload_server_status: dict[str, Any] | None = None
     preload_rss_window_mb: dict[str, float | int | None] | None = None
+    scenario: str = "goldfish"
+    players_per_game: int = 1
+    spectators_per_game: int = 0
+    spectator_messages_received: int = 0
+    spectator_message_latency_ms: dict[str, float | int | None] | None = None
 
 
 @dataclass
@@ -116,14 +133,36 @@ class HarnessConfig:
     ws_action_jitter_ms: float
     json_output: bool
     json_output_path: str | None
+    multiplayer_tables: list[int] = field(default_factory=list)
+    players_per_table: int = 4
+    spectators_per_game: int = 0
+    max_p95_ms: float | None = None
+    max_rss_mb: float | None = None
 
     @property
     def max_requested_games(self) -> int:
-        return max(self.sweep_games)
+        all_counts = [*self.sweep_games, *self.multiplayer_tables]
+        return max(all_counts) if all_counts else 1
 
     @property
     def max_requested_loaded_games(self) -> int:
-        return max(games + idle_hot_games for idle_hot_games in self.hot_game_counts for games in self.sweep_games)
+        candidates: list[int] = [
+            games + idle_hot_games for idle_hot_games in self.hot_game_counts for games in self.sweep_games
+        ]
+        candidates.extend(self.multiplayer_tables)
+        return max(candidates) if candidates else 1
+
+    @property
+    def max_requested_ws_connections(self) -> int:
+        candidates: list[int] = [
+            games * (1 + self.spectators_per_game) + idle_hot_games
+            for idle_hot_games in self.hot_game_counts
+            for games in self.sweep_games
+        ]
+        candidates.extend(
+            tables * (self.players_per_table + self.spectators_per_game) for tables in self.multiplayer_tables
+        )
+        return max(candidates) if candidates else 1
 
     def concurrency_for(self, games: int) -> int:
         if self.concurrency_override is None:
@@ -138,6 +177,7 @@ class PhaseContext:
     result: GameResult
     rng: random.Random
     ws_action_jitter_ms: float = 0.0
+    action_clock: ActionClock | None = None
 
 
 @dataclass
@@ -148,12 +188,13 @@ class IdleHotGame:
     phase: str | None = None
 
 
-def cap_overrides_for(max_games: int) -> dict[str, str]:
+def cap_overrides_for(max_games: int, *, max_ws_connections: int | None = None) -> dict[str, str]:
     scale = max(1, max_games)
+    ws_scale = max(scale, max_ws_connections or 0)
     return {
         "MTB_MAX_HOT_GAMES": str(max(1_000, scale * 3)),
         "MTB_MAX_TOTAL_LOADED_GAMES_HARD": str(max(1_500, scale * 4)),
         "MTB_MAX_PENDING_GAMES": str(max(1_000, scale * 3)),
-        "MTB_MAX_WS_CONNECTIONS": str(max(2_000, scale * 4)),
-        "MTB_MAX_SESSIONS_TOTAL": str(max(50_000, scale * 20)),
+        "MTB_MAX_WS_CONNECTIONS": str(max(2_000, ws_scale * 4)),
+        "MTB_MAX_SESSIONS_TOTAL": str(max(50_000, ws_scale * 20)),
     }
