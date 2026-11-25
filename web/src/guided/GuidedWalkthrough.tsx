@@ -1,85 +1,33 @@
+/** Presentational Guided Mode overlay driven by `useGuidedWalkthrough`. */
+import { useMemo, useRef, type CSSProperties, type RefObject } from "react";
 import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+  computeMorphDuration,
+  spotlightDistance,
+  useGuidedWalkthrough,
+} from "../hooks/useGuidedWalkthrough";
+import type { VisibleGuideStep } from "../pages/gameGuideState";
+import { GuideOverlay } from "./GuideOverlay";
+import { GuideTooltip } from "./GuideTooltip";
 import type {
-  GuideStepDefinition,
   GuidedGuideId,
   GuideRequest,
   GuidedWalkthroughContext,
 } from "./types";
-import { buildGuideDefinition } from "./content";
-import {
-  resolveTarget,
-  useGuidePositioning,
-  type SpotlightRect,
-} from "./useGuidePositioning";
-import { GuideOverlay } from "./GuideOverlay";
-import { GuideTooltip } from "./GuideTooltip";
-import { planRequestTransition, type AnimPhase } from "./walkthroughPhase";
-import { enterPressesControl } from "../utils/enterKey";
 
 const MORPH_EASING = "cubic-bezier(0.22,1,0.36,1)";
 
-function spotlightDistance(
-  a: SpotlightRect | null,
-  b: SpotlightRect | null,
-): number {
-  if (!a || !b) return 0;
-  const ax = a.x + a.width / 2;
-  const ay = a.y + a.height / 2;
-  const bx = b.x + b.width / 2;
-  const by = b.y + b.height / 2;
-  return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
-}
-
-function computeMorphDuration(distance: number): number {
-  if (distance < 20) return 0;
-  return Math.min(420, Math.max(260, 280 + (distance - 100) * 0.2));
-}
-
-function makeInertExcept(root: Element, usable: Element[]): () => void {
-  const madeInert: Element[] = [];
-  const visit = (parent: Element) => {
-    for (const child of parent.children) {
-      if (usable.includes(child)) continue;
-      if (usable.some((element) => child.contains(element))) {
-        visit(child);
-      } else if (!child.hasAttribute("inert")) {
-        child.setAttribute("inert", "");
-        madeInert.push(child);
-      }
-    }
-  };
-  visit(root);
-  return () => madeInert.forEach((element) => element.removeAttribute("inert"));
-}
-
-interface DisplayState {
-  guideLabel: string;
-  layout: NonNullable<ReturnType<typeof useGuidePositioning>>;
-  showSkipAll: boolean;
-  step: GuideStepDefinition;
-  stepIndex: number;
-  stepKey: string;
-  totalSteps: number;
-}
-
 interface GuidedWalkthroughProps {
-  rootRef: React.RefObject<HTMLElement | null>;
-  request: GuideRequest;
+  rootRef: RefObject<HTMLElement | null>;
+  request: GuideRequest | null;
   context: GuidedWalkthroughContext;
   stepIndex: number;
   requestActive: boolean;
+  dismissedImmediately?: boolean;
   onClose: (guideId: GuidedGuideId) => void;
   onSkipAll: () => void;
   onAdvanceStep: () => void;
   onBackStep: () => void;
+  onVisibleGuideStepChange?: (step: VisibleGuideStep | null) => void;
 }
 
 export function GuidedWalkthrough({
@@ -88,326 +36,51 @@ export function GuidedWalkthrough({
   context,
   stepIndex,
   requestActive,
+  dismissedImmediately = false,
   onClose,
   onSkipAll,
   onAdvanceStep,
   onBackStep,
+  onVisibleGuideStepChange,
 }: GuidedWalkthroughProps) {
   const measureCardRef = useRef<HTMLDivElement>(null);
   const walkthroughRef = useRef<HTMLDivElement>(null);
-  const [animPhase, setAnimPhase] = useState<AnimPhase>("entering");
-  const [displayState, setDisplayState] = useState<DisplayState | null>(null);
-  const [pendingState, setPendingState] = useState<DisplayState | null>(null);
-  const hasCommittedInitialLayoutRef = useRef(false);
-  const phaseTimerRef = useRef<number | null>(null);
-  const [reducedMotion] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
 
-  const guide = useMemo(
-    () => buildGuideDefinition(request.guideId, context),
-    [context, request.guideId],
-  );
-
-  const step = guide.steps[stepIndex] ?? null;
-  const stepKey = `${request.nonce}:${step?.id ?? stepIndex}`;
-  const resolvedTargetSelector = useMemo(() => {
-    if (!step?.targetSelector) return undefined;
-    return typeof step.targetSelector === "function"
-      ? step.targetSelector(context)
-      : step.targetSelector;
-  }, [context, step]);
-  const resolvedPositionTargetId = useMemo(() => {
-    if (!step?.positionTargetId) return undefined;
-    return typeof step.positionTargetId === "function"
-      ? step.positionTargetId(context)
-      : step.positionTargetId;
-  }, [context, step]);
-  const resolvedPositionTargetSelector = useMemo(() => {
-    if (!step?.positionTargetSelector) return undefined;
-    return typeof step.positionTargetSelector === "function"
-      ? step.positionTargetSelector(context)
-      : step.positionTargetSelector;
-  }, [context, step]);
-  const resolvedWaitForLayoutTargetId = useMemo(() => {
-    if (!step?.waitForLayoutTargetId) return undefined;
-    return typeof step.waitForLayoutTargetId === "function"
-      ? step.waitForLayoutTargetId(context)
-      : step.waitForLayoutTargetId;
-  }, [context, step]);
-  const resolvedWaitForLayoutTargetSelector = useMemo(() => {
-    if (!step?.waitForLayoutTargetSelector) return undefined;
-    return typeof step.waitForLayoutTargetSelector === "function"
-      ? step.waitForLayoutTargetSelector(context)
-      : step.waitForLayoutTargetSelector;
-  }, [context, step]);
-  const clearPhaseTimer = useCallback(() => {
-    if (phaseTimerRef.current !== null) {
-      window.clearTimeout(phaseTimerRef.current);
-      phaseTimerRef.current = null;
-    }
-  }, []);
-
-  const finishGuide = useCallback(() => {
-    onClose(request.guideId);
-  }, [onClose, request.guideId]);
-  const isCurrentStepDisplayed =
-    requestActive && displayState?.stepKey === stepKey && animPhase === "idle";
-
-  const getUsableTarget = useCallback(() => {
-    const root = rootRef.current;
-    return root && step?.allowTargetInteraction
-      ? resolveTarget(root, step.targetId, resolvedTargetSelector)
-      : null;
-  }, [resolvedTargetSelector, rootRef, step]);
-
-  useEffect(() => {
-    if (
-      guide.phase &&
-      context.currentPhase &&
-      context.currentPhase !== guide.phase
-    ) {
-      finishGuide();
-    }
-  }, [context.currentPhase, finishGuide, guide.phase]);
-
-  useEffect(() => {
-    const transition = planRequestTransition({
-      animPhase,
-      requestActive,
-      hasDisplayState: displayState !== null,
-      reducedMotion,
-    });
-
-    if (transition === "idle") {
-      queueMicrotask(() => {
-        setAnimPhase("idle");
-      });
-      return;
-    }
-
-    if (transition === "exit") {
-      clearPhaseTimer();
-      const exitId = requestAnimationFrame(() => {
-        setPendingState(null);
-        setAnimPhase("exiting");
-      });
-      return () => cancelAnimationFrame(exitId);
-    }
-
-    if (transition === "restart") {
-      const restartId = requestAnimationFrame(() => {
-        clearPhaseTimer();
-        hasCommittedInitialLayoutRef.current = false;
-        setDisplayState(null);
-        setPendingState(null);
-        setAnimPhase("entering");
-      });
-      return () => cancelAnimationFrame(restartId);
-    }
-  }, [animPhase, clearPhaseTimer, displayState, reducedMotion, requestActive]);
-
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      const handled =
-        event.key === "Escape" ||
-        event.key === "ArrowRight" ||
-        event.key === "Enter" ||
-        (event.key === "ArrowLeft" && stepIndex > 0);
-
-      if (!handled) return;
-      if (!isCurrentStepDisplayed) return;
-      if (
-        enterPressesControl(event, walkthroughRef.current, getUsableTarget())
-      ) {
-        // A dialog can be open under the guide, and its Enter would confirm.
-        event.stopImmediatePropagation();
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      if (event.key === "Escape") {
-        finishGuide();
-      } else if (event.key === "ArrowRight" || event.key === "Enter") {
-        onAdvanceStep();
-      } else if (event.key === "ArrowLeft" && stepIndex > 0) {
-        onBackStep();
-      }
-    };
-
-    window.addEventListener("keydown", handleKey, true);
-    return () => window.removeEventListener("keydown", handleKey, true);
-  }, [
-    finishGuide,
-    getUsableTarget,
-    isCurrentStepDisplayed,
-    onAdvanceStep,
-    onBackStep,
-    stepIndex,
-  ]);
-
-  const layout = useGuidePositioning(
-    rootRef,
-    measureCardRef,
-    step?.targetId,
-    resolvedTargetSelector,
-    resolvedPositionTargetId,
-    resolvedPositionTargetSelector,
-    resolvedWaitForLayoutTargetId,
-    resolvedWaitForLayoutTargetSelector,
-    step?.placement ?? "bottom",
-    step?.spotlightPadding,
-    stepKey,
-  );
-
-  useEffect(() => {
-    if (!layout || !step) return;
-
-    const nextState: DisplayState = {
-      guideLabel: guide.label,
-      layout,
-      showSkipAll: guide.showSkipAll === true,
-      step,
-      stepIndex,
-      stepKey,
-      totalSteps: guide.steps.length,
-    };
-
-    if (!hasCommittedInitialLayoutRef.current) {
-      hasCommittedInitialLayoutRef.current = true;
-
-      const commitId = requestAnimationFrame(() => {
-        setDisplayState(nextState);
-        if (reducedMotion) {
-          setAnimPhase("idle");
-        } else {
-          setAnimPhase("entering");
-          phaseTimerRef.current = window.setTimeout(() => {
-            setAnimPhase("idle");
-          }, 480);
-        }
-      });
-      return () => cancelAnimationFrame(commitId);
-    }
-
-    if (animPhase === "idle" || animPhase === "entering") {
-      if (displayState?.stepKey === nextState.stepKey) {
-        const updateId = requestAnimationFrame(() => {
-          setDisplayState(nextState);
-        });
-        return () => cancelAnimationFrame(updateId);
-      }
-
-      if (reducedMotion) {
-        const updateId = requestAnimationFrame(() => {
-          setDisplayState(nextState);
-        });
-        return () => cancelAnimationFrame(updateId);
-      }
-
-      const exitId = requestAnimationFrame(() => {
-        setPendingState(nextState);
-        clearPhaseTimer();
-        setAnimPhase("exit-tooltip");
-      });
-      return () => cancelAnimationFrame(exitId);
-    } else if (animPhase === "morph-spot" || animPhase === "enter-tooltip") {
-      const pendingId = requestAnimationFrame(() => {
-        setPendingState(nextState);
-      });
-      return () => cancelAnimationFrame(pendingId);
-    }
-  }, [
-    animPhase,
-    clearPhaseTimer,
-    displayState?.stepKey,
-    guide.label,
-    guide.showSkipAll,
-    guide.steps.length,
-    layout,
-    reducedMotion,
+  const {
+    state,
+    guide,
     step,
-    stepIndex,
-    stepKey,
-  ]);
-
-  useEffect(() => {
-    if (reducedMotion) return;
-
-    if (animPhase === "exit-tooltip") {
-      clearPhaseTimer();
-      phaseTimerRef.current = window.setTimeout(() => {
-        setAnimPhase("morph-spot");
-      }, 180);
-    }
-
-    if (animPhase === "morph-spot" && pendingState) {
-      const dist = spotlightDistance(
-        displayState?.layout.spotlight ?? null,
-        pendingState.layout.spotlight ?? null,
-      );
-      const morphMs = computeMorphDuration(dist);
-
-      const rafId = requestAnimationFrame(() => {
-        setDisplayState(pendingState);
-        setPendingState(null);
-        clearPhaseTimer();
-        phaseTimerRef.current = window.setTimeout(
-          () => {
-            setAnimPhase("enter-tooltip");
-          },
-          morphMs === 0 ? 80 : morphMs,
-        );
-      });
-      return () => cancelAnimationFrame(rafId);
-    } else if (animPhase === "morph-spot" && !pendingState) {
-      const rafId = requestAnimationFrame(() => {
-        if (pendingState) return;
-        setAnimPhase("morph-spot");
-      });
-      return () => cancelAnimationFrame(rafId);
-    }
-
-    if (animPhase === "enter-tooltip") {
-      clearPhaseTimer();
-      phaseTimerRef.current = window.setTimeout(() => {
-        setAnimPhase("idle");
-      }, 220);
-    }
-
-    if (animPhase === "exiting") {
-      clearPhaseTimer();
-      phaseTimerRef.current = window.setTimeout(() => {
-        phaseTimerRef.current = null;
-      }, 400);
-    }
-
-    return () => {};
-  }, [
     animPhase,
-    clearPhaseTimer,
-    displayState?.layout.spotlight,
+    displayState,
     pendingState,
     reducedMotion,
-  ]);
-
-  useEffect(() => {
-    return () => clearPhaseTimer();
-  }, [clearPhaseTimer]);
+    takesTaps,
+    isCurrentStepDisplayed,
+  } = useGuidedWalkthrough({
+    rootRef,
+    walkthroughRef,
+    measureCardRef,
+    request,
+    context,
+    stepIndex,
+    requestActive,
+    dismissedImmediately,
+    onClose,
+    onAdvanceStep,
+    onBackStep,
+    onVisibleGuideStepChange,
+  });
 
   const morphDuration = useMemo(() => {
     if (!displayState?.layout.spotlight) return 280;
-    if (!pendingState?.layout.spotlight && animPhase !== "morph-spot")
+    if (!pendingState?.layout.spotlight && animPhase !== "morph-spot") {
       return 280;
+    }
     const target =
       pendingState?.layout.spotlight ?? displayState.layout.spotlight;
-    const dist = spotlightDistance(displayState.layout.spotlight, target);
-    return computeMorphDuration(dist);
+    return computeMorphDuration(
+      spotlightDistance(displayState.layout.spotlight, target),
+    );
   }, [animPhase, displayState, pendingState]);
 
   const spotlightTransition = useMemo(() => {
@@ -537,37 +210,22 @@ export function GuidedWalkthrough({
 
   const overlayTransition = useMemo(() => {
     if (reducedMotion) return undefined;
-    if (animPhase === "entering") return undefined;
     if (animPhase === "exiting") return "opacity 300ms ease-in 100ms";
     return undefined;
   }, [animPhase, reducedMotion]);
 
   const overlayAnimation = useMemo(() => {
     if (reducedMotion) return undefined;
-    if (animPhase === "entering")
+    if (animPhase === "entering") {
       return "guide-overlay-enter 400ms ease-out both";
+    }
     return undefined;
   }, [animPhase, reducedMotion]);
 
+  if (state.kind === "hidden" || (!step && !displayState)) return null;
+
   const showIdlePulse = animPhase === "idle";
   const buttonsDisabled = animPhase !== "idle" || !isCurrentStepDisplayed;
-  // A closed guide stays mounted while it fades out, and the board under it must keep taking taps.
-  const takesTaps = requestActive && animPhase !== "exiting";
-
-  // The overlay keeps taps from the board, and inert keeps keys from it. This runs after every render, so that it
-  // also covers what that render added.
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    const walkthrough = walkthroughRef.current;
-    if (!takesTaps || !root || !walkthrough) return;
-    const target = displayState?.stepKey === stepKey ? getUsableTarget() : null;
-    return makeInertExcept(
-      root,
-      target ? [walkthrough, target] : [walkthrough],
-    );
-  });
-
-  if (!step) return null;
 
   return (
     <div
@@ -576,26 +234,28 @@ export function GuidedWalkthrough({
       style={{ pointerEvents: "none" }}
       aria-live="polite"
     >
-      <GuideTooltip
-        ref={measureCardRef}
-        step={step}
-        guideLabel={guide.label}
-        stepIndex={stepIndex}
-        totalSteps={guide.steps.length}
-        showSkipAll={guide.showSkipAll === true}
-        onPrimaryAction={onAdvanceStep}
-        onBack={onBackStep}
-        onSkipAll={onSkipAll}
-        interactive={false}
-        ariaHidden
-        style={{
-          left: 0,
-          top: 0,
-          opacity: 0,
-          visibility: "hidden",
-          transition: "none",
-        }}
-      />
+      {step && guide && (
+        <GuideTooltip
+          ref={measureCardRef}
+          step={step}
+          guideLabel={guide.label}
+          stepIndex={stepIndex}
+          totalSteps={guide.steps.length}
+          showSkipAll={guide.showSkipAll === true}
+          onPrimaryAction={onAdvanceStep}
+          onBack={onBackStep}
+          onSkipAll={onSkipAll}
+          interactive={false}
+          ariaHidden
+          style={{
+            left: 0,
+            top: 0,
+            opacity: 0,
+            visibility: "hidden",
+            transition: "none",
+          }}
+        />
+      )}
 
       <GuideOverlay
         clipPath={displayState?.layout.clipPath ?? "none"}

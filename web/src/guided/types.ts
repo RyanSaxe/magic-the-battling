@@ -1,6 +1,6 @@
 import type { BattleView, Card as GameCard, SelfPlayerView } from "../types";
 import type { Phase } from "../constants/phases";
-import type { ScoutingTab } from "../pages/gameSurfaces";
+import type { ScoutingTab } from "../hooks/useGameSurfaces";
 
 export type ConditionalGuideId =
   | "hint_treasure_producer"
