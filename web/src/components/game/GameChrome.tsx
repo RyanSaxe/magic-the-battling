@@ -3,6 +3,7 @@
  * BottomBar action controls.
  */
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
   BATTLE_SUBMIT_BUTTON_LABEL,
   BUILD_SUBMIT_BUTTON_LABEL,
@@ -93,7 +94,14 @@ export function GameTopBar({
       <TopBar
         lead={
           <>
-            <BrandMark className="hidden sm:block mr-2" />
+            <Link
+              to="/"
+              aria-label="Pitfight Home"
+              title="Home"
+              className="hidden sm:inline-flex items-center justify-center shrink-0 mr-2 rounded transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[var(--color-gold-bright)] focus-visible:outline-offset-2"
+            >
+              <BrandMark />
+            </Link>
             {isOut ? (
               <OutTopBarSummary
                 stage={self_player.stage}

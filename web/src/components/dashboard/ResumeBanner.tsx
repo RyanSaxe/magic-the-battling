@@ -5,13 +5,78 @@ import { resumeDetail, resumeHeadline } from "../../utils/accountFormat";
 import { SurfaceCard } from "../common/SurfaceCard";
 import { CrossIcon } from "../icons/CrossIcon";
 
+function ResumeBannerActions({
+  seat,
+  title,
+  inGame,
+  totalCount,
+  onResume,
+  onClose,
+  onShowAll,
+}: {
+  seat: ResumableSeat;
+  title: string;
+  inGame: boolean;
+  totalCount: number;
+  onResume: () => void;
+  onClose?: (seat: ResumableSeat) => void;
+  onShowAll?: () => void;
+}): ReactElement {
+  const resumeLabel = inGame ? "Resume Game →" : "Return to Lobby →";
+  if (totalCount > 1 && onShowAll) {
+    return (
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={onShowAll}
+          className="btn btn-secondary px-3 py-2 font-medium whitespace-nowrap"
+        >
+          See all {totalCount}
+        </button>
+        <button
+          type="button"
+          onClick={onResume}
+          className="btn btn-primary flex-1 px-4 py-2 font-semibold whitespace-nowrap sm:flex-none"
+        >
+          {resumeLabel}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <button
+        type="button"
+        onClick={onResume}
+        className="btn btn-primary flex-1 px-4 py-2 font-semibold sm:flex-none"
+      >
+        {resumeLabel}
+      </button>
+      {seat.canClose && onClose && (
+        <button
+          type="button"
+          onClick={() => onClose(seat)}
+          aria-label={`${inGame ? "Close" : "Leave"} ${title} as ${seat.playerName}`}
+          className="icon-target -mr-2"
+        >
+          <CrossIcon />
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** The lobby or game this browser or its account can go back to, at the top of the dashboard. */
 export function ResumeBanner({
   seat,
+  totalCount = 1,
   onClose,
+  onShowAll,
 }: {
   seat: ResumableSeat;
+  totalCount?: number;
   onClose?: (seat: ResumableSeat) => void;
+  onShowAll?: () => void;
 }): ReactElement {
   const resume = useResumeSeat();
   const inGame = seat.kind === "game";
@@ -56,25 +121,15 @@ export function ResumeBanner({
           </div>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => resume(seat)}
-          className="btn btn-primary flex-1 px-4 py-2 font-semibold sm:flex-none"
-        >
-          {inGame ? "Resume Game →" : "Return to Lobby →"}
-        </button>
-        {seat.canClose && onClose && (
-          <button
-            type="button"
-            onClick={() => onClose(seat)}
-            aria-label={`${inGame ? "Close" : "Leave"} ${title} as ${seat.playerName}`}
-            className="icon-target -mr-2"
-          >
-            <CrossIcon />
-          </button>
-        )}
-      </div>
+      <ResumeBannerActions
+        seat={seat}
+        title={title}
+        inGame={inGame}
+        totalCount={totalCount}
+        onResume={() => resume(seat)}
+        onClose={onClose}
+        onShowAll={onShowAll}
+      />
     </SurfaceCard>
   );
 }
