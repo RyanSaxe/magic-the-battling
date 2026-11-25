@@ -1,139 +1,81 @@
 # Working on Pitfight
 
 Pitfight is a web app for playing a Magic: The Gathering format that mixes cube
-drafting with roguelike elimination fights. Players draft, build a hand, fight
-each other, take poison, and the last one standing wins. [README.md](README.md)
-covers running and deploying the app. This file covers changing it.
+drafting with roguelike elimination fights. See [README.md](README.md) for the
+overview and [docs/README.md](docs/README.md) for setup, architecture,
+development recipes, and reference tables.
 
-## Setup
+## Repository boundaries
 
-```sh
-uv sync                   # Python dependencies
-(cd web && npm ci)        # web dependencies
-uv run dev                # backend on :8000, Vite on :3000
-```
-
-Open <http://localhost:3000>. Vite proxies `/api` and `/ws` to the backend.
-`uv run dev --help` lists the options: `--backend-port` and `--frontend-port`
-move the servers when a port is taken, `--build` serves the built frontend from
-the backend as production does, and `--db-copy` runs against a temporary copy of
-the database.
-
-The local database is `data/mtb.db`, created on first start. Goldfish games use
-past games of the same cube and settings as opponents, so on a fresh database
-Goldfish fails with "Not enough puppet data". Seed synthetic opponents for the
-default cube with:
-
-```sh
-uv run python -c "
-from pathlib import Path
-from server.perf.load_harness import seed_puppet_histories
-for upgrades in (True, False):
-    seed_puppet_histories(Path('data/mtb.db'), cube_id='auto', use_upgrades=upgrades,
-                          use_vanguards=False, min_histories=24)
-"
-```
-
-Their cards are mock cards, so they look odd in a fight.
-
-## Modules
-
-- `mtb/` holds the game rules and imports nothing from the server. `models/` has
-  the game, player and card types, `phases/` has one module per phase (draft,
-  build, battle, reward) plus elimination, and `utils/` fetches cubes from
-  CubeCobra and card data from Scryfall.
-- `server/` is the FastAPI app. `routers/` has the HTTP routes and the game
-  websocket (`ws.py`). `services/game_manager.py` owns every live game: it
-  creates and starts games, applies each player's actions, saves snapshots and
-  evicts idle games. `db/` has the SQLite models and the maintenance migrations,
-  which `scripts/maintain_db.py` applies on every deploy. `runtime_config.py`
-  reads most of the `MTB_` environment variables, and `perf/` has the load-test
-  harness.
-- `web/src/` is the React client. `pages/` has one component per route in
-  `App.tsx`, with the four game phases in `pages/phases/`. `hooks/` holds the
-  game state (`useGame`, `useWebSocket`) and the card layout (`useCardLayout`,
-  `computeConstrainedLayout`). `guided/` is the Guided Mode walkthrough, and
-  `docs/` is the Markdown that the in-app guide shows players, so it describes
-  the rules as players see them.
-- `tests/` has the pytest suite. Web tests sit beside their source as
-  `*.test.ts` and run with Vitest.
+- `pitfight/`: pure Python game rules, models, phases, and CubeCobra/Scryfall
+  loaders. Imports nothing from `server/`.
+- `server/`: FastAPI HTTP/WebSocket app (`routers/`), single-owner game and
+  connection services (`services/game/`, `services/connection_manager.py`),
+  SQLite models and migrations (`db/`), runtime config (`runtime_config.py`),
+  and load harness (`perf/`).
+- `web/src/`: React and TypeScript client (`pages/`, `components/`, `hooks/`,
+  unified layout engine in `layout/`, Guided Mode in `guided/`). `web/src/docs/`
+  is the in-app player rules guide, not contributor docs.
+- `tests/`: pytest suite and active snapshot fixtures
+  (`tests/fixtures/active_game_snapshots/`). Web tests sit next to source files
+  as `*.test.ts(x)` and Playwright specs live in `web/e2e/`.
 
 ## Names
 
-The code keeps the project's original name, Magic: The Battling, and players see
-Pitfight. Use these names in anything a player reads:
+Use player-facing names in `README.md`, `web/src/docs/`, and anything else
+players read. Keep internal names in code and contributor docs only.
 
-| In the code                       | Players see (limited)    | Players see (constructed) |
-| --------------------------------- | ------------------------ | ------------------------- |
-| `mtb` (Python package)            | —                        | —                         |
-| `battler`                         | Cube                     | Deck                      |
-| `battle` (phase id)               | Fight                    | Fight                     |
-| `mtb_` (browser storage keys)     | —                        | —                         |
-| `MTB_` (environment variables)    | —                        | —                         |
-| `magic-the-battling` (Fly apps)   | —                        | —                         |
+| In the code | Players see (limited) | Players see (constructed) |
+| --- | --- | --- |
+| `pitfight` (Python package) | Pitfight | Pitfight |
+| `pitfight_*` (browser storage, migrated from `mtb_*`) | — | — |
+| `battler` | Cube | Deck |
+| `battle` (phase id) | Fight | Fight |
+| `MTB_*` (environment variables) | — | — |
+| `data/mtb.db` (default SQLite path) | — | — |
+| `magic-the-battling` (Fly apps) | — | — |
 
-Never rename an `mtb_` browser storage key without migrating it, because the old
-key holds each player's session, name and settings.
+Never rename a `pitfight_*` browser storage key without migrating existing keys,
+because stored keys hold player sessions, names, and saved layouts.
 
-This file is the only place that explains the internal names. Keep them out of
-the README, the docs in `web/src/docs/` and anything else players can read.
+## Rules for changes
 
-## Rules for the code
-
-- Run Python with `uv run` and add packages with `uv add`. Run ruff and ty with
-  `uv run` too, which uses the versions pinned in `pyproject.toml`. `uvx`
-  ignores the pin.
-- Ask before adding a Python or npm dependency.
-- Write a comment only to say why the code does something unexpected. Names and
-  structure say what it does.
-- When you fix a bug that could come back, add a test that fails without the
-  fix, through the interface where the bug showed: pytest for rules and server
-  behavior, Vitest for web logic.
-- When a test fails, fix the code. Change the test only when the test itself is
-  wrong, and say why in the pull request.
+- Run Python tools with `uv run` (`ruff`, `ty`, `pytest`) and add packages with
+  `uv add` so versions stay pinned to `pyproject.toml`. Ask before adding any
+  Python or npm dependency.
+- Keep source files at or under 1,000 lines, pass Ruff `ALL` and `ty` for
+  Python, and pass strict type-aware `oxlint` and `oxfmt` for web code.
+- Import `useEffect` and `useLayoutEffect` only inside `web/src/hooks/`.
+- Write a comment only when the code needs to explain why.
+- Add a behavioral test when fixing a bug that could regress (pytest for rules
+  and server, Vitest for web). Fix the code when a test fails; change a test
+  only when the test itself is wrong and explain why in the PR.
+- Keep `tests/fixtures/active_game_snapshots/` restorable. If a change breaks
+  restoring an active snapshot, keep the old format readable rather than
+  regenerating fixtures.
 
 ## Checks
 
 ```sh
-uv run ruff check . && uv run ruff format --check . && uv run ty check
+uvx prek@0.5.11 run --all-files --show-diff-on-failure
 uv run pytest
-(cd web && npm run lint && npm run typecheck && npm run build && npm test)
+(cd web && npm run build && npm test)
 ```
 
-The commit hook in `.pre-commit-config.yaml` runs ruff and ty with `uv run`,
-then ESLint and the web type check. pre-commit itself isn't a project
-dependency, so install the hook once per clone with `uvx pre-commit install`. CI
-runs the same checks, pytest with coverage, the web build and `npm test` on
-every pull request. Pull requests into `main` also run a load test.
+See [docs/development.md](docs/development.md) for Playwright E2E, the load
+harness, and the Docker `image-boot` check (required by CI when `server/`,
+`pitfight/`, `scripts/`, `Dockerfile`, `fly*.toml`, `pyproject.toml`, `uv.lock`,
+or snapshot fixtures change).
 
-When a pull request changes the server image (`server/`, `mtb/`, `scripts/`,
-`Dockerfile`, `fly*.toml`, `pyproject.toml` or `uv.lock`), CI also builds it and
-runs `scripts/check_image_boot.py`, which boots it without network access on an
-empty volume and on the games in `tests/fixtures/active_game_snapshots`. Run it
-yourself with:
+## Branches, deploys, and releases
 
-```sh
-docker build --tag mtb:boot-check . && python3 scripts/check_image_boot.py mtb:boot-check
-```
+Branch from `develop` and open pull requests into `develop` using
+[Conventional Commits](https://www.conventionalcommits.org) for commit messages
+and PR titles. Merging into `develop` deploys staging; merging `develop` into
+`main` deploys production and tags a release (see
+[docs/reference.md](docs/reference.md#deploy-and-release-pr-labels)).
 
-Those games stand in for the ones in progress when a deploy restarts the server.
-If a change stops them restoring, keep the old snapshot format readable rather
-than regenerating the fixtures.
-
-## Branches, deploys and releases
-
-Branch from `develop` and open pull requests into `develop`. Merging into
-`develop` deploys the dev app, `magic-the-battling-dev` on Fly, and a pull
-request from `develop` into `main` deploys production. Labels on the merged pull
-request set how long players are warned before the restart and whether a release
-is tagged. README.md lists the labels.
-
-Without asking, you may create branches, commit, push them and open or update
-pull requests into `develop`. Ask before merging any pull request, adding
-`deploy:` or `release:` labels, running `fly` commands, or changing
-`server/db/maintenance.py`. Each of those deploys, restarts or migrates the game
-that players are using.
-
-Write commit messages and pull request titles as
-[Conventional Commits](https://www.conventionalcommits.org), such as
-`fix: let the play setup screen scroll on short phones`.
+Without asking, you may create branches, commit, push, and open or update pull
+requests into `develop`. Ask before merging any pull request, adding `deploy:`
+or `release:` labels, running `fly` commands, or changing
+`server/db/maintenance.py`.
