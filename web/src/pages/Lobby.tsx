@@ -224,6 +224,8 @@ function useLobbyGuidedMode(
 }
 
 function useLobbyVoice(options: {
+  gameId: string;
+  sessionId: string | null;
   lobbyState: LobbyState | null;
   sessionPlayerId: string | undefined;
   send: (action: string, payload: Record<string, unknown>) => void;
@@ -232,8 +234,15 @@ function useLobbyVoice(options: {
   >;
   addToast: (message: string, type?: "error" | "info" | "warning") => void;
 }): ReturnType<typeof useVoiceChat> {
-  const { lobbyState, sessionPlayerId, send, voiceSignalRef, addToast } =
-    options;
+  const {
+    gameId,
+    sessionId,
+    lobbyState,
+    sessionPlayerId,
+    send,
+    voiceSignalRef,
+    addToast,
+  } = options;
   const peerNames = useMemo(() => {
     if (!lobbyState?.voice_chat_enabled || !sessionPlayerId) return [];
     return lobbyState.players
@@ -265,6 +274,8 @@ function useLobbyVoice(options: {
     peerNames,
     selfPlayerName: voiceName,
     voiceSignalRef,
+    gameId: gameId || null,
+    sessionId,
     onPermissionDenied: handleMicDenied,
     onRetriesExhausted: handleRetriesExhausted,
   });
@@ -573,6 +584,8 @@ function useLobbyRouteController(): {
     onVoiceSignal: handleVoiceSignal,
   });
   const voiceChat = useLobbyVoice({
+    gameId,
+    sessionId,
     lobbyState: gameHook.lobbyState,
     sessionPlayerId,
     send: gameHook.send,

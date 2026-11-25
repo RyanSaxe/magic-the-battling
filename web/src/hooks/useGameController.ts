@@ -115,6 +115,8 @@ function useGameAccess(): {
 }
 
 function useGameVoiceControls(options: {
+  gameId: string;
+  sessionId: string | null;
   gameState: GameState | null;
   send: (action: string, payload?: Record<string, unknown>) => void;
   voiceSignalRef: React.RefObject<
@@ -122,7 +124,8 @@ function useGameVoiceControls(options: {
   >;
   addToast: (message: string, type?: "error" | "info" | "warning") => void;
 }): GameVoiceControls {
-  const { gameState, send, voiceSignalRef, addToast } = options;
+  const { gameId, sessionId, gameState, send, voiceSignalRef, addToast } =
+    options;
   const peerNames = useMemo(
     () => (gameState?.voice_chat_enabled ? getVoicePeerNames(gameState) : []),
     [gameState],
@@ -133,6 +136,8 @@ function useGameVoiceControls(options: {
     peerNames,
     selfPlayerName: gameState?.self_player.name ?? null,
     voiceSignalRef,
+    gameId: gameId || null,
+    sessionId,
     onPermissionDenied: useCallback(() => {
       addToast(
         "Microphone access was denied. Voice chat is unavailable.",
@@ -402,6 +407,8 @@ export function useGameController(): GameController {
   });
 
   const voiceControls = useGameVoiceControls({
+    gameId,
+    sessionId: session?.sessionId ?? null,
     gameState,
     send,
     voiceSignalRef,

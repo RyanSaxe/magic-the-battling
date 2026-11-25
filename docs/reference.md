@@ -27,6 +27,14 @@ browser storage keys.
 | `MTB_RUN_DB_MAINTENANCE_ON_STARTUP` | `1` | Runs `scripts/maintain_db.py --apply` in `scripts/start_server.sh` before starting Uvicorn |
 | `MTB_DISABLE_PREVIEW` | `""` (enabled) | Set to `1`/`true`/`yes`/`on` to disable Playwright share-preview rendering |
 
+### Voice chat (Cloudflare Calls TURN)
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MTB_CLOUDFLARE_TURN_KEY_ID` | `""` | Cloudflare Calls TURN key ID; when unset or paired with an empty token, voice chat falls back to public STUN servers |
+| `MTB_CLOUDFLARE_TURN_API_TOKEN` | `""` | Cloudflare Calls TURN API bearer token used to mint short-lived ICE credentials |
+| `MTB_CLOUDFLARE_TURN_TTL_SECONDS` | `86400` | Credential lifetime in seconds requested from Cloudflare (min `60`; cached in memory for `min(ttl // 2, 3600)` seconds) |
+
 ### Capacity and lifecycle limits
 
 Read by `server/runtime_config.py`. Minimum values are clamped to `1` unless

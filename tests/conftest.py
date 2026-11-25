@@ -27,6 +27,7 @@ from pitfight.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
 from pitfight.models.game import Game, Player
 from server.db.models import Base
 from server.main import app
+from server.services import voice_turn as voice_turn_module
 from server.services.connection_manager import ConnectionManager
 from server.services.game.models import CancellableTask
 from server.services.game_manager import GameManager
@@ -112,6 +113,7 @@ def _cleanup_runtime_state() -> None:
     games_module._create_idempotency_cache.clear()  # noqa: SLF001 -- internal state inspected by test
     games_module._create_idempotency_inflight.clear()  # noqa: SLF001 -- internal state inspected by test
     games_module._create_idempotency_lock = asyncio.Lock()  # noqa: SLF001 -- internal state inspected by test
+    voice_turn_module.ice_server_cache.clear()
 
     monitoring_module.stop_monitoring()
 

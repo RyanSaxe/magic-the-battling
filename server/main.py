@@ -21,7 +21,7 @@ from server.db.database import init_db
 from server.errors import AppHTTPException, ErrorCode
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
-from server.routers import auth, battlers, discover, games, ops, share_preview, ws
+from server.routers import auth, battlers, discover, games, ops, share_preview, voice, ws
 from server.runtime_config import MAX_SESSIONS_TOTAL, RESTORE_ACTIVE_GAME_SNAPSHOTS, SESSION_TTL_MINUTES
 from server.schemas.api import ServerStatusResponse
 from server.services.default_cube import start_loading_default_cube
@@ -178,6 +178,7 @@ app.include_router(auth.router)
 app.include_router(battlers.router)
 app.include_router(discover.router)
 app.include_router(games.router)
+app.include_router(voice.router)
 app.include_router(ws.router)
 app.include_router(share_preview.router)
 app.include_router(ops.router)
