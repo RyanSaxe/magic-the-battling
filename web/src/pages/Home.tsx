@@ -5,8 +5,15 @@ import { JoinGameModal } from "../components/home/JoinGameModal";
 import { AppHeader } from "../components/common/AppHeader";
 import { BarLabel } from "../components/common/FrameBar";
 import { PageFrame } from "../components/common/PageFrame";
-import { CloseSeatDialog, ResumeGamesDialog, ResumeShelf } from "../components/ResumeGame";
-import { useResumableGames, type ResumableSeat } from "../hooks/useResumableGames";
+import {
+  CloseSeatDialog,
+  ResumeGamesDialog,
+  ResumeShelf,
+} from "../components/ResumeGame";
+import {
+  useResumableGames,
+  type ResumableSeat,
+} from "../hooks/useResumableGames";
 import { useAuth } from "../contexts/authState";
 import { prefetchLegendaryName } from "../utils/prefetchName";
 import { LINK } from "../components/common/styles";
@@ -30,30 +37,43 @@ export function Home() {
   }, [loading, user, navigate]);
 
   const resumableGames = useResumableGames();
-  const seats = resumableGames.filter((seat) => !closedIds.includes(seat.gameId));
+  const seats = resumableGames.filter(
+    (seat) => !closedIds.includes(seat.gameId),
+  );
 
   if (loading || user) return null;
 
   return (
     <>
       <PageFrame
-        header={<AppHeader
-          helpers={
-            <>
-              <button onClick={() => navigate("/login")} className="btn btn-secondary hidden sm:inline-block">
-                Log in
+        header={
+          <AppHeader
+            helpers={
+              <>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="btn btn-secondary hidden sm:inline-block"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => setShowJoinModal(true)}
+                  className="btn btn-secondary"
+                >
+                  <BarLabel desktop="Join Game" phone="Join" />
+                </button>
+              </>
+            }
+            primary={
+              <button
+                onClick={() => navigate("/play")}
+                className="btn btn-primary font-semibold animate-gentle-glow"
+              >
+                <BarLabel desktop="Play Game" phone="Play" />
               </button>
-              <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary">
-                <BarLabel desktop="Join Game" phone="Join" />
-              </button>
-            </>
-          }
-          primary={
-            <button onClick={() => navigate("/play")} className="btn btn-primary font-semibold animate-gentle-glow">
-              <BarLabel desktop="Play Game" phone="Play" />
-            </button>
-          }
-        />}
+            }
+          />
+        }
         scroll={false}
         contentClassName="items-center justify-center p-4 overflow-hidden"
         shelf={

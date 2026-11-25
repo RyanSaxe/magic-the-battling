@@ -1,16 +1,16 @@
 interface GhostIconProps {
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
 const sizes = {
   sm: 16,
   md: 24,
   lg: 32,
-}
+};
 
-export function GhostIcon({ size = 'md', className = '' }: GhostIconProps) {
-  const px = sizes[size]
+export function GhostIcon({ size = "md", className = "" }: GhostIconProps) {
+  const px = sizes[size];
   return (
     <svg
       width={px}
@@ -29,5 +29,5 @@ export function GhostIcon({ size = 'md', className = '' }: GhostIconProps) {
       <circle cx="9" cy="10" r="2" fill="#1C1714" />
       <circle cx="15" cy="10" r="2" fill="#1C1714" />
     </svg>
-  )
+  );
 }

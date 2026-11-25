@@ -1,3 +1,3 @@
-import { FaceDownContext } from './faceDownState'
+import { FaceDownContext } from "./faceDownState";
 
-export const FaceDownProvider = FaceDownContext.Provider
+export const FaceDownProvider = FaceDownContext.Provider;

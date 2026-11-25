@@ -10,11 +10,22 @@ import { useZoneDividers, type DividerCallbacks } from "./useZoneDividers";
 // Build at 1280x720 with a hand of 3 and 6 sideboard cards, where grabbing the
 // battlefield/sideboard divider used to shrink the hand from 285px to 189px.
 const BOARD = { width: 980, height: 632 };
-const config = buildLayoutConfig({ handSize: 3, sideboardCount: 6, upgradeRailCount: 0 });
+const config = buildLayoutConfig({
+  handSize: 3,
+  sideboardCount: 6,
+  upgradeRailCount: 0,
+});
 
 /** The dividers of a board drawn with a saved layout, wired to a drag the way useResizableLayout wires them. */
-function dividersFor(saved: ZoneConstraints | null, layoutConfig: CardLayoutConfig = config, board = BOARD) {
-  const rendered = layoutForContainer(board.width, board.height, { ...layoutConfig, constraints: saved });
+function dividersFor(
+  saved: ZoneConstraints | null,
+  layoutConfig: CardLayoutConfig = config,
+  board = BOARD,
+) {
+  const rendered = layoutForContainer(board.width, board.height, {
+    ...layoutConfig,
+    constraints: saved,
+  });
   const writes: ZoneConstraints[] = [];
   const save = (constraints: ZoneConstraints) => {
     writes.push(constraints);
@@ -41,8 +52,15 @@ function dividersFor(saved: ZoneConstraints | null, layoutConfig: CardLayoutConf
     });
   };
   const frameHeights = (constraints: ZoneConstraints | null) => {
-    const { frames } = layoutForContainer(board.width, board.height, { ...layoutConfig, constraints });
-    return { hand: frames.hand.outerHeight, battlefield: frames.battlefield.outerHeight, sideboard: frames.sideboard.outerHeight };
+    const { frames } = layoutForContainer(board.width, board.height, {
+      ...layoutConfig,
+      constraints,
+    });
+    return {
+      hand: frames.hand.outerHeight,
+      battlefield: frames.battlefield.outerHeight,
+      sideboard: frames.sideboard.outerHeight,
+    };
   };
   return { grab, writes, rendered, before: frameHeights(saved), frameHeights };
 }
@@ -54,7 +72,9 @@ describe("useZoneDividers", () => {
 
     const after = frameHeights(writes[writes.length - 1]);
     expect(after.hand).toBe(before.hand);
-    expect(after.battlefield + after.sideboard).toBe(before.battlefield + before.sideboard);
+    expect(after.battlefield + after.sideboard).toBe(
+      before.battlefield + before.sideboard,
+    );
     expect(after.battlefield).toBeGreaterThan(before.battlefield);
   });
 
@@ -62,7 +82,10 @@ describe("useZoneDividers", () => {
     const { grab, writes } = dividersFor({ topFraction: 0.4 });
     grab("bottomLeftSplitDivider", [10]);
 
-    expect(writes[writes.length - 1]).toMatchObject({ topFraction: 0.4, bottomLeftSplit: expect.any(Number) });
+    expect(writes[writes.length - 1]).toMatchObject({
+      topFraction: 0.4,
+      bottomLeftSplit: expect.any(Number),
+    });
   });
 
   it("saves nothing when a divider is pressed and released without moving", () => {
@@ -74,13 +97,20 @@ describe("useZoneDividers", () => {
 
   it("returns a divider drawn closer than 80px to an edge to where it was when moved back", () => {
     // Eight upgrades leave the automatic upgrade rail narrower than the divider's 80px limit.
-    const railConfig = buildLayoutConfig({ handSize: 3, sideboardCount: 0, upgradeRailCount: 8 });
+    const railConfig = buildLayoutConfig({
+      handSize: 3,
+      sideboardCount: 0,
+      upgradeRailCount: 8,
+    });
     const board = { width: 880, height: 732 };
     const { grab, writes, rendered } = dividersFor(null, railConfig, board);
     expect(rendered.frames.commandZone.outerWidth).toBeLessThan(80);
     grab("leftDivider", [6, -6]);
 
-    const after = layoutForContainer(board.width, board.height, { ...railConfig, constraints: writes[writes.length - 1] });
+    const after = layoutForContainer(board.width, board.height, {
+      ...railConfig,
+      constraints: writes[writes.length - 1],
+    });
     expect(after.frames).toEqual(rendered.frames);
   });
 });

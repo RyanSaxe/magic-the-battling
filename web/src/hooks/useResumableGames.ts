@@ -1,47 +1,58 @@
-import { useEffect, useState } from 'react'
-import { getResumableGames } from '../api/client'
-import { useAuth } from '../contexts/authState'
-import type { PlayMode } from '../types'
-import { listReclaimableSeats } from '../utils/deviceIdentity'
+import { useEffect, useState } from "react";
+import { getResumableGames } from "../api/client";
+import { useAuth } from "../contexts/authState";
+import type { PlayMode } from "../types";
+import { listReclaimableSeats } from "../utils/deviceIdentity";
 
 /** A lobby or game this browser or its account can go back to, with the details its resume card shows. */
 export interface ResumableSeat {
-  gameId: string
-  playerName: string
-  kind: 'lobby' | 'game'
-  lastActiveAt: string | null
-  joinCode: string | null
-  cubeId: string
-  cubeName: string | null
-  cubeImageUri: string | null
-  playMode: PlayMode
-  useUpgrades: boolean
-  playerCount: number
-  canClose: boolean
-  stage: number | null
-  round: number | null
-  poison: number | null
+  gameId: string;
+  playerName: string;
+  kind: "lobby" | "game";
+  lastActiveAt: string | null;
+  joinCode: string | null;
+  cubeId: string;
+  cubeName: string | null;
+  cubeImageUri: string | null;
+  playMode: PlayMode;
+  useUpgrades: boolean;
+  playerCount: number;
+  canClose: boolean;
+  stage: number | null;
+  round: number | null;
+  poison: number | null;
 }
 
-const SEATS_TO_CHECK = 10
-const NO_GAMES: ResumableSeat[] = []
+const SEATS_TO_CHECK = 10;
+const NO_GAMES: ResumableSeat[] = [];
 
-export function useResumableGames(limit: number = SEATS_TO_CHECK): ResumableSeat[] {
-  const { user, loading } = useAuth()
-  const userId = user?.user_id ?? null
-  const [found, setFound] = useState<{ userId: string | null; games: ResumableSeat[] } | null>(null)
+export function useResumableGames(
+  limit: number = SEATS_TO_CHECK,
+): ResumableSeat[] {
+  const { user, loading } = useAuth();
+  const userId = user?.user_id ?? null;
+  const [found, setFound] = useState<{
+    userId: string | null;
+    games: ResumableSeat[];
+  } | null>(null);
 
   useEffect(() => {
-    if (loading) return
-    const seats = listReclaimableSeats(SEATS_TO_CHECK)
-    if (seats.length === 0 && !userId) return
-    let cancelled = false
-    const joinCodes = new Map(seats.map((seat) => [seat.gameId, seat.joinCode]))
+    if (loading) return;
+    const seats = listReclaimableSeats(SEATS_TO_CHECK);
+    if (seats.length === 0 && !userId) return;
+    let cancelled = false;
+    const joinCodes = new Map(
+      seats.map((seat) => [seat.gameId, seat.joinCode]),
+    );
     getResumableGames(
-      seats.map((seat) => ({ game_id: seat.gameId, player_name: seat.name, seat_token: seat.seatToken ?? '' })),
+      seats.map((seat) => ({
+        game_id: seat.gameId,
+        player_name: seat.name,
+        seat_token: seat.seatToken ?? "",
+      })),
     )
       .then((resumable) => {
-        if (cancelled) return
+        if (cancelled) return;
         setFound({
           userId,
           games: resumable.slice(0, limit).map((game) => ({
@@ -61,15 +72,15 @@ export function useResumableGames(limit: number = SEATS_TO_CHECK): ResumableSeat
             round: game.round,
             poison: game.poison,
           })),
-        })
+        });
       })
       .catch(() => {
         // The resume card is a shortcut; when the check fails the page simply shows none.
-      })
+      });
     return () => {
-      cancelled = true
-    }
-  }, [limit, loading, userId])
+      cancelled = true;
+    };
+  }, [limit, loading, userId]);
 
-  return found?.userId === userId ? found.games : NO_GAMES
+  return found?.userId === userId ? found.games : NO_GAMES;
 }

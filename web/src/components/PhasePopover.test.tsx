@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
-import { SidePanelHostContext } from './common/sidePanelHost'
-import { PhasePopover } from './PhasePopover'
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { SidePanelHostContext } from "./common/sidePanelHost";
+import { PhasePopover } from "./PhasePopover";
 
 // The popover's wording reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
@@ -11,18 +11,18 @@ vi.hoisted(() => {
     media: query,
     addEventListener() {},
     removeEventListener() {},
-  })) as unknown as typeof window.matchMedia
-})
+  })) as unknown as typeof window.matchMedia;
+});
 
 afterEach(() => {
-  cleanup()
-  document.body.replaceChildren()
-})
+  cleanup();
+  document.body.replaceChildren();
+});
 
-it('takes the whole tap that closes it over the board, and lets a bar button act on that tap', () => {
-  const board = document.body.appendChild(document.createElement('div'))
-  const barButton = document.body.appendChild(document.createElement('button'))
-  const onClose = vi.fn()
+it("takes the whole tap that closes it over the board, and lets a bar button act on that tap", () => {
+  const board = document.body.appendChild(document.createElement("div"));
+  const barButton = document.body.appendChild(document.createElement("button"));
+  const onClose = vi.fn();
   render(
     <SidePanelHostContext.Provider value={board}>
       <PhasePopover
@@ -34,14 +34,14 @@ it('takes the whole tap that closes it over the board, and lets a bar button act
         onOpenControls={() => {}}
       />
     </SidePanelHostContext.Provider>,
-  )
+  );
 
-  const boardTap = board.firstElementChild ?? board
-  fireEvent.mouseDown(boardTap)
-  expect(onClose).not.toHaveBeenCalled()
-  fireEvent.click(boardTap)
-  expect(onClose).toHaveBeenCalledTimes(1)
+  const boardTap = board.firstElementChild ?? board;
+  fireEvent.mouseDown(boardTap);
+  expect(onClose).not.toHaveBeenCalled();
+  fireEvent.click(boardTap);
+  expect(onClose).toHaveBeenCalledTimes(1);
 
-  fireEvent.mouseDown(barButton)
-  expect(onClose).toHaveBeenCalledTimes(2)
-})
+  fireEvent.mouseDown(barButton);
+  expect(onClose).toHaveBeenCalledTimes(2);
+});

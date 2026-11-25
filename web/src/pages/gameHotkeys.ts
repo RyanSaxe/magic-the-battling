@@ -37,7 +37,9 @@ export function findBattleCard(
     ["opponent", battle.opponent_zones],
   ] as const;
   for (const [owner, zones] of sides) {
-    const zone = CARD_ZONES.find((name) => zones[name].some((card) => card.id === cardId));
+    const zone = CARD_ZONES.find((name) =>
+      zones[name].some((card) => card.id === cardId),
+    );
     if (zone) return { id: cardId, zone, owner };
   }
   return null;
@@ -56,7 +58,8 @@ export function buildPanelHotkeys(options: {
   // Actions can open over a minimized Guide, so it takes Escape first.
   if (options.closeMenu) return { escape: options.closeMenu };
   if (options.guideOpen) return { "?": options.closeGuide };
-  if (options.closeUpgrades) return { [options.closeUpgrades.key]: options.closeUpgrades.close };
+  if (options.closeUpgrades)
+    return { [options.closeUpgrades.key]: options.closeUpgrades.close };
   if (options.gameplayHotkeysDisabled) return {};
   return { "?": options.openGuide };
 }

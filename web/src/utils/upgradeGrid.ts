@@ -32,14 +32,16 @@ export function getUpgradeGridDims(
     return { ...fallbackDims, columns, rows };
   }
 
-  const availW = frame && frame.innerWidth > 0
-    ? frame.innerWidth
-    : fallbackDims.columns * fallbackDims.width
-      + UPGRADE_GRID_GAP * Math.max(0, fallbackDims.columns - 1);
-  const availH = frame && frame.innerHeight > 0
-    ? frame.innerHeight
-    : fallbackDims.rows * fallbackDims.height
-      + UPGRADE_GRID_GAP * Math.max(0, fallbackDims.rows - 1);
+  const availW =
+    frame && frame.innerWidth > 0
+      ? frame.innerWidth
+      : fallbackDims.columns * fallbackDims.width +
+        UPGRADE_GRID_GAP * Math.max(0, fallbackDims.columns - 1);
+  const availH =
+    frame && frame.innerHeight > 0
+      ? frame.innerHeight
+      : fallbackDims.rows * fallbackDims.height +
+        UPGRADE_GRID_GAP * Math.max(0, fallbackDims.rows - 1);
 
   if (availW <= 0 || availH <= 0) {
     return { ...fallbackDims, columns, rows };
@@ -54,13 +56,7 @@ export function getUpgradeGridDims(
   );
   const width = Math.max(
     1,
-    Math.floor(
-      Math.min(
-        UPGRADE_MAX_CARD_WIDTH,
-        widthByColumns,
-        widthByRows,
-      ),
-    ),
+    Math.floor(Math.min(UPGRADE_MAX_CARD_WIDTH, widthByColumns, widthByRows)),
   );
 
   return {

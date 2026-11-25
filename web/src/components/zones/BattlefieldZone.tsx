@@ -3,7 +3,10 @@ import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 import { AttachedCardStack } from "../card";
 import { PoisonCard } from "../common/PoisonCard";
-import { canInteractWithBattleCard, canInteractWithBattleZone } from "../../utils/battleInteraction";
+import {
+  canInteractWithBattleCard,
+  canInteractWithBattleZone,
+} from "../../utils/battleInteraction";
 
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
@@ -57,7 +60,15 @@ export function BattlefieldZone({
   faceDownCardIds = new Set(),
   counters = {},
   attachments = {},
-  validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone", "library"],
+  validFromZones = [
+    "hand",
+    "battlefield",
+    "graveyard",
+    "exile",
+    "sideboard",
+    "command_zone",
+    "library",
+  ],
   draggable = true,
   isOpponent = false,
   canManipulateOpponent = false,
@@ -153,13 +164,21 @@ export function BattlefieldZone({
           flipped={flippedCardIds.has(card.id)}
           counters={counters[card.id]}
           onClick={allowCardInteraction ? () => onCardClick?.(card) : undefined}
-          onDoubleClick={allowCardInteraction ? () => onCardDoubleClick?.(card) : undefined}
+          onDoubleClick={
+            allowCardInteraction ? () => onCardDoubleClick?.(card) : undefined
+          }
           disabled={!draggable || !allowCardInteraction || !card.name}
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
-          hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
-          onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
+          hiddenUpgradeCount={
+            (hiddenUpgradesByCardId?.get(card.id) ?? []).length
+          }
+          onRevealHiddenUpgrades={
+            onRevealHiddenUpgrades
+              ? () => onRevealHiddenUpgrades(card.id)
+              : undefined
+          }
           canPeekFaceDown={canPeekFaceDown}
           onCardHover={allowCardInteraction ? onCardHover : undefined}
           onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
@@ -205,7 +224,12 @@ export function BattlefieldZone({
               {treasures.length > 0 && (
                 <div className="flex items-center flex-nowrap shrink-0">
                   {treasures.map((c, i) => (
-                    <div key={c.id} style={i > 0 ? { marginLeft: -treasureOverlap } : undefined}>
+                    <div
+                      key={c.id}
+                      style={
+                        i > 0 ? { marginLeft: -treasureOverlap } : undefined
+                      }
+                    >
                       {renderCard(c, landCardDimensions)}
                     </div>
                   ))}
@@ -231,7 +255,7 @@ export function BattlefieldZone({
       zoneOwner={zoneOwner}
       validFromZones={validFromZones}
       disabled={!allowZoneInteraction}
-      className={`h-full flex-1 ${compact ? 'p-1' : 'p-4'}`}
+      className={`h-full flex-1 ${compact ? "p-1" : "p-4"}`}
     >
       {label && (
         <div className="text-xs text-[var(--ivory-felt)] mb-2 uppercase tracking-wide">

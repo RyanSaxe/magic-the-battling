@@ -49,7 +49,9 @@ export function PlayerCard({
     control && "has-control",
     isOpen && "is-open",
     actions && "has-actions",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
   const face = (
     <>
       {lead}
@@ -66,7 +68,13 @@ export function PlayerCard({
   return (
     <div className={className} data-guide-player-row={guideName}>
       {onSelect ? (
-        <button type="button" className="player-card-button" aria-pressed={selected} disabled={disabled} onClick={onSelect}>
+        <button
+          type="button"
+          className="player-card-button"
+          aria-pressed={selected}
+          disabled={disabled}
+          onClick={onSelect}
+        >
           {face}
         </button>
       ) : (

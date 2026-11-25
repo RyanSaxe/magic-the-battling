@@ -1,64 +1,64 @@
-import type { ReactNode, RefCallback } from 'react'
-import type { DividerCallbacks } from '../../hooks/useZoneDividers'
-import { ZoneDivider } from './ZoneDivider'
-import { ZoneLabel } from './ZoneLabel'
+import type { ReactNode, RefCallback } from "react";
+import type { DividerCallbacks } from "../../hooks/useZoneDividers";
+import { ZoneDivider } from "./ZoneDivider";
+import { ZoneLabel } from "./ZoneLabel";
 
 interface ZoneSectionHeights {
-  hand?: number
-  battlefield?: number
-  sideboard?: number
-  upgrades?: number
+  hand?: number;
+  battlefield?: number;
+  sideboard?: number;
+  upgrades?: number;
 }
 
 interface ZoneSectionWidths {
-  upgrades?: number
+  upgrades?: number;
 }
 
 interface ZoneRefs {
-  hand?: RefCallback<HTMLDivElement>
-  battlefield?: RefCallback<HTMLDivElement>
-  sideboard?: RefCallback<HTMLDivElement>
-  upgrades?: RefCallback<HTMLDivElement>
+  hand?: RefCallback<HTMLDivElement>;
+  battlefield?: RefCallback<HTMLDivElement>;
+  sideboard?: RefCallback<HTMLDivElement>;
+  upgrades?: RefCallback<HTMLDivElement>;
 }
 
 interface ZoneTargetIds {
-  hand?: string
-  battlefield?: string
-  sideboard?: string
-  upgrades?: string
+  hand?: string;
+  battlefield?: string;
+  sideboard?: string;
+  upgrades?: string;
 }
 
 interface ZoneLayoutProps {
-  handContent: ReactNode
-  handLabel: ReactNode
-  battlefieldContent: ReactNode
-  battlefieldLabel: ReactNode
-  sideboardContent: ReactNode
-  sideboardLabel: ReactNode
-  upgradesContent: ReactNode | null
-  upgradesLabel: ReactNode | null
-  hasHand: boolean
-  hasBattlefield: boolean
-  hasSideboard: boolean
-  hasUpgrades: boolean
-  containerRef: RefCallback<HTMLElement>
-  containerTargetId?: string
-  className?: string
-  onClick?: React.MouseEventHandler<HTMLDivElement>
-  dividerCallbacks?: DividerCallbacks | null
-  isMobile?: boolean
-  zoneHeights?: ZoneSectionHeights | null
-  zoneWidths?: ZoneSectionWidths | null
-  zoneRefs?: ZoneRefs
-  zoneTargetIds?: ZoneTargetIds
-  overlay?: ReactNode
+  handContent: ReactNode;
+  handLabel: ReactNode;
+  battlefieldContent: ReactNode;
+  battlefieldLabel: ReactNode;
+  sideboardContent: ReactNode;
+  sideboardLabel: ReactNode;
+  upgradesContent: ReactNode | null;
+  upgradesLabel: ReactNode | null;
+  hasHand: boolean;
+  hasBattlefield: boolean;
+  hasSideboard: boolean;
+  hasUpgrades: boolean;
+  containerRef: RefCallback<HTMLElement>;
+  containerTargetId?: string;
+  className?: string;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
+  dividerCallbacks?: DividerCallbacks | null;
+  isMobile?: boolean;
+  zoneHeights?: ZoneSectionHeights | null;
+  zoneWidths?: ZoneSectionWidths | null;
+  zoneRefs?: ZoneRefs;
+  zoneTargetIds?: ZoneTargetIds;
+  overlay?: ReactNode;
 }
 
 const PASSIVE_DIVIDER_CALLBACKS = {
   onDragStart: () => {},
   onDrag: () => {},
   onDragEnd: () => {},
-}
+};
 
 export function ZoneLayout({
   handContent,
@@ -85,56 +85,54 @@ export function ZoneLayout({
   zoneTargetIds,
   overlay,
 }: ZoneLayoutProps) {
-  const hasLower = hasBattlefield || hasSideboard || hasUpgrades
-  const hasRight = hasBattlefield || hasSideboard
-  const isControlled = !!zoneHeights
-  const gap = 0
-  const topHandle = dividerCallbacks?.topDivider ?? null
-  const bottomSplitHandle = dividerCallbacks?.bottomLeftSplitDivider ?? null
-  const battlefieldLabelHandle = hasBattlefield ? topHandle : null
-  const sideboardLabelHandle = hasBattlefield
-    ? bottomSplitHandle
-    : topHandle
-  const upgradesLabelHandle = hasUpgrades ? topHandle : null
-  const showTopDivider = hasHand && hasLower
-  const showBottomSplitDivider = hasBattlefield && hasSideboard
-  const showLeftDivider = hasRight && hasUpgrades
+  const hasLower = hasBattlefield || hasSideboard || hasUpgrades;
+  const hasRight = hasBattlefield || hasSideboard;
+  const isControlled = !!zoneHeights;
+  const gap = 0;
+  const topHandle = dividerCallbacks?.topDivider ?? null;
+  const bottomSplitHandle = dividerCallbacks?.bottomLeftSplitDivider ?? null;
+  const battlefieldLabelHandle = hasBattlefield ? topHandle : null;
+  const sideboardLabelHandle = hasBattlefield ? bottomSplitHandle : topHandle;
+  const upgradesLabelHandle = hasUpgrades ? topHandle : null;
+  const showTopDivider = hasHand && hasLower;
+  const showBottomSplitDivider = hasBattlefield && hasSideboard;
+  const showLeftDivider = hasRight && hasUpgrades;
   const controlledStyle = (height?: number) =>
     isControlled && height != null
-      ? { height, flex: '0 0 auto' as const }
-      : undefined
+      ? { height, flex: "0 0 auto" as const }
+      : undefined;
   const controlledFillStyle = (height?: number) =>
     isControlled && height != null
-      ? { minHeight: height, flex: '1 1 auto' as const }
-      : undefined
+      ? { minHeight: height, flex: "1 1 auto" as const }
+      : undefined;
   const handStyle = hasLower
     ? controlledStyle(zoneHeights?.hand)
-    : controlledFillStyle(zoneHeights?.hand)
+    : controlledFillStyle(zoneHeights?.hand);
   const battlefieldStyle = hasSideboard
     ? controlledStyle(zoneHeights?.battlefield)
-    : controlledFillStyle(zoneHeights?.battlefield)
-  const sideboardStyle = controlledFillStyle(zoneHeights?.sideboard)
+    : controlledFillStyle(zoneHeights?.battlefield);
+  const sideboardStyle = controlledFillStyle(zoneHeights?.sideboard);
   const upgradesStyle = {
     ...(isControlled
       ? {
-          alignSelf: 'stretch' as const,
+          alignSelf: "stretch" as const,
           minHeight: 0,
           // Keep the right column flush with the outer seam without
           // doubling the lower edge chrome during manual resize.
-          boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.3)',
+          boxShadow: "inset 0 2px 6px rgba(0, 0, 0, 0.3)",
         }
       : {}),
     ...(zoneWidths?.upgrades != null
-      ? { width: zoneWidths.upgrades, flex: '0 0 auto' as const }
+      ? { width: zoneWidths.upgrades, flex: "0 0 auto" as const }
       : {}),
-  }
+  };
   const rootClassName = [
     // Not positioned, so an overlay sits in the corners of the frame's gold edge.
-    'zone-divider-bg flex-1 min-h-0 flex flex-col',
+    "zone-divider-bg flex-1 min-h-0 flex flex-col",
     className,
   ]
     .filter(Boolean)
-    .join(' ')
+    .join(" ");
 
   return (
     <div
@@ -163,7 +161,13 @@ export function ZoneLayout({
           />
         )}
         {hasLower && (
-          <div className={`flex min-h-0 w-full ${isControlled ? '' : 'flex-1'}`} style={{ gap, ...(isControlled ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
+          <div
+            className={`flex min-h-0 w-full ${isControlled ? "" : "flex-1"}`}
+            style={{
+              gap,
+              ...(isControlled ? { flex: "1 1 auto", minHeight: 0 } : {}),
+            }}
+          >
             {hasRight && (
               <div className="min-w-0 flex flex-1 flex-col" style={{ gap }}>
                 {hasBattlefield && (
@@ -182,14 +186,17 @@ export function ZoneLayout({
                 {showBottomSplitDivider && (
                   <ZoneDivider
                     orientation="horizontal"
-                    interactive={!!dividerCallbacks?.bottomLeftSplitDivider && !isMobile}
-                    {...(dividerCallbacks?.bottomLeftSplitDivider ?? PASSIVE_DIVIDER_CALLBACKS)}
+                    interactive={
+                      !!dividerCallbacks?.bottomLeftSplitDivider && !isMobile
+                    }
+                    {...(dividerCallbacks?.bottomLeftSplitDivider ??
+                      PASSIVE_DIVIDER_CALLBACKS)}
                   />
                 )}
                 {hasSideboard && (
                   <div
                     ref={zoneRefs?.sideboard}
-                    className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? '' : 'flex-1'}`}
+                    className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? "" : "flex-1"}`}
                     style={sideboardStyle}
                     data-guide-target={zoneTargetIds?.sideboard}
                   >
@@ -205,7 +212,8 @@ export function ZoneLayout({
               <ZoneDivider
                 orientation="vertical"
                 interactive={!!dividerCallbacks?.leftDivider && !isMobile}
-                {...(dividerCallbacks?.leftDivider ?? PASSIVE_DIVIDER_CALLBACKS)}
+                {...(dividerCallbacks?.leftDivider ??
+                  PASSIVE_DIVIDER_CALLBACKS)}
               />
             )}
             {hasUpgrades && (
@@ -225,9 +233,7 @@ export function ZoneLayout({
                 >
                   {upgradesLabel}
                 </ZoneLabel>
-                <div className="overflow-hidden">
-                  {upgradesContent}
-                </div>
+                <div className="overflow-hidden">{upgradesContent}</div>
               </div>
             )}
           </div>
@@ -235,5 +241,5 @@ export function ZoneLayout({
       </div>
       {overlay}
     </div>
-  )
+  );
 }

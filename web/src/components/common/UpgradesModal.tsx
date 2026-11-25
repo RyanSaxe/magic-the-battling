@@ -1,27 +1,37 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import type { Card as CardType } from '../../types'
-import { Card, CardPreviewContext } from '../card'
-import { UpgradeStack } from '../sidebar/UpgradeStack'
-import { CardGrid } from './CardGrid'
-import { CloseButton } from './CloseButton'
-import { DIALOG_BACKDROP } from './styles'
-import { useCardLayout } from '../../hooks/useCardLayout'
-import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from './upgradeModalLayouts'
-import { useElementHeight } from '../../hooks/useElementHeight'
-import { applyUpgradeWithModalClose, revealUpgradeWithModalClose } from './upgradeModalFlow'
-import { getAppliedUpgrades, getUnappliedUpgrades, getUnrevealedAppliedUpgrades } from '../../utils/upgrades'
-import { enterPressesControl } from '../../utils/enterKey'
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import type { Card as CardType } from "../../types";
+import { Card, CardPreviewContext } from "../card";
+import { UpgradeStack } from "../sidebar/UpgradeStack";
+import { CardGrid } from "./CardGrid";
+import { CloseButton } from "./CloseButton";
+import { DIALOG_BACKDROP } from "./styles";
+import { useCardLayout } from "../../hooks/useCardLayout";
+import {
+  upgradeApplyLayoutConfig,
+  upgradeListLayoutConfig,
+} from "./upgradeModalLayouts";
+import { useElementHeight } from "../../hooks/useElementHeight";
+import {
+  applyUpgradeWithModalClose,
+  revealUpgradeWithModalClose,
+} from "./upgradeModalFlow";
+import {
+  getAppliedUpgrades,
+  getUnappliedUpgrades,
+  getUnrevealedAppliedUpgrades,
+} from "../../utils/upgrades";
+import { enterPressesControl } from "../../utils/enterKey";
 
 interface UpgradesModalProps {
-  upgrades: CardType[]
-  mode: 'view' | 'apply' | 'reveal'
-  targets?: CardType[]
-  onApply?: (upgradeId: string, targetId: string) => void
-  onReveal?: (upgradeIds: string[]) => void
-  onClose: () => void
-  initialTargetId?: string
-  initialUpgradeId?: string
-  initialRevealUpgradeIds?: string[]
+  upgrades: CardType[];
+  mode: "view" | "apply" | "reveal";
+  targets?: CardType[];
+  onApply?: (upgradeId: string, targetId: string) => void;
+  onReveal?: (upgradeIds: string[]) => void;
+  onClose: () => void;
+  initialTargetId?: string;
+  initialUpgradeId?: string;
+  initialRevealUpgradeIds?: string[];
 }
 
 export function UpgradesModal({
@@ -35,84 +45,113 @@ export function UpgradesModal({
   initialUpgradeId,
   initialRevealUpgradeIds = [],
 }: UpgradesModalProps) {
-  const previewContext = useContext(CardPreviewContext)
-  const canApply = mode === 'apply' && !!onApply
-  const applied = getAppliedUpgrades(upgrades)
-  const unapplied = getUnappliedUpgrades(upgrades)
-  const hiddenApplied = getUnrevealedAppliedUpgrades(upgrades)
-  const revealedApplied = applied.filter((upgrade) => upgrade.is_revealed !== false)
-  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(() => (
-    canApply
-      ? (
-          unapplied.some((upgrade) => upgrade.id === initialUpgradeId)
-            ? initialUpgradeId ?? null
-            : unapplied.length === 1
-              ? unapplied[0].id
-              : null
-        )
-      : null
-  ))
-  const [selectedRevealUpgradeIds, setSelectedRevealUpgradeIds] = useState<string[]>(() => {
-    if (mode !== 'reveal') return []
+  const previewContext = useContext(CardPreviewContext);
+  const canApply = mode === "apply" && !!onApply;
+  const applied = getAppliedUpgrades(upgrades);
+  const unapplied = getUnappliedUpgrades(upgrades);
+  const hiddenApplied = getUnrevealedAppliedUpgrades(upgrades);
+  const revealedApplied = applied.filter(
+    (upgrade) => upgrade.is_revealed !== false,
+  );
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
+    () =>
+      canApply
+        ? unapplied.some((upgrade) => upgrade.id === initialUpgradeId)
+          ? (initialUpgradeId ?? null)
+          : unapplied.length === 1
+            ? unapplied[0].id
+            : null
+        : null,
+  );
+  const [selectedRevealUpgradeIds, setSelectedRevealUpgradeIds] = useState<
+    string[]
+  >(() => {
+    if (mode !== "reveal") return [];
 
-    const hiddenUpgradeIds = new Set(hiddenApplied.map((upgrade) => upgrade.id))
-    const initialSelection = initialRevealUpgradeIds.filter((upgradeId) => hiddenUpgradeIds.has(upgradeId))
-    if (initialSelection.length > 0) return initialSelection
-    return hiddenApplied.length === 1 ? [hiddenApplied[0].id] : []
-  })
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(canApply ? initialTargetId ?? null : null)
+    const hiddenUpgradeIds = new Set(
+      hiddenApplied.map((upgrade) => upgrade.id),
+    );
+    const initialSelection = initialRevealUpgradeIds.filter((upgradeId) =>
+      hiddenUpgradeIds.has(upgradeId),
+    );
+    if (initialSelection.length > 0) return initialSelection;
+    return hiddenApplied.length === 1 ? [hiddenApplied[0].id] : [];
+  });
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(
+    canApply ? (initialTargetId ?? null) : null,
+  );
 
-  const applyUpgrade = useCallback((upgradeId: string, targetId: string) => {
-    applyUpgradeWithModalClose({
-      upgradeId,
-      targetId,
-      onApply,
-      onClose,
-    })
-  }, [onApply, onClose])
+  const applyUpgrade = useCallback(
+    (upgradeId: string, targetId: string) => {
+      applyUpgradeWithModalClose({
+        upgradeId,
+        targetId,
+        onApply,
+        onClose,
+      });
+    },
+    [onApply, onClose],
+  );
 
-  const revealUpgrade = useCallback((upgradeIds: string[]) => {
-    revealUpgradeWithModalClose({
-      upgradeIds,
-      onReveal,
-      onClose,
-    })
-  }, [onClose, onReveal])
+  const revealUpgrade = useCallback(
+    (upgradeIds: string[]) => {
+      revealUpgradeWithModalClose({
+        upgradeIds,
+        onReveal,
+        onClose,
+      });
+    },
+    [onClose, onReveal],
+  );
 
-  const dialogRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // The Enter that opened this can still be held down, and neither applying nor revealing can be undone.
-      if (e.key === 'Enter' && e.repeat) { e.preventDefault(); return }
-      if (enterPressesControl(e, dialogRef.current)) return
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        if (mode === 'reveal' && selectedRevealUpgradeIds.length > 0) {
-          setSelectedRevealUpgradeIds([])
-        } else {
-          onClose()
-        }
-      } else if (e.key === 'Enter' && mode === 'apply' && selectedUpgradeId && selectedTargetId && onApply) {
-        e.preventDefault()
-        e.stopPropagation()
-        const active = document.activeElement
-        if (active instanceof HTMLElement) {
-          active.blur()
-        }
-        applyUpgrade(selectedUpgradeId, selectedTargetId)
-      } else if (e.key === 'Enter' && mode === 'reveal' && selectedRevealUpgradeIds.length > 0 && onReveal) {
-        e.preventDefault()
-        e.stopPropagation()
-        const active = document.activeElement
-        if (active instanceof HTMLElement) {
-          active.blur()
-        }
-        revealUpgrade(selectedRevealUpgradeIds)
+      if (e.key === "Enter" && e.repeat) {
+        e.preventDefault();
+        return;
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+      if (enterPressesControl(e, dialogRef.current)) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (mode === "reveal" && selectedRevealUpgradeIds.length > 0) {
+          setSelectedRevealUpgradeIds([]);
+        } else {
+          onClose();
+        }
+      } else if (
+        e.key === "Enter" &&
+        mode === "apply" &&
+        selectedUpgradeId &&
+        selectedTargetId &&
+        onApply
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) {
+          active.blur();
+        }
+        applyUpgrade(selectedUpgradeId, selectedTargetId);
+      } else if (
+        e.key === "Enter" &&
+        mode === "reveal" &&
+        selectedRevealUpgradeIds.length > 0 &&
+        onReveal
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) {
+          active.blur();
+        }
+        revealUpgrade(selectedRevealUpgradeIds);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     applyUpgrade,
     mode,
@@ -123,63 +162,74 @@ export function UpgradesModal({
     selectedRevealUpgradeIds,
     selectedTargetId,
     selectedUpgradeId,
-  ])
+  ]);
 
-  const selectedUpgrade = unapplied.find((u) => u.id === selectedUpgradeId) ?? null
-  const selectedTarget = targets.find((t) => t.id === selectedTargetId) ?? null
-  const readyToConfirm = mode === 'apply'
-    ? !!(canApply && selectedUpgrade && selectedTarget)
-    : mode === 'reveal'
-      ? selectedRevealUpgradeIds.length > 0
-      : false
+  const selectedUpgrade =
+    unapplied.find((u) => u.id === selectedUpgradeId) ?? null;
+  const selectedTarget = targets.find((t) => t.id === selectedTargetId) ?? null;
+  const readyToConfirm =
+    mode === "apply"
+      ? !!(canApply && selectedUpgrade && selectedTarget)
+      : mode === "reveal"
+        ? selectedRevealUpgradeIds.length > 0
+        : false;
 
-  const isApplyMode = mode === 'apply'
-  const isRevealMode = mode === 'reveal'
+  const isApplyMode = mode === "apply";
+  const isRevealMode = mode === "reveal";
 
-  const [separatorRef, separatorHeight] = useElementHeight()
-  const [applyRef, applyDims] = useCardLayout(upgradeApplyLayoutConfig({
-    upgradeCount: isApplyMode ? upgrades.length : 0,
-    targetCount: isApplyMode ? targets.length : 0,
-    separatorHeight,
-  }))
+  const [separatorRef, separatorHeight] = useElementHeight();
+  const [applyRef, applyDims] = useCardLayout(
+    upgradeApplyLayoutConfig({
+      upgradeCount: isApplyMode ? upgrades.length : 0,
+      targetCount: isApplyMode ? targets.length : 0,
+      separatorHeight,
+    }),
+  );
 
-  const [viewRef, viewDims] = useCardLayout(upgradeListLayoutConfig(
-    !isApplyMode
-      ? (isRevealMode ? revealedApplied.length + hiddenApplied.length : upgrades.length)
-      : 0,
-  ))
+  const [viewRef, viewDims] = useCardLayout(
+    upgradeListLayoutConfig(
+      !isApplyMode
+        ? isRevealMode
+          ? revealedApplied.length + hiddenApplied.length
+          : upgrades.length
+        : 0,
+    ),
+  );
 
   const upgradeDims = isApplyMode
     ? { width: applyDims.upgrades.width, height: applyDims.upgrades.height }
-    : { width: viewDims.upgrades.width, height: viewDims.upgrades.height }
-  const targetDims = { width: applyDims.targets.width, height: applyDims.targets.height }
+    : { width: viewDims.upgrades.width, height: viewDims.upgrades.height };
+  const targetDims = {
+    width: applyDims.targets.width,
+    height: applyDims.targets.height,
+  };
 
   const handleConfirm = () => {
     if (isApplyMode) {
-      if (!selectedUpgrade) return
-      if (!selectedTarget || !onApply) return
-      applyUpgrade(selectedUpgrade.id, selectedTarget.id)
-      return
+      if (!selectedUpgrade) return;
+      if (!selectedTarget || !onApply) return;
+      applyUpgrade(selectedUpgrade.id, selectedTarget.id);
+      return;
     }
-    if (!isRevealMode || !onReveal) return
-    revealUpgrade(selectedRevealUpgradeIds)
-  }
+    if (!isRevealMode || !onReveal) return;
+    revealUpgrade(selectedRevealUpgradeIds);
+  };
 
   const handleTargetClick = (target: CardType) => {
     if (!canApply) {
-      previewContext?.setPreviewCard(target)
-      return
+      previewContext?.setPreviewCard(target);
+      return;
     }
-    setSelectedTargetId(selectedTargetId === target.id ? null : target.id)
-  }
+    setSelectedTargetId(selectedTargetId === target.id ? null : target.id);
+  };
 
   const handleRevealUpgradeClick = (upgradeId: string) => {
     setSelectedRevealUpgradeIds((current) =>
       current.includes(upgradeId)
         ? current.filter((id) => id !== upgradeId)
         : [...current, upgradeId],
-    )
-  }
+    );
+  };
 
   return (
     <div
@@ -195,34 +245,51 @@ export function UpgradesModal({
           <div className="min-w-0">
             <h2 className="text-white font-semibold text-lg truncate">
               {isApplyMode ? (
-                <>Apply Upgrade <span className="text-red-400 font-bold">Permanently</span></>
+                <>
+                  Apply Upgrade{" "}
+                  <span className="text-red-400 font-bold">Permanently</span>
+                </>
               ) : isRevealMode ? (
-                'Reveal Upgrade'
+                "Reveal Upgrade"
               ) : (
-                'Upgrades'
+                "Upgrades"
               )}
             </h2>
           </div>
-          <CloseButton onClick={onClose} label="Close Upgrades" className="shrink-0 ml-4 my-[3px]" />
+          <CloseButton
+            onClick={onClose}
+            label="Close Upgrades"
+            className="shrink-0 ml-4 my-[3px]"
+          />
         </div>
 
         {isApplyMode ? (
           <div ref={applyRef} className="flex-1 min-h-0 flex flex-col p-2">
             {separatorHeight > 0 && (
               <div className="shrink-0 flex justify-center">
-                <CardGrid columns={applyDims.upgrades.columns} cardWidth={upgradeDims.width}>
+                <CardGrid
+                  columns={applyDims.upgrades.columns}
+                  cardWidth={upgradeDims.width}
+                >
                   {applied.map((upgrade) => (
                     <UpgradeStack
                       key={upgrade.id}
                       upgrade={upgrade}
                       dimensions={upgradeDims}
-                      onClick={!canApply ? () => {
-                        if (upgrade.upgrade_target) {
-                          previewContext?.setPreviewCard(upgrade.upgrade_target, [upgrade])
-                        } else {
-                          previewContext?.setPreviewCard(upgrade)
-                        }
-                      } : undefined}
+                      onClick={
+                        !canApply
+                          ? () => {
+                              if (upgrade.upgrade_target) {
+                                previewContext?.setPreviewCard(
+                                  upgrade.upgrade_target,
+                                  [upgrade],
+                                );
+                              } else {
+                                previewContext?.setPreviewCard(upgrade);
+                              }
+                            }
+                          : undefined
+                      }
                     />
                   ))}
                   {unapplied.map((upgrade) => (
@@ -232,13 +299,13 @@ export function UpgradesModal({
                       dimensions={upgradeDims}
                       onClick={() => {
                         if (!canApply) {
-                          previewContext?.setPreviewCard(upgrade)
-                          return
+                          previewContext?.setPreviewCard(upgrade);
+                          return;
                         }
                         if (selectedUpgradeId === upgrade.id) {
-                          setSelectedUpgradeId(null)
+                          setSelectedUpgradeId(null);
                         } else {
-                          setSelectedUpgradeId(upgrade.id)
+                          setSelectedUpgradeId(upgrade.id);
                         }
                       }}
                       selected={canApply && selectedUpgradeId === upgrade.id}
@@ -247,10 +314,15 @@ export function UpgradesModal({
                 </CardGrid>
               </div>
             )}
-            <div ref={separatorRef} className="py-2 shrink-0"><hr className="gold-divider" /></div>
+            <div ref={separatorRef} className="py-2 shrink-0">
+              <hr className="gold-divider" />
+            </div>
             {separatorHeight > 0 && (
               <div className="flex-1 min-h-0 flex justify-center">
-                <CardGrid columns={applyDims.targets.columns} cardWidth={targetDims.width}>
+                <CardGrid
+                  columns={applyDims.targets.columns}
+                  cardWidth={targetDims.width}
+                >
                   {targets.map((card) => (
                     <Card
                       key={card.id}
@@ -267,27 +339,45 @@ export function UpgradesModal({
         ) : (
           <div ref={viewRef} className="flex-1 min-h-0 p-2">
             <div className="h-full">
-              {(isRevealMode ? revealedApplied.length + hiddenApplied.length : upgrades.length) > 0 ? (
-                <CardGrid columns={viewDims.upgrades.columns} cardWidth={upgradeDims.width}>
+              {(isRevealMode
+                ? revealedApplied.length + hiddenApplied.length
+                : upgrades.length) > 0 ? (
+                <CardGrid
+                  columns={viewDims.upgrades.columns}
+                  cardWidth={upgradeDims.width}
+                >
                   {(isRevealMode ? revealedApplied : upgrades).map((upgrade) =>
                     upgrade.upgrade_target ? (
-                      <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />
+                      <UpgradeStack
+                        key={upgrade.id}
+                        upgrade={upgrade}
+                        dimensions={upgradeDims}
+                      />
                     ) : (
-                      <Card key={upgrade.id} card={upgrade} dimensions={upgradeDims} />
-                    )
+                      <Card
+                        key={upgrade.id}
+                        card={upgrade}
+                        dimensions={upgradeDims}
+                      />
+                    ),
                   )}
-                  {isRevealMode && hiddenApplied.map((upgrade) => (
-                    <UpgradeStack
-                      key={upgrade.id}
-                      upgrade={upgrade}
-                      dimensions={upgradeDims}
-                      onClick={() => handleRevealUpgradeClick(upgrade.id)}
-                      selected={selectedRevealUpgradeIds.includes(upgrade.id)}
-                    />
-                  ))}
+                  {isRevealMode &&
+                    hiddenApplied.map((upgrade) => (
+                      <UpgradeStack
+                        key={upgrade.id}
+                        upgrade={upgrade}
+                        dimensions={upgradeDims}
+                        onClick={() => handleRevealUpgradeClick(upgrade.id)}
+                        selected={selectedRevealUpgradeIds.includes(upgrade.id)}
+                      />
+                    ))}
                 </CardGrid>
               ) : (
-                <p className="text-[var(--ivory-muted)]">{isRevealMode ? 'No hidden upgrades to reveal' : 'No upgrades yet'}</p>
+                <p className="text-[var(--ivory-muted)]">
+                  {isRevealMode
+                    ? "No hidden upgrades to reveal"
+                    : "No upgrades yet"}
+                </p>
               )}
             </div>
           </div>
@@ -302,5 +392,5 @@ export function UpgradesModal({
         )}
       </div>
     </div>
-  )
+  );
 }

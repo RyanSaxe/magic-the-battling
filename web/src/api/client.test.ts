@@ -34,7 +34,9 @@ describe("authGetMe", () => {
       }
       return signedIn
         ? new Response(JSON.stringify(USER), { status: 200 })
-        : new Response(JSON.stringify({ detail: "Not authenticated" }), { status: 401 });
+        : new Response(JSON.stringify({ detail: "Not authenticated" }), {
+            status: 401,
+          });
     });
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("window", { localStorage: createStorageMock() });

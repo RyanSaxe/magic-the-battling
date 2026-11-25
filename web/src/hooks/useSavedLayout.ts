@@ -16,7 +16,8 @@ export interface BoardSize {
 
 /** The size band a board falls in, such as "w1h2" for a board 800-1399px wide and at least 900px tall. */
 export function boardSizeBand({ width, height }: BoardSize): string {
-  const index = (value: number, edges: number[]) => edges.filter((edge) => value >= edge).length;
+  const index = (value: number, edges: number[]) =>
+    edges.filter((edge) => value >= edge).length;
   return `w${index(width, BAND_WIDTH_EDGES)}h${index(height, BAND_HEIGHT_EDGES)}`;
 }
 
@@ -80,29 +81,45 @@ function isSameStageRound(
   return a.stage === b.stage && a.round === b.round;
 }
 
-function sortEntries(entries: PersistedConstraintEntry[]): PersistedConstraintEntry[] {
+function sortEntries(
+  entries: PersistedConstraintEntry[],
+): PersistedConstraintEntry[] {
   return [...entries].sort(compareStageRound);
 }
 
-function loadBands(scopeKey: string): Record<string, PersistedConstraintEntry[]> {
+function loadBands(
+  scopeKey: string,
+): Record<string, PersistedConstraintEntry[]> {
   try {
     const raw = localStorage.getItem(storageKeyForScope(scopeKey));
     if (!raw) return {};
 
     const parsed = JSON.parse(raw) as Partial<PersistedConstraintStore> | null;
-    if (parsed?.version !== 3 || !parsed.bands || typeof parsed.bands !== "object") return {};
+    if (
+      parsed?.version !== 3 ||
+      !parsed.bands ||
+      typeof parsed.bands !== "object"
+    )
+      return {};
     return parsed.bands;
   } catch {
     return {};
   }
 }
 
-function loadEntries(scopeKey: string, band: string): PersistedConstraintEntry[] {
+function loadEntries(
+  scopeKey: string,
+  band: string,
+): PersistedConstraintEntry[] {
   const entries = loadBands(scopeKey)[band];
   return Array.isArray(entries) ? sortEntries(entries) : [];
 }
 
-function saveEntries(scopeKey: string, band: string, entries: PersistedConstraintEntry[]): void {
+function saveEntries(
+  scopeKey: string,
+  band: string,
+  entries: PersistedConstraintEntry[],
+): void {
   const payload: PersistedConstraintStore = {
     version: 3,
     bands: { ...loadBands(scopeKey), [band]: sortEntries(entries) },
@@ -147,7 +164,9 @@ export function upsertConstraintHistoryEntry(
   entries: PersistedConstraintEntry[],
   nextEntry: PersistedConstraintEntry,
 ): PersistedConstraintEntry[] {
-  const filtered = entries.filter((entry) => !isSameStageRound(entry, nextEntry));
+  const filtered = entries.filter(
+    (entry) => !isSameStageRound(entry, nextEntry),
+  );
   filtered.push(nextEntry);
   return sortEntries(filtered);
 }
@@ -158,7 +177,9 @@ export function resetConstraintHistoryFrom(
   round: number,
 ): PersistedConstraintEntry[] {
   const cursor = { stage, round };
-  const filtered = entries.filter((entry) => compareStageRound(entry, cursor) < 0);
+  const filtered = entries.filter(
+    (entry) => compareStageRound(entry, cursor) < 0,
+  );
   filtered.push({ stage, round, mode: "dynamic" });
   return sortEntries(filtered);
 }
@@ -177,7 +198,8 @@ export function useSavedLayout(
   const scopeKey = location?.scopeKey ?? null;
   const stage = location?.stage ?? 0;
   const round = location?.round ?? 0;
-  const band = board && board.width > 0 && board.height > 0 ? boardSizeBand(board) : null;
+  const band =
+    board && board.width > 0 && board.height > 0 ? boardSizeBand(board) : null;
 
   // Storage is read when the phase, round or band changes, or after this hook writes, not on every render.
   const resolution: PersistedConstraintResolution = useMemo(() => {
@@ -215,7 +237,11 @@ export function useSavedLayout(
   const clearConstraints = useCallback(() => {
     if (!scopeKey || !band) return;
     const entries = loadEntries(scopeKey, band);
-    saveEntries(scopeKey, band, resetConstraintHistoryFrom(entries, stage, round));
+    saveEntries(
+      scopeKey,
+      band,
+      resetConstraintHistoryFrom(entries, stage, round),
+    );
     bumpRevision();
   }, [scopeKey, band, stage, round]);
 

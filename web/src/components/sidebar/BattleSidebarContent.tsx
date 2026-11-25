@@ -67,7 +67,8 @@ function LifeCounter({
     <div className="flex items-center gap-1">
       <button
         onClick={() => onChange(life - 1)}
-        className="w-6 h-6 rounded text-white text-sm font-bold" style={{ background: 'var(--chrome)' }}
+        className="w-6 h-6 rounded text-white text-sm font-bold"
+        style={{ background: "var(--chrome)" }}
       >
         -
       </button>
@@ -79,7 +80,8 @@ function LifeCounter({
           onFocus={(e) => e.currentTarget.select()}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold-bright)]" style={{ background: 'var(--chrome)' }}
+          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold-bright)]"
+          style={{ background: "var(--chrome)" }}
           autoFocus
         />
       ) : (
@@ -88,14 +90,16 @@ function LifeCounter({
             setInputValue(life.toString());
             setIsEditing(true);
           }}
-          className="w-10 h-6 text-center text-white text-sm rounded" style={{ background: 'var(--chrome)' }}
+          className="w-10 h-6 text-center text-white text-sm rounded"
+          style={{ background: "var(--chrome)" }}
         >
           {life}
         </button>
       )}
       <button
         onClick={() => onChange(life + 1)}
-        className="w-6 h-6 rounded text-white text-sm font-bold" style={{ background: 'var(--chrome)' }}
+        className="w-6 h-6 rounded text-white text-sm font-bold"
+        style={{ background: "var(--chrome)" }}
       >
         +
       </button>
@@ -103,18 +107,18 @@ function LifeCounter({
   );
 }
 
-const GAP = 8
-const MIN_DIMS = { width: 50, height: 70 }
-const SECTION_GUTTER = 12
+const GAP = 8;
+const MIN_DIMS = { width: 50, height: 70 };
+const SECTION_GUTTER = 12;
 
 function resolveUpgradeDims(
   count: number,
   container: { width: number; height: number } | null,
 ): ZoneDims {
-  if (!container || count === 0) return { ...MIN_DIMS, rows: 1, columns: 1 }
-  const availWidth = Math.max(1, container.width)
-  const availHeight = Math.max(1, container.height)
-  return bestFit(count, availWidth, availHeight, GAP, availWidth, 1)
+  if (!container || count === 0) return { ...MIN_DIMS, rows: 1, columns: 1 };
+  const availWidth = Math.max(1, container.width);
+  const availHeight = Math.max(1, container.height);
+  return bestFit(count, availWidth, availHeight, GAP, availWidth, 1);
 }
 
 function PlayerSection({
@@ -124,35 +128,35 @@ function PlayerSection({
   upgrades: CardType[];
   isReversed?: boolean;
 }) {
-  const [containerDims, setContainerDims] = useState<{ width: number; height: number } | null>(null)
-  const observerRef = useRef<ResizeObserver | null>(null)
+  const [containerDims, setContainerDims] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
 
   // Callback ref so the observer attaches the moment the gated <div> mounts.
   // A useEffect with [] deps would run before the early-return gate flips
   // from null to JSX, see a null ref, and never set up the observer.
   const containerRef = useCallback((node: HTMLDivElement | null) => {
-    observerRef.current?.disconnect()
-    observerRef.current = null
-    if (!node) return
-    setContainerDims({ width: node.clientWidth, height: node.clientHeight })
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (!node) return;
+    setContainerDims({ width: node.clientWidth, height: node.clientHeight });
     const obs = new ResizeObserver(() => {
-      setContainerDims({ width: node.clientWidth, height: node.clientHeight })
-    })
-    obs.observe(node)
-    observerRef.current = obs
-  }, [])
+      setContainerDims({ width: node.clientWidth, height: node.clientHeight });
+    });
+    obs.observe(node);
+    observerRef.current = obs;
+  }, []);
 
   const appliedUpgrades = getRevealedAppliedUpgrades(upgrades);
 
   if (appliedUpgrades.length === 0) return null;
 
-  const dims = resolveUpgradeDims(appliedUpgrades.length, containerDims)
+  const dims = resolveUpgradeDims(appliedUpgrades.length, containerDims);
 
   return (
-    <div
-      ref={containerRef}
-      className={`h-full overflow-hidden`}
-    >
+    <div ref={containerRef} className={`h-full overflow-hidden`}>
       <div
         className={`grid h-full justify-center gap-2 ${isReversed ? "content-end" : "content-start"}`}
         style={{
@@ -183,7 +187,7 @@ function ActionButtonsRow({
   passDisabled: boolean;
 }) {
   if (!onCreateTreasure && !onUntapAll && !onPassTurn) {
-    return null
+    return null;
   }
 
   return (
@@ -214,7 +218,7 @@ function ActionButtonsRow({
         </button>
       )}
     </div>
-  )
+  );
 }
 
 function ControlsPanel({
@@ -243,14 +247,14 @@ function ControlsPanel({
   return (
     <div
       className="relative grid h-full min-h-0 w-full grid-rows-[1fr_auto_1fr] overflow-hidden"
-      style={{ background: 'var(--chrome-modal)' }}
+      style={{ background: "var(--chrome-modal)" }}
     >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-[2px]"
         style={{
           boxShadow:
-            'inset 0 10px 18px -14px rgba(255, 236, 181, 0.18), inset 0 0 24px rgba(0, 0, 0, 0.22)',
+            "inset 0 10px 18px -14px rgba(255, 236, 181, 0.18), inset 0 0 24px rgba(0, 0, 0, 0.22)",
         }}
       />
       {showTopDivider && (
@@ -265,33 +269,35 @@ function ControlsPanel({
             <span className="text-xs text-[var(--ivory-muted)] uppercase truncate">
               {opponentName}
             </span>
-            {voiceChat && voiceChat.state.peers.some((p) => p.name === opponentName) && (
-              <MicToggle
-                muted={voiceChat.state.mutedPeers.has(opponentName)}
-                connectionState={voiceChat.state.peers.find(p => p.name === opponentName)?.connectionState}
-                audioLevelKey={opponentName}
-                remoteMuted={voiceChat.state.remoteMutedPeers.has(opponentName)}
-                onClick={() => voiceChat.togglePeerMute(opponentName)}
-              />
-            )}
+            {voiceChat &&
+              voiceChat.state.peers.some((p) => p.name === opponentName) && (
+                <MicToggle
+                  muted={voiceChat.state.mutedPeers.has(opponentName)}
+                  connectionState={
+                    voiceChat.state.peers.find((p) => p.name === opponentName)
+                      ?.connectionState
+                  }
+                  audioLevelKey={opponentName}
+                  remoteMuted={voiceChat.state.remoteMutedPeers.has(
+                    opponentName,
+                  )}
+                  onClick={() => voiceChat.togglePeerMute(opponentName)}
+                />
+              )}
           </div>
           <div className="flex justify-center">
-            <LifeCounter
-              life={opponentLife}
-              onChange={onOpponentLifeChange}
-            />
+            <LifeCounter life={opponentLife} onChange={onOpponentLifeChange} />
           </div>
         </div>
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center gap-1 px-3 py-1 text-center text-xs">
-        {currentTurnName && (
-          isYourTurn ? (
+        {currentTurnName &&
+          (isYourTurn ? (
             <span className="text-green-400">It is your turn</span>
           ) : (
             <span className="text-amber-400">Opponent's turn</span>
-          )
-        )}
+          ))}
       </div>
 
       <div className="relative z-10 flex min-h-0 flex-col items-center justify-center gap-2 px-3 py-2">
@@ -314,7 +320,7 @@ function ControlsPanel({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export function BattleSidebarContent({
@@ -338,22 +344,28 @@ export function BattleSidebarContent({
   overlayTopInset = 0,
   voiceChat,
 }: BattleSidebarContentProps) {
-  const { opponent_name, current_turn_name, opponent_zones } =
-    currentBattle;
+  const { opponent_name, current_turn_name, opponent_zones } = currentBattle;
 
   const isYourTurn = current_turn_name === playerName;
   const hasMeasuredMiddleLane = middleLaneHeight != null;
-  const hasMeasuredLayout = topSectionHeight != null && middleLaneHeight != null;
-  const hasOpponentActions = !!canManipulateOpponent && !!(onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn)
-  const hasPlayerActions = !!(onCreateTreasure || onUntapAll || onPassTurn)
-  const opponentLaneRows = [header ? "auto" : null, "minmax(0,1fr)", hasOpponentActions ? "auto" : null]
+  const hasMeasuredLayout =
+    topSectionHeight != null && middleLaneHeight != null;
+  const hasOpponentActions =
+    !!canManipulateOpponent &&
+    !!(onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn);
+  const hasPlayerActions = !!(onCreateTreasure || onUntapAll || onPassTurn);
+  const opponentLaneRows = [
+    header ? "auto" : null,
+    "minmax(0,1fr)",
+    hasOpponentActions ? "auto" : null,
+  ]
     .filter(Boolean)
-    .join(" ")
+    .join(" ");
 
   if (hasMeasuredLayout) {
-    const totalTopSectionHeight = topSectionHeight + overlayTopInset
-    const controlsTop = totalTopSectionHeight
-    const controlsBottom = controlsTop + middleLaneHeight
+    const totalTopSectionHeight = topSectionHeight + overlayTopInset;
+    const controlsTop = totalTopSectionHeight;
+    const controlsBottom = controlsTop + middleLaneHeight;
 
     return (
       <div className="relative h-full">
@@ -370,10 +382,7 @@ export function BattleSidebarContent({
           >
             {header}
             <div className="min-h-0">
-              <PlayerSection
-                upgrades={opponent_zones.upgrades}
-                isReversed
-              />
+              <PlayerSection upgrades={opponent_zones.upgrades} isReversed />
             </div>
             {hasOpponentActions && (
               <ActionButtonsRow
@@ -416,7 +425,9 @@ export function BattleSidebarContent({
             className="grid h-full min-h-0 px-3 pt-3 pb-3"
             style={{
               gap: SECTION_GUTTER,
-              gridTemplateRows: hasPlayerActions ? "auto minmax(0,1fr)" : "minmax(0,1fr)",
+              gridTemplateRows: hasPlayerActions
+                ? "auto minmax(0,1fr)"
+                : "minmax(0,1fr)",
             }}
           >
             {hasPlayerActions && (
@@ -428,9 +439,7 @@ export function BattleSidebarContent({
               />
             )}
             <div className="min-h-0">
-              <PlayerSection
-                upgrades={selfUpgrades}
-              />
+              <PlayerSection upgrades={selfUpgrades} />
             </div>
           </div>
         </div>
@@ -447,7 +456,9 @@ export function BattleSidebarContent({
             ? ""
             : "border-b border-[var(--gold-border-opaque)]"
         }`}
-        style={topSectionHeight != null ? { height: topSectionHeight } : undefined}
+        style={
+          topSectionHeight != null ? { height: topSectionHeight } : undefined
+        }
       >
         <div
           className="grid h-full min-h-0 px-3 pt-3 pb-3"
@@ -458,10 +469,7 @@ export function BattleSidebarContent({
         >
           {header}
           <div className="min-h-0">
-            <PlayerSection
-              upgrades={opponent_zones.upgrades}
-              isReversed
-            />
+            <PlayerSection upgrades={opponent_zones.upgrades} isReversed />
           </div>
           {hasOpponentActions && (
             <ActionButtonsRow
@@ -477,7 +485,9 @@ export function BattleSidebarContent({
       {/* Controls panel */}
       <div
         className={`${middleLaneHeight != null ? "box-border shrink-0" : "flex-1"} min-h-0`}
-        style={middleLaneHeight != null ? { height: middleLaneHeight } : undefined}
+        style={
+          middleLaneHeight != null ? { height: middleLaneHeight } : undefined
+        }
       >
         <ControlsPanel
           opponentName={opponent_name}
@@ -511,7 +521,9 @@ export function BattleSidebarContent({
           className="grid h-full min-h-0 px-3 pt-3 pb-3"
           style={{
             gap: SECTION_GUTTER,
-            gridTemplateRows: hasPlayerActions ? "auto minmax(0,1fr)" : "minmax(0,1fr)",
+            gridTemplateRows: hasPlayerActions
+              ? "auto minmax(0,1fr)"
+              : "minmax(0,1fr)",
           }}
         >
           {hasPlayerActions && (
@@ -523,9 +535,7 @@ export function BattleSidebarContent({
             />
           )}
           <div className="min-h-0">
-            <PlayerSection
-              upgrades={selfUpgrades}
-            />
+            <PlayerSection upgrades={selfUpgrades} />
           </div>
         </div>
       </div>

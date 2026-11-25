@@ -1,4 +1,11 @@
-import { useState, useRef, useCallback, useEffect, useLayoutEffect, useContext } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useContext,
+} from "react";
 import { getTimelinePhases, type Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
@@ -15,14 +22,16 @@ const PHASE_TIMELINE_LABELS: Record<Phase, string> = {
 };
 
 // The current step reads as "you are here": a walnut tag with a gold rim, crimson in the Fight.
-const STEP_HERE = "bg-[#352c25] text-[var(--gold-pale)] ring-1 ring-[var(--color-gold)]";
+const STEP_HERE =
+  "bg-[#352c25] text-[var(--gold-pale)] ring-1 ring-[var(--color-gold)]";
 const PHASE_ACTIVE_STYLE: Record<Phase, string> = {
   draft: STEP_HERE,
   build: STEP_HERE,
   battle: "bg-[#441f1e] text-[#fecaca] ring-1 ring-[#d9534f]",
   reward: STEP_HERE,
 };
-const STEP_ARROW = "max-[360px]:hidden text-[var(--gold-border-opaque)] text-xs";
+const STEP_ARROW =
+  "max-[360px]:hidden text-[var(--gold-border-opaque)] text-xs";
 const GUIDED_POPOVER_AUTO_CLOSE_MS = 10_000;
 const PHASE_POPOVER_FADE_OUT_MS = 220;
 
@@ -75,7 +84,9 @@ export function PhaseTimeline({
   const guideState = useContext(GuideStateContext);
   const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
   const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
-  const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
+  const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(
+    null,
+  );
   const [isPopoverClosing, setIsPopoverClosing] = useState(false);
   const autoCloseTimerRef = useRef<number | null>(null);
   const closeAnimationTimerRef = useRef<number | null>(null);
@@ -102,10 +113,15 @@ export function PhaseTimeline({
 
   useLayoutEffect(() => {
     const row = stepsRowRef.current;
-    const step = isGamePhase(currentPhase) ? phaseStepRefs.current[currentPhase] : null;
+    const step = isGamePhase(currentPhase)
+      ? phaseStepRefs.current[currentPhase]
+      : null;
     if (!stepsOverflow || !row || !step) return;
     const fadeWidth = parseFloat(getComputedStyle(row).scrollPaddingRight);
-    const stepEnd = step.getBoundingClientRect().right - row.getBoundingClientRect().left + row.scrollLeft;
+    const stepEnd =
+      step.getBoundingClientRect().right -
+      row.getBoundingClientRect().left +
+      row.scrollLeft;
     row.scrollLeft = Math.max(0, stepEnd + fadeWidth - row.clientWidth);
   }, [currentPhase, stepsOverflow]);
 
@@ -173,17 +189,26 @@ export function PhaseTimeline({
     beginClosingPopover();
   }, [beginClosingPopover]);
 
-  const handlePhaseClick = useCallback((phase: Phase) => {
-    if (welcomeGuideActive) {
-      return;
-    }
-    onStepClick?.();
-    if (popoverPhase === phase) {
-      handleClosePopover();
-      return;
-    }
-    openPopoverForPhase(phase);
-  }, [handleClosePopover, onStepClick, openPopoverForPhase, popoverPhase, welcomeGuideActive]);
+  const handlePhaseClick = useCallback(
+    (phase: Phase) => {
+      if (welcomeGuideActive) {
+        return;
+      }
+      onStepClick?.();
+      if (popoverPhase === phase) {
+        handleClosePopover();
+        return;
+      }
+      openPopoverForPhase(phase);
+    },
+    [
+      handleClosePopover,
+      onStepClick,
+      openPopoverForPhase,
+      popoverPhase,
+      welcomeGuideActive,
+    ],
+  );
 
   useEffect(() => {
     if (!autoOpenPhase) return;
@@ -213,7 +238,13 @@ export function PhaseTimeline({
         window.clearTimeout(retryId);
       }
     };
-  }, [autoOpenDurationMs, autoOpenPhase, currentPhase, onAutoOpenHandled, openPopoverForPhase]);
+  }, [
+    autoOpenDurationMs,
+    autoOpenPhase,
+    currentPhase,
+    onAutoOpenHandled,
+    openPopoverForPhase,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -231,7 +262,7 @@ export function PhaseTimeline({
   const handleOpenControlsFromPopover = useCallback(() => {
     const phase = popoverPhase;
     closePopoverImmediately();
-    onOpenRules?.(phase ? { docId: phase, tab: 'controls' } : undefined);
+    onOpenRules?.(phase ? { docId: phase, tab: "controls" } : undefined);
   }, [closePopoverImmediately, onOpenRules, popoverPhase]);
 
   const isEnd = !isGamePhase(currentPhase);
@@ -246,7 +277,10 @@ export function PhaseTimeline({
         ref={stepsRowRef}
         className={`flex items-center flex-1 min-w-0 max-lg:-translate-y-0.5 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}
       >
-        <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 max-[360px]:gap-[7px] shrink-0">
+        <div
+          ref={stepsRef}
+          className="flex items-center gap-1 sm:gap-1.5 max-[360px]:gap-[7px] shrink-0"
+        >
           <span
             className="text-xs sm:text-sm text-[#e2d8cb] font-mono"
             data-guide-target="timeline-stage-round"
@@ -255,14 +289,18 @@ export function PhaseTimeline({
           </span>
 
           {timelinePhases.map((phase, index) => {
-            const currentIndex = isEnd ? timelinePhases.length : timelinePhases.indexOf(currentPhase as Phase);
+            const currentIndex = isEnd
+              ? timelinePhases.length
+              : timelinePhases.indexOf(currentPhase as Phase);
             const isActive = !isEnd && index === currentIndex;
             const isCompleted = index < currentIndex;
             const isUpcoming = !isEnd && index > currentIndex;
             const isEndReward = isEnd && phase === "reward";
             const phaseButton = (
               <button
-                ref={(el) => { phaseButtonRefs.current[phase] = el; }}
+                ref={(el) => {
+                  phaseButtonRefs.current[phase] = el;
+                }}
                 disabled={welcomeGuideActive || isEnd}
                 onClick={() => handlePhaseClick(phase)}
                 data-guide-target={`timeline-phase-${phase}`}
@@ -280,11 +318,17 @@ export function PhaseTimeline({
               </button>
             );
 
-            const stepRef = (el: HTMLDivElement | null) => { phaseStepRefs.current[phase] = el; };
+            const stepRef = (el: HTMLDivElement | null) => {
+              phaseStepRefs.current[phase] = el;
+            };
 
             if (phase === "reward") {
               return (
-                <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+                <div
+                  key={phase}
+                  ref={stepRef}
+                  className="flex items-center gap-1 sm:gap-1.5"
+                >
                   <span className={STEP_ARROW}>→</span>
                   <div
                     className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
@@ -293,7 +337,10 @@ export function PhaseTimeline({
                     {phaseButton}
                     {!isEnd && !endsInWinner && (
                       <span className="max-[400px]:hidden text-xs sm:text-sm text-[var(--ivory-faint)]">
-                        to <span className="font-mono">{nextStage}-{nextRound}</span>
+                        to{" "}
+                        <span className="font-mono">
+                          {nextStage}-{nextRound}
+                        </span>
                       </span>
                     )}
                   </div>
@@ -302,7 +349,11 @@ export function PhaseTimeline({
             }
 
             return (
-              <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+              <div
+                key={phase}
+                ref={stepRef}
+                className="flex items-center gap-1 sm:gap-1.5"
+              >
                 <span className={STEP_ARROW}>→</span>
                 {phaseButton}
               </div>

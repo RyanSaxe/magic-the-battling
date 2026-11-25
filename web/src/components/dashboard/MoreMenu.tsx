@@ -1,63 +1,74 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BoardBackdrop } from '../common/BoardBackdrop'
-import { POPOVER_CHROME } from '../common/styles'
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { BoardBackdrop } from "../common/BoardBackdrop";
+import { POPOVER_CHROME } from "../common/styles";
 
 export interface MoreMenuItem {
-  label: string
-  onSelect: () => void
-  danger?: boolean
-  disabled?: boolean
+  label: string;
+  onSelect: () => void;
+  danger?: boolean;
+  disabled?: boolean;
 }
 
 /** The part of the screen a scrolling ancestor shows, or the window when nothing scrolls. */
 function visibleArea(element: HTMLElement): { top: number; bottom: number } {
   for (let node = element.parentElement; node; node = node.parentElement) {
-    if (['auto', 'scroll', 'hidden'].includes(getComputedStyle(node).overflowY)) return node.getBoundingClientRect()
+    if (["auto", "scroll", "hidden"].includes(getComputedStyle(node).overflowY))
+      return node.getBoundingClientRect();
   }
-  return { top: 0, bottom: window.innerHeight }
+  return { top: 0, bottom: window.innerHeight };
 }
 
 /** A ⋯ button that opens a short list of a card's less common actions. */
-export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const backdropRef = useRef<HTMLDivElement>(null)
+export function MoreMenu({
+  label,
+  items,
+}: {
+  label: string;
+  items: MoreMenuItem[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
 
   // A card near the bottom of the felt would open its menu past the felt's edge, behind the bottom bar.
   useLayoutEffect(() => {
-    const menu = menuRef.current
-    const button = ref.current
-    if (!open || !menu || !button) return
-    const visible = visibleArea(button)
-    const below = menu.getBoundingClientRect()
-    const roomAbove = button.getBoundingClientRect().top - visible.top
+    const menu = menuRef.current;
+    const button = ref.current;
+    if (!open || !menu || !button) return;
+    const visible = visibleArea(button);
+    const below = menu.getBoundingClientRect();
+    const roomAbove = button.getBoundingClientRect().top - visible.top;
     if (below.bottom > visible.bottom && below.height <= roomAbove) {
-      menu.style.top = 'auto'
-      menu.style.bottom = '100%'
-      menu.style.marginTop = '0'
-      menu.style.marginBottom = '0.25rem'
+      menu.style.top = "auto";
+      menu.style.bottom = "100%";
+      menu.style.marginTop = "0";
+      menu.style.marginBottom = "0.25rem";
     }
-  }, [open])
+  }, [open]);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const close = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (ref.current?.contains(target) || backdropRef.current?.contains(target)) return
-      setOpen(false)
-    }
+      const target = e.target as Node;
+      if (
+        ref.current?.contains(target) ||
+        backdropRef.current?.contains(target)
+      )
+        return;
+      setOpen(false);
+    };
     const closeOnEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', closeOnEscape)
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.removeEventListener('mousedown', close)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [open])
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
@@ -87,12 +98,14 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
               disabled={item.disabled}
               onClick={() => {
                 // Return focus to the staying trigger before the menu unmounts, so any dialog opened next knows where to return focus.
-                triggerRef.current?.focus()
-                setOpen(false)
-                item.onSelect()
+                triggerRef.current?.focus();
+                setOpen(false);
+                item.onSelect();
               }}
               className={`menu-item w-full text-left px-4 py-2 text-sm transition-colors disabled:opacity-50 ${
-                item.danger ? 'menu-item-destructive' : 'text-[var(--ivory-soft)]'
+                item.danger
+                  ? "menu-item-destructive"
+                  : "text-[var(--ivory-soft)]"
               }`}
             >
               {item.label}
@@ -101,5 +114,5 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
         </div>
       )}
     </div>
-  )
+  );
 }

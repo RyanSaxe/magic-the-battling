@@ -110,10 +110,7 @@ describe("guided storage", () => {
       "build",
       1,
     );
-    markGuideSeenForGame(
-      { gameId: "game-1", playerName: "Alice" },
-      "build",
-    );
+    markGuideSeenForGame({ gameId: "game-1", playerName: "Alice" }, "build");
 
     expect(
       getGuideProgressForGame({

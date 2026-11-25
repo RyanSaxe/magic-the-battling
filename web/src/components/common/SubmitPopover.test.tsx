@@ -7,35 +7,43 @@ import { shouldCloseSubmitPopoverOnOutsideClick } from "./submitPopoverState";
 
 describe("shouldCloseSubmitPopoverOnOutsideClick", () => {
   it("closes on a normal outside click", () => {
-    expect(shouldCloseSubmitPopoverOnOutsideClick({
-      closeOnOutsideClick: true,
-      clickedInsidePopover: false,
-      clickedIgnoredElement: false,
-    })).toBe(true);
+    expect(
+      shouldCloseSubmitPopoverOnOutsideClick({
+        closeOnOutsideClick: true,
+        clickedInsidePopover: false,
+        clickedIgnoredElement: false,
+      }),
+    ).toBe(true);
   });
 
   it("does not close when outside-click closing is disabled", () => {
-    expect(shouldCloseSubmitPopoverOnOutsideClick({
-      closeOnOutsideClick: false,
-      clickedInsidePopover: false,
-      clickedIgnoredElement: false,
-    })).toBe(false);
+    expect(
+      shouldCloseSubmitPopoverOnOutsideClick({
+        closeOnOutsideClick: false,
+        clickedInsidePopover: false,
+        clickedIgnoredElement: false,
+      }),
+    ).toBe(false);
   });
 
   it("does not close when the click was inside the popover", () => {
-    expect(shouldCloseSubmitPopoverOnOutsideClick({
-      closeOnOutsideClick: true,
-      clickedInsidePopover: true,
-      clickedIgnoredElement: false,
-    })).toBe(false);
+    expect(
+      shouldCloseSubmitPopoverOnOutsideClick({
+        closeOnOutsideClick: true,
+        clickedInsidePopover: true,
+        clickedIgnoredElement: false,
+      }),
+    ).toBe(false);
   });
 
   it("does not close when the click came from the guided tooltip exception", () => {
-    expect(shouldCloseSubmitPopoverOnOutsideClick({
-      closeOnOutsideClick: true,
-      clickedInsidePopover: false,
-      clickedIgnoredElement: true,
-    })).toBe(false);
+    expect(
+      shouldCloseSubmitPopoverOnOutsideClick({
+        closeOnOutsideClick: true,
+        clickedInsidePopover: false,
+        clickedIgnoredElement: true,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -69,7 +77,12 @@ describe("SubmitPopover", () => {
   it("closes from outside on the click, not for a press that started inside, and keeps its Escape to itself", () => {
     const outside = document.body.appendChild(document.createElement("button"));
     const onClose = vi.fn();
-    const { getByText } = render(<SubmitPopover options={[{ label: "Draw", onClick: () => {} }]} onClose={onClose} />);
+    const { getByText } = render(
+      <SubmitPopover
+        options={[{ label: "Draw", onClick: () => {} }]}
+        onClose={onClose}
+      />,
+    );
 
     // A press released somewhere else clicks what the two places share.
     fireEvent.pointerDown(getByText("Draw"));

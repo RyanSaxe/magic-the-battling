@@ -1,43 +1,50 @@
-import { useState } from 'react'
-import type { Card as CardType, ZoneName } from '../../types'
-import type { ZoneOwner } from '../../dnd/types'
-import { DraggableCard, DroppableZone, useGameDnd } from '../../dnd'
-import { Card } from '../card'
-import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
-import { makeDraggableId } from '../../dnd/types'
-import { canInteractWithBattleCard, canInteractWithBattleZone } from '../../utils/battleInteraction'
+import { useState } from "react";
+import type { Card as CardType, ZoneName } from "../../types";
+import type { ZoneOwner } from "../../dnd/types";
+import { DraggableCard, DroppableZone, useGameDnd } from "../../dnd";
+import { Card } from "../card";
+import { ZoneModal } from "../sidebar/DroppableZoneDisplay";
+import { makeDraggableId } from "../../dnd/types";
+import {
+  canInteractWithBattleCard,
+  canInteractWithBattleZone,
+} from "../../utils/battleInteraction";
 
-const CARD_ASPECT = 5 / 7
-const LABEL_HEIGHT = 18
+const CARD_ASPECT = 5 / 7;
+const LABEL_HEIGHT = 18;
 
 interface CompactZoneDisplayProps {
-  title: string
+  title: string;
   /** The open panel's title, when the pile's label doesn't say whose it is. */
-  panelTitle?: string
-  zone: ZoneName
-  cards: CardType[]
-  height: number
-  width: number
-  isOpponent?: boolean
-  canManipulateOpponent?: boolean
-  validFromZones: ZoneName[]
-  onCardHover?: (cardId: string, zone: ZoneName) => void
-  onCardHoverEnd?: () => void
-  canPeekFaceDown?: boolean
-  selectedCardId?: string
-  onZoneClick?: () => void
-  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
-  onCardContextMenu?: (e: React.MouseEvent, card: CardType, zone: ZoneName) => void
-  containerClassName?: string
-  forceFaceDown?: boolean
-  isModalOpen?: boolean
-  onModalOpenChange?: (open: boolean) => void
-  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void
-  modalHeaderActions?: React.ReactNode
-  upgradedCardIds?: Set<string>
-  upgradesByCardId?: Map<string, CardType[]>
-  hiddenUpgradesByCardId?: Map<string, CardType[]>
-  onRevealHiddenUpgrades?: (cardId: string) => void
+  panelTitle?: string;
+  zone: ZoneName;
+  cards: CardType[];
+  height: number;
+  width: number;
+  isOpponent?: boolean;
+  canManipulateOpponent?: boolean;
+  validFromZones: ZoneName[];
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  canPeekFaceDown?: boolean;
+  selectedCardId?: string;
+  onZoneClick?: () => void;
+  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void;
+  onCardContextMenu?: (
+    e: React.MouseEvent,
+    card: CardType,
+    zone: ZoneName,
+  ) => void;
+  containerClassName?: string;
+  forceFaceDown?: boolean;
+  isModalOpen?: boolean;
+  onModalOpenChange?: (open: boolean) => void;
+  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  modalHeaderActions?: React.ReactNode;
+  upgradedCardIds?: Set<string>;
+  upgradesByCardId?: Map<string, CardType[]>;
+  hiddenUpgradesByCardId?: Map<string, CardType[]>;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
 }
 
 export function CompactZoneDisplay({
@@ -68,40 +75,44 @@ export function CompactZoneDisplay({
   hiddenUpgradesByCardId,
   onRevealHiddenUpgrades,
 }: CompactZoneDisplayProps) {
-  const [uncontrolledModalOpen, setUncontrolledModalOpen] = useState(false)
-  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+  const [uncontrolledModalOpen, setUncontrolledModalOpen] = useState(false);
+  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
   const allowZoneInteraction = canInteractWithBattleZone({
     owner: zoneOwner,
     zone,
     canManipulateOpponent,
-  })
-  const showModal = isModalOpen ?? uncontrolledModalOpen
-  const setShowModal = onModalOpenChange ?? setUncontrolledModalOpen
+  });
+  const showModal = isModalOpen ?? uncontrolledModalOpen;
+  const setShowModal = onModalOpenChange ?? setUncontrolledModalOpen;
 
-  const { activeDraggableId } = useGameDnd()
-  const topCard = cards[cards.length - 1]
+  const { activeDraggableId } = useGameDnd();
+  const topCard = cards[cards.length - 1];
   const topCardDraggableId = topCard
-    ? makeDraggableId(zone, zoneOwner, topCard.id, 'compact')
-    : null
-  const isDraggingTopCard = activeDraggableId !== null && activeDraggableId === topCardDraggableId
-  const nextCard = isDraggingTopCard ? cards[cards.length - 2] : null
+    ? makeDraggableId(zone, zoneOwner, topCard.id, "compact")
+    : null;
+  const isDraggingTopCard =
+    activeDraggableId !== null && activeDraggableId === topCardDraggableId;
+  const nextCard = isDraggingTopCard ? cards[cards.length - 2] : null;
   const allowCardInteraction = canInteractWithBattleCard({
     owner: zoneOwner,
     zone,
     canManipulateOpponent,
     isFaceDown: forceFaceDown,
-  })
+  });
 
-  const availW = width - 4
-  const availH = height - LABEL_HEIGHT
-  const cardW = Math.floor(Math.min(availW, availH * CARD_ASPECT))
-  const cardH = Math.floor(cardW / CARD_ASPECT)
+  const availW = width - 4;
+  const availH = height - LABEL_HEIGHT;
+  const cardW = Math.floor(Math.min(availW, availH * CARD_ASPECT));
+  const cardH = Math.floor(cardW / CARD_ASPECT);
 
   const label = (
-    <div className="flex items-center justify-center gap-0 px-0.5 shrink-0" style={{ height: LABEL_HEIGHT }}>
+    <div
+      className="flex items-center justify-center gap-0 px-0.5 shrink-0"
+      style={{ height: LABEL_HEIGHT }}
+    >
       <span className="battle-side-label truncate">{title}</span>
     </div>
-  )
+  );
 
   return (
     <>
@@ -117,13 +128,13 @@ export function CompactZoneDisplay({
           onContextMenu={onContextMenu}
           onClick={(e) => {
             if (selectedCardId && onZoneClick) {
-              e.stopPropagation()
-              onZoneClick()
-              return
+              e.stopPropagation();
+              onZoneClick();
+              return;
             }
-            setShowModal(true)
+            setShowModal(true);
           }}
-          className={`flex flex-col items-center overflow-hidden cursor-pointer ${containerClassName ?? ''} w-full h-full`}
+          className={`flex flex-col items-center overflow-hidden cursor-pointer ${containerClassName ?? ""} w-full h-full`}
         >
           {label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
@@ -135,8 +146,14 @@ export function CompactZoneDisplay({
                   faceDown={forceFaceDown}
                   upgraded={upgradedCardIds?.has(nextCard.id)}
                   appliedUpgrades={upgradesByCardId?.get(nextCard.id)}
-                  hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(nextCard.id) ?? []).length}
-                  onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(nextCard.id) : undefined}
+                  hiddenUpgradeCount={
+                    (hiddenUpgradesByCardId?.get(nextCard.id) ?? []).length
+                  }
+                  onRevealHiddenUpgrades={
+                    onRevealHiddenUpgrades
+                      ? () => onRevealHiddenUpgrades(nextCard.id)
+                      : undefined
+                  }
                 />
               </div>
             )}
@@ -150,14 +167,26 @@ export function CompactZoneDisplay({
                 disabled={!allowCardInteraction}
                 isOpponent={isOpponent}
                 onCardHover={allowCardInteraction ? onCardHover : undefined}
-                onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
-                onContextMenu={allowCardInteraction && onCardContextMenu ? (e) => onCardContextMenu(e, topCard, zone) : undefined}
+                onCardHoverEnd={
+                  allowCardInteraction ? onCardHoverEnd : undefined
+                }
+                onContextMenu={
+                  allowCardInteraction && onCardContextMenu
+                    ? (e) => onCardContextMenu(e, topCard, zone)
+                    : undefined
+                }
                 faceDown={forceFaceDown}
                 canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
                 upgraded={upgradedCardIds?.has(topCard.id)}
                 appliedUpgrades={upgradesByCardId?.get(topCard.id)}
-                hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(topCard.id) ?? []).length}
-                onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(topCard.id) : undefined}
+                hiddenUpgradeCount={
+                  (hiddenUpgradesByCardId?.get(topCard.id) ?? []).length
+                }
+                onRevealHiddenUpgrades={
+                  onRevealHiddenUpgrades
+                    ? () => onRevealHiddenUpgrades(topCard.id)
+                    : undefined
+                }
               />
             )}
           </div>
@@ -187,5 +216,5 @@ export function CompactZoneDisplay({
         onRevealHiddenUpgrades={onRevealHiddenUpgrades}
       />
     </>
-  )
+  );
 }

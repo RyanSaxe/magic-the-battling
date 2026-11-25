@@ -1,14 +1,14 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig, devices } from "@playwright/test";
 
-const port = 4317
+const port = 4317;
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: "./e2e",
   forbidOnly: !!process.env.CI,
-  reporter: process.env.CI ? [['github'], ['list']] : 'list',
+  reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: `http://localhost:${port}`,
-    ...devices['Desktop Safari'],
+    ...devices["Desktop Safari"],
   },
   webServer: {
     command: `npx vite build && npx vite preview --port ${port} --strictPort`,
@@ -16,4 +16,4 @@ export default defineConfig({
     // A server already on this port may be another checkout's build, so never test against it.
     reuseExistingServer: false,
   },
-})
+});

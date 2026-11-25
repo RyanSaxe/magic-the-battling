@@ -31,7 +31,9 @@ export function SubmitPopover({
     let pressWasOutside = true;
     const handlePointerDown = (e: PointerEvent) => {
       const pressed = e.target as Node;
-      pressWasOutside = !ref.current?.contains(pressed) && !backdropRef.current?.contains(pressed);
+      pressWasOutside =
+        !ref.current?.contains(pressed) &&
+        !backdropRef.current?.contains(pressed);
     };
     const handleClick = (e: MouseEvent) => {
       const target = e.target as Node | null;
@@ -40,17 +42,20 @@ export function SubmitPopover({
       }
 
       const clickedIgnoredElement = !!(
-        ignoreOutsideClickSelector
-        && target instanceof Element
-        && target.closest(ignoreOutsideClickSelector)
+        ignoreOutsideClickSelector &&
+        target instanceof Element &&
+        target.closest(ignoreOutsideClickSelector)
       );
 
-      if (shouldCloseSubmitPopoverOnOutsideClick({
-        closeOnOutsideClick,
-        // A press dragged out of the choices or off the board clicks what the two places share, and doesn't close.
-        clickedInsidePopover: !pressWasOutside || ref.current.contains(target),
-        clickedIgnoredElement,
-      })) {
+      if (
+        shouldCloseSubmitPopoverOnOutsideClick({
+          closeOnOutsideClick,
+          // A press dragged out of the choices or off the board clicks what the two places share, and doesn't close.
+          clickedInsidePopover:
+            !pressWasOutside || ref.current.contains(target),
+          clickedIgnoredElement,
+        })
+      ) {
         onClose();
       }
     };
@@ -73,25 +78,27 @@ export function SubmitPopover({
 
   return (
     <>
-    {closeOnOutsideClick && <BoardBackdrop ref={backdropRef} onTap={onClose} />}
-    <div
-      ref={ref}
-      className="absolute bottom-full mb-4 right-2 min-w-[120px] z-[95]"
-      data-guide-target={guideTarget}
-    >
-      <div className={`relative ${POPOVER_CHROME} p-2 flex flex-col gap-1.5`}>
-        {options.map((option) => (
-          <button
-            key={option.label}
-            onClick={option.onClick}
-            data-ends-phase
-            className={option.className ?? "btn btn-secondary text-sm py-1.5"}
-          >
-            {option.label}
-          </button>
-        ))}
+      {closeOnOutsideClick && (
+        <BoardBackdrop ref={backdropRef} onTap={onClose} />
+      )}
+      <div
+        ref={ref}
+        className="absolute bottom-full mb-4 right-2 min-w-[120px] z-[95]"
+        data-guide-target={guideTarget}
+      >
+        <div className={`relative ${POPOVER_CHROME} p-2 flex flex-col gap-1.5`}>
+          {options.map((option) => (
+            <button
+              key={option.label}
+              onClick={option.onClick}
+              data-ends-phase
+              className={option.className ?? "btn btn-secondary text-sm py-1.5"}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
     </>
   );
 }

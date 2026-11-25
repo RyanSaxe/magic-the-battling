@@ -1,279 +1,338 @@
-import { describe, it, expect } from 'vitest'
-import { computeLayout, ZONE_LAYOUT_PADDING } from './useCardLayout'
-import { CARD_ASPECT_RATIO } from './cardSizeUtils'
+import { describe, it, expect } from "vitest";
+import { computeLayout, ZONE_LAYOUT_PADDING } from "./useCardLayout";
+import { CARD_ASPECT_RATIO } from "./cardSizeUtils";
 
-const MIN_CARD_WIDTH = 30
+const MIN_CARD_WIDTH = 30;
 
-describe('computeLayout', () => {
-  describe('dual-zone equivalence', () => {
-    it('produces reasonable sizes for top+bottomLeft (Draft-style)', () => {
+describe("computeLayout", () => {
+  describe("dual-zone equivalence", () => {
+    it("produces reasonable sizes for top+bottomLeft (Draft-style)", () => {
       const result = computeLayout(1200, 800, {
         zones: {
           pool: { count: 10, maxCardWidth: 300 },
           pack: { count: 15, maxCardWidth: 400 },
         },
-        layout: { top: ['pool'], bottomLeft: ['pack'] },
+        layout: { top: ["pool"], bottomLeft: ["pack"] },
         fixedHeight: 65,
         padding: 24,
-      })
-      expect(result.pool.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.pack.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.pool.height).toBe(Math.round(result.pool.width * CARD_ASPECT_RATIO))
-      expect(result.pack.height).toBe(Math.round(result.pack.width * CARD_ASPECT_RATIO))
-    })
+      });
+      expect(result.pool.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.pack.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.pool.height).toBe(
+        Math.round(result.pool.width * CARD_ASPECT_RATIO),
+      );
+      expect(result.pack.height).toBe(
+        Math.round(result.pack.width * CARD_ASPECT_RATIO),
+      );
+    });
 
-    it('matches computeDualZone pattern: widths are reasonable for equal counts', () => {
+    it("matches computeDualZone pattern: widths are reasonable for equal counts", () => {
       const result = computeLayout(1000, 600, {
         zones: {
           top: { count: 8 },
           bottom: { count: 8 },
         },
-        layout: { top: ['top'], bottomLeft: ['bottom'] },
-      })
-      expect(result.top.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.bottom.width).toBeGreaterThan(MIN_CARD_WIDTH)
-    })
+        layout: { top: ["top"], bottomLeft: ["bottom"] },
+      });
+      expect(result.top.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.bottom.width).toBeGreaterThan(MIN_CARD_WIDTH);
+    });
 
-    it('keeps top+bottom primary zones within available height when a fit exists', () => {
-      const containerH = 520
-      const fixedHeight = 120
+    it("keeps top+bottom primary zones within available height when a fit exists", () => {
+      const containerH = 520;
+      const fixedHeight = 120;
       const result = computeLayout(1100, containerH, {
         zones: {
           upgrades: { count: 4, maxCardWidth: 200 },
           pool: { count: 12, maxCardWidth: 180 },
         },
-        layout: { top: ['upgrades'], bottomLeft: ['pool'] },
+        layout: { top: ["upgrades"], bottomLeft: ["pool"] },
         fixedHeight,
         ...ZONE_LAYOUT_PADDING,
-      })
+      });
 
       const upgradesTotalH =
         result.upgrades.rows * result.upgrades.height +
         Math.max(0, result.upgrades.rows - 1) * 6 +
         ZONE_LAYOUT_PADDING.sectionPadTop +
-        ZONE_LAYOUT_PADDING.sectionPadBottom
+        ZONE_LAYOUT_PADDING.sectionPadBottom;
       const poolTotalH =
         result.pool.rows * result.pool.height +
         Math.max(0, result.pool.rows - 1) * 6 +
         ZONE_LAYOUT_PADDING.sectionPadTop +
-        ZONE_LAYOUT_PADDING.sectionPadBottom
-      const usedH = upgradesTotalH + poolTotalH + ZONE_LAYOUT_PADDING.sectionGap
+        ZONE_LAYOUT_PADDING.sectionPadBottom;
+      const usedH =
+        upgradesTotalH + poolTotalH + ZONE_LAYOUT_PADDING.sectionGap;
 
-      expect(usedH).toBeLessThanOrEqual(containerH - fixedHeight)
-    })
-  })
+      expect(usedH).toBeLessThanOrEqual(containerH - fixedHeight);
+    });
+  });
 
-  describe('single zone', () => {
-    it('uses bestFit when only one zone has count > 0', () => {
+  describe("single zone", () => {
+    it("uses bestFit when only one zone has count > 0", () => {
       const result = computeLayout(800, 600, {
         zones: {
           hand: { count: 7 },
           sideboard: { count: 0 },
         },
-        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
-      })
-      expect(result.hand.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.hand.rows).toBeGreaterThanOrEqual(1)
-      expect(result.hand.columns).toBeGreaterThanOrEqual(1)
-    })
+        layout: { top: ["hand"], bottomLeft: ["sideboard"] },
+      });
+      expect(result.hand.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.hand.rows).toBeGreaterThanOrEqual(1);
+      expect(result.hand.columns).toBeGreaterThanOrEqual(1);
+    });
 
-    it('returns defaults for zones with count=0', () => {
+    it("returns defaults for zones with count=0", () => {
       const result = computeLayout(800, 600, {
         zones: {
           hand: { count: 7 },
           sideboard: { count: 0 },
         },
-        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
-      })
-      expect(result.sideboard).toBeDefined()
-    })
-  })
+        layout: { top: ["hand"], bottomLeft: ["sideboard"] },
+      });
+      expect(result.sideboard).toBeDefined();
+    });
+  });
 
-  describe('fill zones', () => {
-    it('battlefield (fill) gets remaining height and is ≤ sideboard', () => {
+  describe("fill zones", () => {
+    it("battlefield (fill) gets remaining height and is ≤ sideboard", () => {
       const result = computeLayout(1000, 600, {
         zones: {
           hand: { count: 7 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'] },
+        layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.battlefield.width).toBeLessThanOrEqual(result.sideboard.width)
-      expect(result.battlefield.width).toBeGreaterThan(0)
-    })
+      });
+      expect(result.battlefield.width).toBeLessThanOrEqual(
+        result.sideboard.width,
+      );
+      expect(result.battlefield.width).toBeGreaterThan(0);
+    });
 
-    it('battlefield is at least 50% of smallest primary card (with minCardWidth floor)', () => {
+    it("battlefield is at least 50% of smallest primary card (with minCardWidth floor)", () => {
       const result = computeLayout(1000, 600, {
         zones: {
           hand: { count: 7 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'] },
+        layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
         ...ZONE_LAYOUT_PADDING,
-      })
-      const smallerPrimary = Math.min(result.hand.width, result.sideboard.width)
-      const fillMin = Math.max(MIN_CARD_WIDTH, Math.round(smallerPrimary * 0.5))
-      expect(result.battlefield.width).toBeGreaterThanOrEqual(fillMin)
-    })
+      });
+      const smallerPrimary = Math.min(
+        result.hand.width,
+        result.sideboard.width,
+      );
+      const fillMin = Math.max(
+        MIN_CARD_WIDTH,
+        Math.round(smallerPrimary * 0.5),
+      );
+      expect(result.battlefield.width).toBeGreaterThanOrEqual(fillMin);
+    });
 
-    it('works with only battlefield (no sideboard)', () => {
+    it("works with only battlefield (no sideboard)", () => {
       const result = computeLayout(800, 600, {
         zones: {
           hand: { count: 5 },
-          battlefield: { count: 3, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 3, priority: "fill", maxRows: 1 },
           sideboard: { count: 0 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'] },
+        layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.battlefield.width).toBeGreaterThan(0)
-    })
+      });
+      expect(result.battlefield.width).toBeGreaterThan(0);
+    });
 
-    it('supports a top fill zone with two primary lower zones', () => {
+    it("supports a top fill zone with two primary lower zones", () => {
       const result = computeLayout(1100, 650, {
         zones: {
-          rewards: { count: 3, priority: 'fill', maxRows: 1, maxCardWidth: 300 },
+          rewards: {
+            count: 3,
+            priority: "fill",
+            maxRows: 1,
+            maxCardWidth: 300,
+          },
           upgrades: { count: 3, maxCardWidth: 200 },
           pool: { count: 12, maxCardWidth: 180 },
         },
-        layout: { top: ['rewards'], bottomLeft: ['upgrades', 'pool'] },
+        layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
         ...ZONE_LAYOUT_PADDING,
-      })
+      });
 
-      expect(result.rewards.width).toBeGreaterThan(0)
-      expect(result.upgrades.width).toBeGreaterThan(0)
-      expect(result.pool.width).toBeGreaterThan(0)
-      expect(result.rewards.rows).toBe(1)
-    })
-  })
+      expect(result.rewards.width).toBeGreaterThan(0);
+      expect(result.upgrades.width).toBeGreaterThan(0);
+      expect(result.pool.width).toBeGreaterThan(0);
+      expect(result.rewards.rows).toBe(1);
+    });
+  });
 
-  describe('right column (command zone)', () => {
-    it('CZ sizes correctly in bottom-right', () => {
+  describe("right column (command zone)", () => {
+    it("CZ sizes correctly in bottom-right", () => {
       const result = computeLayout(1000, 700, {
         zones: {
           hand: { count: 6 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
           commandZone: { count: 2 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
-    })
+      });
+      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH);
+    });
 
-    it('keeps command zone dimensions valid in tight layouts', () => {
+    it("keeps command zone dimensions valid in tight layouts", () => {
       const result = computeLayout(1000, 350, {
         zones: {
           hand: { count: 7 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
           commandZone: { count: 3 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.commandZone.columns).toBeGreaterThanOrEqual(1)
-      expect(result.commandZone.columns).toBeLessThanOrEqual(2)
-      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
-    })
+      });
+      expect(result.commandZone.columns).toBeGreaterThanOrEqual(1);
+      expect(result.commandZone.columns).toBeLessThanOrEqual(2);
+      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH);
+    });
 
-    it('CZ cards do not overflow when top zone takes significant height', () => {
+    it("CZ cards do not overflow when top zone takes significant height", () => {
       const result = computeLayout(1100, 700, {
         zones: {
           hand: { count: 5 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 8 },
           commandZone: { count: 3 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      const handH = result.hand.rows * result.hand.height + (result.hand.rows - 1) * 6
-      const topH = handH + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
-      const bottomH = 700 - topH - ZONE_LAYOUT_PADDING.sectionGap
-      const czTotalH = result.commandZone.rows * result.commandZone.height
-        + (result.commandZone.rows - 1) * 6
-        + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
-      expect(czTotalH).toBeLessThanOrEqual(bottomH)
-    })
+      });
+      const handH =
+        result.hand.rows * result.hand.height + (result.hand.rows - 1) * 6;
+      const topH =
+        handH +
+        ZONE_LAYOUT_PADDING.sectionPadTop +
+        ZONE_LAYOUT_PADDING.sectionPadBottom;
+      const bottomH = 700 - topH - ZONE_LAYOUT_PADDING.sectionGap;
+      const czTotalH =
+        result.commandZone.rows * result.commandZone.height +
+        (result.commandZone.rows - 1) * 6 +
+        ZONE_LAYOUT_PADDING.sectionPadTop +
+        ZONE_LAYOUT_PADDING.sectionPadBottom;
+      expect(czTotalH).toBeLessThanOrEqual(bottomH);
+    });
 
-    it('CZ does not overflow after scale-up grows top/bL into the bottom row', () => {
+    it("CZ does not overflow after scale-up grows top/bL into the bottom row", () => {
       // Real bug: scale-up pass treats availH - (top + bL) as free slack and
       // grows hand/battlefield/sideboard into it without recomputing the
       // bottomRight zone, which shares the bottom row with bL. When CZ needs
       // a taller bottom row than bL, the grown hand steals from CZ and the
       // upgrades overflow visually (zone-upgrades has overflow-visible).
-      const containerW = 1400
-      const containerH = 800
+      const containerW = 1400;
+      const containerH = 800;
       const result = computeLayout(containerW, containerH, {
         zones: {
           hand: { count: 6 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 9 },
           commandZone: { count: 3, minColumns: 1 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      const handGridH = result.hand.rows * result.hand.height + (result.hand.rows - 1) * 6
-      const topSectionH = handGridH + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
-      const bottomRowH = containerH - topSectionH - ZONE_LAYOUT_PADDING.sectionGap
-      const czStackH = result.commandZone.rows * result.commandZone.height
-        + (result.commandZone.rows - 1) * 6
-        + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
-      expect(czStackH).toBeLessThanOrEqual(bottomRowH)
-    })
+      });
+      const handGridH =
+        result.hand.rows * result.hand.height + (result.hand.rows - 1) * 6;
+      const topSectionH =
+        handGridH +
+        ZONE_LAYOUT_PADDING.sectionPadTop +
+        ZONE_LAYOUT_PADDING.sectionPadBottom;
+      const bottomRowH =
+        containerH - topSectionH - ZONE_LAYOUT_PADDING.sectionGap;
+      const czStackH =
+        result.commandZone.rows * result.commandZone.height +
+        (result.commandZone.rows - 1) * 6 +
+        ZONE_LAYOUT_PADDING.sectionPadTop +
+        ZONE_LAYOUT_PADDING.sectionPadBottom;
+      expect(czStackH).toBeLessThanOrEqual(bottomRowH);
+    });
 
-    it('keeps 1 CZ column when only 1 CZ card', () => {
+    it("keeps 1 CZ column when only 1 CZ card", () => {
       const result = computeLayout(1200, 700, {
         zones: {
           hand: { count: 7 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
           commandZone: { count: 1 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.commandZone.columns).toBe(1)
-    })
+      });
+      expect(result.commandZone.columns).toBe(1);
+    });
 
-    it('respects minColumns on command zone', () => {
+    it("respects minColumns on command zone", () => {
       const result = computeLayout(1000, 700, {
         zones: {
           hand: { count: 7 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
           commandZone: { count: 5, minColumns: 2 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.commandZone.columns).toBe(2)
-    })
+      });
+      expect(result.commandZone.columns).toBe(2);
+    });
 
-    it('respects maxColumns on command zone (forces exact column count)', () => {
+    it("respects maxColumns on command zone (forces exact column count)", () => {
       // The renderer mirrors whatever pass 1 picks, so honoring maxColumns
       // is what keeps the rendered grid in sync with the budgeted space.
       const result = computeLayout(1024, 800, {
         zones: {
           hand: { count: 5 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 9 },
           commandZone: { count: 3, minColumns: 1, maxColumns: 1 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.commandZone.columns).toBe(1)
-      expect(result.commandZone.rows).toBe(3)
-    })
+      });
+      expect(result.commandZone.columns).toBe(1);
+      expect(result.commandZone.rows).toBe(3);
+    });
 
-    it('picks 2 columns for 3 upgrades when the zone is height-constrained', () => {
+    it("picks 2 columns for 3 upgrades when the zone is height-constrained", () => {
       // On a small viewport (e.g. 1024x800) the bottom-right zone runs out
       // of vertical space first, so 2 columns × 2 rows yields wider cards
       // than 1 column × 3 rows. Wide viewports stay 1-col because the
@@ -281,186 +340,211 @@ describe('computeLayout', () => {
       const result = computeLayout(1024, 800, {
         zones: {
           hand: { count: 5 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 9 },
           commandZone: { count: 3, minColumns: 1, maxColumns: 2 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.commandZone.columns).toBe(2)
-      expect(result.commandZone.rows).toBe(2)
-    })
-  })
+      });
+      expect(result.commandZone.columns).toBe(2);
+      expect(result.commandZone.rows).toBe(2);
+    });
+  });
 
-  describe('overflow fallback', () => {
-    it('returns non-zero dims even in tight containers', () => {
+  describe("overflow fallback", () => {
+    it("returns non-zero dims even in tight containers", () => {
       const result = computeLayout(300, 200, {
         zones: {
           hand: { count: 7 },
           sideboard: { count: 12 },
         },
-        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
-      })
-      expect(result.hand.width).toBeGreaterThan(0)
-      expect(result.sideboard.width).toBeGreaterThan(0)
-    })
+        layout: { top: ["hand"], bottomLeft: ["sideboard"] },
+      });
+      expect(result.hand.width).toBeGreaterThan(0);
+      expect(result.sideboard.width).toBeGreaterThan(0);
+    });
 
-    it('never returns all-zero dims for wide containers with tight height', () => {
+    it("never returns all-zero dims for wide containers with tight height", () => {
       const result = computeLayout(1200, 500, {
         zones: {
           hand: { count: 5 },
-          battlefield: { count: 4, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 4, priority: "fill", maxRows: 1 },
           sideboard: { count: 8 },
           commandZone: { count: 2 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.hand.width).toBeGreaterThan(0)
-      expect(result.sideboard.width).toBeGreaterThan(0)
-    })
-  })
+      });
+      expect(result.hand.width).toBeGreaterThan(0);
+      expect(result.sideboard.width).toBeGreaterThan(0);
+    });
+  });
 
-  describe('aspect ratio', () => {
-    it('all zones maintain 7/5 ratio', () => {
+  describe("aspect ratio", () => {
+    it("all zones maintain 7/5 ratio", () => {
       const result = computeLayout(1000, 700, {
         zones: {
           hand: { count: 7 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
           commandZone: { count: 1 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      for (const zone of ['hand', 'sideboard', 'battlefield', 'commandZone'] as const) {
-        const { width, height } = result[zone]
+      });
+      for (const zone of [
+        "hand",
+        "sideboard",
+        "battlefield",
+        "commandZone",
+      ] as const) {
+        const { width, height } = result[zone];
         if (width > 0) {
-          expect(height).toBe(Math.round(width * CARD_ASPECT_RATIO))
+          expect(height).toBe(Math.round(width * CARD_ASPECT_RATIO));
         }
       }
-    })
-  })
+    });
+  });
 
-  describe('row penalty (anti-flicker)', () => {
-    it('fewer rows win at crossover boundary where fill is slightly better with more rows', () => {
+  describe("row penalty (anti-flicker)", () => {
+    it("fewer rows win at crossover boundary where fill is slightly better with more rows", () => {
       const result = computeLayout(1000, 400, {
         zones: {
           cards: { count: 8 },
         },
-        layout: { top: ['cards'] },
-      })
+        layout: { top: ["cards"] },
+      });
       const result2 = computeLayout(1001, 400, {
         zones: {
           cards: { count: 8 },
         },
-        layout: { top: ['cards'] },
-      })
-      expect(result.cards.rows).toBe(result2.cards.rows)
-    })
-  })
+        layout: { top: ["cards"] },
+      });
+      expect(result.cards.rows).toBe(result2.cards.rows);
+    });
+  });
 
-  describe('scale-up pass', () => {
-    it('grows zones to fill slack height without exceeding caps', () => {
+  describe("scale-up pass", () => {
+    it("grows zones to fill slack height without exceeding caps", () => {
       const tall = computeLayout(800, 900, {
         zones: {
           hand: { count: 5, maxCardWidth: 200 },
           sideboard: { count: 8, maxCardWidth: 200 },
         },
-        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
+        layout: { top: ["hand"], bottomLeft: ["sideboard"] },
         ...ZONE_LAYOUT_PADDING,
-      })
+      });
       const short = computeLayout(800, 500, {
         zones: {
           hand: { count: 5, maxCardWidth: 200 },
           sideboard: { count: 8, maxCardWidth: 200 },
         },
-        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
+        layout: { top: ["hand"], bottomLeft: ["sideboard"] },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(tall.hand.width).toBeGreaterThanOrEqual(short.hand.width)
-      expect(tall.sideboard.width).toBeGreaterThanOrEqual(short.sideboard.width)
-      expect(tall.hand.width).toBeLessThanOrEqual(200)
-      expect(tall.sideboard.width).toBeLessThanOrEqual(200)
-    })
+      });
+      expect(tall.hand.width).toBeGreaterThanOrEqual(short.hand.width);
+      expect(tall.sideboard.width).toBeGreaterThanOrEqual(
+        short.sideboard.width,
+      );
+      expect(tall.hand.width).toBeLessThanOrEqual(200);
+      expect(tall.sideboard.width).toBeLessThanOrEqual(200);
+    });
 
-    it('respects per-zone maxCardWidth ceilings independently', () => {
+    it("respects per-zone maxCardWidth ceilings independently", () => {
       const result = computeLayout(800, 900, {
         zones: {
           hand: { count: 5, maxCardWidth: 120 },
           sideboard: { count: 8, maxCardWidth: 300 },
         },
-        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
+        layout: { top: ["hand"], bottomLeft: ["sideboard"] },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.hand.width).toBeLessThanOrEqual(120)
-      expect(result.sideboard.width).toBeLessThanOrEqual(300)
-    })
-  })
+      });
+      expect(result.hand.width).toBeLessThanOrEqual(120);
+      expect(result.sideboard.width).toBeLessThanOrEqual(300);
+    });
+  });
 
-  describe('edge cases', () => {
-    it('returns defaults for zero container', () => {
+  describe("edge cases", () => {
+    it("returns defaults for zero container", () => {
       const result = computeLayout(0, 0, {
         zones: { hand: { count: 5 } },
-        layout: { top: ['hand'] },
-      })
-      expect(result.hand.width).toBe(100)
-      expect(result.hand.height).toBe(140)
-    })
+        layout: { top: ["hand"] },
+      });
+      expect(result.hand.width).toBe(100);
+      expect(result.hand.height).toBe(140);
+    });
 
-    it('returns defaults for all zero counts', () => {
+    it("returns defaults for all zero counts", () => {
       const result = computeLayout(800, 600, {
         zones: {
           hand: { count: 0 },
           sideboard: { count: 0 },
         },
-        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
-      })
-      expect(result.hand).toBeDefined()
-      expect(result.sideboard).toBeDefined()
-    })
+        layout: { top: ["hand"], bottomLeft: ["sideboard"] },
+      });
+      expect(result.hand).toBeDefined();
+      expect(result.sideboard).toBeDefined();
+    });
 
-    it('handles only fill zones (no primary zones)', () => {
+    it("handles only fill zones (no primary zones)", () => {
       const result = computeLayout(800, 600, {
         zones: {
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
         },
-        layout: { bottomLeft: ['battlefield'] },
-      })
-      expect(result.battlefield.width).toBeGreaterThan(0)
-    })
+        layout: { bottomLeft: ["battlefield"] },
+      });
+      expect(result.battlefield.width).toBeGreaterThan(0);
+    });
 
-    it('Build.tsx scenario: hand + bf + sideboard, no CZ', () => {
+    it("Build.tsx scenario: hand + bf + sideboard, no CZ", () => {
       const result = computeLayout(1000, 600, {
         zones: {
           hand: { count: 7 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'] },
+        layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.hand.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.sideboard.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.battlefield.width).toBeGreaterThan(0)
-      expect(result.battlefield.width).toBeLessThanOrEqual(result.sideboard.width)
-    })
+      });
+      expect(result.hand.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.sideboard.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.battlefield.width).toBeGreaterThan(0);
+      expect(result.battlefield.width).toBeLessThanOrEqual(
+        result.sideboard.width,
+      );
+    });
 
-    it('DeckDisplay scenario: all four zones active', () => {
+    it("DeckDisplay scenario: all four zones active", () => {
       const result = computeLayout(1000, 700, {
         zones: {
           hand: { count: 6 },
-          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          battlefield: { count: 5, priority: "fill", maxRows: 1 },
           sideboard: { count: 12 },
           commandZone: { count: 2 },
         },
-        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
         ...ZONE_LAYOUT_PADDING,
-      })
-      expect(result.hand.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.sideboard.width).toBeGreaterThan(MIN_CARD_WIDTH)
-      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
-    })
-  })
-})
+      });
+      expect(result.hand.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.sideboard.width).toBeGreaterThan(MIN_CARD_WIDTH);
+      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH);
+    });
+  });
+});

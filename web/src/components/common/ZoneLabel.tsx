@@ -14,8 +14,7 @@ const badgeWrapCls =
 
 const constrainedWrapCls = "max-w-[calc(100%-0.5rem)]";
 const constrainedBadgeCls = "min-w-0 max-w-full";
-const compactBadgeCls =
-  "px-1.5 gap-1 text-[9px] tracking-[0.12em]";
+const compactBadgeCls = "px-1.5 gap-1 text-[9px] tracking-[0.12em]";
 
 const noopDragCallbacks: DividerDragCallbacks = {
   onDragStart: () => {},
@@ -77,7 +76,11 @@ export function ZoneLabel({
       className={wrapClasses}
       data-zone-label
       data-drag-handle={dragCallbacks ? "true" : undefined}
-      style={dragCallbacks ? { touchAction: "none", cursor: "row-resize" } : undefined}
+      style={
+        dragCallbacks
+          ? { touchAction: "none", cursor: "row-resize" }
+          : undefined
+      }
       {...dragBindings}
     >
       <span className={badgeClasses}>

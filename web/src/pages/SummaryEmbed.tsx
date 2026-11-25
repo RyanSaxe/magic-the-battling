@@ -1,58 +1,61 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
-import { getShareGame } from '../api/client'
-import type { ShareGameResponse } from '../types'
-import { GameSummary } from '../components/GameSummary'
-import { FrameBoard } from '../components/common/PageFrame'
-import { buildGameSummaryData } from '../utils/share'
+import { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom";
+import { getShareGame } from "../api/client";
+import type { ShareGameResponse } from "../types";
+import { GameSummary } from "../components/GameSummary";
+import { FrameBoard } from "../components/common/PageFrame";
+import { buildGameSummaryData } from "../utils/share";
 
 export function SummaryEmbed() {
-  const { gameId, playerName } = useParams<{ gameId: string; playerName: string }>()
-  const [data, setData] = useState<ShareGameResponse | null>(null)
-  const [error, setError] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const { gameId, playerName } = useParams<{
+    gameId: string;
+    playerName: string;
+  }>();
+  const [data, setData] = useState<ShareGameResponse | null>(null);
+  const [error, setError] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!gameId || !playerName) return
+    if (!gameId || !playerName) return;
     getShareGame(gameId, playerName)
       .then(setData)
-      .catch(() => setError(true))
-  }, [gameId, playerName])
+      .catch(() => setError(true));
+  }, [gameId, playerName]);
 
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current) return;
     if (error) {
-      containerRef.current.setAttribute('data-embed-ready', 'true')
-      return
+      containerRef.current.setAttribute("data-embed-ready", "true");
+      return;
     }
-    if (!data) return
+    if (!data) return;
 
-    const el = containerRef.current
-    const images = el.querySelectorAll('img')
+    const el = containerRef.current;
+    const images = el.querySelectorAll("img");
     if (images.length === 0) {
-      el.setAttribute('data-embed-ready', 'true')
-      return
+      el.setAttribute("data-embed-ready", "true");
+      return;
     }
 
-    let loaded = 0
-    const total = images.length
+    let loaded = 0;
+    const total = images.length;
     const onDone = () => {
-      loaded++
+      loaded++;
       if (loaded >= total) {
-        el.setAttribute('data-embed-ready', 'true')
+        el.setAttribute("data-embed-ready", "true");
       }
-    }
+    };
     images.forEach((img) => {
       if (img.complete) {
-        onDone()
+        onDone();
       } else {
-        img.addEventListener('load', onDone, { once: true })
-        img.addEventListener('error', onDone, { once: true })
+        img.addEventListener("load", onDone, { once: true });
+        img.addEventListener("error", onDone, { once: true });
       }
-    })
-  }, [data, error])
+    });
+  }, [data, error]);
 
-  const summaryData = data ? buildGameSummaryData(data) : null
+  const summaryData = data ? buildGameSummaryData(data) : null;
 
   return (
     <div
@@ -73,5 +76,5 @@ export function SummaryEmbed() {
         <div className="w-full h-full" />
       )}
     </div>
-  )
+  );
 }

@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useGameShellMode, type GameShellMode } from "../../hooks/useGameShellMode";
+import {
+  useGameShellMode,
+  type GameShellMode,
+} from "../../hooks/useGameShellMode";
 import { POPOVER_CHROME } from "./styles";
 
 interface LayoutResetControlProps {
@@ -14,7 +17,10 @@ interface LayoutResetControlProps {
   message?: string;
 }
 
-function positionClasses(position: "top-right" | "bottom-right", shellMode: GameShellMode) {
+function positionClasses(
+  position: "top-right" | "bottom-right",
+  shellMode: GameShellMode,
+) {
   if (position === "bottom-right") {
     return {
       wrapper: "absolute right-2 bottom-2 z-40 pointer-events-auto",
@@ -22,9 +28,10 @@ function positionClasses(position: "top-right" | "bottom-right", shellMode: Game
     };
   }
 
-  const wrapper = shellMode === "big"
-    ? "absolute right-0 top-0 -translate-y-[calc(100%+0.5rem)] z-40 pointer-events-auto"
-    : "absolute right-2 top-2 z-40 pointer-events-auto";
+  const wrapper =
+    shellMode === "big"
+      ? "absolute right-0 top-0 -translate-y-[calc(100%+0.5rem)] z-40 pointer-events-auto"
+      : "absolute right-2 top-2 z-40 pointer-events-auto";
 
   return {
     wrapper,
@@ -66,7 +73,8 @@ export function LayoutResetControl({
             </div>
             {isInherited && originStage != null && originRound != null && (
               <div className="mt-2 text-xs text-[var(--ivory-muted)]">
-                Current layout is inherited from Stage {originStage}, Round {originRound}.
+                Current layout is inherited from Stage {originStage}, Round{" "}
+                {originRound}.
               </div>
             )}
             <div className="mt-2 text-xs leading-snug text-[var(--ivory)]">

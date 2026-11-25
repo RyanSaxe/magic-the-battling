@@ -7,7 +7,12 @@ import { GuidedWalkthrough } from "./GuidedWalkthrough";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none. Reduced motion shows a step at once.
 vi.hoisted(() => {
-  window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList;
+  window.matchMedia = () =>
+    ({
+      matches: true,
+      addEventListener() {},
+      removeEventListener() {},
+    }) as unknown as MediaQueryList;
 });
 
 const context = { currentPhase: "build" } as GuidedWalkthroughContext;
@@ -51,11 +56,14 @@ function Board({
 }
 
 beforeEach(() => {
-  vi.stubGlobal("ResizeObserver", class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  });
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   Element.prototype.scrollIntoView ??= () => {};
 });
 
@@ -65,7 +73,9 @@ afterEach(() => {
 });
 
 it("takes keys only to its own controls and the target its step lets players use, until it closes", async () => {
-  const { rerender } = render(<Board guideId="build_play_draw" showGuide={false} />);
+  const { rerender } = render(
+    <Board guideId="build_play_draw" showGuide={false} />,
+  );
   const home = screen.getByText("Home");
   const play = screen.getByText("Play");
   const submit = screen.getByText("Submit Hand");
@@ -73,7 +83,9 @@ it("takes keys only to its own controls and the target its step lets players use
   rerender(<Board guideId="build_play_draw" stepIndex={0} showGuide />);
   // jsdom doesn't act on inert, so this reads where it's set.
   expect(home.closest("[inert]")).not.toBeNull();
-  await waitFor(() => expect(screen.getByRole("dialog").closest("[inert]")).toBeNull());
+  await waitFor(() =>
+    expect(screen.getByRole("dialog").closest("[inert]")).toBeNull(),
+  );
   await waitFor(() => expect(play.closest("[inert]")).toBeNull());
   expect(submit.closest("[inert]")).not.toBeNull();
 
@@ -93,16 +105,23 @@ it("shows each step and follows its target while an animation changes the page e
 
   const { rerender } = render(<Board guideId="welcome" />);
   // jsdom lays nothing out, so the board and the step's target get places of their own.
-  Object.defineProperties(screen.getByTestId("root"), { clientWidth: { value: 1000 }, clientHeight: { value: 800 } });
+  Object.defineProperties(screen.getByTestId("root"), {
+    clientWidth: { value: 1000 },
+    clientHeight: { value: 800 },
+  });
   const target = screen.getByTestId("target");
   let left = 100;
-  target.getBoundingClientRect = () => ({ left, top: 50, width: 60, height: 20 }) as DOMRect;
+  target.getBoundingClientRect = () =>
+    ({ left, top: 50, width: 60, height: 20 }) as DOMRect;
 
   let animating = true;
   let level = 0;
   const drawFrames = async (count: number) => {
     for (let frame = 0; frame < count; frame++) {
-      if (animating) screen.getByTestId("animation").style.setProperty("--level", `${++level}`);
+      if (animating)
+        screen
+          .getByTestId("animation")
+          .style.setProperty("--level", `${++level}`);
       // The observer hears of a change before the next frame's callbacks run.
       await act(async () => {});
       await act(async () => {
@@ -112,11 +131,14 @@ it("shows each step and follows its target while an animation changes the page e
       });
     }
   };
-  const spotlightLeft = () => document.querySelector<HTMLElement>(".border-amber-300\\/80")?.style.left;
+  const spotlightLeft = () =>
+    document.querySelector<HTMLElement>(".border-amber-300\\/80")?.style.left;
 
   rerender(<Board guideId="welcome" stepIndex={0} />);
   await drawFrames(10);
-  expect(screen.queryByRole("dialog")?.textContent ?? "no card").toContain("Playing Pitfight");
+  expect(screen.queryByRole("dialog")?.textContent ?? "no card").toContain(
+    "Playing Pitfight",
+  );
 
   rerender(<Board guideId="welcome" stepIndex={1} />);
   await drawFrames(10);

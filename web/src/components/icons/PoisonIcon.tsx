@@ -1,16 +1,16 @@
 interface PoisonIconProps {
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
 const sizes = {
   sm: 16,
   md: 24,
   lg: 32,
-}
+};
 
-export function PoisonIcon({ size = 'md', className = '' }: PoisonIconProps) {
-  const px = sizes[size]
+export function PoisonIcon({ size = "md", className = "" }: PoisonIconProps) {
+  const px = sizes[size];
   return (
     <svg
       width={px}
@@ -41,5 +41,5 @@ export function PoisonIcon({ size = 'md', className = '' }: PoisonIconProps) {
       <circle cx="10" cy="8" r="1" fill="#E9D5FF" />
       <circle cx="14" cy="10" r="0.75" fill="#E9D5FF" />
     </svg>
-  )
+  );
 }

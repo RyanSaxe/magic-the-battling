@@ -184,13 +184,18 @@ describe("useSavedLayout", () => {
     expect(boardSizeBand({ width: 799, height: 599 })).toBe("w0h0");
     expect(boardSizeBand(laptop)).toBe("w1h1");
     expect(boardSizeBand({ width: 1400, height: 900 })).toBe("w2h2");
-    expect(boardSizeBand({ width: 1140, height: 812 })).toBe(boardSizeBand({ width: 1180, height: 840 }));
+    expect(boardSizeBand({ width: 1140, height: 812 })).toBe(
+      boardSizeBand({ width: 1180, height: 840 }),
+    );
   });
 
   it("applies a saved layout only on boards in the band it was saved in", () => {
-    const { result, rerender } = renderHook(({ board }) => useSavedLayout(location, board), {
-      initialProps: { board: laptop },
-    });
+    const { result, rerender } = renderHook(
+      ({ board }) => useSavedLayout(location, board),
+      {
+        initialProps: { board: laptop },
+      },
+    );
     act(() => result.current.setConstraints({ topFraction: 0.3 }));
     expect(result.current.constraints).toEqual({ topFraction: 0.3 });
 
@@ -203,7 +208,9 @@ describe("useSavedLayout", () => {
   });
 
   it("inherits a layout from an earlier round only within its band", () => {
-    const { result } = renderHook(() => useSavedLayout({ ...location, round: 1 }, laptop));
+    const { result } = renderHook(() =>
+      useSavedLayout({ ...location, round: 1 }, laptop),
+    );
     act(() => result.current.setConstraints({ topFraction: 0.3 }));
 
     const later = renderHook(({ board }) => useSavedLayout(location, board), {
@@ -219,7 +226,14 @@ describe("useSavedLayout", () => {
       "mtb_zone_constraints:v2:phase:build",
       JSON.stringify({
         version: 2,
-        entries: [{ stage: 4, round: 2, mode: "constraints", constraints: { topFraction: 0.3 } }],
+        entries: [
+          {
+            stage: 4,
+            round: 2,
+            mode: "constraints",
+            constraints: { topFraction: 0.3 },
+          },
+        ],
       }),
     );
     const { result } = renderHook(() => useSavedLayout(location, laptop));
@@ -230,9 +244,12 @@ describe("useSavedLayout", () => {
     const storage = createStorageMock();
     const getItem = vi.spyOn(storage, "getItem");
     vi.stubGlobal("localStorage", storage);
-    const { rerender } = renderHook(({ round }) => useSavedLayout({ ...location, round }, laptop), {
-      initialProps: { round: 2 },
-    });
+    const { rerender } = renderHook(
+      ({ round }) => useSavedLayout({ ...location, round }, laptop),
+      {
+        initialProps: { round: 2 },
+      },
+    );
     rerender({ round: 2 });
     rerender({ round: 2 });
     expect(getItem).toHaveBeenCalledTimes(1);

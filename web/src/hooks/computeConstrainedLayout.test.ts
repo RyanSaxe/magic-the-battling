@@ -130,7 +130,12 @@ describe("computeConstrainedLayout", () => {
     it("derives stable frames for a top fill zone with two lower primary zones", () => {
       const config = {
         zones: {
-          rewards: { count: 3, priority: "fill" as const, maxRows: 1, maxCardWidth: 300 },
+          rewards: {
+            count: 3,
+            priority: "fill" as const,
+            maxRows: 1,
+            maxCardWidth: 300,
+          },
           upgrades: { count: 3, maxCardWidth: 200 },
           pool: { count: 12, maxCardWidth: 180 },
         },
@@ -207,12 +212,19 @@ describe("computeConstrainedLayout", () => {
       );
 
       const sectionPadV =
-        ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
+        ZONE_LAYOUT_PADDING.sectionPadTop +
+        ZONE_LAYOUT_PADDING.sectionPadBottom;
       // Frames must reserve sectionPad — outer must exceed inner by exactly sectionPadV.
       // If a caller forgets ...ZONE_LAYOUT_PADDING, this delta becomes 0 and cards overflow.
-      expect(frames.pack.outerHeight - frames.pack.innerHeight).toBe(sectionPadV);
-      expect(frames.pool.outerHeight - frames.pool.innerHeight).toBe(sectionPadV);
-      expect(frames.upgrades.outerHeight - frames.upgrades.innerHeight).toBe(sectionPadV);
+      expect(frames.pack.outerHeight - frames.pack.innerHeight).toBe(
+        sectionPadV,
+      );
+      expect(frames.pool.outerHeight - frames.pool.innerHeight).toBe(
+        sectionPadV,
+      );
+      expect(frames.upgrades.outerHeight - frames.upgrades.innerHeight).toBe(
+        sectionPadV,
+      );
 
       const packGridH =
         dims.pack.rows * dims.pack.height + Math.max(0, dims.pack.rows - 1) * 6;
@@ -225,7 +237,12 @@ describe("computeConstrainedLayout", () => {
     it("re-fits cards to derived frames for reward-style top fill layouts", () => {
       const config = {
         zones: {
-          rewards: { count: 2, priority: "fill" as const, maxRows: 1, maxCardWidth: 300 },
+          rewards: {
+            count: 2,
+            priority: "fill" as const,
+            maxRows: 1,
+            maxCardWidth: 300,
+          },
           upgrades: { count: 4, maxCardWidth: 200 },
           pool: { count: 13, maxCardWidth: 180 },
         },
@@ -258,11 +275,12 @@ describe("computeConstrainedLayout", () => {
         dims.upgrades.rows * dims.upgrades.height +
         Math.max(0, dims.upgrades.rows - 1) * 6;
       const poolGridHeight =
-        dims.pool.rows * dims.pool.height +
-        Math.max(0, dims.pool.rows - 1) * 6;
+        dims.pool.rows * dims.pool.height + Math.max(0, dims.pool.rows - 1) * 6;
 
       expect(rewardsGridHeight).toBeLessThanOrEqual(frames.rewards.innerHeight);
-      expect(upgradesGridHeight).toBeLessThanOrEqual(frames.upgrades.innerHeight);
+      expect(upgradesGridHeight).toBeLessThanOrEqual(
+        frames.upgrades.innerHeight,
+      );
       expect(poolGridHeight).toBeLessThanOrEqual(frames.pool.innerHeight);
       expect(frames.rewards.outerHeight).toBeLessThanOrEqual(
         Math.ceil((520 - ZONE_LAYOUT_PADDING.sectionGap) * 0.2),
@@ -321,15 +339,10 @@ describe("computeConstrainedLayout", () => {
         620,
         420,
       );
-      const frames = computeConstrainedFrames(
-        420,
-        620,
-        config,
-        {
-          ...derived,
-          leftFraction: 0.95,
-        },
-      );
+      const frames = computeConstrainedFrames(420, 620, config, {
+        ...derived,
+        leftFraction: 0.95,
+      });
 
       expect(frames.commandZone.outerWidth).toBeGreaterThanOrEqual(112);
       expect(frames.battlefield.outerWidth).toBeLessThanOrEqual(
@@ -523,10 +536,12 @@ describe("computeConstrainedLayout", () => {
         derived,
       );
 
-      expect(pass2.sideboard.width).toBeGreaterThanOrEqual(pass1.sideboard.width);
+      expect(pass2.sideboard.width).toBeGreaterThanOrEqual(
+        pass1.sideboard.width,
+      );
       const sideboardGridH =
-        pass2.sideboard.rows * pass2.sideboard.height
-        + Math.max(0, pass2.sideboard.rows - 1) * 6;
+        pass2.sideboard.rows * pass2.sideboard.height +
+        Math.max(0, pass2.sideboard.rows - 1) * 6;
       expect(sideboardGridH).toBeLessThanOrEqual(frames.sideboard.innerHeight);
     });
 
@@ -559,7 +574,12 @@ describe("computeConstrainedLayout", () => {
             const cfg = config(cz);
             const pass1 = computeLayout(w, h, cfg);
             const derived = deriveConstraintsFromLayout(pass1, cfg, h, w);
-            const { dims: pass2 } = computeConstrainedLayoutState(w, h, cfg, derived);
+            const { dims: pass2 } = computeConstrainedLayoutState(
+              w,
+              h,
+              cfg,
+              derived,
+            );
             expect(
               pass2.sideboard.width,
               `sideboard shrank at ${w}x${h} cz=${cz}: ${pass1.sideboard.width} -> ${pass2.sideboard.width}`,
@@ -613,8 +633,12 @@ describe("computeConstrainedLayout", () => {
       );
 
       // Allow tiny rounding deltas (≤ 1px-equivalent in fraction space).
-      expect(Math.abs(derived2.topFraction - derived1.topFraction)).toBeLessThan(0.01);
-      expect(Math.abs(derived2.leftFraction - derived1.leftFraction)).toBeLessThan(0.01);
+      expect(
+        Math.abs(derived2.topFraction - derived1.topFraction),
+      ).toBeLessThan(0.01);
+      expect(
+        Math.abs(derived2.leftFraction - derived1.leftFraction),
+      ).toBeLessThan(0.01);
       expect(
         Math.abs(derived2.bottomLeftSplit - derived1.bottomLeftSplit),
       ).toBeLessThan(0.05);

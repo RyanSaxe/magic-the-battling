@@ -13,7 +13,11 @@ it("takes the whole tap that closes the land picker, so nothing on the board get
   const boardCover = document.body.appendChild(document.createElement("div"));
   render(
     <SidePanelHostContext.Provider value={boardCover}>
-      <BasicLandSlot selected={null} dimensions={{ width: 80, height: 112 }} onPick={() => {}} />
+      <BasicLandSlot
+        selected={null}
+        dimensions={{ width: 80, height: 112 }}
+        onPick={() => {}}
+      />
     </SidePanelHostContext.Provider>,
   );
   fireEvent.click(screen.getByText("Click to pick basic land"));
@@ -30,7 +34,13 @@ it("takes the whole tap that closes the land picker, so nothing on the board get
 it("closes on Escape alone, so what's open under it stays", () => {
   const heardUnderIt = vi.fn();
   window.addEventListener("keydown", heardUnderIt);
-  render(<BasicLandSlot selected={null} dimensions={{ width: 80, height: 112 }} onPick={() => {}} />);
+  render(
+    <BasicLandSlot
+      selected={null}
+      dimensions={{ width: 80, height: 112 }}
+      onPick={() => {}}
+    />,
+  );
   fireEvent.click(screen.getByText("Click to pick basic land"));
 
   const notHandled = fireEvent.keyDown(document.body, { key: "Escape" });

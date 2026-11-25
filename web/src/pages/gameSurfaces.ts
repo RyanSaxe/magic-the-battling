@@ -26,12 +26,24 @@ export type GameSurface =
   | { kind: "zone"; zone: PanelZone; owner: ZoneOwner; guide?: GuideSurface }
   | { kind: "players"; guide?: GuideSurface }
   /** A player's scouting panel, beside the player list. From the drawer, closing it goes back to the drawer. */
-  | { kind: "scouting"; player: string; tab: ScoutingTab; fromDrawer: boolean; guide?: GuideSurface }
+  | {
+      kind: "scouting";
+      player: string;
+      tab: ScoutingTab;
+      fromDrawer: boolean;
+      guide?: GuideSurface;
+    }
   | { kind: "actions"; guide?: GuideSurface }
   | { kind: "submitHand" }
   | { kind: "submitResult"; guide?: GuideSurface }
   | GuideSurface
-  | { kind: "upgrades"; mode: UpgradesWindowMode; targetId?: string; upgradeId?: string; revealIds: string[] }
+  | {
+      kind: "upgrades";
+      mode: UpgradesWindowMode;
+      targetId?: string;
+      upgradeId?: string;
+      revealIds: string[];
+    }
   | { kind: "share" };
 
 export type GameSurfaceKind = GameSurface["kind"];
@@ -64,8 +76,15 @@ const PHASE_OF: Partial<Record<GameSurfaceKind, string>> = {
 type KeepsGuide = Extract<GameSurface, { guide?: GuideSurface }>;
 type BesideGuide = Exclude<KeepsGuide, { kind: "submitResult" }>;
 
-function canSitBesideGuide(surface: GameSurface | null): surface is BesideGuide {
-  return surface?.kind === "zone" || surface?.kind === "players" || surface?.kind === "scouting" || surface?.kind === "actions";
+function canSitBesideGuide(
+  surface: GameSurface | null,
+): surface is BesideGuide {
+  return (
+    surface?.kind === "zone" ||
+    surface?.kind === "players" ||
+    surface?.kind === "scouting" ||
+    surface?.kind === "actions"
+  );
 }
 
 function canKeepGuide(surface: GameSurface | null): surface is KeepsGuide {
@@ -73,17 +92,28 @@ function canKeepGuide(surface: GameSurface | null): surface is KeepsGuide {
 }
 
 function isSameSurface(a: GameSurface, b: GameSurface): boolean {
-  if (a.kind === "zone" && b.kind === "zone") return a.zone === b.zone && a.owner === b.owner;
+  if (a.kind === "zone" && b.kind === "zone")
+    return a.zone === b.zone && a.owner === b.owner;
   return a.kind === b.kind;
 }
 
-export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEvent): GameSurface | null {
+export function reduceGameSurface(
+  open: GameSurface | null,
+  event: GameSurfaceEvent,
+): GameSurface | null {
   switch (event.type) {
     case "open":
-      if (canKeepGuide(event.surface)) return { ...event.surface, guide: guideToKeep(open, event.surface.kind) };
+      if (canKeepGuide(event.surface))
+        return {
+          ...event.surface,
+          guide: guideToKeep(open, event.surface.kind),
+        };
       // Opening the Guide restores it, at the place it was left unless it's sent to a page.
       if (event.surface.kind === "guide") {
-        return { kind: "guide", target: event.surface.target ?? guideKept(open)?.target };
+        return {
+          kind: "guide",
+          target: event.surface.target ?? guideKept(open)?.target,
+        };
       }
       return event.surface;
     case "toggle":
@@ -91,9 +121,11 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
     case "close":
       if (canKeepGuide(open)) {
         if (event.kind === "guide") return withoutGuide(open);
-        if (event.kind === "scouting" && open.kind === "scouting") return closeScouting(open);
+        if (event.kind === "scouting" && open.kind === "scouting")
+          return closeScouting(open);
         // The drawer holds the player list that a scouting panel opened from it sits beside.
-        if (event.kind === "players" && isDrawerOpen(open)) return open.guide ?? null;
+        if (event.kind === "players" && isDrawerOpen(open))
+          return open.guide ?? null;
         return open.kind === event.kind ? (open.guide ?? null) : open;
       }
       return open?.kind === event.kind ? null : open;
@@ -107,7 +139,9 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
       };
     case "guideMinimized": {
       const guide = guideKept(open);
-      return guide && !!guide.minimized !== event.minimized ? { ...guide, minimized: event.minimized } : open;
+      return guide && !!guide.minimized !== event.minimized
+        ? { ...guide, minimized: event.minimized }
+        : open;
     }
     case "closeOverlays":
       if (open?.kind === "players" || open?.kind === "scouting") {
@@ -125,7 +159,10 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
   }
 }
 
-function closeScouting({ fromDrawer, guide }: Extract<GameSurface, { kind: "scouting" }>): GameSurface | null {
+function closeScouting({
+  fromDrawer,
+  guide,
+}: Extract<GameSurface, { kind: "scouting" }>): GameSurface | null {
   return fromDrawer ? { kind: "players", guide } : (guide ?? null);
 }
 
@@ -141,12 +178,20 @@ export function guideKept(open: GameSurface | null): GuideSurface | undefined {
 
 /** The Guide is on screen, on its own or minimized beside what's open. */
 export function isGuideShowing(open: GameSurface | null): boolean {
-  return open?.kind === "guide" || (canSitBesideGuide(open) && !!open.guide?.minimized);
+  return (
+    open?.kind === "guide" ||
+    (canSitBesideGuide(open) && !!open.guide?.minimized)
+  );
 }
 
-function guideToKeep(open: GameSurface | null, next: KeepsGuide["kind"]): GuideSurface | undefined {
+function guideToKeep(
+  open: GameSurface | null,
+  next: KeepsGuide["kind"],
+): GuideSurface | undefined {
   const guide = guideKept(open);
-  return guide?.minimized || next === "players" || next === "scouting" ? guide : undefined;
+  return guide?.minimized || next === "players" || next === "scouting"
+    ? guide
+    : undefined;
 }
 
 /** What's open over the board, and the card selected on it or in one of its panels. */
@@ -161,32 +206,53 @@ export type GameBoardEvent =
   /** A card left its zone by a drag or a hotkey, so it's no longer selected there. */
   | { type: "cardMoved"; cardId: string };
 
-export function reduceGameBoard(board: GameBoard, event: GameBoardEvent): GameBoard {
+export function reduceGameBoard(
+  board: GameBoard,
+  event: GameBoardEvent,
+): GameBoard {
   if (event.type === "select") {
-    return event.card === board.selectedCard ? board : { ...board, selectedCard: event.card };
+    return event.card === board.selectedCard
+      ? board
+      : { ...board, selectedCard: event.card };
   }
   if (event.type === "cardMoved") {
-    return event.cardId === board.selectedCard?.card.id ? { ...board, selectedCard: null } : board;
+    return event.cardId === board.selectedCard?.card.id
+      ? { ...board, selectedCard: null }
+      : board;
   }
   const open = reduceGameSurface(board.open, event);
   if (open === board.open) return board;
-  return { open, selectedCard: keepsSelectedCard(board, open) ? board.selectedCard : null };
+  return {
+    open,
+    selectedCard: keepsSelectedCard(board, open) ? board.selectedCard : null,
+  };
 }
 
-function keepsSelectedCard({ open, selectedCard }: GameBoard, next: GameSurface | null): boolean {
-  if (!selectedCard || !PANEL_ZONES.some((zone) => zone === selectedCard.zone)) return true;
+function keepsSelectedCard(
+  { open, selectedCard }: GameBoard,
+  next: GameSurface | null,
+): boolean {
+  if (!selectedCard || !PANEL_ZONES.some((zone) => zone === selectedCard.zone))
+    return true;
   // Out of sight, a panel's card stays selected only for Actions to act on, or to move into a panel Actions opens.
   if (next?.kind === "actions") return true;
   if (next?.kind !== "zone") return false;
-  if (open?.kind === "actions" || (open && isSameSurface(open, next))) return true;
+  if (open?.kind === "actions" || (open && isSameSurface(open, next)))
+    return true;
   return next.zone === selectedCard.zone && next.owner === selectedCard.owner;
 }
 
 /** The player list is showing in the drawer, with or without a scouting panel beside it. */
 export function isDrawerOpen(open: GameSurface | null): boolean {
-  return open?.kind === "players" || (open?.kind === "scouting" && open.fromDrawer);
+  return (
+    open?.kind === "players" || (open?.kind === "scouting" && open.fromDrawer)
+  );
 }
 
-export function isZonePanelOpen(open: GameSurface | null, zone: PanelZone, owner: ZoneOwner): boolean {
+export function isZonePanelOpen(
+  open: GameSurface | null,
+  zone: PanelZone,
+  owner: ZoneOwner,
+): boolean {
   return open?.kind === "zone" && open.zone === zone && open.owner === owner;
 }

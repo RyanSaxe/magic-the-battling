@@ -11,5 +11,5 @@ export function CrossIcon() {
     >
       <path d="M2 2l20 20M22 2L2 22" />
     </svg>
-  )
+  );
 }

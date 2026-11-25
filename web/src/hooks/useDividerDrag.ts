@@ -106,11 +106,14 @@ export function useDividerDrag({
     [enabled, handleWindowPointerEnd, handleWindowPointerMove, orientation],
   );
 
-  const handleClick: MouseEventHandler<HTMLElement> = useCallback((event) => {
-    if (!enabled) return;
-    event.preventDefault();
-    event.stopPropagation();
-  }, [enabled]);
+  const handleClick: MouseEventHandler<HTMLElement> = useCallback(
+    (event) => {
+      if (!enabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    [enabled],
+  );
 
   const handleDoubleClick: MouseEventHandler<HTMLElement> = useCallback(
     (event) => {

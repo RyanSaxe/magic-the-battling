@@ -19,7 +19,9 @@ interface StoredProgressEntry {
 type StoredProgress = Record<string, StoredProgressEntry>;
 
 function canUseStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  return (
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+  );
 }
 
 function buildScopeKey(gameId: string, playerKey?: string | null): string {
@@ -30,7 +32,8 @@ function normalizeEntry(value: unknown): StoredProgressEntry | null {
   if (Array.isArray(value)) {
     return {
       seen: value.filter(
-        (entry): entry is string => typeof entry === "string" && entry.length > 0,
+        (entry): entry is string =>
+          typeof entry === "string" && entry.length > 0,
       ),
     };
   }
@@ -41,15 +44,17 @@ function normalizeEntry(value: unknown): StoredProgressEntry | null {
 
   const seen = Array.isArray((value as { seen?: unknown }).seen)
     ? (value as { seen: unknown[] }).seen.filter(
-      (entry): entry is string => typeof entry === "string" && entry.length > 0,
-    )
+        (entry): entry is string =>
+          typeof entry === "string" && entry.length > 0,
+      )
     : [];
   const skippedAll = (value as { skipped_all?: unknown }).skipped_all;
   const activeGuideValue = (value as { active_guide?: unknown }).active_guide;
-  const activeGuide = activeGuideValue
-    && typeof activeGuideValue === "object"
-    && typeof (activeGuideValue as { id?: unknown }).id === "string"
-    && typeof (activeGuideValue as { step?: unknown }).step === "number"
+  const activeGuide =
+    activeGuideValue &&
+    typeof activeGuideValue === "object" &&
+    typeof (activeGuideValue as { id?: unknown }).id === "string" &&
+    typeof (activeGuideValue as { step?: unknown }).step === "number"
       ? {
           id: (activeGuideValue as { id: string }).id,
           step: (activeGuideValue as { step: number }).step,
@@ -94,7 +99,9 @@ function pruneProgress(progress: StoredProgress): StoredProgress {
     return progress;
   }
 
-  return Object.fromEntries(entries.slice(entries.length - MAX_TRACKED_SESSIONS));
+  return Object.fromEntries(
+    entries.slice(entries.length - MAX_TRACKED_SESSIONS),
+  );
 }
 
 function writeProgress(progress: StoredProgress): void {
@@ -123,10 +130,11 @@ function readEntry(
     ? buildScopeKey(identity.gameId, identity.legacyPlayerId)
     : null;
 
-  return progress[primaryKey]
-    ?? (legacyKey ? progress[legacyKey] : undefined)
-    ?? progress[buildScopeKey(identity.gameId)]
-    ?? { seen: [] };
+  return (
+    progress[primaryKey] ??
+    (legacyKey ? progress[legacyKey] : undefined) ??
+    progress[buildScopeKey(identity.gameId)] ?? { seen: [] }
+  );
 }
 
 function resolveWriteScope(identity: GuideStorageIdentity): string | null {

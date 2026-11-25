@@ -3,22 +3,22 @@ export function CardGrid({
   cardWidth,
   children,
 }: {
-  columns: number
-  cardWidth: number
-  children: React.ReactNode
+  columns: number;
+  cardWidth: number;
+  children: React.ReactNode;
 }) {
   return (
     <div
       style={{
-        display: 'grid',
+        display: "grid",
         gridTemplateColumns: `repeat(${columns}, ${cardWidth}px)`,
-        gap: '6px',
-        justifyContent: 'center',
-        maxWidth: '100%',
-        overflow: 'hidden',
+        gap: "6px",
+        justifyContent: "center",
+        maxWidth: "100%",
+        overflow: "hidden",
       }}
     >
       {children}
     </div>
-  )
+  );
 }

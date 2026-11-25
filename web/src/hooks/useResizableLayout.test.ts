@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { measureFromPlacement } from "./useResizableLayout";
 import { ZONE_LAYOUT_PADDING } from "./useCardLayout";
 
-const PADDING_V = ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
+const PADDING_V =
+  ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
 
 describe("measureFromPlacement", () => {
   it("returns null before any zone has been measured", () => {

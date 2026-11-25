@@ -1,27 +1,49 @@
-import { useEffect, useState, type CSSProperties } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/authState'
-import { useToast } from '../contexts'
-import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
-import { SurfaceCard } from '../components/common/SurfaceCard'
-import { JoinGameModal } from '../components/home/JoinGameModal'
-import { CloseSeatDialog } from '../components/ResumeGame'
-import { AddCubeModal } from '../components/dashboard/AddCubeModal'
-import { CubeTile } from '../components/dashboard/CubeTile'
-import { DashboardFrame } from '../components/dashboard/DashboardFrame'
-import { DeletePresetDialog } from '../components/dashboard/DeletePresetDialog'
-import { GameTile } from '../components/dashboard/GameTile'
-import { JoinCodeBox } from '../components/dashboard/JoinCodeBox'
-import { ResumeBanner } from '../components/dashboard/ResumeBanner'
-import { LoadMoreButton } from '../components/dashboard/ResultList'
-import { Count, NoticeTile, PlayIcon, SectionCounts, SectionLink, SectionTitle, WinsCount } from '../components/dashboard/Section'
-import { SegmentedFilter } from '../components/dashboard/SegmentedFilter'
-import { deleteBattler, getBattlers, getFollowing, getMyGames, unfollowCube } from '../api/client'
-import { useFirstLoad } from '../hooks/useFirstLoad'
-import { useResumableGames, type ResumableSeat } from '../hooks/useResumableGames'
-import type { GameSummary } from '../types'
-import { battlerPlayUrl } from '../utils/battlerPlayUrl'
-import { countLabel, cubeTitle, formatWhen, upgradesLabel } from '../utils/accountFormat'
+import { useEffect, useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/authState";
+import { useToast } from "../contexts";
+import { AppHeader, UserMenuButton } from "../components/common/AppHeader";
+import { SurfaceCard } from "../components/common/SurfaceCard";
+import { JoinGameModal } from "../components/home/JoinGameModal";
+import { CloseSeatDialog } from "../components/ResumeGame";
+import { AddCubeModal } from "../components/dashboard/AddCubeModal";
+import { CubeTile } from "../components/dashboard/CubeTile";
+import { DashboardFrame } from "../components/dashboard/DashboardFrame";
+import { DeletePresetDialog } from "../components/dashboard/DeletePresetDialog";
+import { GameTile } from "../components/dashboard/GameTile";
+import { JoinCodeBox } from "../components/dashboard/JoinCodeBox";
+import { ResumeBanner } from "../components/dashboard/ResumeBanner";
+import { LoadMoreButton } from "../components/dashboard/ResultList";
+import {
+  Count,
+  NoticeTile,
+  PlayIcon,
+  SectionCounts,
+  SectionLink,
+  SectionTitle,
+  WinsCount,
+} from "../components/dashboard/Section";
+import { SegmentedFilter } from "../components/dashboard/SegmentedFilter";
+import {
+  deleteBattler,
+  getBattlers,
+  getFollowing,
+  getMyGames,
+  unfollowCube,
+} from "../api/client";
+import { useFirstLoad } from "../hooks/useFirstLoad";
+import {
+  useResumableGames,
+  type ResumableSeat,
+} from "../hooks/useResumableGames";
+import type { GameSummary } from "../types";
+import { battlerPlayUrl } from "../utils/battlerPlayUrl";
+import {
+  countLabel,
+  cubeTitle,
+  formatWhen,
+  upgradesLabel,
+} from "../utils/accountFormat";
 import {
   canRemove,
   libraryEntries,
@@ -39,120 +61,145 @@ import {
   type Library,
   type LibraryEntry,
   type LibraryPage,
-} from './dashboardState'
+} from "./dashboardState";
 
-const RECENT_GAME_COUNT = 3
+const RECENT_GAME_COUNT = 3;
 
-type BoardSection = 'library' | 'recent'
+type BoardSection = "library" | "recent";
 
 /** The two sections' names, shared by their headers on wide screens and the switch that stands in for them below. */
-const SECTION_NAMES: Record<BoardSection, string> = { library: 'Cubes & Decks', recent: 'Recent Games' }
+const SECTION_NAMES: Record<BoardSection, string> = {
+  library: "Cubes & Decks",
+  recent: "Recent Games",
+};
 
 /** Both headers share a height and center their items, so their titles share a baseline and their first cards a top. */
-const SECTION_HEADER = 'flex min-h-9 flex-wrap items-center gap-x-3 gap-y-2'
+const SECTION_HEADER = "flex min-h-9 flex-wrap items-center gap-x-3 gap-y-2";
 
 /** Places a card in the grid on screens 1280px and wider: the library fills columns 1 and 2, and recent games column 4, after a spacer. */
 function gridCell(row: number, column: number): CSSProperties {
-  return { '--grid-row': row, '--grid-column': column } as CSSProperties
+  return { "--grid-row": row, "--grid-column": column } as CSSProperties;
 }
 
-const GRID_CELL = 'xl:[grid-row:var(--grid-row)] xl:[grid-column:var(--grid-column)]'
+const GRID_CELL =
+  "xl:[grid-row:var(--grid-row)] xl:[grid-column:var(--grid-column)]";
 
 interface MyGames {
-  games: GameSummary[]
-  totalGames: number
-  totalWins: number
+  games: GameSummary[];
+  totalGames: number;
+  totalWins: number;
 }
 
 async function loadLibrary(): Promise<Library> {
-  const [saved, following] = await Promise.all([getBattlers(), getFollowing()])
-  return loadedLibrary(saved, following)
+  const [saved, following] = await Promise.all([getBattlers(), getFollowing()]);
+  return loadedLibrary(saved, following);
 }
 
 async function loadMyGames(): Promise<MyGames> {
-  const data = await getMyGames(0)
-  return { games: data.games, totalGames: data.total_games, totalWins: data.total_wins }
+  const data = await getMyGames(0);
+  return {
+    games: data.games,
+    totalGames: data.total_games,
+    totalWins: data.total_wins,
+  };
 }
 
 export function Dashboard() {
-  const navigate = useNavigate()
-  const { user, loading: authLoading } = useAuth()
-  const { addToast } = useToast()
-  const resumableGames = useResumableGames()
-  const [closedSeatIds, setClosedSeatIds] = useState<string[]>([])
-  const [closingSeat, setClosingSeat] = useState<ResumableSeat | null>(null)
-  const resumable = resumableGames.find((seat) => !closedSeatIds.includes(seat.gameId))
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { addToast } = useToast();
+  const resumableGames = useResumableGames();
+  const [closedSeatIds, setClosedSeatIds] = useState<string[]>([]);
+  const [closingSeat, setClosingSeat] = useState<ResumableSeat | null>(null);
+  const resumable = resumableGames.find(
+    (seat) => !closedSeatIds.includes(seat.gameId),
+  );
 
-  const libraryLoad = useFirstLoad(loadLibrary, !!user)
-  const myGamesLoad = useFirstLoad(loadMyGames, !!user)
-  const [phoneSection, setPhoneSection] = useState<BoardSection>('library')
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showJoinModal, setShowJoinModal] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState<Extract<LibraryEntry, { kind: 'saved' }> | null>(null)
+  const libraryLoad = useFirstLoad(loadLibrary, !!user);
+  const myGamesLoad = useFirstLoad(loadMyGames, !!user);
+  const [phoneSection, setPhoneSection] = useState<BoardSection>("library");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState<Extract<
+    LibraryEntry,
+    { kind: "saved" }
+  > | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate('/login?returnTo=/dashboard', { replace: true })
-  }, [authLoading, user, navigate])
+    if (!authLoading && !user)
+      navigate("/login?returnTo=/dashboard", { replace: true });
+  }, [authLoading, user, navigate]);
 
-  const library = libraryLoad.state.status === 'loaded' ? libraryLoad.state.value : null
-  const myGames = myGamesLoad.state.status === 'loaded' ? myGamesLoad.state.value : null
+  const library =
+    libraryLoad.state.status === "loaded" ? libraryLoad.state.value : null;
+  const myGames =
+    myGamesLoad.state.status === "loaded" ? myGamesLoad.state.value : null;
 
   const updateLibrary = (change: (library: Library) => Library) =>
-    libraryLoad.update((prev) => (prev.status === 'loaded' ? { ...prev, value: change(prev.value) } : prev))
+    libraryLoad.update((prev) =>
+      prev.status === "loaded" ? { ...prev, value: change(prev.value) } : prev,
+    );
 
   const loadMoreLibrary = async () => {
-    const next = library && nextLibraryPage(library)
-    if (!next) return
-    updateLibrary(withLibraryPageRequested)
+    const next = library && nextLibraryPage(library);
+    if (!next) return;
+    updateLibrary(withLibraryPageRequested);
     try {
       const page: LibraryPage =
-        next.list === 'saved'
-          ? { list: 'saved', page: await getBattlers(next.offset) }
-          : { list: 'following', page: await getFollowing(next.offset) }
-      updateLibrary((current) => withLibraryPage(current, page))
+        next.list === "saved"
+          ? { list: "saved", page: await getBattlers(next.offset) }
+          : { list: "following", page: await getFollowing(next.offset) };
+      updateLibrary((current) => withLibraryPage(current, page));
     } catch {
-      updateLibrary(withLibraryPageFailed)
-      addToast('Failed to load more', 'error')
+      updateLibrary(withLibraryPageFailed);
+      addToast("Failed to load more", "error");
     }
-  }
+  };
 
   const performRemove = async (entry: LibraryEntry) => {
-    if (!library || !canRemove(library, entry)) return
-    updateLibrary((current) => withRemovalStarted(current, entry))
+    if (!library || !canRemove(library, entry)) return;
+    updateLibrary((current) => withRemovalStarted(current, entry));
     try {
-      await (entry.kind === 'saved' ? deleteBattler(entry.preset.id) : unfollowCube(entry.follow.id))
-      updateLibrary((current) => withRemoved(current, entry))
+      await (entry.kind === "saved"
+        ? deleteBattler(entry.preset.id)
+        : unfollowCube(entry.follow.id));
+      updateLibrary((current) => withRemoved(current, entry));
     } catch {
-      updateLibrary((current) => withRemovalFailed(current, entry))
-      addToast(entry.kind === 'saved' ? 'Failed to delete' : 'Failed to unfollow', 'error')
+      updateLibrary((current) => withRemovalFailed(current, entry));
+      addToast(
+        entry.kind === "saved" ? "Failed to delete" : "Failed to unfollow",
+        "error",
+      );
     }
-  }
+  };
 
   const remove = (entry: LibraryEntry) => {
-    if (!library || !canRemove(library, entry)) return
-    if (entry.kind === 'saved') {
-      setConfirmingDelete(entry)
-      return
+    if (!library || !canRemove(library, entry)) return;
+    if (entry.kind === "saved") {
+      setConfirmingDelete(entry);
+      return;
     }
-    void performRemove(entry)
-  }
+    void performRemove(entry);
+  };
 
-  if (authLoading || !user) return null
+  if (authLoading || !user) return null;
 
-  const entries = library ? libraryEntries(library) : []
-  const hasMore = !!library && libraryHasMore(library)
-  const allCount = library ? `${entries.length}${hasMore ? '+' : ''}` : ''
-  const isLibraryEmpty = !!library && entries.length === 0
-  const libraryRows = Math.max(1, Math.ceil((entries.length + 1) / 2))
-  const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? []
+  const entries = library ? libraryEntries(library) : [];
+  const hasMore = !!library && libraryHasMore(library);
+  const allCount = library ? `${entries.length}${hasMore ? "+" : ""}` : "";
+  const isLibraryEmpty = !!library && entries.length === 0;
+  const libraryRows = Math.max(1, Math.ceil((entries.length + 1) / 2));
+  const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? [];
   // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
-  const libraryCell = `${GRID_CELL} ${phoneSection === 'library' ? '' : 'max-xl:hidden'}`
-  const libraryNotice = `col-span-full ${libraryCell} xl:col-span-2`
+  const libraryCell = `${GRID_CELL} ${phoneSection === "library" ? "" : "max-xl:hidden"}`;
+  const libraryNotice = `col-span-full ${libraryCell} xl:col-span-2`;
 
   return (
     <>
       <DashboardFrame header={<AppHeader account={<UserMenuButton />} />}>
-        {resumable && <ResumeBanner seat={resumable} onClose={setClosingSeat} />}
+        {resumable && (
+          <ResumeBanner seat={resumable} onClose={setClosingSeat} />
+        )}
 
         <SurfaceCard
           as="section"
@@ -163,13 +210,16 @@ export function Dashboard() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => navigate('/play')}
+              onClick={() => navigate("/play")}
               className="btn btn-primary flex h-9 flex-1 items-center justify-center gap-2 !py-0 px-5 font-semibold sm:flex-none"
             >
               <PlayIcon />
               New Game
             </button>
-            <JoinCodeBox playerName={user.username} className="hidden md:flex" />
+            <JoinCodeBox
+              playerName={user.username}
+              className="hidden md:flex"
+            />
             <button
               type="button"
               onClick={() => setShowJoinModal(true)}
@@ -180,10 +230,16 @@ export function Dashboard() {
           </div>
           {myGames && (
             <SectionCounts className="flex items-center justify-between gap-4 whitespace-nowrap sm:justify-end">
-              <Count value={myGames.totalGames}>{' '}{myGames.totalGames === 1 ? 'game' : 'games'}</Count>
+              <Count value={myGames.totalGames}>
+                {" "}
+                {myGames.totalGames === 1 ? "game" : "games"}
+              </Count>
               <WinsCount wins={myGames.totalWins} games={myGames.totalGames} />
               {library && (
-                <Count value={allCount} className="hidden lg:inline"> saved &amp; followed</Count>
+                <Count value={allCount} className="hidden lg:inline">
+                  {" "}
+                  saved &amp; followed
+                </Count>
               )}
             </SectionCounts>
           )}
@@ -192,7 +248,11 @@ export function Dashboard() {
         <div
           data-testid="dashboard-board"
           // Only the last row flexes, so when Recent Games runs longer it lengthens that row and no cube card.
-          style={{ '--board-rows': `auto repeat(${libraryRows}, auto) 1fr` } as CSSProperties}
+          style={
+            {
+              "--board-rows": `auto repeat(${libraryRows}, auto) 1fr`,
+            } as CSSProperties
+          }
           className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.5rem_minmax(0,1fr)] xl:[grid-template-rows:var(--board-rows)]"
         >
           <SegmentedFilter
@@ -202,8 +262,8 @@ export function Dashboard() {
             onChange={setPhoneSection}
             className="col-span-full w-full sm:w-auto sm:justify-self-start xl:hidden"
             options={[
-              { value: 'library', label: SECTION_NAMES.library },
-              { value: 'recent', label: SECTION_NAMES.recent },
+              { value: "library", label: SECTION_NAMES.library },
+              { value: "recent", label: SECTION_NAMES.recent },
             ]}
           />
 
@@ -222,7 +282,8 @@ export function Dashboard() {
           >
             {isLibraryEmpty && (
               <p className="max-w-sm text-sm text-[var(--ivory-felt)]">
-                Save a cube or deck with your settings to play it again in one click.
+                Save a cube or deck with your settings to play it again in one
+                click.
               </p>
             )}
             <button
@@ -232,11 +293,17 @@ export function Dashboard() {
             >
               + Add Cube / Deck
             </button>
-            <SectionLink to="/dashboard/discover">Discover cubes / decks →</SectionLink>
+            <SectionLink to="/dashboard/discover">
+              Discover cubes / decks →
+            </SectionLink>
           </div>
 
-          {libraryLoad.state.status === 'failed' ? (
-            <NoticeTile style={gridCell(2, 2)} className={libraryCell} action={{ label: 'Retry', onClick: libraryLoad.retry }}>
+          {libraryLoad.state.status === "failed" ? (
+            <NoticeTile
+              style={gridCell(2, 2)}
+              className={libraryCell}
+              action={{ label: "Retry", onClick: libraryLoad.retry }}
+            >
               Your cubes and decks didn&apos;t load.
             </NoticeTile>
           ) : !library ? (
@@ -248,7 +315,10 @@ export function Dashboard() {
               <LibraryTile
                 key={libraryEntryKey(entry)}
                 entry={entry}
-                style={gridCell(2 + Math.floor((index + 1) / 2), 1 + ((index + 1) % 2))}
+                style={gridCell(
+                  2 + Math.floor((index + 1) / 2),
+                  1 + ((index + 1) % 2),
+                )}
                 className={libraryCell}
                 removable={canRemove(library, entry)}
                 onRemove={remove}
@@ -270,23 +340,32 @@ export function Dashboard() {
           <section
             aria-label={SECTION_NAMES.recent}
             data-beside-cubes={entries.length > 0 || undefined}
-            className={`${phoneSection === 'recent' ? 'contents' : 'hidden'} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:grid-cols-1 xl:gap-3 xl:[grid-row:1/-1] xl:self-start`}
+            className={`${phoneSection === "recent" ? "contents" : "hidden"} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:grid-cols-1 xl:gap-3 xl:[grid-row:1/-1] xl:self-start`}
           >
-            <div data-testid="recent-header" className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}>
+            <div
+              data-testid="recent-header"
+              className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}
+            >
               <div className="max-xl:hidden">
                 <SectionTitle>{SECTION_NAMES.recent}</SectionTitle>
               </div>
               <SectionLink to="/dashboard/games">All games →</SectionLink>
             </div>
 
-            {myGamesLoad.state.status === 'failed' ? (
-              <NoticeTile action={{ label: 'Retry', onClick: myGamesLoad.retry }}>Your games didn&apos;t load.</NoticeTile>
+            {myGamesLoad.state.status === "failed" ? (
+              <NoticeTile
+                action={{ label: "Retry", onClick: myGamesLoad.retry }}
+              >
+                Your games didn&apos;t load.
+              </NoticeTile>
             ) : !myGames ? (
               <NoticeTile>Loading...</NoticeTile>
             ) : recentGames.length === 0 ? (
               <NoticeTile>Your finished games show up here.</NoticeTile>
             ) : (
-              recentGames.map((game) => <GameTile key={game.game_id} game={game} />)
+              recentGames.map((game) => (
+                <GameTile key={game.game_id} game={game} />
+              ))
             )}
           </section>
         </div>
@@ -297,20 +376,24 @@ export function Dashboard() {
           onClose={() => setShowAddModal(false)}
           onCreated={(preset) => {
             // The list can finish loading after Add is sent, so this can't go by the `library` of that render.
-            libraryLoad.updateOrReload((current) => withAddedPreset(current, preset))
-            setShowAddModal(false)
+            libraryLoad.updateOrReload((current) =>
+              withAddedPreset(current, preset),
+            );
+            setShowAddModal(false);
           }}
           addToast={addToast}
         />
       )}
-      {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+      {showJoinModal && (
+        <JoinGameModal onClose={() => setShowJoinModal(false)} />
+      )}
       {closingSeat && (
         <CloseSeatDialog
           seat={closingSeat}
           onKeep={() => setClosingSeat(null)}
           onClosed={() => {
-            setClosedSeatIds((ids) => [...ids, closingSeat.gameId])
-            setClosingSeat(null)
+            setClosedSeatIds((ids) => [...ids, closingSeat.gameId]);
+            setClosingSeat(null);
           }}
         />
       )}
@@ -320,14 +403,14 @@ export function Dashboard() {
           imageUri={confirmingDelete.preset.cube_image_uri}
           onKeep={() => setConfirmingDelete(null)}
           onDelete={() => {
-            const entry = confirmingDelete
-            setConfirmingDelete(null)
-            void performRemove(entry)
+            const entry = confirmingDelete;
+            setConfirmingDelete(null);
+            void performRemove(entry);
           }}
         />
       )}
     </>
-  )
+  );
 }
 
 function LibraryTile({
@@ -337,65 +420,91 @@ function LibraryTile({
   removable,
   onRemove,
 }: {
-  entry: LibraryEntry
-  style: CSSProperties
-  className: string
+  entry: LibraryEntry;
+  style: CSSProperties;
+  className: string;
   /** False while this card's delete or unfollow, or a page of the library, is loading. */
-  removable: boolean
-  onRemove: (entry: LibraryEntry) => void
+  removable: boolean;
+  onRemove: (entry: LibraryEntry) => void;
 }) {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  if (entry.kind === 'saved') {
-    const { preset } = entry
-    const href = `/dashboard/list/${preset.id}`
+  if (entry.kind === "saved") {
+    const { preset } = entry;
+    const href = `/dashboard/list/${preset.id}`;
     return (
       <CubeTile
         title={cubeTitle(preset)}
         cubeId={preset.cube_id}
         imageUri={preset.cube_image_uri}
-        badge={preset.play_mode === 'constructed' ? 'Deck' : 'Cube'}
-        chips={[countLabel(preset.puppet_count, 'opponent'), upgradesLabel(preset.use_upgrades)]}
+        badge={preset.play_mode === "constructed" ? "Deck" : "Cube"}
+        chips={[
+          countLabel(preset.puppet_count, "opponent"),
+          upgradesLabel(preset.use_upgrades),
+        ]}
         footer={
           preset.my_game_count > 0 ? (
             <>
-              <Count value={preset.my_game_count}>{' '}{preset.my_game_count === 1 ? 'game' : 'games'}</Count>
-              {preset.my_last_played && ` · ${formatWhen(preset.my_last_played)}`}
+              <Count value={preset.my_game_count}>
+                {" "}
+                {preset.my_game_count === 1 ? "game" : "games"}
+              </Count>
+              {preset.my_last_played &&
+                ` · ${formatWhen(preset.my_last_played)}`}
             </>
           ) : (
-            'No games yet'
+            "No games yet"
           )
         }
         href={href}
         onPlay={() => navigate(battlerPlayUrl(preset))}
         menuItems={[
-          { label: 'View', onSelect: () => navigate(href) },
-          { label: 'Delete', onSelect: () => onRemove(entry), danger: true, disabled: !removable },
+          { label: "View", onSelect: () => navigate(href) },
+          {
+            label: "Delete",
+            onSelect: () => onRemove(entry),
+            danger: true,
+            disabled: !removable,
+          },
         ]}
         style={style}
         className={className}
       />
-    )
+    );
   }
 
-  const { follow } = entry
-  const href = `/cube/${encodeURIComponent(follow.cube_id)}`
+  const { follow } = entry;
+  const href = `/cube/${encodeURIComponent(follow.cube_id)}`;
   return (
     <CubeTile
       title={cubeTitle(follow)}
       cubeId={follow.cube_id}
       imageUri={follow.cube_image_uri}
       badge="Following"
-      chips={[countLabel(follow.human_player_count, 'player'), countLabel(follow.game_count, 'community game')]}
-      footer={follow.last_played ? `Last played ${formatWhen(follow.last_played)}` : 'No games yet'}
+      chips={[
+        countLabel(follow.human_player_count, "player"),
+        countLabel(follow.game_count, "community game"),
+      ]}
+      footer={
+        follow.last_played
+          ? `Last played ${formatWhen(follow.last_played)}`
+          : "No games yet"
+      }
       href={href}
-      onPlay={() => navigate(`/play?cubeId=${encodeURIComponent(follow.cube_id)}`)}
+      onPlay={() =>
+        navigate(`/play?cubeId=${encodeURIComponent(follow.cube_id)}`)
+      }
       menuItems={[
-        { label: 'View', onSelect: () => navigate(href) },
-        { label: 'Unfollow', onSelect: () => onRemove(entry), danger: true, disabled: !removable },
+        { label: "View", onSelect: () => navigate(href) },
+        {
+          label: "Unfollow",
+          onSelect: () => onRemove(entry),
+          danger: true,
+          disabled: !removable,
+        },
       ]}
       style={style}
       className={className}
     />
-  )
+  );
 }

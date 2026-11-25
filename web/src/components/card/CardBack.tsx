@@ -1,12 +1,12 @@
-import { CARD_BACK_IMAGE } from '../../constants/assets'
+import { CARD_BACK_IMAGE } from "../../constants/assets";
 
 interface CardBackProps {
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  dimensions?: { width: number; height: number }
-  tapped?: boolean
-  onClick?: () => void
-  className?: string
-  style?: React.CSSProperties
+  size?: "xs" | "sm" | "md" | "lg";
+  dimensions?: { width: number; height: number };
+  tapped?: boolean;
+  onClick?: () => void;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 const sizeStyles = {
@@ -14,25 +14,27 @@ const sizeStyles = {
   sm: { width: 80, height: 112 },
   md: { width: 130, height: 182 },
   lg: { width: 200, height: 280 },
-}
+};
 
 export function CardBack({
-  size = 'md',
+  size = "md",
   dimensions,
   tapped = false,
   onClick,
-  className = '',
+  className = "",
   style: externalStyle,
 }: CardBackProps) {
-  const dims = dimensions ?? sizeStyles[size]
+  const dims = dimensions ?? sizeStyles[size];
 
   const baseClasses = [
-    'card card-on-table',
-    'relative overflow-hidden',
-    onClick && 'cursor-pointer',
-    tapped && 'tapped',
+    "card card-on-table",
+    "relative overflow-hidden",
+    onClick && "cursor-pointer",
+    tapped && "tapped",
     className,
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
@@ -51,5 +53,5 @@ export function CardBack({
         draggable={false}
       />
     </div>
-  )
+  );
 }

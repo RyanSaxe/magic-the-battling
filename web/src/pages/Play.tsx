@@ -1,4 +1,10 @@
-import { startTransition, useState, useEffect, useRef, useCallback } from "react";
+import {
+  startTransition,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createGame, warmCubeCache } from "../api/client";
 import { useGame } from "../hooks/useGame";
@@ -11,18 +17,36 @@ import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { LoadingScreen } from "../components/common/LoadingScreen";
-import { type LoadingRouteState, goldfishSteps, loadStep, newLobbySteps } from "../components/common/loadingSteps";
+import {
+  type LoadingRouteState,
+  goldfishSteps,
+  loadStep,
+  newLobbySteps,
+} from "../components/common/loadingSteps";
 import { PageFrame } from "../components/common/PageFrame";
 import { ZoneLabel } from "../components/common/ZoneLabel";
 import { PlayerCard } from "../components/PlayerCard";
 import { PLAYER_ROW_STACK_CLASS } from "../components/PlayerList";
-import { CloseSeatDialog, ResumeGamesDialog, ResumeShelf } from "../components/ResumeGame";
-import { useResumableGames, type ResumableSeat } from "../hooks/useResumableGames";
+import {
+  CloseSeatDialog,
+  ResumeGamesDialog,
+  ResumeShelf,
+} from "../components/ResumeGame";
+import {
+  useResumableGames,
+  type ResumableSeat,
+} from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { InfoTip } from "../components/common/InfoTip";
 import { Switch } from "../components/common/Switch";
 import { UPGRADES_HELP } from "../constants/rules";
-import { BoardArt, BoardCubeTitle, BoardDrawerHead, BoardPlayGames, SeatLead } from "../components/setup/BoardParts";
+import {
+  BoardArt,
+  BoardCubeTitle,
+  BoardDrawerHead,
+  BoardPlayGames,
+  SeatLead,
+} from "../components/setup/BoardParts";
 import { CubeBanner } from "../components/setup/CubeBanner";
 import { GuidedSwitch } from "../components/setup/GuidedSwitch";
 import { SegmentedFilter } from "../components/dashboard/SegmentedFilter";
@@ -39,7 +63,11 @@ import {
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 import type { LobbyState, PlayMode } from "../types";
-import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
+import {
+  type AppError,
+  getAppErrorMessage,
+  unknownToAppError,
+} from "../utils/appError";
 import { DIALOG_BACKDROP } from "../components/common/styles";
 
 type SoloPhase =
@@ -54,7 +82,8 @@ type PlayView = "setup" | "options";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function normalizeCreateGameError(error: unknown): string {
-  return unknownToAppError(error, "create-game", "Failed to create game").message;
+  return unknownToAppError(error, "create-game", "Failed to create game")
+    .message;
 }
 
 function abandonStart(gameId: string) {
@@ -120,7 +149,16 @@ function useSoloLobbyWatcher(
       onNavigating();
       actions.startGame();
     }
-  }, [actions, autoStartEnabled, lobbyState, onNavigating, onNotEnoughPuppets, onStarting, pendingGameId, soloPhaseRef]);
+  }, [
+    actions,
+    autoStartEnabled,
+    lobbyState,
+    onNavigating,
+    onNotEnoughPuppets,
+    onStarting,
+    pendingGameId,
+    soloPhaseRef,
+  ]);
 
   return { reset };
 }
@@ -166,8 +204,24 @@ function FriendsIcon({ className }: { className: string }) {
 }
 
 const MODE_OPTIONS = [
-  { value: "solo" as const, label: <><GoldfishIcon className="setup-mode-icon" />Goldfish</> },
-  { value: "friends" as const, label: <><FriendsIcon className="setup-mode-icon" />Play with Friends</> },
+  {
+    value: "solo" as const,
+    label: (
+      <>
+        <GoldfishIcon className="setup-mode-icon" />
+        Goldfish
+      </>
+    ),
+  },
+  {
+    value: "friends" as const,
+    label: (
+      <>
+        <FriendsIcon className="setup-mode-icon" />
+        Play with Friends
+      </>
+    ),
+  },
 ];
 
 const PLAY_MODE_OPTIONS = [
@@ -177,7 +231,8 @@ const PLAY_MODE_OPTIONS = [
 
 const PITCHES: Record<ActiveMode, string> = {
   solo: "Fight historically winning hands, played face up. Move their cards and decide who would have won.",
-  friends: "See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!",
+  friends:
+    "See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!",
 };
 
 /** Both modes' pitches share one space, so switching between them moves nothing. */
@@ -185,7 +240,11 @@ function ModePitch({ mode }: { mode: ActiveMode }) {
   return (
     <div className="setup-pitch">
       {MODE_OPTIONS.map(({ value }) => (
-        <p key={value} className={value === mode ? "" : "invisible"} aria-hidden={value !== mode}>
+        <p
+          key={value}
+          className={value === mode ? "" : "invisible"}
+          aria-hidden={value !== mode}
+        >
           {PITCHES[value]}
         </p>
       ))}
@@ -211,14 +270,22 @@ export function Play() {
   const stripButtonRef = useRef<HTMLButtonElement>(null);
   const restoreStripFocusRef = useRef(false);
   const isBoard = useBoardDesktop();
-  const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
+  const [cubeId, setCubeId] = useState(
+    () => searchParams.get("cubeId") || "auto",
+  );
   // The banner follows the ID when Change settings closes, rather than asking the server about each key typed.
   const [bannerCubeId, setBannerCubeId] = useState(() => cubeId.trim());
-  const [useUpgrades, setUseUpgrades] = useState(() => searchParams.get("useUpgrades") !== "false");
-  const [playMode, setPlayMode] = useState<PlayMode>(() => (searchParams.get("playMode") === "constructed" ? "constructed" : "limited"));
+  const [useUpgrades, setUseUpgrades] = useState(
+    () => searchParams.get("useUpgrades") !== "false",
+  );
+  const [playMode, setPlayMode] = useState<PlayMode>(() =>
+    searchParams.get("playMode") === "constructed" ? "constructed" : "limited",
+  );
   const [opponents, setOpponents] = useState<OpponentCount>(() => {
     const p = Number(searchParams.get("puppetCount"));
-    return OPPONENT_OPTIONS.includes(p as OpponentCount) ? (p as OpponentCount) : 3;
+    return OPPONENT_OPTIONS.includes(p as OpponentCount)
+      ? (p as OpponentCount)
+      : 3;
   });
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
@@ -245,10 +312,16 @@ export function Play() {
   }, []);
 
   const [soloStartEnded, setSoloStartEnded] = useState(false);
-  const handleServerError = useCallback((error: AppError) => {
-    addToast(getAppErrorMessage(error, "play-connection", "Something went wrong."), "error");
-    if (soloPhaseRef.current === "navigating") setSoloStartEnded(true);
-  }, [addToast]);
+  const handleServerError = useCallback(
+    (error: AppError) => {
+      addToast(
+        getAppErrorMessage(error, "play-connection", "Something went wrong."),
+        "error",
+      );
+      if (soloPhaseRef.current === "navigating") setSoloStartEnded(true);
+    },
+    [addToast],
+  );
 
   const { lobbyState, gameState, actions, connectionError } = useGame(
     pendingGameId,
@@ -288,7 +361,9 @@ export function Play() {
   useEffect(() => {
     if (gameState?.game_id === pendingGameId && pendingGameId) {
       unfinishedStartRef.current = null;
-      const state: LoadingRouteState = { loadingSteps: goldfishSteps(playMode) };
+      const state: LoadingRouteState = {
+        loadingSteps: goldfishSteps(playMode),
+      };
       navigate(`/game/${pendingGameId}/play`, { state });
     }
   }, [gameState?.game_id, navigate, pendingGameId, playMode]);
@@ -301,14 +376,24 @@ export function Play() {
       lobbyState.cube_loading_status === "ready"
     ) {
       unfinishedStartRef.current = null;
-      const state: LoadingRouteState = { loadingSteps: newLobbySteps(playMode) };
+      const state: LoadingRouteState = {
+        loadingSteps: newLobbySteps(playMode),
+      };
       navigate(`/game/${pendingGameId}/lobby`, { state });
     }
-  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId, playMode]);
+  }, [
+    friendsLoading,
+    lobbyState?.cube_loading_status,
+    lobbyState?.game_id,
+    navigate,
+    pendingGameId,
+    playMode,
+  ]);
 
   useEffect(() => {
     const nextError =
-      lobbyState?.game_id === pendingGameId && lobbyState.cube_loading_status === "error"
+      lobbyState?.game_id === pendingGameId &&
+      lobbyState.cube_loading_status === "error"
         ? lobbyState.cube_loading_error
         : null;
     if (!nextError || nextError === lastLobbyErrorRef.current) {
@@ -353,7 +438,11 @@ export function Play() {
   useEffect(() => {
     if (connectionError && pendingGameId) {
       addToast(
-        getAppErrorMessage(connectionError, "play-connection", "That game is no longer available. Please start a new one."),
+        getAppErrorMessage(
+          connectionError,
+          "play-connection",
+          "That game is no longer available. Please start a new one.",
+        ),
         "error",
       );
       // A seat that moved is still the player's, in the tab or on the device that took it.
@@ -419,7 +508,10 @@ export function Play() {
         void abandonSeat(response.game_id, name, response.seat_token);
         return;
       }
-      saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      saveTabSession(response.game_id, {
+        sessionId: response.session_id,
+        playerId: response.player_id,
+      });
       if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
@@ -469,7 +561,10 @@ export function Play() {
         void abandonSeat(response.game_id, name, response.seat_token);
         return;
       }
-      saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      saveTabSession(response.game_id, {
+        sessionId: response.session_id,
+        playerId: response.player_id,
+      });
       if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
@@ -527,9 +622,13 @@ export function Play() {
     }
   };
 
-  const cubeLook = useCubeLook(bannerCubeId || (playMode === "limited" ? "auto" : null));
+  const cubeLook = useCubeLook(
+    bannerCubeId || (playMode === "limited" ? "auto" : null),
+  );
 
-  const seats = resumableGames.filter((seat) => !closedIds.includes(seat.gameId));
+  const seats = resumableGames.filter(
+    (seat) => !closedIds.includes(seat.gameId),
+  );
 
   const showView = (next: PlayView, byKeyboard = false) => {
     if (view === "options") setBannerCubeId(cubeId.trim());
@@ -554,7 +653,9 @@ export function Play() {
     // Its spaces don't break, so a line that wraps does so only after a dot.
     setup: [
       playMode === "constructed" ? "Constructed" : "Limited",
-      ...(activeMode === "solo" ? [`${opponents}\u00a0${opponents === 1 ? "opponent" : "opponents"}`] : []),
+      ...(activeMode === "solo"
+        ? [`${opponents}\u00a0${opponents === 1 ? "opponent" : "opponents"}`]
+        : []),
       `Upgrades\u00a0${useUpgrades ? "On" : "Off"}`,
     ].join("\u00a0· "),
     options: activeMode === "solo" ? "Goldfish options" : "Friends options",
@@ -589,7 +690,10 @@ export function Play() {
   const header = (
     <AppHeader
       helpers={
-        <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary hidden sm:inline-block">
+        <button
+          onClick={() => setShowJoinModal(true)}
+          className="btn btn-secondary hidden sm:inline-block"
+        >
           Join Game
         </button>
       }
@@ -603,7 +707,8 @@ export function Play() {
       type="button"
       onClick={() => showView(view === "setup" ? "options" : "setup", false)}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") restoreStripFocusRef.current = true;
+        if (event.key === "Enter" || event.key === " ")
+          restoreStripFocusRef.current = true;
       }}
       className="btn btn-secondary btn-pill"
     >
@@ -643,12 +748,19 @@ export function Play() {
           />
         </label>
       )}
-      <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
+      <GuidedSwitch
+        enabled={isGuidedMode}
+        setEnabled={handleGuidedModeToggle}
+      />
     </div>
   );
 
   const startButton = (
-    <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
+    <button
+      onClick={startNewGame}
+      disabled={!nameValid}
+      className="btn btn-primary setup-next"
+    >
       {activeMode === "solo" ? "Start Game" : "Create Lobby"}
     </button>
   );
@@ -677,14 +789,21 @@ export function Play() {
           <span className="setup-row-label">Opponents</span>
           <SegmentedFilter
             label="Opponents"
-            options={OPPONENT_OPTIONS.map((n) => ({ value: String(n), label: n }))}
+            options={OPPONENT_OPTIONS.map((n) => ({
+              value: String(n),
+              label: n,
+            }))}
             value={String(opponents)}
             onChange={(value) => setOpponents(Number(value) as OpponentCount)}
             variant="field"
           />
         </div>
       ) : (
-        <Switch spread checked={autoApproveSpectators} onChange={setAutoApproveSpectators}>
+        <Switch
+          spread
+          checked={autoApproveSpectators}
+          onChange={setAutoApproveSpectators}
+        >
           Open Spectating · let anyone watch
         </Switch>
       )}
@@ -706,8 +825,9 @@ export function Play() {
   );
 
   const isGoldfish = activeMode === "solo";
-  const previewOthers = Array.from({ length: isGoldfish ? opponents : 3 }, (_, i) =>
-    isGoldfish ? `Puppet\u00a0${i + 1}` : "Open seat",
+  const previewOthers = Array.from(
+    { length: isGoldfish ? opponents : 3 },
+    (_, i) => (isGoldfish ? `Puppet\u00a0${i + 1}` : "Open seat"),
   );
   const noDeck = cubeLook === null;
   const boardView = view;
@@ -721,12 +841,21 @@ export function Play() {
           contentClassName="setup-page board-page"
           hints="play"
           aside={
-            <aside aria-label="At the table" className="board-aside frame-chrome">
+            <aside
+              aria-label="At the table"
+              className="board-aside frame-chrome"
+            >
               <BoardDrawerHead />
               <div className="board-seats">
                 <div className={PLAYER_ROW_STACK_CLASS}>
-                  <PlayerCard isSelf lead={<SeatLead who="person" />} name={playerName || "\u00a0"}>
-                    {!isGoldfish && <span className="player-card-label">Host</span>}
+                  <PlayerCard
+                    isSelf
+                    lead={<SeatLead who="person" />}
+                    name={playerName || "\u00a0"}
+                  >
+                    {!isGoldfish && (
+                      <span className="player-card-label">Host</span>
+                    )}
                   </PlayerCard>
                   {previewOthers.map((name, index) => (
                     <PlayerCard
@@ -735,7 +864,9 @@ export function Play() {
                       lead={<SeatLead who={isGoldfish ? "puppet" : "open"} />}
                       name={name}
                     >
-                      {isGoldfish && <span className="player-card-label">Puppet</span>}
+                      {isGoldfish && (
+                        <span className="player-card-label">Puppet</span>
+                      )}
                     </PlayerCard>
                   ))}
                 </div>
@@ -764,7 +895,9 @@ export function Play() {
               <div className="board-words">
                 <BoardCubeTitle look={cubeLook} playMode={playMode} />
                 <p className="board-summary">{stripLabel}</p>
-                {(!noDeck || boardView !== "setup") && <div>{changeButton}</div>}
+                {(!noDeck || boardView !== "setup") && (
+                  <div>{changeButton}</div>
+                )}
               </div>
             </section>
             <section
@@ -772,14 +905,20 @@ export function Play() {
               onKeyDown={
                 boardView === "options"
                   ? (event) => {
-                      if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+                      if (
+                        event.key !== "Escape" ||
+                        event.nativeEvent.isComposing
+                      )
+                        return;
                       event.stopPropagation();
                       showView("setup", true);
                     }
                   : undefined
               }
             >
-              <ZoneLabel hideGrip>{boardView === "options" ? "Options" : "New game"}</ZoneLabel>
+              <ZoneLabel hideGrip>
+                {boardView === "options" ? "Options" : "New game"}
+              </ZoneLabel>
               <div className="board-two">
                 {boardView === "options" ? (
                   <div className="board-options">{optionsFields}</div>
@@ -819,7 +958,10 @@ export function Play() {
                 {personRow}
                 <div className="play-actions">
                   {activeMode === "friends" && (
-                    <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary setup-next play-join">
+                    <button
+                      onClick={() => setShowJoinModal(true)}
+                      className="btn btn-secondary setup-next play-join"
+                    >
                       Join Game
                     </button>
                   )}
@@ -840,7 +982,8 @@ export function Play() {
               className="setup-felt play-felt"
               // Hotkeys skip keys from inputs, which every field and switch here is.
               onKeyDown={(event) => {
-                if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+                if (event.key !== "Escape" || event.nativeEvent.isComposing)
+                  return;
                 event.stopPropagation();
                 showView("setup", true);
               }}
@@ -851,7 +994,9 @@ export function Play() {
         </PageFrame>
       )}
 
-      {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+      {showJoinModal && (
+        <JoinGameModal onClose={() => setShowJoinModal(false)} />
+      )}
 
       {showAllGames && (
         <ResumeGamesDialog
@@ -889,7 +1034,9 @@ export function Play() {
             </p>
             {validRecoveryCounts.length > 0 ? (
               <>
-                <p className="text-[var(--ivory-muted)] text-sm mb-3">Play with:</p>
+                <p className="text-[var(--ivory-muted)] text-sm mb-3">
+                  Play with:
+                </p>
                 <RecoveryOpponentPicker
                   counts={validRecoveryCounts}
                   onSelect={(count) => {

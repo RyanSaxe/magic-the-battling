@@ -33,14 +33,18 @@ type TrackedPlayerMap = Record<string, TrackedPlayerEntry>;
 type NewPlayerPreferenceMap = Record<string, NewPlayerPreferenceEntry>;
 
 function canUseStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  return (
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+  );
 }
 
 function readTrackedPlayerMap(): TrackedPlayerMap {
   if (!canUseStorage()) return {};
 
   try {
-    return parseTrackedPlayerMap(window.localStorage.getItem(GAME_PLAYER_MAP_KEY));
+    return parseTrackedPlayerMap(
+      window.localStorage.getItem(GAME_PLAYER_MAP_KEY),
+    );
   } catch {
     return {};
   }
@@ -62,8 +66,10 @@ function parseTrackedPlayerMap(raw: string | null): TrackedPlayerMap {
       if (typeof name !== "string" || !name) continue;
       if (typeof seenAt !== "number") continue;
       result[gameId] = { name, seen_at: seenAt };
-      if (typeof seatToken === "string" && seatToken) result[gameId].seat_token = seatToken;
-      if (typeof joinCode === "string" && joinCode) result[gameId].join_code = joinCode;
+      if (typeof seatToken === "string" && seatToken)
+        result[gameId].seat_token = seatToken;
+      if (typeof joinCode === "string" && joinCode)
+        result[gameId].join_code = joinCode;
     }
     return result;
   } catch {
@@ -179,7 +185,10 @@ export function rememberPlayerForGame(
   writeTrackedPlayerMap(pruneTrackedPlayerMap(map));
 }
 
-function toRememberedSeat(gameId: string, entry: TrackedPlayerEntry): RememberedSeat {
+function toRememberedSeat(
+  gameId: string,
+  entry: TrackedPlayerEntry,
+): RememberedSeat {
   return {
     gameId,
     name: entry.name,
@@ -195,11 +204,14 @@ export function getRememberedSeat(gameId: string): RememberedSeat | null {
   return entry ? toRememberedSeat(gameId, entry) : null;
 }
 
-export function findRememberedSeatByJoinCode(joinCode: string): RememberedSeat | null {
+export function findRememberedSeatByJoinCode(
+  joinCode: string,
+): RememberedSeat | null {
   const wanted = joinCode.trim().toUpperCase();
   if (!wanted) return null;
   const match = Object.entries(readTrackedPlayerMap()).find(
-    ([, entry]) => entry.join_code?.toUpperCase() === wanted && entry.seat_token,
+    ([, entry]) =>
+      entry.join_code?.toUpperCase() === wanted && entry.seat_token,
   );
   return match ? toRememberedSeat(match[0], match[1]) : null;
 }
@@ -221,9 +233,12 @@ export function forgetSeatForGame(gameId: string): void {
 }
 
 /** Forgets an account's seats as it logs out, but not a guest's seat in the same game. The seats stay in play. */
-export function forgetAccountSeats(seats: { game_id: string; player_name: string }[]): void {
+export function forgetAccountSeats(
+  seats: { game_id: string; player_name: string }[],
+): void {
   for (const seat of seats) {
-    if (getRememberedSeat(seat.game_id)?.name === seat.player_name) forgetSeatForGame(seat.game_id);
+    if (getRememberedSeat(seat.game_id)?.name === seat.player_name)
+      forgetSeatForGame(seat.game_id);
   }
 }
 
@@ -233,16 +248,26 @@ export function forgetAccountSeats(seats: { game_id: string; player_name: string
  * browser without them stored hasn't forgotten any.
  */
 export function hasForgottenSeat(gameId: string): boolean {
-  if (!canUseStorage() || window.localStorage.getItem(GAME_PLAYER_MAP_KEY) === null) return false;
+  if (
+    !canUseStorage() ||
+    window.localStorage.getItem(GAME_PLAYER_MAP_KEY) === null
+  )
+    return false;
   return !getRememberedSeat(gameId)?.seatToken;
 }
 
 /** Calls `listener` with the games whose seats another tab forgot, even if one has been remembered again since. */
-export function onSeatsForgotten(listener: (gameIds: string[]) => void): () => void {
+export function onSeatsForgotten(
+  listener: (gameIds: string[]) => void,
+): () => void {
   const onStorage = (event: StorageEvent) => {
     if (event.key !== GAME_PLAYER_MAP_KEY) return;
     const kept = parseTrackedPlayerMap(event.newValue);
-    listener(Object.keys(parseTrackedPlayerMap(event.oldValue)).filter((gameId) => !(gameId in kept)));
+    listener(
+      Object.keys(parseTrackedPlayerMap(event.oldValue)).filter(
+        (gameId) => !(gameId in kept),
+      ),
+    );
   };
   window.addEventListener("storage", onStorage);
   return () => window.removeEventListener("storage", onStorage);
@@ -302,7 +327,10 @@ export function getDefaultNewPlayerPreference(): boolean {
   return getGlobalGuidedModePreference() ?? true;
 }
 
-function buildScopedGamePreferenceKey(gameId: string, playerId: string): string {
+function buildScopedGamePreferenceKey(
+  gameId: string,
+  playerId: string,
+): string {
   return `${gameId}${GAME_PLAYER_PREF_KEY_SEP}${playerId}`;
 }
 

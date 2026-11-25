@@ -1,50 +1,55 @@
-import { useDraggable } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
-import type { Card as CardType, ZoneName } from '../types'
-import { Card } from '../components/card'
-import { useFaceDown } from '../contexts/faceDownState'
-import { makeDraggableId, makeZoneId, type DragData, type ZoneOwner } from './types'
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import type { Card as CardType, ZoneName } from "../types";
+import { Card } from "../components/card";
+import { useFaceDown } from "../contexts/faceDownState";
+import {
+  makeDraggableId,
+  makeZoneId,
+  type DragData,
+  type ZoneOwner,
+} from "./types";
 
 interface DraggableCardProps {
-  card: CardType
-  zone: ZoneName
-  zoneOwner?: ZoneOwner
-  onClick?: () => void
-  onDoubleClick?: () => void
-  onContextMenu?: (e: React.MouseEvent) => void
-  onCardHover?: (cardId: string, zone: ZoneName) => void
-  onCardHoverEnd?: () => void
-  selected?: boolean
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  dimensions?: { width: number; height: number }
-  tapped?: boolean
-  faceDown?: boolean
-  flipped?: boolean
-  counters?: Record<string, number>
-  glow?: 'none' | 'gold' | 'green' | 'red'
-  disabled?: boolean
-  isOpponent?: boolean
-  isCompanion?: boolean
-  upgraded?: boolean
-  appliedUpgrades?: CardType[]
-  hiddenUpgradeCount?: number
-  onRevealHiddenUpgrades?: () => void
-  canPeekFaceDown?: boolean
-  style?: React.CSSProperties
-  dragInstanceKey?: string
+  card: CardType;
+  zone: ZoneName;
+  zoneOwner?: ZoneOwner;
+  onClick?: () => void;
+  onDoubleClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  selected?: boolean;
+  size?: "xs" | "sm" | "md" | "lg";
+  dimensions?: { width: number; height: number };
+  tapped?: boolean;
+  faceDown?: boolean;
+  flipped?: boolean;
+  counters?: Record<string, number>;
+  glow?: "none" | "gold" | "green" | "red";
+  disabled?: boolean;
+  isOpponent?: boolean;
+  isCompanion?: boolean;
+  upgraded?: boolean;
+  appliedUpgrades?: CardType[];
+  hiddenUpgradeCount?: number;
+  onRevealHiddenUpgrades?: () => void;
+  canPeekFaceDown?: boolean;
+  style?: React.CSSProperties;
+  dragInstanceKey?: string;
 }
 
 export function DraggableCard({
   card,
   zone,
-  zoneOwner = 'player',
+  zoneOwner = "player",
   onClick,
   onDoubleClick,
   onContextMenu,
   onCardHover,
   onCardHoverEnd,
   selected,
-  size = 'md',
+  size = "md",
   dimensions,
   tapped,
   faceDown,
@@ -62,22 +67,34 @@ export function DraggableCard({
   style: externalStyle,
   dragInstanceKey,
 }: DraggableCardProps) {
-  const contextFaceDown = useFaceDown(card.id)
-  const effectiveFaceDown = faceDown || contextFaceDown
+  const contextFaceDown = useFaceDown(card.id);
+  const effectiveFaceDown = faceDown || contextFaceDown;
 
-  const zoneId = makeZoneId(zone, zoneOwner)
-  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent, faceDown: effectiveFaceDown }
-  const draggableId = makeDraggableId(zone, zoneOwner, card.id, dragInstanceKey)
+  const zoneId = makeZoneId(zone, zoneOwner);
+  const dragData: DragData = {
+    card,
+    fromZone: zone,
+    fromZoneId: zoneId,
+    isOpponent,
+    faceDown: effectiveFaceDown,
+  };
+  const draggableId = makeDraggableId(
+    zone,
+    zoneOwner,
+    card.id,
+    dragInstanceKey,
+  );
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: draggableId,
-    data: dragData,
-    disabled,
-  })
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: draggableId,
+      data: dragData,
+      disabled,
+    });
 
   const style = {
     ...externalStyle,
-  }
+  };
 
   return (
     <div style={style}>
@@ -88,8 +105,8 @@ export function DraggableCard({
           ...listeners,
           ...attributes,
           onClick: (e) => {
-            if (!(e.target as HTMLElement).closest('button')) {
-              onClick?.()
+            if (!(e.target as HTMLElement).closest("button")) {
+              onClick?.();
             }
           },
         }}
@@ -115,12 +132,14 @@ export function DraggableCard({
         canPeekFaceDown={canPeekFaceDown}
         onDoubleClick={onDoubleClick}
         onContextMenu={(e) => {
-          e.preventDefault()
-          onContextMenu?.(e)
+          e.preventDefault();
+          onContextMenu?.(e);
         }}
-        onHoverStart={onCardHover ? () => onCardHover(card.id, zone) : undefined}
+        onHoverStart={
+          onCardHover ? () => onCardHover(card.id, zone) : undefined
+        }
         onHoverEnd={onCardHoverEnd}
       />
     </div>
-  )
+  );
 }

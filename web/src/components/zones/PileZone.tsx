@@ -1,19 +1,19 @@
-import { useState } from 'react'
-import type { Card as CardType, ZoneName } from '../../types'
-import { DraggableCard, DroppableZone } from '../../dnd'
-import { Card } from '../card'
-import { DndPanel } from '../common/DndPanel'
-import { Tag } from '../common/Tag'
+import { useState } from "react";
+import type { Card as CardType, ZoneName } from "../../types";
+import { DraggableCard, DroppableZone } from "../../dnd";
+import { Card } from "../card";
+import { DndPanel } from "../common/DndPanel";
+import { Tag } from "../common/Tag";
 
 interface PileZoneProps {
-  zone: 'graveyard' | 'exile'
-  cards: CardType[]
-  selectedCardId?: string
-  onCardClick?: (card: CardType) => void
-  validFromZones?: ZoneName[]
-  draggable?: boolean
-  isOpponent?: boolean
-  canManipulateOpponent?: boolean
+  zone: "graveyard" | "exile";
+  cards: CardType[];
+  selectedCardId?: string;
+  onCardClick?: (card: CardType) => void;
+  validFromZones?: ZoneName[];
+  draggable?: boolean;
+  isOpponent?: boolean;
+  canManipulateOpponent?: boolean;
 }
 
 export function PileZone({
@@ -26,33 +26,39 @@ export function PileZone({
   isOpponent = false,
   canManipulateOpponent = false,
 }: PileZoneProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const allowInteraction = !isOpponent || canManipulateOpponent
-  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+  const [isExpanded, setIsExpanded] = useState(false);
+  const allowInteraction = !isOpponent || canManipulateOpponent;
+  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
-  const defaultValidZones = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']
+  const defaultValidZones = [
+    "hand",
+    "battlefield",
+    "graveyard",
+    "exile",
+    "sideboard",
+    "command_zone",
+    "library",
+  ];
 
-  const label = zone === 'graveyard' ? 'GY' : 'Exile'
-  const bgColor = zone === 'graveyard'
-    ? 'bg-red-950/40'
-    : 'bg-purple-950/40'
+  const label = zone === "graveyard" ? "GY" : "Exile";
+  const bgColor = zone === "graveyard" ? "bg-red-950/40" : "bg-purple-950/40";
 
   if (cards.length === 0) {
     return (
       <DroppableZone
         zone={zone}
         zoneOwner={zoneOwner}
-        validFromZones={validFromZones || defaultValidZones as ZoneName[]}
+        validFromZones={validFromZones || (defaultValidZones as ZoneName[])}
         disabled={!allowInteraction}
         className={`zone-pile ${bgColor} w-16 h-24 flex items-center justify-center`}
       >
         <span className="text-[var(--ivory-muted)] text-xs">{label}</span>
       </DroppableZone>
-    )
+    );
   }
 
   if (isExpanded) {
-    const zoneName = zone === 'graveyard' ? 'Graveyard' : 'Exile'
+    const zoneName = zone === "graveyard" ? "Graveyard" : "Exile";
 
     if (draggable && allowInteraction) {
       return (
@@ -76,7 +82,7 @@ export function PileZone({
             ))
           }
         </DndPanel>
-      )
+      );
     }
 
     return (
@@ -112,14 +118,14 @@ export function PileZone({
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <DroppableZone
       zone={zone}
       zoneOwner={zoneOwner}
-      validFromZones={validFromZones || defaultValidZones as ZoneName[]}
+      validFromZones={validFromZones || (defaultValidZones as ZoneName[])}
       disabled={!allowInteraction}
       className={`zone-pile ${bgColor}`}
     >
@@ -132,10 +138,14 @@ export function PileZone({
           size="sm"
           className="w-full h-full"
         />
-        <Tag tone="stone" small className="absolute -top-1 -right-1 tabular-nums">
+        <Tag
+          tone="stone"
+          small
+          className="absolute -top-1 -right-1 tabular-nums"
+        >
           {cards.length}
         </Tag>
       </div>
     </DroppableZone>
-  )
+  );
 }

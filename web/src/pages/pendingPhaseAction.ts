@@ -19,11 +19,16 @@ export type PhaseActionEvent =
   | { type: "failed" }
   | { type: "server_state"; server: PhaseActionServerState };
 
-export function initialPhaseActionState(server: PhaseActionServerState): PhaseActionState {
+export function initialPhaseActionState(
+  server: PhaseActionServerState,
+): PhaseActionState {
   return { pending: null, server };
 }
 
-function serverStateChanged(previous: PhaseActionServerState, next: PhaseActionServerState): boolean {
+function serverStateChanged(
+  previous: PhaseActionServerState,
+  next: PhaseActionServerState,
+): boolean {
   return (
     previous.phase !== next.phase ||
     previous.buildReady !== next.buildReady ||
@@ -31,18 +36,28 @@ function serverStateChanged(previous: PhaseActionServerState, next: PhaseActionS
   );
 }
 
-export function reducePhaseAction(state: PhaseActionState, event: PhaseActionEvent): PhaseActionState {
+export function reducePhaseAction(
+  state: PhaseActionState,
+  event: PhaseActionEvent,
+): PhaseActionState {
   switch (event.type) {
     case "sent":
-      return state.pending ? state : { ...state, pending: { action: event.action } };
+      return state.pending
+        ? state
+        : { ...state, pending: { action: event.action } };
     case "failed":
       return state.pending ? { ...state, pending: null } : state;
     case "server_state":
       // Other players' updates arrive with this player's state unchanged, so only a change here answers the action.
-      return serverStateChanged(state.server, event.server) ? { pending: null, server: event.server } : state;
+      return serverStateChanged(state.server, event.server)
+        ? { pending: null, server: event.server }
+        : state;
   }
 }
 
-export function isPhaseActionPending(pending: PendingPhaseAction, action: PhaseAction): boolean {
+export function isPhaseActionPending(
+  pending: PendingPhaseAction,
+  action: PhaseAction,
+): boolean {
   return pending?.action === action;
 }

@@ -1,40 +1,40 @@
-import type { Card as CardType } from '../../types'
-import { Card } from './Card'
+import type { Card as CardType } from "../../types";
+import { Card } from "./Card";
 
 interface AttachedCardStackProps {
-  parentCard: CardType
-  attachedCards: CardType[]
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  dimensions?: { width: number; height: number }
-  parentTapped?: boolean
-  parentCounters?: Record<string, number>
-  attachedTappedIds?: Set<string>
-  attachedCounters?: Record<string, Record<string, number>>
-  selectedCardId?: string
-  onCardClick?: (card: CardType) => void
-  onCardDoubleClick?: (card: CardType) => void
-  onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void
-  allowCardInteraction?: (card: CardType) => boolean
-  upgradedCardIds?: Set<string>
-  upgradesByCardId?: Map<string, CardType[]>
-  hiddenUpgradesByCardId?: Map<string, CardType[]>
-  onRevealHiddenUpgrades?: (cardId: string) => void
+  parentCard: CardType;
+  attachedCards: CardType[];
+  size?: "xs" | "sm" | "md" | "lg";
+  dimensions?: { width: number; height: number };
+  parentTapped?: boolean;
+  parentCounters?: Record<string, number>;
+  attachedTappedIds?: Set<string>;
+  attachedCounters?: Record<string, Record<string, number>>;
+  selectedCardId?: string;
+  onCardClick?: (card: CardType) => void;
+  onCardDoubleClick?: (card: CardType) => void;
+  onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void;
+  allowCardInteraction?: (card: CardType) => boolean;
+  upgradedCardIds?: Set<string>;
+  upgradesByCardId?: Map<string, CardType[]>;
+  hiddenUpgradesByCardId?: Map<string, CardType[]>;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
 }
 
-const PEEK_FRACTION = 0.15
-const ASPECT_RATIO = 7 / 5
+const PEEK_FRACTION = 0.15;
+const ASPECT_RATIO = 7 / 5;
 
 const SIZE_DIMENSIONS: Record<string, { width: number; height: number }> = {
   xs: { width: 50, height: 70 },
   sm: { width: 80, height: 112 },
   md: { width: 130, height: 182 },
   lg: { width: 200, height: 280 },
-}
+};
 
 export function AttachedCardStack({
   parentCard,
   attachedCards,
-  size = 'md',
+  size = "md",
   dimensions,
   parentTapped = false,
   parentCounters,
@@ -50,14 +50,14 @@ export function AttachedCardStack({
   hiddenUpgradesByCardId,
   onRevealHiddenUpgrades,
 }: AttachedCardStackProps) {
-  const baseDims = dimensions ?? SIZE_DIMENSIONS[size]
-  const n = attachedCards.length
+  const baseDims = dimensions ?? SIZE_DIMENSIONS[size];
+  const n = attachedCards.length;
 
-  const scaledHeight = Math.round(baseDims.height / (1 + n * PEEK_FRACTION))
-  const scaledWidth = Math.round(scaledHeight / ASPECT_RATIO)
-  const offset = Math.round(scaledHeight * PEEK_FRACTION)
-  const leftOffset = Math.round((baseDims.width - scaledWidth) / 2)
-  const scaledDims = { width: scaledWidth, height: scaledHeight }
+  const scaledHeight = Math.round(baseDims.height / (1 + n * PEEK_FRACTION));
+  const scaledWidth = Math.round(scaledHeight / ASPECT_RATIO);
+  const offset = Math.round(scaledHeight * PEEK_FRACTION);
+  const leftOffset = Math.round((baseDims.width - scaledWidth) / 2);
+  const scaledDims = { width: scaledWidth, height: scaledHeight };
 
   return (
     <div
@@ -74,10 +74,10 @@ export function AttachedCardStack({
             zIndex: index,
           }}
           onContextMenu={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            if (!allowCardInteraction?.(card) && allowCardInteraction) return
-            onCardContextMenu?.(e, card)
+            e.preventDefault();
+            e.stopPropagation();
+            if (!allowCardInteraction?.(card) && allowCardInteraction) return;
+            onCardContextMenu?.(e, card);
           }}
         >
           <Card
@@ -86,12 +86,26 @@ export function AttachedCardStack({
             tapped={attachedTappedIds.has(card.id)}
             counters={attachedCounters[card.id]}
             selected={card.id === selectedCardId}
-            onClick={allowCardInteraction?.(card) === false ? undefined : () => onCardClick?.(card)}
-            onDoubleClick={allowCardInteraction?.(card) === false ? undefined : () => onCardDoubleClick?.(card)}
+            onClick={
+              allowCardInteraction?.(card) === false
+                ? undefined
+                : () => onCardClick?.(card)
+            }
+            onDoubleClick={
+              allowCardInteraction?.(card) === false
+                ? undefined
+                : () => onCardDoubleClick?.(card)
+            }
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
-            hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
-            onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
+            hiddenUpgradeCount={
+              (hiddenUpgradesByCardId?.get(card.id) ?? []).length
+            }
+            onRevealHiddenUpgrades={
+              onRevealHiddenUpgrades
+                ? () => onRevealHiddenUpgrades(card.id)
+                : undefined
+            }
           />
         </div>
       ))}
@@ -103,10 +117,11 @@ export function AttachedCardStack({
           zIndex: n,
         }}
         onContextMenu={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          if (!allowCardInteraction?.(parentCard) && allowCardInteraction) return
-          onCardContextMenu?.(e, parentCard)
+          e.preventDefault();
+          e.stopPropagation();
+          if (!allowCardInteraction?.(parentCard) && allowCardInteraction)
+            return;
+          onCardContextMenu?.(e, parentCard);
         }}
       >
         <Card
@@ -115,14 +130,28 @@ export function AttachedCardStack({
           tapped={parentTapped}
           counters={parentCounters}
           selected={parentCard.id === selectedCardId}
-          onClick={allowCardInteraction?.(parentCard) === false ? undefined : () => onCardClick?.(parentCard)}
-          onDoubleClick={allowCardInteraction?.(parentCard) === false ? undefined : () => onCardDoubleClick?.(parentCard)}
+          onClick={
+            allowCardInteraction?.(parentCard) === false
+              ? undefined
+              : () => onCardClick?.(parentCard)
+          }
+          onDoubleClick={
+            allowCardInteraction?.(parentCard) === false
+              ? undefined
+              : () => onCardDoubleClick?.(parentCard)
+          }
           upgraded={upgradedCardIds.has(parentCard.id)}
           appliedUpgrades={upgradesByCardId?.get(parentCard.id)}
-          hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(parentCard.id) ?? []).length}
-          onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(parentCard.id) : undefined}
+          hiddenUpgradeCount={
+            (hiddenUpgradesByCardId?.get(parentCard.id) ?? []).length
+          }
+          onRevealHiddenUpgrades={
+            onRevealHiddenUpgrades
+              ? () => onRevealHiddenUpgrades(parentCard.id)
+              : undefined
+          }
         />
       </div>
     </div>
-  )
+  );
 }

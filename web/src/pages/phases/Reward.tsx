@@ -90,8 +90,12 @@ export function RewardPhase({
   const { last_battle_result } = self_player;
   const isStageIncreasing = self_player.is_stage_increasing;
   const hasUpgradeSection =
-    gameState.use_upgrades && isStageIncreasing && available_upgrades.length > 0;
-  const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target);
+    gameState.use_upgrades &&
+    isStageIncreasing &&
+    available_upgrades.length > 0;
+  const appliedUpgradesList = self_player.upgrades.filter(
+    (u) => u.upgrade_target,
+  );
   const upgradedCardIds = new Set(
     appliedUpgradesList.map((u) => u.upgrade_target!.id),
   );
@@ -158,14 +162,20 @@ export function RewardPhase({
     isDesktop,
   });
 
-  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
-    useResizableLayout({
-      layoutConfig,
-      constraints: activeConstraints,
-      onConstraintsChange: setConstraints,
-      onConstraintsClear: clearConstraints,
-      allowHorizontalResize: false,
-    });
+  const {
+    containerRef,
+    dims,
+    containerSize,
+    zoneFrames,
+    zoneRefs,
+    dividerCallbacks,
+  } = useResizableLayout({
+    layoutConfig,
+    constraints: activeConstraints,
+    onConstraintsChange: setConstraints,
+    onConstraintsClear: clearConstraints,
+    allowHorizontalResize: false,
+  });
   // A saved layout belongs to a board size band, known once the board is measured.
   if (measuredBoard !== containerSize) setMeasuredBoard(containerSize);
   // Wrap each refCallback in a stable useCallback so the react-hooks/refs
@@ -247,7 +257,10 @@ export function RewardPhase({
             </div>
           ) : !hasUpgradeSection ? (
             <div className="flex items-center justify-center min-h-full">
-              <CardGrid columns={dims.rewards.columns} cardWidth={rewardsDims.width}>
+              <CardGrid
+                columns={dims.rewards.columns}
+                cardWidth={rewardsDims.width}
+              >
                 {rewardItems.map((item) => (
                   <Card
                     key={item.key}
@@ -264,7 +277,10 @@ export function RewardPhase({
               </CardGrid>
             </div>
           ) : (
-            <CardGrid columns={dims.rewards.columns} cardWidth={rewardsDims.width}>
+            <CardGrid
+              columns={dims.rewards.columns}
+              cardWidth={rewardsDims.width}
+            >
               {rewardItems.map((item) => (
                 <Card
                   key={item.key}
@@ -301,9 +317,7 @@ export function RewardPhase({
               style={upgradesStyle}
               data-guide-target="reward-upgrades"
             >
-              <ZoneLabel
-                dragCallbacks={dividerCallbacks.topDivider}
-              >
+              <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
                 Upgrades
               </ZoneLabel>
               <CardGrid
@@ -336,14 +350,14 @@ export function RewardPhase({
 
             <div
               ref={setPoolNode}
-                className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${cappedZoneAlignment}`}
-                style={poolStyle}
+              className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${cappedZoneAlignment}`}
+              style={poolStyle}
+            >
+              <ZoneLabel
+                dragCallbacks={dividerCallbacks.bottomLeftSplitDivider}
               >
-                <ZoneLabel
-                  dragCallbacks={dividerCallbacks.bottomLeftSplitDivider}
-                >
-                  Pool
-                </ZoneLabel>
+                Pool
+              </ZoneLabel>
               {poolCards.length === 0 ? (
                 <div className="flex items-center justify-center min-h-full">
                   <EmptyZoneTile dimensions={poolDims} label="No pool cards" />

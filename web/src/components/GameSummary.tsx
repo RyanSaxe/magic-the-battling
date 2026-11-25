@@ -1,17 +1,17 @@
-import { useState } from 'react'
-import type { SelfPlayerView } from '../types'
-import { DeckDisplay } from './common'
-import type { DeckDisplayResizeState } from './common/DeckDisplay'
+import { useState } from "react";
+import type { SelfPlayerView } from "../types";
+import { DeckDisplay } from "./common";
+import type { DeckDisplayResizeState } from "./common/DeckDisplay";
 
 interface GameSummaryProps {
-  player: SelfPlayerView
-  useUpgrades?: boolean
-  compact?: boolean
-  enableResize?: boolean
-  isMobile?: boolean
-  layoutStateKey?: string
-  resizeState?: DeckDisplayResizeState
-  showLayoutReset?: boolean
+  player: SelfPlayerView;
+  useUpgrades?: boolean;
+  compact?: boolean;
+  enableResize?: boolean;
+  isMobile?: boolean;
+  layoutStateKey?: string;
+  resizeState?: DeckDisplayResizeState;
+  showLayoutReset?: boolean;
 }
 
 export function GameSummary({
@@ -35,10 +35,10 @@ export function GameSummary({
     name: player.name,
     preBattleTreasures: player.last_battle_result?.pre_battle_treasures ?? 0,
     poison: player.poison,
-  }))
+  }));
 
-  const upgrades = useUpgrades ? frozenPlayer.upgrades : []
-  const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
+  const upgrades = useUpgrades ? frozenPlayer.upgrades : [];
+  const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id));
 
   return (
     <div className="flex-1 flex flex-col items-center min-h-0">
@@ -51,19 +51,24 @@ export function GameSummary({
           poison={frozenPlayer.poison}
           upgrades={upgrades}
           companionIds={companionIds}
-          className={compact ? 'flex-1 min-h-0 flex flex-col' : undefined}
+          className={compact ? "flex-1 min-h-0 flex flex-col" : undefined}
           enableResize={enableResize}
           isMobile={isMobile}
           layoutStateKey={layoutStateKey}
           resizeState={resizeState}
-          resetControl={showLayoutReset ? {
-            phaseLabel: 'Deck Layout',
-            currentStage: frozenPlayer.stage,
-            currentRound: frozenPlayer.round,
-            message: 'This resets the current deck layout for this view on this device.',
-          } : undefined}
+          resetControl={
+            showLayoutReset
+              ? {
+                  phaseLabel: "Deck Layout",
+                  currentStage: frozenPlayer.stage,
+                  currentRound: frozenPlayer.round,
+                  message:
+                    "This resets the current deck layout for this view on this device.",
+                }
+              : undefined
+          }
         />
       </div>
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { Dialog } from '../common/Dialog'
+import { Dialog } from "../common/Dialog";
 
 export function DeletePresetDialog({
   title,
@@ -7,11 +7,11 @@ export function DeletePresetDialog({
   onKeep,
   onDelete,
 }: {
-  title: string
-  imageUri?: string | null
-  deleting?: boolean
-  onKeep: () => void
-  onDelete: () => void
+  title: string;
+  imageUri?: string | null;
+  deleting?: boolean;
+  onKeep: () => void;
+  onDelete: () => void;
 }) {
   return (
     <Dialog title="Delete this preset?" onClose={onKeep}>
@@ -25,13 +25,23 @@ export function DeletePresetDialog({
         Your finished games stay in Recent Games.
       </p>
       <div className="mt-5 grid grid-cols-2 gap-2">
-        <button type="button" onClick={onKeep} disabled={deleting} className="btn btn-secondary">
+        <button
+          type="button"
+          onClick={onKeep}
+          disabled={deleting}
+          className="btn btn-secondary"
+        >
           Keep
         </button>
-        <button type="button" onClick={onDelete} disabled={deleting} className="btn btn-secondary btn-destructive">
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deleting}
+          className="btn btn-secondary btn-destructive"
+        >
           Delete
         </button>
       </div>
     </Dialog>
-  )
+  );
 }
