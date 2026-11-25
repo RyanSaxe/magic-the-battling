@@ -6,8 +6,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from mtb.models.game import Player
-from mtb.models.types import Phase
+from pitfight.models.game import Player
+from pitfight.models.types import Phase
 from server.routers.ws_actions import ACTION_REQUIRED_PHASES, validate_action_phase
 
 

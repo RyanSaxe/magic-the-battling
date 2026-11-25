@@ -2,8 +2,8 @@ from collections.abc import Callable
 
 import pytest
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Config, create_game, set_battler, set_player_battlers
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Config, create_game, set_battler, set_player_battlers
 
 
 def test_create_game_exact_players() -> None:

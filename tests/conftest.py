@@ -22,9 +22,9 @@ import server.routers.ws as ws_module
 import server.services.game.state as game_state_module
 import server.services.game_manager as gm_module
 import server.services.session_manager as sm_module
-from mtb.models.card_registry import clear_registry
-from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
-from mtb.models.game import Game, Player
+from pitfight.models.card_registry import clear_registry
+from pitfight.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
+from pitfight.models.game import Game, Player
 from server.db.models import Base
 from server.main import app
 from server.services.connection_manager import ConnectionManager
@@ -194,7 +194,7 @@ def offline_cubecobra(monkeypatch: pytest.MonkeyPatch) -> None:
     def _no_network(url: str) -> Never:
         raise LookupError(url)
 
-    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _no_network)
+    monkeypatch.setattr("pitfight.utils.json_helpers.get_json", _no_network)
 
 
 @pytest.fixture
@@ -210,7 +210,7 @@ def mock_cube_data(
             return []
         return [card_factory(f"card{i}") for i in range(120)]
 
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", _mock)
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", _mock)
 
 
 @pytest.fixture

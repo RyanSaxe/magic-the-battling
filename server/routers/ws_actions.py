@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 import server.db.database as db
-from mtb.models.game import Game, Player
+from pitfight.models.game import Game, Player
 from server.services.game.manager import GameManager
 
 type ActionResult = bool | str | None

@@ -10,10 +10,10 @@ import hmac
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from mtb.models.cards import Card
-from mtb.models.game import Battle, Game, LastBattleResult, Player, Puppet, StaticOpponent, Zones
-from mtb.phases import reward
-from mtb.phases.battle import get_furthest_round, get_pairing_probabilities
+from pitfight.models.cards import Card
+from pitfight.models.game import Battle, Game, LastBattleResult, Player, Puppet, StaticOpponent, Zones
+from pitfight.phases import reward
+from pitfight.phases.battle import get_furthest_round, get_pairing_probabilities
 from server.schemas.api import (
     BattleView,
     GameBootstrapResponse,
@@ -113,7 +113,7 @@ def puppet_snapshot_for_round(puppet: Puppet, *, stage: int, round_num: int) -> 
 
 
 def _read_only_pairing_game(game: Game) -> Game:
-    # mtb.models.game.Puppet.get_opponent_for_round writes opponent.poison in place when building
+    # pitfight.models.game.Puppet.get_opponent_for_round writes opponent.poison in place when building
     # the round table; cloning puppet snapshots keeps reads strictly side-effect free.
     if not game.puppets and game.most_recent_ghost_puppet is None:
         return game

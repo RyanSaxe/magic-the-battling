@@ -50,7 +50,7 @@ jobs:
 
       # Python
       - uses: astral-sh/setup-uv@v10.4.0
-      - run: uv run --locked pytest --cov=mtb --cov=server
+      - run: uv run --locked pytest --cov=pitfight --cov=server
 
       # Web
       - uses: actions/setup-node@v7
@@ -86,7 +86,7 @@ jobs:
               - 'web/**'
             image:
               - 'server/**'
-              - 'mtb/**'
+              - 'pitfight/**'
               - 'scripts/**'
               - 'Dockerfile'
               - 'fly*.toml'
@@ -141,7 +141,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.4.0
 
       - name: Build the server image
-        run: docker build --tag mtb:boot-check .
+        run: docker build --tag pitfight:boot-check .
 
       - name: Boot the image on an empty volume and on the snapshot fixtures
-        run: uv run --no-project python scripts/check_image_boot.py mtb:boot-check
+        run: uv run --no-project python scripts/check_image_boot.py pitfight:boot-check

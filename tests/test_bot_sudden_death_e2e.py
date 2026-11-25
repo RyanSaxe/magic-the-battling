@@ -1,9 +1,9 @@
 """E2E tests for bot-specific sudden death, round-start elimination, and double-draw edge cases."""
 
-from mtb.models.cards import Card
-from mtb.models.game import BattleSnapshotData, Game, Player, Puppet, StaticOpponent, create_game
-from mtb.phases import battle
-from mtb.phases.elimination import (
+from pitfight.models.cards import Card
+from pitfight.models.game import BattleSnapshotData, Game, Player, Puppet, StaticOpponent, create_game
+from pitfight.phases import battle
+from pitfight.phases.elimination import (
     check_game_over,
     get_live_players,
     get_live_puppets,

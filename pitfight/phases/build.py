@@ -1,10 +1,10 @@
 """Build-phase hand/sideboard/companion/basics management and ready checks."""
 
-from mtb.models.cards import Card
-from mtb.models.game import Game, Player
-from mtb.models.types import BuildSource
-from mtb.phases.elimination import get_live_players
-from mtb.phases.reward import apply_upgrade_to_card
+from pitfight.models.cards import Card
+from pitfight.models.game import Game, Player
+from pitfight.models.types import BuildSource
+from pitfight.phases.elimination import get_live_players
+from pitfight.phases.reward import apply_upgrade_to_card
 
 VALID_BASICS = frozenset(["Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes"])
 

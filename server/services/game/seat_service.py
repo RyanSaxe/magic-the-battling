@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import server.db.database as db
-from mtb.models.game import (
+from pitfight.models.game import (
     Config,
     Game,
 )

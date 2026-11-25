@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 import server.db.database as db_module
 import server.routers.share_preview as share_preview_module
 import server.routers.ws as ws_module
-from mtb.models.cards import Card
-from mtb.models.game import (
+from pitfight.models.cards import Card
+from pitfight.models.game import (
     Battle,
     BattleSnapshotData,
     Game,
@@ -24,7 +24,7 @@ from mtb.models.game import (
     create_game,
     restore_snapshot_data,
 )
-from mtb.phases import battle, reward
+from pitfight.phases import battle, reward
 from server.db.models import Base, BattleSnapshot, GameRecord, PlayerGameHistory
 from server.routers.share_preview import RATE_LIMIT_MAX, RATE_LIMIT_WINDOW, SlidingWindowRateLimiter
 from server.services.game_manager import GameManager

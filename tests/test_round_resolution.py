@@ -8,11 +8,11 @@ from typing import get_args
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.cards import Card
-from mtb.models.game import BattleSnapshotData, Game, Player, Puppet, StaticOpponent, create_game
-from mtb.models.types import Phase
-from mtb.phases import battle, elimination
-from mtb.phases.round_resolution import (
+from pitfight.models.cards import Card
+from pitfight.models.game import BattleSnapshotData, Game, Player, Puppet, StaticOpponent, create_game
+from pitfight.models.types import Phase
+from pitfight.phases import battle, elimination
+from pitfight.phases.round_resolution import (
     LEGAL_PHASE_TRANSITIONS,
     InvalidPhaseTransitionError,
     finalize_game_over,

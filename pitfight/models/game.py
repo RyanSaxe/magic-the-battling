@@ -17,9 +17,9 @@ from pydantic import (
     model_serializer,
 )
 
-from mtb.models.card_registry import export_registry, import_registry
-from mtb.models.cards import Battler, Card
-from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
+from pitfight.models.card_registry import export_registry, import_registry
+from pitfight.models.cards import Battler, Card
+from pitfight.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
 
 
 class StaticOpponent(BaseModel):

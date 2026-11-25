@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-from mtb.models.card_registry import (
+from pitfight.models.card_registry import (
     CardData,
     CardDataInput,
     derive_scryfall_id,
@@ -23,7 +23,7 @@ from mtb.models.card_registry import (
     get_card_data,
     register_card_data,
 )
-from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE, PlayMode
+from pitfight.models.types import UPGRADE_TYPE, VANGUARD_TYPE, PlayMode
 
 CONSTRUCTED_MIN_CARDS = 100
 SHARED_BANNED_KEYWORDS = {"toxic", "poisonous", "proliferate"}
@@ -259,7 +259,7 @@ def build_battler(
     *,
     vanguards_id: str | None = None,
 ) -> Battler:
-    from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415 -- deferred circular import
+    from pitfight.utils.cubecobra import get_cube_data  # noqa: PLC0415 -- deferred circular import
 
     cards = get_cube_data(battler_id)
     if problem := _own_supplements_problem(cards):

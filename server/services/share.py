@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy.orm import Session, joinedload
 
-from mtb.models.game import restore_snapshot_data
+from pitfight.models.game import restore_snapshot_data
 from server.db.models import GameRecord, PlayerGameHistory
 from server.errors import ErrorCode, api_error
 from server.schemas.api import ShareGameResponse, SharePlayerData, SharePlayerSnapshot

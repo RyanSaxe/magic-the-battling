@@ -13,9 +13,9 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
-from mtb.phases import battle, build, draft, reward
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
+from pitfight.phases import battle, build, draft, reward
 
 FIXTURES_DIR = Path(__file__).parent / "active_game_snapshots"
 BASICS = ["Plains", "Island", "Mountain"]

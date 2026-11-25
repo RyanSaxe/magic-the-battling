@@ -9,13 +9,13 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 import server.db.database as db
-from mtb.models.game import (
+from pitfight.models.game import (
     Battle,
     Game,
     Player,
     restore_game_from_snapshot,
 )
-from mtb.phases import battle
+from pitfight.phases import battle
 from server.db.models import (
     ActiveGameSnapshot,
     GamePlayerRecord,

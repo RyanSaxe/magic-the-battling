@@ -1,5 +1,5 @@
-from mtb.models.card_registry import clear_registry, export_registry, import_registry
-from mtb.models.cards import Card
+from pitfight.models.card_registry import clear_registry, export_registry, import_registry
+from pitfight.models.cards import Card
 from server.services.game_serialization import build_catalog_from_scryfall_ids, catalog_entry_for_card
 
 

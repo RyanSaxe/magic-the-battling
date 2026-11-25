@@ -2,8 +2,8 @@
 
 import pytest
 
-from mtb.models.cards import Card
-from mtb.models.game import (
+from pitfight.models.cards import Card
+from pitfight.models.game import (
     BattleSnapshotData,
     Game,
     Player,
@@ -11,8 +11,8 @@ from mtb.models.game import (
     StaticOpponent,
     create_game,
 )
-from mtb.phases import battle
-from mtb.phases.elimination import (
+from pitfight.phases import battle
+from pitfight.phases.elimination import (
     get_live_players,
     get_live_puppets,
     get_sudden_death_fighters,

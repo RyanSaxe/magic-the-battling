@@ -2,9 +2,9 @@ from collections.abc import Callable
 
 import pytest
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Config, create_game, set_player_battlers
-from mtb.phases import draft
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Config, create_game, set_player_battlers
+from pitfight.phases import draft
 
 
 def test_start_draft_creates_packs_without_dealing(card_factory: Callable[..., Card]) -> None:

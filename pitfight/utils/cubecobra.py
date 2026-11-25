@@ -11,11 +11,11 @@ from uuid import uuid4
 
 from httpx import HTTPStatusError
 
-from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card, ListedCard
-from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
-from mtb.utils import json_helpers
-from mtb.utils.json_helpers import revalidate_and_get
-from mtb.utils.scryfall import get_card_from_scryfall
+from pitfight.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card, ListedCard
+from pitfight.models.types import UPGRADE_TYPE, VANGUARD_TYPE
+from pitfight.utils import json_helpers
+from pitfight.utils.json_helpers import revalidate_and_get
+from pitfight.utils.scryfall import get_card_from_scryfall
 
 MOCK_CUBE_DATA_ENV = "MTB_FAKE_CUBE_DATA"
 MOCK_MAINBOARD_SIZE = 240

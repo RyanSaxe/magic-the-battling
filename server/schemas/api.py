@@ -6,9 +6,9 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
-from mtb.models.cards import Card
-from mtb.models.game import BattleResolution
-from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
+from pitfight.models.cards import Card
+from pitfight.models.game import BattleResolution
+from pitfight.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
 from server.services.spectate_requests import SpectateStatus
 
 LastResult = Literal["win", "loss", "draw"]

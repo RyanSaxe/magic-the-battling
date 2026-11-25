@@ -9,8 +9,8 @@ from httpx import Response
 
 import server.routers.games as games_module
 import server.services.game_manager as gm_module
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Config, create_game, set_player_battlers
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Config, create_game, set_player_battlers
 from server.db import database
 from server.db.models import GamePlayerRecord
 

@@ -799,7 +799,7 @@ it("persists self and peer mute toggles and tracks remote mute_state signals", a
   });
   expect(track.enabled).toBe(false);
   expect(result.current.state.isMuted).toBe(true);
-  expect(sessionStorage.getItem("mtb_voice_muted")).toBe("true");
+  expect(sessionStorage.getItem("pitfight_voice_muted")).toBe("true");
   expect(
     harness.sent.some(
       (s) =>
@@ -814,7 +814,7 @@ it("persists self and peer mute toggles and tracks remote mute_state signals", a
     result.current.togglePeerMute("Bob");
   });
   expect(result.current.state.mutedPeers.has("Bob")).toBe(true);
-  expect(sessionStorage.getItem("mtb_voice_muted_peers")).toBe('["Bob"]');
+  expect(sessionStorage.getItem("pitfight_voice_muted_peers")).toBe('["Bob"]');
 
   await act(async () => {
     harness.inboxFor("Alice").current?.({

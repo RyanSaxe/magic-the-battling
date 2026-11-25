@@ -19,6 +19,7 @@ import {
   useViewportSync,
 } from "../../hooks/useDomEffects";
 import type { ServerNoticeStatus } from "../../types";
+import { readMigratedItem } from "../../utils/storage";
 import { FloatingWindow } from "./FloatingWindow";
 import {
   DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
@@ -31,7 +32,8 @@ import {
   type ViewportBox,
 } from "../rulesPanelWindow";
 
-const WINDOW_STORAGE_KEY = "mtb_server_notice_window:v1";
+const WINDOW_STORAGE_KEY = "pitfight_server_notice_window:v1";
+const LEGACY_WINDOW_STORAGE_KEY = "mtb_server_notice_window:v1";
 const MOBILE_PANEL_TOP_GAP_PX = 48;
 const MOBILE_PANEL_MAX_WIDTH_PX = 640;
 const DEFAULT_EXPANDED_HEIGHT_PX = 260;
@@ -174,7 +176,11 @@ function loadStoredWindowState(): ReturnType<typeof parseStoredWindowState> {
     return null;
   }
   return parseStoredWindowState(
-    window.localStorage.getItem(WINDOW_STORAGE_KEY),
+    readMigratedItem(
+      window.localStorage,
+      WINDOW_STORAGE_KEY,
+      LEGACY_WINDOW_STORAGE_KEY,
+    ),
   );
 }
 

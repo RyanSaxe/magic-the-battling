@@ -6,10 +6,10 @@ from conftest import setup_battle_ready
 from sqlalchemy.orm import Session
 
 import server.db.database as db
-from mtb.models.cards import Card
-from mtb.models.game import BattleSnapshotData, LastBattleResult, Puppet, StaticOpponent, create_game
-from mtb.phases import battle
-from mtb.phases.elimination import eliminate_puppet
+from pitfight.models.cards import Card
+from pitfight.models.game import BattleSnapshotData, LastBattleResult, Puppet, StaticOpponent, create_game
+from pitfight.phases import battle
+from pitfight.phases.elimination import eliminate_puppet
 from server.db.models import BattleSnapshot, GameRecord, PlayerGameHistory
 from server.services.game_manager import GameManager
 

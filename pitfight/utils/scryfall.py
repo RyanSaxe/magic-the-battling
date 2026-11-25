@@ -1,7 +1,7 @@
 """Scryfall card lookup and token/art enrichment helpers."""
 
-from mtb.models.cards import Card
-from mtb.utils.json_helpers import get_json
+from pitfight.models.cards import Card
+from pitfight.utils.json_helpers import get_json
 
 
 def get_card_from_scryfall(card_id: str) -> Card:

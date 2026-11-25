@@ -10,6 +10,7 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from "react";
+import { readMigratedItem, removeStorageKeys } from "../utils/storage";
 import {
   PeerConnectionController,
   parseStringList,
@@ -39,25 +40,41 @@ const SPEAKING_THRESHOLD = 15;
 const ATTACK_ALPHA = 0.4;
 const DECAY_ALPHA = 0.15;
 
-const MUTE_STORAGE_KEY = "mtb_voice_muted";
-const MUTED_PEERS_STORAGE_KEY = "mtb_voice_muted_peers";
+const MUTE_STORAGE_KEY = "pitfight_voice_muted";
+const LEGACY_MUTE_STORAGE_KEY = "mtb_voice_muted";
+const MUTED_PEERS_STORAGE_KEY = "pitfight_voice_muted_peers";
+const LEGACY_MUTED_PEERS_STORAGE_KEY = "mtb_voice_muted_peers";
 
 function getPersistedMute(): boolean {
-  return sessionStorage.getItem(MUTE_STORAGE_KEY) === "true";
+  return (
+    readMigratedItem(
+      sessionStorage,
+      MUTE_STORAGE_KEY,
+      LEGACY_MUTE_STORAGE_KEY,
+    ) === "true"
+  );
 }
 
 function setPersistedMute(muted: boolean): void {
   sessionStorage.setItem(MUTE_STORAGE_KEY, muted ? "true" : "false");
+  removeStorageKeys(sessionStorage, [LEGACY_MUTE_STORAGE_KEY]);
 }
 
 function getPersistedMutedPeers(): Set<string> {
   return new Set(
-    parseStringList(sessionStorage.getItem(MUTED_PEERS_STORAGE_KEY)),
+    parseStringList(
+      readMigratedItem(
+        sessionStorage,
+        MUTED_PEERS_STORAGE_KEY,
+        LEGACY_MUTED_PEERS_STORAGE_KEY,
+      ),
+    ),
   );
 }
 
 function setPersistedMutedPeers(peers: Set<string>): void {
   sessionStorage.setItem(MUTED_PEERS_STORAGE_KEY, JSON.stringify([...peers]));
+  removeStorageKeys(sessionStorage, [LEGACY_MUTED_PEERS_STORAGE_KEY]);
 }
 
 let sharedAudioContext: AudioContext | null = null;

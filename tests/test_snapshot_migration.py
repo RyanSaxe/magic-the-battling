@@ -1,8 +1,8 @@
 import sqlite3
 from pathlib import Path
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import BattleSnapshotData, create_game, set_battler
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import BattleSnapshotData, create_game, set_battler
 from server.db.snapshot_migration import migrate_snapshot_storage
 
 

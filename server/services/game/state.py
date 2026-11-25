@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
-from mtb.models.game import (
+from pitfight.models.game import (
     Game,
     Player,
 )

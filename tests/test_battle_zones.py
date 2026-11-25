@@ -3,9 +3,9 @@ from collections.abc import Callable
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.cards import Card
-from mtb.models.game import Battle, Player, StaticOpponent, create_game
-from mtb.phases import battle
+from pitfight.models.cards import Card
+from pitfight.models.game import Battle, Player, StaticOpponent, create_game
+from pitfight.phases import battle
 from server.services.game_manager import GameManager
 
 
@@ -336,7 +336,7 @@ def test_shuffle_library_randomizes_player_library(
     def reverse_shuffle(items: list[Card]) -> None:
         items[:] = list(reversed(items))
 
-    monkeypatch.setattr("mtb.phases.battle.random.shuffle", reverse_shuffle)
+    monkeypatch.setattr("pitfight.phases.battle.random.shuffle", reverse_shuffle)
 
     result = battle.update_card_state(b, alice, action_type="shuffle_library", card_id="")
 
@@ -409,7 +409,7 @@ def test_draw_and_shuffle_opponent_library_for_static_opponent(
     def reverse_shuffle(items: list[Card]) -> None:
         items[:] = list(reversed(items))
 
-    monkeypatch.setattr("mtb.phases.battle.random.shuffle", reverse_shuffle)
+    monkeypatch.setattr("pitfight.phases.battle.random.shuffle", reverse_shuffle)
     shuffle_result = battle.update_card_state(
         b, alice, action_type="shuffle_library", card_id="", data={"for_opponent": True}
     )

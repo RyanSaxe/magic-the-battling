@@ -48,7 +48,7 @@ vi.mock("../api/client", () => ({
   closeSeat: vi.fn(async () => {}),
   getResumableGames: vi.fn(async () => []),
   getCubeSummary: vi.fn(async () => ({
-    cube_name: "Crucible",
+    cube_name: "Pitfight",
     cube_image_uri: null,
   })),
 }));

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from mtb.models.cards import Card
+    from pitfight.models.cards import Card
 
 _HEX8_RE = re.compile(r"^[0-9a-f]{8}$")
 

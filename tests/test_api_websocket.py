@@ -10,7 +10,7 @@ from starlette.websockets import WebSocketDisconnect
 
 import server.db.database as db_module
 import server.routers.ws as ws_module
-from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
+from pitfight.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
 from server.db.models import GameRecord
 
 
@@ -74,7 +74,7 @@ class TestLobbyWebSocket:
                 return []
             return [card_factory(f"{cube_id}_{i}") for i in range(100)]
 
-        monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+        monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
         create = client.post(
             "/api/games",
@@ -119,7 +119,7 @@ class TestLobbyWebSocket:
                 return []
             return [card_factory(f"{cube_id}_{i}") for i in range(100)]
 
-        monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+        monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
         create = client.post(
             "/api/games",

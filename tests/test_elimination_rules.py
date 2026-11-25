@@ -2,9 +2,9 @@ from collections.abc import Callable
 
 from conftest import setup_battle_ready
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import DraftState, Puppet, StaticOpponent, create_game
-from mtb.phases import battle, elimination
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import DraftState, Puppet, StaticOpponent, create_game
+from pitfight.phases import battle, elimination
 from server.services.game_manager import GameManager
 
 

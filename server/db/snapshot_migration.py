@@ -8,7 +8,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-from mtb.models.game import restore_game_from_snapshot, restore_snapshot_data, slim_snapshot_dump
+from pitfight.models.game import restore_game_from_snapshot, restore_snapshot_data, slim_snapshot_dump
 
 
 @dataclass(slots=True)

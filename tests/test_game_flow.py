@@ -1,8 +1,8 @@
 from collections.abc import Callable
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import create_game, set_battler
-from mtb.phases import battle, build, draft, reward
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import create_game, set_battler
+from pitfight.phases import battle, build, draft, reward
 
 
 def test_full_round_flow_round_1(card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]) -> None:

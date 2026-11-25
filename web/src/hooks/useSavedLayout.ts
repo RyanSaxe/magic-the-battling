@@ -15,6 +15,7 @@ import {
   type PersistedConstraintResolution,
   type ZoneConstraints,
 } from "../layout";
+import { readMigratedItem } from "../utils/storage";
 
 export {
   boardSizeBand,
@@ -26,7 +27,8 @@ export {
   type PersistedConstraintResolution,
 };
 
-const STORAGE_PREFIX = "mtb_zone_constraints:v2:";
+const STORAGE_PREFIX = "pitfight_zone_constraints:v2:";
+const LEGACY_STORAGE_PREFIX = "mtb_zone_constraints:v2:";
 
 export interface PersistedConstraintLocation {
   scopeKey: string;
@@ -45,7 +47,11 @@ function loadBands(
   scopeKey: string,
 ): Record<string, PersistedConstraintEntry[]> {
   try {
-    const raw = localStorage.getItem(`${STORAGE_PREFIX}${scopeKey}`);
+    const raw = readMigratedItem(
+      localStorage,
+      `${STORAGE_PREFIX}${scopeKey}`,
+      `${LEGACY_STORAGE_PREFIX}${scopeKey}`,
+    );
     return raw ? parsePersistedConstraintBands(raw) : {};
   } catch {
     return {};

@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import ColumnElement, Connection, Index, create_engine, func, select, text
 from sqlalchemy.orm import sessionmaker
 
-from mtb.utils import json_helpers
+from pitfight.utils import json_helpers
 from server.db.models import LOWERCASE_UNIQUE_USER_INDEXES, Base
 
 if db_path := os.getenv("DATABASE_PATH"):

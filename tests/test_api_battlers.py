@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 
-from mtb.utils import json_helpers
+from pitfight.utils import json_helpers
 from server.db import database
 from server.db.models import BattleSnapshot, CubeMetadata, GameRecord, PlayerGameHistory
 
@@ -246,7 +246,7 @@ def _cubecobra_answers(monkeypatch: pytest.MonkeyPatch, status: int) -> None:
         msg = "CubeCobra"
         raise httpx.HTTPStatusError(msg, request=request, response=httpx.Response(status, request=request))
 
-    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _get_json)
+    monkeypatch.setattr("pitfight.utils.json_helpers.get_json", _get_json)
 
 
 class TestPresetCube:
@@ -581,7 +581,7 @@ def test_waits_on_cubecobra_without_a_database_connection(
         held_during_fetch.append(len(held))
         return {"name": "Slow Cube"}
 
-    monkeypatch.setattr("mtb.utils.json_helpers.get_json", slow_cubecobra)
+    monkeypatch.setattr("pitfight.utils.json_helpers.get_json", slow_cubecobra)
 
     response = client.request(method, path.format(preset_id=preset["id"]), json=body)
 

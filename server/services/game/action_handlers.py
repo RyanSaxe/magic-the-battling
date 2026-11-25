@@ -7,8 +7,8 @@ from uuid import uuid4
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from mtb.models.cards import Card
-from mtb.models.game import (
+from pitfight.models.cards import Card
+from pitfight.models.game import (
     Battle,
     Game,
     PendingRevealAnimation,
@@ -16,9 +16,9 @@ from mtb.models.game import (
     StaticOpponent,
     Zones,
 )
-from mtb.models.types import BuildSource, CardDestination, ZoneName
-from mtb.phases import battle, build, draft, reward
-from mtb.phases.round_resolution import (
+from pitfight.models.types import BuildSource, CardDestination, ZoneName
+from pitfight.phases import battle, build, draft, reward
+from pitfight.phases.round_resolution import (
     resolve_reward_done,
     transition_phase,
 )

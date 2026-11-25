@@ -3,7 +3,7 @@
 import logging
 import random
 
-from mtb.models.game import Game, Player, Puppet, StaticOpponent
+from pitfight.models.game import Game, Player, Puppet, StaticOpponent
 
 logger = logging.getLogger(__name__)
 

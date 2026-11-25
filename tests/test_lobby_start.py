@@ -12,8 +12,8 @@ from starlette.testclient import WebSocketTestSession
 import server.db.database as db_module
 import server.routers.ws as ws_module
 import server.services.game.lobby_service as lobby_service_module
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Game
+from pitfight.models.cards import Battler, Card
+from pitfight.models.game import Game
 from server.runtime_config import MAX_GAME_STARTS_IN_FLIGHT
 from server.services.game_manager import BattlerReady, GameManager, LobbyStage, LobbyStartFailedError, PendingGame
 
@@ -229,7 +229,7 @@ def test_a_cube_id_cubecobra_answers_with_a_web_page_fails_the_start_in_players_
         msg = "Expecting value"
         raise json.JSONDecodeError(msg, "<!doctype html>", 0)
 
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", answered_with_a_web_page)
+    monkeypatch.setattr("pitfight.utils.cubecobra.get_cube_data", answered_with_a_web_page)
     manager = GameManager()
     pending = _two_player_lobby(manager)
     _ready_everyone(manager, pending)
@@ -322,7 +322,7 @@ def test_a_cube_too_small_to_give_everyone_a_pack_refuses_to_start(
     _ = test_db
     cube_size = 103
     monkeypatch.setattr(
-        "mtb.utils.cubecobra.get_cube_data", lambda _cube_id: [card_factory(f"c{i}") for i in range(cube_size)]
+        "pitfight.utils.cubecobra.get_cube_data", lambda _cube_id: [card_factory(f"c{i}") for i in range(cube_size)]
     )
     manager = GameManager()
     pending = manager.create_game("Host", "pid-0", cube_id="small", target_player_count=8, use_upgrades=False)

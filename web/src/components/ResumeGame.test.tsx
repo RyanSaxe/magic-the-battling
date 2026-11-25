@@ -82,26 +82,26 @@ function Harness({ initial }: { initial: ResumableSeat[] }): ReactNode {
 }
 
 it("keeps ResumeShelf sleek with only a close button when a single active game exists", () => {
-  render(<Harness initial={[seat("g1", "Crucible")]} />);
+  render(<Harness initial={[seat("g1", "Pitfight")]} />);
 
-  expect(screen.getByText("Crucible")).toBeTruthy();
+  expect(screen.getByText("Pitfight")).toBeTruthy();
   expect(
-    screen.getByRole("button", { name: "Close Crucible as Alice" }),
+    screen.getByRole("button", { name: "Close Pitfight as Alice" }),
   ).toBeTruthy();
   expect(screen.queryByRole("button", { name: /more$/ })).toBeNull();
 });
 
 it("opens In progress modal from +N more, keeps modal open on Escape over CloseSeatDialog, and closes when last game closes", async () => {
-  render(<Harness initial={[seat("g1", "Crucible"), seat("g2", "Vintage")]} />);
+  render(<Harness initial={[seat("g1", "Pitfight"), seat("g2", "Vintage")]} />);
 
   fireEvent.click(screen.getByRole("button", { name: "+1 more" }));
   const modal = screen.getByRole("dialog", { name: "In progress" });
-  expect(within(modal).getByText("Crucible")).toBeTruthy();
+  expect(within(modal).getByText("Pitfight")).toBeTruthy();
   expect(within(modal).getByText("Vintage")).toBeTruthy();
 
   // Closing one game opens CloseSeatDialog on top; Escape closes only CloseSeatDialog.
   fireEvent.click(
-    within(modal).getByRole("button", { name: "Close Crucible as Alice" }),
+    within(modal).getByRole("button", { name: "Close Pitfight as Alice" }),
   );
   expect(screen.getByRole("dialog", { name: "Close this game?" })).toBeTruthy();
   fireEvent.keyDown(window, { key: "Escape" });
@@ -110,7 +110,7 @@ it("opens In progress modal from +N more, keeps modal open on Escape over CloseS
 
   // Close both games -> modal closes automatically.
   fireEvent.click(
-    within(modal).getByRole("button", { name: "Close Crucible as Alice" }),
+    within(modal).getByRole("button", { name: "Close Pitfight as Alice" }),
   );
   fireEvent.click(
     within(screen.getByRole("dialog", { name: "Close this game?" })).getByRole(

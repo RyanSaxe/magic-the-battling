@@ -20,6 +20,7 @@ import type {
 import { AppError, responseToAppError } from "../utils/appError";
 import { getOrCreateDeviceId } from "../utils/deviceIdentity";
 import { hydrateCardCatalogEntries } from "../utils/catalogHydration";
+import { readMigratedItem, removeStorageKeys } from "../utils/storage";
 
 const API_BASE = "/api";
 const DEVICE_ID_HEADER = "X-MTB-Device-Id";
@@ -432,10 +433,12 @@ export function warmCubeCache(cubeId: string): void {
 
 // The auth cookie is httpOnly, so the client keeps its own note of whether it holds a session.
 // With no note yet it still asks once, so sessions that predate the note keep working.
-const SIGNED_IN_KEY = "mtb_signed_in";
+const SIGNED_IN_KEY = "pitfight_signed_in";
+const LEGACY_SIGNED_IN_KEY = "mtb_signed_in";
 
 function rememberSignedIn(signedIn: boolean): void {
   window.localStorage.setItem(SIGNED_IN_KEY, signedIn ? "1" : "0");
+  removeStorageKeys(window.localStorage, [LEGACY_SIGNED_IN_KEY]);
 }
 
 export async function authRegister(
@@ -485,7 +488,15 @@ export async function authLogout(): Promise<void> {
 }
 
 export async function authGetMe(): Promise<AuthUser | null> {
-  if (window.localStorage.getItem(SIGNED_IN_KEY) === "0") return null;
+  if (
+    readMigratedItem(
+      window.localStorage,
+      SIGNED_IN_KEY,
+      LEGACY_SIGNED_IN_KEY,
+    ) === "0"
+  ) {
+    return null;
+  }
   try {
     const response = await fetch(`${API_BASE}/auth/me`, {
       credentials: "include",

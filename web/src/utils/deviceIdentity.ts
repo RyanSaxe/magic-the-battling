@@ -1,10 +1,19 @@
-const DEVICE_ID_KEY = "mtb_device_id";
-const GUEST_NAME_KEY = "mtb_guest_name";
-const GAME_PLAYER_MAP_KEY = "mtb_game_player_map";
-const GAME_NEW_PLAYER_PREF_MAP_KEY = "mtb_game_new_player_pref_map";
-const GUIDED_MODE_PREFERENCE_KEY = "mtb_guided_mode_preference";
-const PLAYED_BEFORE_KEY = "mtb_played_before";
-const SPECTATOR_NAME_KEY = "mtb_spectator_name";
+import { readMigratedItem, removeStorageKeys } from "./storage";
+
+const DEVICE_ID_KEY = "pitfight_device_id";
+const LEGACY_DEVICE_ID_KEY = "mtb_device_id";
+const GUEST_NAME_KEY = "pitfight_guest_name";
+const LEGACY_GUEST_NAME_KEY = "mtb_guest_name";
+const GAME_PLAYER_MAP_KEY = "pitfight_game_player_map";
+const LEGACY_GAME_PLAYER_MAP_KEY = "mtb_game_player_map";
+const GAME_NEW_PLAYER_PREF_MAP_KEY = "pitfight_game_new_player_pref_map";
+const LEGACY_GAME_NEW_PLAYER_PREF_MAP_KEY = "mtb_game_new_player_pref_map";
+const GUIDED_MODE_PREFERENCE_KEY = "pitfight_guided_mode_preference";
+const LEGACY_GUIDED_MODE_PREFERENCE_KEY = "mtb_guided_mode_preference";
+const PLAYED_BEFORE_KEY = "pitfight_played_before";
+const LEGACY_PLAYED_BEFORE_KEY = "mtb_played_before";
+const SPECTATOR_NAME_KEY = "pitfight_spectator_name";
+const LEGACY_SPECTATOR_NAME_KEY = "mtb_spectator_name";
 const GAME_PLAYER_PREF_KEY_SEP = "::";
 const MAX_TRACKED_GAMES = 100;
 
@@ -43,7 +52,11 @@ function readTrackedPlayerMap(): TrackedPlayerMap {
 
   try {
     return parseTrackedPlayerMap(
-      window.localStorage.getItem(GAME_PLAYER_MAP_KEY),
+      readMigratedItem(
+        window.localStorage,
+        GAME_PLAYER_MAP_KEY,
+        LEGACY_GAME_PLAYER_MAP_KEY,
+      ),
     );
   } catch {
     return {};
@@ -105,7 +118,11 @@ function readNewPlayerPreferenceMap(): NewPlayerPreferenceMap {
   if (!canUseStorage()) return {};
 
   try {
-    const raw = window.localStorage.getItem(GAME_NEW_PLAYER_PREF_MAP_KEY);
+    const raw = readMigratedItem(
+      window.localStorage,
+      GAME_NEW_PLAYER_PREF_MAP_KEY,
+      LEGACY_GAME_NEW_PLAYER_PREF_MAP_KEY,
+    );
     if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return {};
@@ -173,7 +190,11 @@ function generateDeviceId(): string {
 export function getOrCreateDeviceId(): string {
   if (!canUseStorage()) return "";
 
-  const existing = window.localStorage.getItem(DEVICE_ID_KEY);
+  const existing = readMigratedItem(
+    window.localStorage,
+    DEVICE_ID_KEY,
+    LEGACY_DEVICE_ID_KEY,
+  );
   if (existing) return existing;
 
   const next = generateDeviceId();
@@ -281,7 +302,11 @@ export function forgetAccountSeats(
 export function hasForgottenSeat(gameId: string): boolean {
   if (
     !canUseStorage() ||
-    window.localStorage.getItem(GAME_PLAYER_MAP_KEY) === null
+    readMigratedItem(
+      window.localStorage,
+      GAME_PLAYER_MAP_KEY,
+      LEGACY_GAME_PLAYER_MAP_KEY,
+    ) === null
   ) {
     return false;
   }
@@ -308,13 +333,18 @@ export function onSeatsForgotten(
 /** The name this browser last played under without an account. An account's name always comes before it. */
 export function getRememberedGuestName(): string | null {
   if (!canUseStorage()) return null;
-  return window.localStorage.getItem(GUEST_NAME_KEY);
+  return readMigratedItem(
+    window.localStorage,
+    GUEST_NAME_KEY,
+    LEGACY_GUEST_NAME_KEY,
+  );
 }
 
 export function rememberGuestName(name: string): void {
   if (!canUseStorage()) return;
   try {
     window.localStorage.setItem(GUEST_NAME_KEY, name);
+    removeStorageKeys(window.localStorage, [LEGACY_GUEST_NAME_KEY]);
   } catch {
     // Best effort only.
   }
@@ -322,13 +352,20 @@ export function rememberGuestName(name: string): void {
 
 export function hasPlayedBefore(): boolean {
   if (!canUseStorage()) return false;
-  return window.localStorage.getItem(PLAYED_BEFORE_KEY) === "1";
+  return (
+    readMigratedItem(
+      window.localStorage,
+      PLAYED_BEFORE_KEY,
+      LEGACY_PLAYED_BEFORE_KEY,
+    ) === "1"
+  );
 }
 
 export function markPlayedBefore(): void {
   if (!canUseStorage()) return;
   try {
     window.localStorage.setItem(PLAYED_BEFORE_KEY, "1");
+    removeStorageKeys(window.localStorage, [LEGACY_PLAYED_BEFORE_KEY]);
   } catch {
     // Best effort only.
   }
@@ -337,7 +374,11 @@ export function markPlayedBefore(): void {
 export function getGlobalGuidedModePreference(): boolean | null {
   if (!canUseStorage()) return null;
 
-  const raw = window.localStorage.getItem(GUIDED_MODE_PREFERENCE_KEY);
+  const raw = readMigratedItem(
+    window.localStorage,
+    GUIDED_MODE_PREFERENCE_KEY,
+    LEGACY_GUIDED_MODE_PREFERENCE_KEY,
+  );
   if (raw === "1") return true;
   if (raw === "0") return false;
   return null;
@@ -350,6 +391,7 @@ export function setGlobalGuidedModePreference(enabled: boolean): void {
       GUIDED_MODE_PREFERENCE_KEY,
       enabled ? "1" : "0",
     );
+    removeStorageKeys(window.localStorage, [LEGACY_GUIDED_MODE_PREFERENCE_KEY]);
   } catch {
     // Best effort only.
   }
@@ -411,10 +453,15 @@ export function resolveNewPlayerPreferenceForGame(
 /** The name this browser last asked to watch a game under. */
 export function getRememberedSpectatorName(): string | null {
   if (!canUseStorage()) return null;
-  return window.localStorage.getItem(SPECTATOR_NAME_KEY);
+  return readMigratedItem(
+    window.localStorage,
+    SPECTATOR_NAME_KEY,
+    LEGACY_SPECTATOR_NAME_KEY,
+  );
 }
 
 export function rememberSpectatorName(name: string): void {
   if (!canUseStorage()) return;
   window.localStorage.setItem(SPECTATOR_NAME_KEY, name);
+  removeStorageKeys(window.localStorage, [LEGACY_SPECTATOR_NAME_KEY]);
 }

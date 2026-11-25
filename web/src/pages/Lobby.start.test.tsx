@@ -37,7 +37,7 @@ vi.mock("../api/client", () => ({
   closeSeat,
   getServerStatus: vi.fn(async () => null),
   getCubeSummary: vi.fn(async () => ({
-    cube_name: "Crucible",
+    cube_name: "Pitfight",
     cube_image_uri: null,
   })),
 }));
