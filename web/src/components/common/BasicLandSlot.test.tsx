@@ -24,10 +24,11 @@ it("takes the whole tap that closes the land picker, so nothing on the board get
 
   const tapTarget = boardCover.firstElementChild;
   expect(tapTarget).not.toBeNull();
-  fireEvent.mouseDown(tapTarget!);
+  if (!tapTarget) return;
+  fireEvent.mouseDown(tapTarget);
   expect(screen.queryByText("Swamp")).not.toBeNull();
 
-  fireEvent.click(tapTarget!);
+  fireEvent.click(tapTarget);
   expect(screen.queryByText("Swamp")).toBeNull();
 });
 

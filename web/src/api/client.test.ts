@@ -3,11 +3,11 @@ import { authGetMe, authLogin, authLogout } from "./client";
 
 const USER = { user_id: "u1", username: "alice" };
 
-function createStorageMock() {
+function createStorageMock(): Pick<Storage, "getItem" | "setItem"> {
   const store = new Map<string, string>();
   return {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => {
+    getItem: (key: string): string | null => store.get(key) ?? null,
+    setItem: (key: string, value: string): void => {
       store.set(key, value);
     },
   };

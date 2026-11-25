@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ReactElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
@@ -17,7 +18,7 @@ const GAME: GameSummary = {
   hand_scryfall_ids: ["a1", "b2", "c3", "d4", "e5"],
 };
 
-function Recap() {
+function Recap(): ReactElement {
   const { gameId, playerName } = useParams();
   return (
     <p>

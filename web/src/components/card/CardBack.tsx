@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { CARD_BACK_IMAGE } from "../../constants/assets";
 
 interface CardBackProps {
@@ -23,7 +24,7 @@ export function CardBack({
   onClick,
   className = "",
   style: externalStyle,
-}: CardBackProps) {
+}: CardBackProps): ReactElement {
   const dims = dimensions ?? sizeStyles[size];
 
   const baseClasses = [
@@ -36,22 +37,37 @@ export function CardBack({
     .filter(Boolean)
     .join(" ");
 
+  const boxStyle: React.CSSProperties = {
+    ...externalStyle,
+    width: dims.width,
+    height: dims.height,
+  };
+
+  const image = (
+    <img
+      src={CARD_BACK_IMAGE}
+      alt="Card back"
+      className="w-full h-full object-cover"
+      draggable={false}
+    />
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`${baseClasses} border-0 bg-transparent p-0 text-left block`}
+        style={boxStyle}
+        onClick={onClick}
+      >
+        {image}
+      </button>
+    );
+  }
+
   return (
-    <div
-      className={baseClasses}
-      style={{
-        ...externalStyle,
-        width: dims.width,
-        height: dims.height,
-      }}
-      onClick={onClick}
-    >
-      <img
-        src={CARD_BACK_IMAGE}
-        alt="Card back"
-        className="w-full h-full object-cover"
-        draggable={false}
-      />
+    <div className={baseClasses} style={boxStyle}>
+      {image}
     </div>
   );
 }

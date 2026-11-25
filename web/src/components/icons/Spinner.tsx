@@ -1,4 +1,6 @@
-export function Spinner({ className }: { className: string }) {
+import type { ReactElement } from "react";
+
+export function Spinner({ className }: { className: string }): ReactElement {
   return (
     <svg
       aria-hidden="true"

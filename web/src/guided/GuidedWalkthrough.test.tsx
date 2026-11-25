@@ -1,21 +1,65 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { useRef } from "react";
+import { useRef, type ReactElement } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { GuidedGuideId, GuidedWalkthroughContext } from "./types";
 import { GuidedWalkthrough } from "./GuidedWalkthrough";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none. Reduced motion shows a step at once.
 vi.hoisted(() => {
-  window.matchMedia = () =>
-    ({
-      matches: true,
-      addEventListener() {},
-      removeEventListener() {},
-    }) as unknown as MediaQueryList;
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: true,
+    media: query,
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
-const context = { currentPhase: "build" } as GuidedWalkthroughContext;
+const context: GuidedWalkthroughContext = {
+  currentPhase: "build",
+  selfPlayer: null,
+  currentBattle: null,
+  isMobile: false,
+  sidebarOpen: false,
+  revealedPlayerName: null,
+  useUpgrades: false,
+  hasRewardUpgradeChoice: false,
+  showBuildSubmitPopover: false,
+  showBattleSubmitPopover: false,
+  hasBattleRevealUpgrade: false,
+  availableRewardUpgrades: [],
+  draftGuideOpponentName: null,
+  draftGuideOpponentRevealedCount: 0,
+  isStageEnd: false,
+};
+
+function spotlightLeft(): string | undefined {
+  return document.querySelector<HTMLElement>(".border-amber-300\\/80")?.style
+    .left;
+}
+
+function makeDomRect(box: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}): DOMRect {
+  return {
+    x: box.left,
+    y: box.top,
+    left: box.left,
+    top: box.top,
+    width: box.width,
+    height: box.height,
+    right: box.left + box.width,
+    bottom: box.top + box.height,
+    toJSON: (): Record<string, never> => ({}),
+  };
+}
 
 function Board({
   guideId,
@@ -25,7 +69,7 @@ function Board({
   guideId: GuidedGuideId;
   stepIndex?: number;
   showGuide?: boolean;
-}) {
+}): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
   return (
     <div ref={rootRef} data-testid="root">
@@ -59,12 +103,18 @@ beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
     },
   );
-  Element.prototype.scrollIntoView ??= () => {};
+  if (typeof Reflect.get(Element.prototype, "scrollIntoView") !== "function") {
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      value: (): void => {},
+      configurable: true,
+      writable: true,
+    });
+  }
 });
 
 afterEach(() => {
@@ -111,28 +161,27 @@ it("shows each step and follows its target while an animation changes the page e
   });
   const target = screen.getByTestId("target");
   let left = 100;
-  target.getBoundingClientRect = () =>
-    ({ left, top: 50, width: 60, height: 20 }) as DOMRect;
+  target.getBoundingClientRect = (): DOMRect =>
+    makeDomRect({ left, top: 50, width: 60, height: 20 });
 
   let animating = true;
   let level = 0;
-  const drawFrames = async (count: number) => {
-    for (let frame = 0; frame < count; frame++) {
-      if (animating)
-        screen
-          .getByTestId("animation")
-          .style.setProperty("--level", `${++level}`);
-      // The observer hears of a change before the next frame's callbacks run.
-      await act(async () => {});
-      await act(async () => {
-        const due = [...queued.values()];
-        queued.clear();
-        due.forEach((callback) => callback(0));
-      });
+  const drawFrames = async (count: number): Promise<void> => {
+    if (count <= 0) return;
+    if (animating) {
+      screen
+        .getByTestId("animation")
+        .style.setProperty("--level", `${++level}`);
     }
+    // The observer hears of a change before the next frame's callbacks run.
+    await act(async () => {});
+    await act(async () => {
+      const due = [...queued.values()];
+      queued.clear();
+      due.forEach((callback) => callback(0));
+    });
+    await drawFrames(count - 1);
   };
-  const spotlightLeft = () =>
-    document.querySelector<HTMLElement>(".border-amber-300\\/80")?.style.left;
 
   rerender(<Board guideId="welcome" stepIndex={0} />);
   await drawFrames(10);

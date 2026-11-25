@@ -15,10 +15,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-interface FakeTrack {
-  enabled: boolean;
+interface FakeTrack extends MediaStreamTrack {
   stopped: boolean;
-  stop: () => void;
 }
 
 interface FakeSender {
@@ -27,24 +25,82 @@ interface FakeSender {
   replaceTrack: (next: FakeTrack | null) => Promise<void>;
 }
 
+const allowAllSignals = (_signal: {
+  from: string;
+  to: string;
+  signalType: string;
+}): boolean => true;
+
+const noopSend = (): void => {};
+const noopCallback = (): void => {};
+
+class FakeMediaStream extends EventTarget implements MediaStream {
+  readonly active = true;
+  readonly id = "fake-stream";
+  onaddtrack:
+    | ((this: MediaStream, ev: MediaStreamTrackEvent) => unknown)
+    | null = null;
+  onremovetrack:
+    | ((this: MediaStream, ev: MediaStreamTrackEvent) => unknown)
+    | null = null;
+  private readonly tracks: MediaStreamTrack[];
+
+  constructor(track: FakeTrack) {
+    super();
+    this.tracks = [track];
+  }
+
+  addTrack(track: MediaStreamTrack): void {
+    this.tracks.push(track);
+  }
+  clone(): MediaStream {
+    return this;
+  }
+  getAudioTracks(): MediaStreamTrack[] {
+    return this.tracks;
+  }
+  getTrackById(trackId: string): MediaStreamTrack | null {
+    return this.tracks.find((t) => t.id === trackId) ?? null;
+  }
+  getTracks(): MediaStreamTrack[] {
+    return this.tracks;
+  }
+  getVideoTracks(): MediaStreamTrack[] {
+    return [];
+  }
+  removeTrack(track: MediaStreamTrack): void {
+    const idx = this.tracks.indexOf(track);
+    if (idx >= 0) this.tracks.splice(idx, 1);
+  }
+}
+
 function createFakeStream(): {
   stream: MediaStream;
   track: FakeTrack;
 } {
-  const track: FakeTrack = {
+  const track: FakeTrack = Object.assign(new EventTarget(), {
+    contentHint: "",
     enabled: true,
+    id: "fake-audio-track",
+    kind: "audio",
+    label: "Fake Microphone",
+    muted: false,
+    onended: null,
+    onmute: null,
+    onunmute: null,
+    readyState: "live" as const,
     stopped: false,
-    stop() {
+    applyConstraints: async (): Promise<void> => {},
+    clone: (): MediaStreamTrack => track,
+    getCapabilities: (): MediaTrackCapabilities => ({}),
+    getConstraints: (): MediaTrackConstraints => ({}),
+    getSettings: (): MediaTrackSettings => ({}),
+    stop: (): void => {
       track.stopped = true;
     },
-  };
-  const streamLike = {
-    getTracks: () => [track],
-    getAudioTracks: () => [track],
-  };
+  });
   return {
-    // Minimal MediaStream fake for WebRTC signaling tests in jsdom.
-    stream: streamLike as unknown as MediaStream,
+    stream: new FakeMediaStream(track),
     track,
   };
 }
@@ -84,7 +140,7 @@ class FakePeerConnection {
     return sender;
   }
 
-  async addIceCandidate(candidate: RTCIceCandidateInit) {
+  async addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
     this.iceCandidates.push(candidate);
   }
 
@@ -104,7 +160,9 @@ class FakePeerConnection {
     };
   }
 
-  async setLocalDescription(description: RTCSessionDescriptionInit) {
+  async setLocalDescription(
+    description: RTCSessionDescriptionInit,
+  ): Promise<void> {
     if (description.type === "rollback") {
       this.rollbacks++;
       this.localDescription = null;
@@ -116,7 +174,9 @@ class FakePeerConnection {
       description.type === "offer" ? "have-local-offer" : "stable";
   }
 
-  async setRemoteDescription(description: RTCSessionDescriptionInit) {
+  async setRemoteDescription(
+    description: RTCSessionDescriptionInit,
+  ): Promise<void> {
     if (description.type === "offer" && this.signalingState !== "stable") {
       throw new DOMException(
         "Cannot set remote offer while not stable",
@@ -128,24 +188,24 @@ class FakePeerConnection {
       description.type === "offer" ? "have-remote-offer" : "stable";
   }
 
-  emitConnectionState(next: RTCPeerConnectionState) {
+  emitConnectionState(next: RTCPeerConnectionState): void {
     this.connectionState = next;
     this.onconnectionstatechange?.();
   }
 
-  emitIceConnectionState(next: RTCIceConnectionState) {
+  emitIceConnectionState(next: RTCIceConnectionState): void {
     this.iceConnectionState = next;
     this.oniceconnectionstatechange?.();
   }
 
-  close() {
+  close(): void {
     this.closed = true;
     this.signalingState = "closed";
     this.connectionState = "closed";
   }
 }
 
-function stubVoiceBrowser(getUserMedia: () => Promise<MediaStream>) {
+function stubVoiceBrowser(getUserMedia: () => Promise<MediaStream>): void {
   FakePeerConnection.made = [];
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   vi.stubGlobal("requestAnimationFrame", () => 0);
@@ -155,33 +215,47 @@ function stubVoiceBrowser(getUserMedia: () => Promise<MediaStream>) {
   vi.stubGlobal(
     "AudioContext",
     class {
-      createMediaStreamSource() {
-        return { connect() {}, disconnect() {} };
+      createMediaStreamSource(): {
+        connect: () => void;
+        disconnect: () => void;
+      } {
+        return { connect(): void {}, disconnect(): void {} };
       }
-      createAnalyser() {
+      createAnalyser(): { frequencyBinCount: number } {
         return { frequencyBinCount: 1 };
       }
-      async close() {}
+      async close(): Promise<void> {}
     },
   );
 }
 
-type SignalRef = Parameters<typeof useVoiceChat>[3];
+type SignalRef = Parameters<typeof useVoiceChat>[0]["voiceSignalRef"];
 
-function createSignalHarness() {
-  const inboxes: Record<string, SignalRef> = {};
-  const sent: {
+interface SignalHarness {
+  inboxFor: (name: string) => SignalRef;
+  sendFrom: (
+    from: string,
+  ) => (_action: string, payload: Record<string, unknown>) => void;
+  sent: {
     from: string;
     to: string;
     signalType: string;
     data: unknown;
     delivered: boolean;
-  }[] = [];
-  let shouldDeliver = (_signal: {
-    from: string;
-    to: string;
-    signalType: string;
-  }) => true;
+  }[];
+  setDeliveryFilter: (
+    filter: (signal: {
+      from: string;
+      to: string;
+      signalType: string;
+    }) => boolean,
+  ) => void;
+}
+
+function createSignalHarness(): SignalHarness {
+  const inboxes: Record<string, SignalRef> = {};
+  const sent: SignalHarness["sent"] = [];
+  let shouldDeliver = allowAllSignals;
 
   const inboxFor = (name: string): SignalRef => {
     if (!inboxes[name]) inboxes[name] = { current: null };
@@ -189,7 +263,8 @@ function createSignalHarness() {
   };
 
   const sendFrom =
-    (from: string) => (_action: string, payload: Record<string, unknown>) => {
+    (from: string) =>
+    (_action: string, payload: Record<string, unknown>): void => {
       const to =
         typeof payload.target_player === "string" ? payload.target_player : "";
       const signalType =
@@ -217,20 +292,20 @@ function createSignalHarness() {
         to: string;
         signalType: string;
       }) => boolean,
-    ) {
+    ): void {
       shouldDeliver = filter;
     },
   };
 }
 
-const advance = (ms: number) =>
+const advance = (ms: number): Promise<void> =>
   act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
   });
 
 it("asks for the microphone and says it was refused once, until Voice has been off", async () => {
   const prompts: (() => void)[] = [];
-  const getUserMedia = () =>
+  const getUserMedia = (): Promise<MediaStream> =>
     new Promise<MediaStream>((_, reject) => {
       prompts.push(() =>
         reject(new DOMException("Permission denied", "NotAllowedError")),
@@ -239,17 +314,28 @@ it("asks for the microphone and says it was refused once, until Voice has been o
   vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
   vi.stubGlobal("RTCPeerConnection", FakePeerConnection);
   let notices = 0;
-  const send = () => {};
   const signalRef: SignalRef = { current: null };
+  const initialProps: { peers: string[]; self: string | null } = {
+    peers: ["Bob"],
+    self: "Alice",
+  };
   const { result, rerender } = renderHook(
     ({ peers, self }: { peers: string[]; self: string | null }) =>
-      useVoiceChat(send, peers, self, signalRef, () => {
-        notices++;
+      useVoiceChat({
+        send: noopSend,
+        peerNames: peers,
+        selfPlayerName: self,
+        voiceSignalRef: signalRef,
+        onPermissionDenied: () => {
+          notices++;
+        },
       }),
-    { initialProps: { peers: ["Bob"], self: "Alice" as string | null } },
+    { initialProps },
   );
-  const update = (peers: string[], self: string | null = "Alice") =>
-    act(async () => rerender({ peers, self }));
+  const update = (
+    peers: string[],
+    self: string | null = "Alice",
+  ): Promise<void> => act(async () => rerender({ peers, self }));
 
   await update(["Bob"]);
   await update(["Bob", "Cara"]);
@@ -280,20 +366,19 @@ it("keeps one RTCPeerConnection per opponent and requests the microphone once ac
   });
 
   const harness = createSignalHarness();
+  const initialProps: { peers: string[]; self: string | null } = {
+    peers: ["Bob", "Cara"],
+    self: "Alice",
+  };
   const { result, rerender } = renderHook(
     ({ peers, self }: { peers: string[]; self: string | null }) =>
-      useVoiceChat(
-        harness.sendFrom("Alice"),
-        peers,
-        self,
-        harness.inboxFor("Alice"),
-      ),
-    {
-      initialProps: {
-        peers: ["Bob", "Cara"],
-        self: "Alice" as string | null,
-      },
-    },
+      useVoiceChat({
+        send: harness.sendFrom("Alice"),
+        peerNames: peers,
+        selfPlayerName: self,
+        voiceSignalRef: harness.inboxFor("Alice"),
+      }),
+    { initialProps },
   );
 
   await advance(0);
@@ -363,20 +448,20 @@ it("resends a lost WebRTC offer after a timeout and stops once answered", async 
   });
 
   renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Alice"),
-      ["Bob"],
-      "Alice",
-      harness.inboxFor("Alice"),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Alice"),
+      peerNames: ["Bob"],
+      selfPlayerName: "Alice",
+      voiceSignalRef: harness.inboxFor("Alice"),
+    }),
   );
   renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Bob"),
-      ["Alice"],
-      "Bob",
-      harness.inboxFor("Bob"),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Bob"),
+      peerNames: ["Alice"],
+      selfPlayerName: "Bob",
+      voiceSignalRef: harness.inboxFor("Bob"),
+    }),
   );
 
   await advance(0);
@@ -426,20 +511,20 @@ it("resolves offer glare so polite peer rolls back and impolite peer wins on the
 
   const harness = createSignalHarness();
   renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Alice"),
-      ["Bob"],
-      "Alice",
-      harness.inboxFor("Alice"),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Alice"),
+      peerNames: ["Bob"],
+      selfPlayerName: "Alice",
+      voiceSignalRef: harness.inboxFor("Alice"),
+    }),
   );
   renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Bob"),
-      ["Alice"],
-      "Bob",
-      harness.inboxFor("Bob"),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Bob"),
+      peerNames: ["Alice"],
+      selfPlayerName: "Bob",
+      voiceSignalRef: harness.inboxFor("Bob"),
+    }),
   );
 
   await advance(0);
@@ -505,27 +590,26 @@ it("resolves offer glare so polite peer rolls back and impolite peer wins on the
 
 it("connects to a player who comes back, and allows the microphone, minutes after the offer", async () => {
   const { stream } = createFakeStream();
-  let bobAllows = () => {};
+  let bobAllows: () => void = noopCallback;
   let calls = 0;
   stubVoiceBrowser(() => {
     if (calls++ === 0) return Promise.resolve(stream);
     return new Promise((resolve) => {
-      bobAllows = () => resolve(stream);
+      bobAllows = (): void => resolve(stream);
     });
   });
 
   const harness = createSignalHarness();
   const failed: string[] = [];
-  const join = (self: string, peers: string[]) => {
+  const join = (self: string, peers: string[]): void => {
     renderHook(() =>
-      useVoiceChat(
-        harness.sendFrom(self),
-        peers,
-        self,
-        harness.inboxFor(self),
-        undefined,
-        (peer) => failed.push(peer),
-      ),
+      useVoiceChat({
+        send: harness.sendFrom(self),
+        peerNames: peers,
+        selfPlayerName: self,
+        voiceSignalRef: harness.inboxFor(self),
+        onRetriesExhausted: (peer) => failed.push(peer),
+      }),
     );
   };
   const MINUTE = 60_000;
@@ -562,22 +646,21 @@ it("reconnects an established peer after a mid-game server restart without recre
   const harness = createSignalHarness();
   const exhausted: string[] = [];
   const alice = renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Alice"),
-      ["Bob"],
-      "Alice",
-      harness.inboxFor("Alice"),
-      undefined,
-      (peer) => exhausted.push(peer),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Alice"),
+      peerNames: ["Bob"],
+      selfPlayerName: "Alice",
+      voiceSignalRef: harness.inboxFor("Alice"),
+      onRetriesExhausted: (peer) => exhausted.push(peer),
+    }),
   );
   renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Bob"),
-      ["Alice"],
-      "Bob",
-      harness.inboxFor("Bob"),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Bob"),
+      peerNames: ["Alice"],
+      selfPlayerName: "Bob",
+      voiceSignalRef: harness.inboxFor("Bob"),
+    }),
   );
 
   await advance(0);
@@ -622,14 +705,13 @@ it("serializes reconnect attempts with exponential backoff so concurrent failure
   const harness = createSignalHarness();
   const exhausted: string[] = [];
   const { result } = renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Alice"),
-      ["Bob"],
-      "Alice",
-      harness.inboxFor("Alice"),
-      undefined,
-      (peer) => exhausted.push(peer),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Alice"),
+      peerNames: ["Bob"],
+      selfPlayerName: "Alice",
+      voiceSignalRef: harness.inboxFor("Alice"),
+      onRetriesExhausted: (peer) => exhausted.push(peer),
+    }),
   );
 
   await advance(0);
@@ -703,12 +785,12 @@ it("persists self and peer mute toggles and tracks remote mute_state signals", a
 
   const harness = createSignalHarness();
   const { result } = renderHook(() =>
-    useVoiceChat(
-      harness.sendFrom("Alice"),
-      ["Bob"],
-      "Alice",
-      harness.inboxFor("Alice"),
-    ),
+    useVoiceChat({
+      send: harness.sendFrom("Alice"),
+      peerNames: ["Bob"],
+      selfPlayerName: "Alice",
+      voiceSignalRef: harness.inboxFor("Alice"),
+    }),
   );
 
   await advance(0);

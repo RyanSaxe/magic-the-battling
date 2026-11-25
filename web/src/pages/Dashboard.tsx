@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../contexts";
 import { useRequireAuth } from "../hooks/pages/useAuthSession";
@@ -76,9 +76,26 @@ const SECTION_NAMES: Record<BoardSection, string> = {
 /** Both headers share a height and center their items, so their titles share a baseline and their first cards a top. */
 const SECTION_HEADER = "flex min-h-9 flex-wrap items-center gap-x-3 gap-y-2";
 
+interface GridCellStyle extends CSSProperties {
+  "--grid-row": number;
+  "--grid-column": number;
+}
+
+interface BoardRowsStyle extends CSSProperties {
+  "--board-rows": string;
+}
+
 /** Places a card in the grid on screens 1280px and wider: the library fills columns 1 and 2, and recent games column 4, after a spacer. */
 function gridCell(row: number, column: number): CSSProperties {
-  return { "--grid-row": row, "--grid-column": column } as CSSProperties;
+  const style: GridCellStyle = { "--grid-row": row, "--grid-column": column };
+  return style;
+}
+
+function boardRowsStyle(libraryRows: number): CSSProperties {
+  const style: BoardRowsStyle = {
+    "--board-rows": `auto repeat(${libraryRows}, auto) 1fr`,
+  };
+  return style;
 }
 
 const GRID_CELL =
@@ -104,7 +121,386 @@ async function loadMyGames(): Promise<MyGames> {
   };
 }
 
-export function Dashboard() {
+function DashboardQuickBar({
+  username,
+  myGames,
+  allCount,
+  showLibraryCount,
+  onNewGame,
+  onOpenJoinModal,
+}: {
+  username: string;
+  myGames: MyGames | null;
+  allCount: string;
+  showLibraryCount: boolean;
+  onNewGame: () => void;
+  onOpenJoinModal: () => void;
+}): ReactElement {
+  return (
+    <SurfaceCard
+      as="section"
+      layout="tile"
+      aria-label="Start or join a game"
+      className="flex flex-col gap-3 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onNewGame}
+          className="btn btn-primary flex h-9 flex-1 items-center justify-center gap-2 !py-0 px-5 font-semibold sm:flex-none"
+        >
+          <PlayIcon />
+          New Game
+        </button>
+        <JoinCodeBox playerName={username} className="hidden md:flex" />
+        <button
+          type="button"
+          onClick={onOpenJoinModal}
+          className="btn btn-secondary h-9 flex-1 !py-0 px-4 font-medium sm:flex-none md:hidden"
+        >
+          Join Code
+        </button>
+      </div>
+      {myGames && (
+        <SectionCounts className="flex items-center justify-between gap-4 whitespace-nowrap sm:justify-end">
+          <Count value={myGames.totalGames}>
+            {" "}
+            {myGames.totalGames === 1 ? "game" : "games"}
+          </Count>
+          <WinsCount wins={myGames.totalWins} games={myGames.totalGames} />
+          {showLibraryCount && (
+            <Count value={allCount} className="hidden lg:inline">
+              {" "}
+              saved &amp; followed
+            </Count>
+          )}
+        </SectionCounts>
+      )}
+    </SurfaceCard>
+  );
+}
+
+function LibraryCards({
+  status,
+  library,
+  entries,
+  libraryCell,
+  onRetry,
+  onRemove,
+}: {
+  status: string;
+  library: Library | null;
+  entries: LibraryEntry[];
+  libraryCell: string;
+  onRetry: () => void;
+  onRemove: (entry: LibraryEntry) => void;
+}): ReactElement {
+  if (status === "failed") {
+    return (
+      <NoticeTile
+        style={gridCell(2, 2)}
+        className={libraryCell}
+        action={{ label: "Retry", onClick: onRetry }}
+      >
+        Your cubes and decks didn&apos;t load.
+      </NoticeTile>
+    );
+  }
+  if (!library) {
+    return (
+      <NoticeTile style={gridCell(2, 2)} className={libraryCell}>
+        Loading...
+      </NoticeTile>
+    );
+  }
+  return (
+    <>
+      {entries.map((entry, index) => (
+        <LibraryTile
+          key={libraryEntryKey(entry)}
+          entry={entry}
+          style={gridCell(
+            2 + Math.floor((index + 1) / 2),
+            1 + ((index + 1) % 2),
+          )}
+          className={libraryCell}
+          removable={canRemove(library, entry)}
+          onRemove={onRemove}
+        />
+      ))}
+    </>
+  );
+}
+
+function RecentGamesCards({
+  status,
+  myGames,
+  recentGames,
+  onRetry,
+}: {
+  status: string;
+  myGames: MyGames | null;
+  recentGames: GameSummary[];
+  onRetry: () => void;
+}): ReactElement {
+  if (status === "failed") {
+    return (
+      <NoticeTile action={{ label: "Retry", onClick: onRetry }}>
+        Your games didn&apos;t load.
+      </NoticeTile>
+    );
+  }
+  if (!myGames) {
+    return <NoticeTile>Loading...</NoticeTile>;
+  }
+  if (recentGames.length === 0) {
+    return <NoticeTile>Your finished games show up here.</NoticeTile>;
+  }
+  return (
+    <>
+      {recentGames.map((game) => (
+        <GameTile key={game.game_id} game={game} />
+      ))}
+    </>
+  );
+}
+
+function LibraryAddSlot({
+  isLibraryEmpty,
+  className,
+  onOpenAddModal,
+}: {
+  isLibraryEmpty: boolean;
+  className: string;
+  onOpenAddModal: () => void;
+}): ReactElement {
+  return (
+    <div
+      data-testid="library-add-slot"
+      style={gridCell(2, 1)}
+      className={`dashboard-add-slot ${className}`}
+    >
+      {isLibraryEmpty && (
+        <p className="max-w-sm text-sm text-[var(--ivory-felt)]">
+          Save a cube or deck with your settings to play it again in one click.
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onOpenAddModal}
+        className="btn btn-secondary py-2 px-4 text-sm font-semibold"
+      >
+        + Add Cube / Deck
+      </button>
+      <SectionLink to="/dashboard/discover">
+        Discover cubes / decks →
+      </SectionLink>
+    </div>
+  );
+}
+
+function LibraryLoadMoreSlot({
+  library,
+  hasMore,
+  libraryRows,
+  className,
+  onLoadMore,
+}: {
+  library: Library | null;
+  hasMore: boolean;
+  libraryRows: number;
+  className: string;
+  onLoadMore: () => void;
+}): ReactElement | null {
+  if (!library || !hasMore) return null;
+  return (
+    <LoadMoreButton
+      loading={library.loadingMore}
+      disabled={!nextLibraryPage(library)}
+      onClick={onLoadMore}
+      style={gridCell(2 + libraryRows, 1)}
+      className={`${className} justify-self-center self-start`}
+    />
+  );
+}
+
+function DashboardBoard({
+  phoneSection,
+  setPhoneSection,
+  libraryStatus,
+  library,
+  entries,
+  hasMore,
+  myGamesStatus,
+  myGames,
+  onRetryLibrary,
+  onRetryGames,
+  onLoadMoreLibrary,
+  onRemove,
+  onOpenAddModal,
+}: {
+  phoneSection: BoardSection;
+  setPhoneSection: (section: BoardSection) => void;
+  libraryStatus: string;
+  library: Library | null;
+  entries: LibraryEntry[];
+  hasMore: boolean;
+  myGamesStatus: string;
+  myGames: MyGames | null;
+  onRetryLibrary: () => void;
+  onRetryGames: () => void;
+  onLoadMoreLibrary: () => void;
+  onRemove: (entry: LibraryEntry) => void;
+  onOpenAddModal: () => void;
+}): ReactElement {
+  const isLibraryEmpty = Boolean(library) && entries.length === 0;
+  const libraryRows = Math.max(1, Math.ceil((entries.length + 1) / 2));
+  const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? [];
+  // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
+  const libraryCell = `${GRID_CELL} ${phoneSection === "library" ? "" : "max-xl:hidden"}`;
+  const libraryNotice = `col-span-full ${libraryCell} xl:col-span-2`;
+
+  return (
+    <div
+      data-testid="dashboard-board"
+      // Only the last row flexes, so when Recent Games runs longer it lengthens that row and no cube card.
+      style={boardRowsStyle(libraryRows)}
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.5rem_minmax(0,1fr)] xl:[grid-template-rows:var(--board-rows)]"
+    >
+      <SegmentedFilter
+        label="Section"
+        variant="heading"
+        value={phoneSection}
+        onChange={setPhoneSection}
+        className="col-span-full w-full sm:w-auto sm:justify-self-start xl:hidden"
+        options={[
+          { value: "library", label: SECTION_NAMES.library },
+          { value: "recent", label: SECTION_NAMES.recent },
+        ]}
+      />
+
+      <div
+        data-testid="library-header"
+        style={gridCell(1, 1)}
+        className={`max-xl:hidden ${GRID_CELL} xl:col-span-2 ${SECTION_HEADER}`}
+      >
+        <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
+      </div>
+
+      <LibraryAddSlot
+        isLibraryEmpty={isLibraryEmpty}
+        className={isLibraryEmpty ? libraryNotice : libraryCell}
+        onOpenAddModal={onOpenAddModal}
+      />
+
+      <LibraryCards
+        status={libraryStatus}
+        library={library}
+        entries={entries}
+        libraryCell={libraryCell}
+        onRetry={onRetryLibrary}
+        onRemove={onRemove}
+      />
+
+      <LibraryLoadMoreSlot
+        library={library}
+        hasMore={hasMore}
+        libraryRows={libraryRows}
+        className={libraryNotice}
+        onLoadMore={onLoadMoreLibrary}
+      />
+
+      {/* One section, so it can stay in view while the cubes scroll, with rows of its own so its cards stay short. */}
+      <section
+        aria-label={SECTION_NAMES.recent}
+        data-beside-cubes={entries.length > 0 || undefined}
+        className={`${phoneSection === "recent" ? "contents" : "hidden"} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:grid-cols-1 xl:gap-3 xl:[grid-row:1/-1] xl:self-start`}
+      >
+        <div
+          data-testid="recent-header"
+          className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}
+        >
+          <div className="max-xl:hidden">
+            <SectionTitle>{SECTION_NAMES.recent}</SectionTitle>
+          </div>
+          <SectionLink to="/dashboard/games">All games →</SectionLink>
+        </div>
+
+        <RecentGamesCards
+          status={myGamesStatus}
+          myGames={myGames}
+          recentGames={recentGames}
+          onRetry={onRetryGames}
+        />
+      </section>
+    </div>
+  );
+}
+
+type SavedLibraryEntry = Extract<LibraryEntry, { kind: "saved" }>;
+
+function DashboardModals({
+  showAddModal,
+  showJoinModal,
+  closingSeat,
+  confirmingDelete,
+  onCloseAddModal,
+  onCreatedPreset,
+  onCloseJoinModal,
+  onKeepSeat,
+  onSeatClosed,
+  onKeepDelete,
+  onConfirmDelete,
+  addToast,
+}: {
+  showAddModal: boolean;
+  showJoinModal: boolean;
+  closingSeat: ResumableSeat | null;
+  confirmingDelete: SavedLibraryEntry | null;
+  onCloseAddModal: () => void;
+  onCreatedPreset: (preset: SavedLibraryEntry["preset"]) => void;
+  onCloseJoinModal: () => void;
+  onKeepSeat: () => void;
+  onSeatClosed: (gameId: string) => void;
+  onKeepDelete: () => void;
+  onConfirmDelete: (entry: SavedLibraryEntry) => void;
+  addToast: (message: string, type?: "error" | "info" | "warning") => void;
+}): ReactElement {
+  return (
+    <>
+      {showAddModal && (
+        <AddCubeModal
+          onClose={onCloseAddModal}
+          onCreated={onCreatedPreset}
+          addToast={addToast}
+        />
+      )}
+      {showJoinModal && <JoinGameModal onClose={onCloseJoinModal} />}
+      {closingSeat && (
+        <CloseSeatDialog
+          seat={closingSeat}
+          onKeep={onKeepSeat}
+          onClosed={() => onSeatClosed(closingSeat.gameId)}
+        />
+      )}
+      {confirmingDelete && (
+        <DeletePresetDialog
+          title={cubeTitle(confirmingDelete.preset)}
+          imageUri={confirmingDelete.preset.cube_image_uri}
+          onKeep={onKeepDelete}
+          onDelete={() => onConfirmDelete(confirmingDelete)}
+        />
+      )}
+    </>
+  );
+}
+
+function formatLibraryCount(library: Library | null, count: number): string {
+  if (!library) return "";
+  return `${count}${libraryHasMore(library) ? "+" : ""}`;
+}
+
+export function Dashboard(): ReactElement | null {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useRequireAuth("/dashboard");
   const { addToast } = useToast();
@@ -115,27 +511,25 @@ export function Dashboard() {
     (seat) => !closedSeatIds.includes(seat.gameId),
   );
 
-  const libraryLoad = useFirstLoad(loadLibrary, !!user);
-  const myGamesLoad = useFirstLoad(loadMyGames, !!user);
+  const libraryLoad = useFirstLoad(loadLibrary, Boolean(user));
+  const myGamesLoad = useFirstLoad(loadMyGames, Boolean(user));
   const [phoneSection, setPhoneSection] = useState<BoardSection>("library");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState<Extract<
-    LibraryEntry,
-    { kind: "saved" }
-  > | null>(null);
+  const [confirmingDelete, setConfirmingDelete] =
+    useState<SavedLibraryEntry | null>(null);
 
   const library =
     libraryLoad.state.status === "loaded" ? libraryLoad.state.value : null;
   const myGames =
     myGamesLoad.state.status === "loaded" ? myGamesLoad.state.value : null;
 
-  const updateLibrary = (change: (library: Library) => Library) =>
+  const updateLibrary = (change: (library: Library) => Library): void =>
     libraryLoad.update((prev) =>
       prev.status === "loaded" ? { ...prev, value: change(prev.value) } : prev,
     );
 
-  const loadMoreLibrary = async () => {
+  const loadMoreLibrary = async (): Promise<void> => {
     const next = library && nextLibraryPage(library);
     if (!next) return;
     updateLibrary(withLibraryPageRequested);
@@ -151,7 +545,7 @@ export function Dashboard() {
     }
   };
 
-  const performRemove = async (entry: LibraryEntry) => {
+  const performRemove = async (entry: LibraryEntry): Promise<void> => {
     if (!library || !canRemove(library, entry)) return;
     updateLibrary((current) => withRemovalStarted(current, entry));
     try {
@@ -168,7 +562,7 @@ export function Dashboard() {
     }
   };
 
-  const remove = (entry: LibraryEntry) => {
+  const remove = (entry: LibraryEntry): void => {
     if (!library || !canRemove(library, entry)) return;
     if (entry.kind === "saved") {
       setConfirmingDelete(entry);
@@ -180,14 +574,7 @@ export function Dashboard() {
   if (authLoading || !user) return null;
 
   const entries = library ? libraryEntries(library) : [];
-  const hasMore = !!library && libraryHasMore(library);
-  const allCount = library ? `${entries.length}${hasMore ? "+" : ""}` : "";
-  const isLibraryEmpty = !!library && entries.length === 0;
-  const libraryRows = Math.max(1, Math.ceil((entries.length + 1) / 2));
-  const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? [];
-  // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
-  const libraryCell = `${GRID_CELL} ${phoneSection === "library" ? "" : "max-xl:hidden"}`;
-  const libraryNotice = `col-span-full ${libraryCell} xl:col-span-2`;
+  const hasMore = Boolean(library && libraryHasMore(library));
 
   return (
     <>
@@ -196,214 +583,62 @@ export function Dashboard() {
           <ResumeBanner seat={resumable} onClose={setClosingSeat} />
         )}
 
-        <SurfaceCard
-          as="section"
-          layout="tile"
-          aria-label="Start or join a game"
-          className="flex flex-col gap-3 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/play")}
-              className="btn btn-primary flex h-9 flex-1 items-center justify-center gap-2 !py-0 px-5 font-semibold sm:flex-none"
-            >
-              <PlayIcon />
-              New Game
-            </button>
-            <JoinCodeBox
-              playerName={user.username}
-              className="hidden md:flex"
-            />
-            <button
-              type="button"
-              onClick={() => setShowJoinModal(true)}
-              className="btn btn-secondary h-9 flex-1 !py-0 px-4 font-medium sm:flex-none md:hidden"
-            >
-              Join Code
-            </button>
-          </div>
-          {myGames && (
-            <SectionCounts className="flex items-center justify-between gap-4 whitespace-nowrap sm:justify-end">
-              <Count value={myGames.totalGames}>
-                {" "}
-                {myGames.totalGames === 1 ? "game" : "games"}
-              </Count>
-              <WinsCount wins={myGames.totalWins} games={myGames.totalGames} />
-              {library && (
-                <Count value={allCount} className="hidden lg:inline">
-                  {" "}
-                  saved &amp; followed
-                </Count>
-              )}
-            </SectionCounts>
-          )}
-        </SurfaceCard>
+        <DashboardQuickBar
+          username={user.username}
+          myGames={myGames}
+          allCount={formatLibraryCount(library, entries.length)}
+          showLibraryCount={Boolean(library)}
+          onNewGame={() => {
+            void navigate("/play");
+          }}
+          onOpenJoinModal={() => setShowJoinModal(true)}
+        />
 
-        <div
-          data-testid="dashboard-board"
-          // Only the last row flexes, so when Recent Games runs longer it lengthens that row and no cube card.
-          style={
-            {
-              "--board-rows": `auto repeat(${libraryRows}, auto) 1fr`,
-            } as CSSProperties
-          }
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.5rem_minmax(0,1fr)] xl:[grid-template-rows:var(--board-rows)]"
-        >
-          <SegmentedFilter
-            label="Section"
-            variant="heading"
-            value={phoneSection}
-            onChange={setPhoneSection}
-            className="col-span-full w-full sm:w-auto sm:justify-self-start xl:hidden"
-            options={[
-              { value: "library", label: SECTION_NAMES.library },
-              { value: "recent", label: SECTION_NAMES.recent },
-            ]}
-          />
-
-          <div
-            data-testid="library-header"
-            style={gridCell(1, 1)}
-            className={`max-xl:hidden ${GRID_CELL} xl:col-span-2 ${SECTION_HEADER}`}
-          >
-            <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
-          </div>
-
-          <div
-            data-testid="library-add-slot"
-            style={gridCell(2, 1)}
-            className={`dashboard-add-slot ${isLibraryEmpty ? libraryNotice : libraryCell}`}
-          >
-            {isLibraryEmpty && (
-              <p className="max-w-sm text-sm text-[var(--ivory-felt)]">
-                Save a cube or deck with your settings to play it again in one
-                click.
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowAddModal(true)}
-              className="btn btn-secondary py-2 px-4 text-sm font-semibold"
-            >
-              + Add Cube / Deck
-            </button>
-            <SectionLink to="/dashboard/discover">
-              Discover cubes / decks →
-            </SectionLink>
-          </div>
-
-          {libraryLoad.state.status === "failed" ? (
-            <NoticeTile
-              style={gridCell(2, 2)}
-              className={libraryCell}
-              action={{ label: "Retry", onClick: libraryLoad.retry }}
-            >
-              Your cubes and decks didn&apos;t load.
-            </NoticeTile>
-          ) : !library ? (
-            <NoticeTile style={gridCell(2, 2)} className={libraryCell}>
-              Loading...
-            </NoticeTile>
-          ) : (
-            entries.map((entry, index) => (
-              <LibraryTile
-                key={libraryEntryKey(entry)}
-                entry={entry}
-                style={gridCell(
-                  2 + Math.floor((index + 1) / 2),
-                  1 + ((index + 1) % 2),
-                )}
-                className={libraryCell}
-                removable={canRemove(library, entry)}
-                onRemove={remove}
-              />
-            ))
-          )}
-
-          {library && hasMore && (
-            <LoadMoreButton
-              loading={library.loadingMore}
-              disabled={!nextLibraryPage(library)}
-              onClick={loadMoreLibrary}
-              style={gridCell(2 + libraryRows, 1)}
-              className={`${libraryNotice} justify-self-center self-start`}
-            />
-          )}
-
-          {/* One section, so it can stay in view while the cubes scroll, with rows of its own so its cards stay short. */}
-          <section
-            aria-label={SECTION_NAMES.recent}
-            data-beside-cubes={entries.length > 0 || undefined}
-            className={`${phoneSection === "recent" ? "contents" : "hidden"} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:grid-cols-1 xl:gap-3 xl:[grid-row:1/-1] xl:self-start`}
-          >
-            <div
-              data-testid="recent-header"
-              className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}
-            >
-              <div className="max-xl:hidden">
-                <SectionTitle>{SECTION_NAMES.recent}</SectionTitle>
-              </div>
-              <SectionLink to="/dashboard/games">All games →</SectionLink>
-            </div>
-
-            {myGamesLoad.state.status === "failed" ? (
-              <NoticeTile
-                action={{ label: "Retry", onClick: myGamesLoad.retry }}
-              >
-                Your games didn&apos;t load.
-              </NoticeTile>
-            ) : !myGames ? (
-              <NoticeTile>Loading...</NoticeTile>
-            ) : recentGames.length === 0 ? (
-              <NoticeTile>Your finished games show up here.</NoticeTile>
-            ) : (
-              recentGames.map((game) => (
-                <GameTile key={game.game_id} game={game} />
-              ))
-            )}
-          </section>
-        </div>
+        <DashboardBoard
+          phoneSection={phoneSection}
+          setPhoneSection={setPhoneSection}
+          libraryStatus={libraryLoad.state.status}
+          library={library}
+          entries={entries}
+          hasMore={hasMore}
+          myGamesStatus={myGamesLoad.state.status}
+          myGames={myGames}
+          onRetryLibrary={libraryLoad.retry}
+          onRetryGames={myGamesLoad.retry}
+          onLoadMoreLibrary={() => {
+            void loadMoreLibrary();
+          }}
+          onRemove={remove}
+          onOpenAddModal={() => setShowAddModal(true)}
+        />
       </DashboardFrame>
 
-      {showAddModal && (
-        <AddCubeModal
-          onClose={() => setShowAddModal(false)}
-          onCreated={(preset) => {
-            // The list can finish loading after Add is sent, so this can't go by the `library` of that render.
-            libraryLoad.updateOrReload((current) =>
-              withAddedPreset(current, preset),
-            );
-            setShowAddModal(false);
-          }}
-          addToast={addToast}
-        />
-      )}
-      {showJoinModal && (
-        <JoinGameModal onClose={() => setShowJoinModal(false)} />
-      )}
-      {closingSeat && (
-        <CloseSeatDialog
-          seat={closingSeat}
-          onKeep={() => setClosingSeat(null)}
-          onClosed={() => {
-            setClosedSeatIds((ids) => [...ids, closingSeat.gameId]);
-            setClosingSeat(null);
-          }}
-        />
-      )}
-      {confirmingDelete && (
-        <DeletePresetDialog
-          title={cubeTitle(confirmingDelete.preset)}
-          imageUri={confirmingDelete.preset.cube_image_uri}
-          onKeep={() => setConfirmingDelete(null)}
-          onDelete={() => {
-            const entry = confirmingDelete;
-            setConfirmingDelete(null);
-            void performRemove(entry);
-          }}
-        />
-      )}
+      <DashboardModals
+        showAddModal={showAddModal}
+        showJoinModal={showJoinModal}
+        closingSeat={closingSeat}
+        confirmingDelete={confirmingDelete}
+        onCloseAddModal={() => setShowAddModal(false)}
+        onCreatedPreset={(preset) => {
+          // The list can finish loading after Add is sent, so this can't go by the `library` of that render.
+          libraryLoad.updateOrReload((current) =>
+            withAddedPreset(current, preset),
+          );
+          setShowAddModal(false);
+        }}
+        onCloseJoinModal={() => setShowJoinModal(false)}
+        onKeepSeat={() => setClosingSeat(null)}
+        onSeatClosed={(gameId) => {
+          setClosedSeatIds((ids) => [...ids, gameId]);
+          setClosingSeat(null);
+        }}
+        onKeepDelete={() => setConfirmingDelete(null)}
+        onConfirmDelete={(entry) => {
+          setConfirmingDelete(null);
+          void performRemove(entry);
+        }}
+        addToast={addToast}
+      />
     </>
   );
 }
@@ -421,7 +656,7 @@ function LibraryTile({
   /** False while this card's delete or unfollow, or a page of the library, is loading. */
   removable: boolean;
   onRemove: (entry: LibraryEntry) => void;
-}) {
+}): ReactElement {
   const navigate = useNavigate();
 
   if (entry.kind === "saved") {
@@ -452,12 +687,19 @@ function LibraryTile({
           )
         }
         href={href}
-        onPlay={() => navigate(battlerPlayUrl(preset))}
+        onPlay={() => {
+          void navigate(battlerPlayUrl(preset));
+        }}
         menuItems={[
-          { label: "View", onSelect: () => navigate(href) },
+          {
+            label: "View",
+            onSelect: (): void => {
+              void navigate(href);
+            },
+          },
           {
             label: "Delete",
-            onSelect: () => onRemove(entry),
+            onSelect: (): void => onRemove(entry),
             danger: true,
             disabled: !removable,
           },
@@ -486,14 +728,19 @@ function LibraryTile({
           : "No games yet"
       }
       href={href}
-      onPlay={() =>
-        navigate(`/play?cubeId=${encodeURIComponent(follow.cube_id)}`)
-      }
+      onPlay={() => {
+        void navigate(`/play?cubeId=${encodeURIComponent(follow.cube_id)}`);
+      }}
       menuItems={[
-        { label: "View", onSelect: () => navigate(href) },
+        {
+          label: "View",
+          onSelect: (): void => {
+            void navigate(href);
+          },
+        },
         {
           label: "Unfollow",
-          onSelect: () => onRemove(entry),
+          onSelect: (): void => onRemove(entry),
           danger: true,
           disabled: !removable,
         },

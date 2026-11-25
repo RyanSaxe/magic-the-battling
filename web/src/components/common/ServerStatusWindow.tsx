@@ -2,7 +2,9 @@ import {
   useCallback,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type ReactElement,
 } from "react";
 
 import {
@@ -54,11 +56,21 @@ type InteractionState = {
   startY: number;
 } | null;
 
+interface WindowClampOptions {
+  state: DesktopWindowState;
+  viewport: ViewportBox;
+  isCollapsed: boolean;
+  collapsedHeight: number;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function availableExpandedSize(viewport: ViewportBox) {
+function availableExpandedSize(viewport: ViewportBox): {
+  width: number;
+  height: number;
+} {
   return {
     width: Math.max(1, viewport.width - WINDOW_MARGIN_PX * 2),
     height: Math.max(1, viewport.height - WINDOW_MARGIN_PX * 2),
@@ -98,12 +110,12 @@ function clampExpandedWindowState(
   };
 }
 
-function clampServerWindowForMode(
-  state: DesktopWindowState,
-  viewport: ViewportBox,
-  isCollapsed: boolean,
-  collapsedHeight: number,
-): DesktopWindowState {
+function clampServerWindowForMode({
+  state,
+  viewport,
+  isCollapsed,
+  collapsedHeight,
+}: WindowClampOptions): DesktopWindowState {
   if (!isCollapsed) {
     return clampExpandedWindowState(state, viewport);
   }
@@ -111,20 +123,19 @@ function clampServerWindowForMode(
   return {
     ...expanded,
     ...clampDesktopPanelOrigin(
-      expanded.x,
-      expanded.y,
+      { x: expanded.x, y: expanded.y },
       collapsedPanelSize(viewport, collapsedHeight),
       viewport,
     ),
   };
 }
 
-function getServerDesktopPanelRect(
-  state: DesktopWindowState,
-  viewport: ViewportBox,
-  isCollapsed: boolean,
-  collapsedHeight: number,
-): DesktopWindowState {
+function getServerDesktopPanelRect({
+  state,
+  viewport,
+  isCollapsed,
+  collapsedHeight,
+}: WindowClampOptions): DesktopWindowState {
   if (!isCollapsed) {
     return clampExpandedWindowState(state, viewport);
   }
@@ -133,7 +144,11 @@ function getServerDesktopPanelRect(
   return {
     width: panel.width,
     height: panel.height,
-    ...clampDesktopPanelOrigin(expanded.x, expanded.y, panel, viewport),
+    ...clampDesktopPanelOrigin(
+      { x: expanded.x, y: expanded.y },
+      panel,
+      viewport,
+    ),
   };
 }
 
@@ -154,7 +169,7 @@ function defaultServerWindowState(viewport: ViewportBox): DesktopWindowState {
   };
 }
 
-function loadStoredWindowState() {
+function loadStoredWindowState(): ReturnType<typeof parseStoredWindowState> {
   if (typeof window === "undefined") {
     return null;
   }
@@ -169,12 +184,12 @@ function resolveInitialDesktopWindowState(): DesktopWindowState | null {
   }
   const viewport = currentViewportBox();
   const stored = loadStoredWindowState();
-  return clampServerWindowForMode(
-    stored?.windowState ?? defaultServerWindowState(viewport),
+  return clampServerWindowForMode({
+    state: stored?.windowState ?? defaultServerWindowState(viewport),
     viewport,
-    stored?.isCollapsed ?? false,
-    DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
-  );
+    isCollapsed: stored?.isCollapsed ?? false,
+    collapsedHeight: DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
+  });
 }
 
 function resolveInitialCollapsedState(): boolean {
@@ -184,14 +199,31 @@ function resolveInitialCollapsedState(): boolean {
 function defaultMobileCollapsedOrigin(
   viewport: ViewportBox,
   collapsedHeight: number,
-) {
+): { x: number; y: number } {
   const panel = collapsedPanelSize(viewport, collapsedHeight);
   return clampDesktopPanelOrigin(
-    viewport.left + viewport.width - panel.width - WINDOW_MARGIN_PX,
-    viewport.top + WINDOW_MARGIN_PX,
+    {
+      x: viewport.left + viewport.width - panel.width - WINDOW_MARGIN_PX,
+      y: viewport.top + WINDOW_MARGIN_PX,
+    },
     panel,
     viewport,
   );
+}
+
+function computeMobileCollapsedRect(
+  viewport: ViewportBox,
+  originOverride: { x: number; y: number } | null,
+  collapsedHeight: number,
+): DesktopWindowState {
+  const panel = collapsedPanelSize(viewport, collapsedHeight);
+  const origin =
+    originOverride ?? defaultMobileCollapsedOrigin(viewport, collapsedHeight);
+  return {
+    width: panel.width,
+    height: panel.height,
+    ...clampDesktopPanelOrigin(origin, panel, viewport),
+  };
 }
 
 function formatEasternTime(isoUtc: string): string | null {
@@ -220,13 +252,221 @@ function drainingMessageWithEasternTime(
   );
 }
 
+interface ServerNoticeCopy {
+  isDraining: boolean;
+  heading: string;
+  badge: string;
+  collapsedLabel: string;
+  primaryMessage: string;
+  secondaryMessage: string;
+  recoveryHint: string | null;
+}
+
+function resolveFallbackMessage(isDraining: boolean, inGame: boolean): string {
+  if (isDraining) {
+    return "A server update is scheduled soon. New games are paused while current games continue.";
+  }
+  if (inGame) {
+    return "The server is temporarily unavailable while maintenance is in progress.";
+  }
+  return "The server is currently updating. Please wait a few minutes and retry.";
+}
+
+function resolveSecondaryMessage(isDraining: boolean, inGame: boolean): string {
+  if (isDraining) {
+    return inGame
+      ? "New games are paused temporarily. Your current game can continue and reconnect automatically if needed."
+      : "New games are paused temporarily. Active games may continue and reconnect automatically.";
+  }
+  return inGame
+    ? "Keep this tab open and we'll reconnect automatically when service returns."
+    : "Please wait a few minutes and retry once maintenance is complete.";
+}
+
+function resolveServerNoticeCopy(
+  status: ServerNoticeStatus,
+  inGame: boolean,
+): ServerNoticeCopy {
+  const isDraining = status.mode === "draining";
+  const easternScheduled = status.scheduled_for_utc
+    ? formatEasternTime(status.scheduled_for_utc)
+    : null;
+  const displayMessage = isDraining
+    ? drainingMessageWithEasternTime(status.message, easternScheduled)
+    : status.message;
+  const recoveryMinutes = status.estimated_recovery_minutes;
+  const recoveryHint = recoveryMinutes
+    ? `Estimated recovery: about ${recoveryMinutes} minute${recoveryMinutes === 1 ? "" : "s"}.`
+    : null;
+
+  return {
+    isDraining,
+    heading: isDraining ? "Scheduled Server Update" : "Server Maintenance",
+    badge: isDraining ? "Update" : "Maintenance",
+    collapsedLabel: isDraining ? "Server Update" : "Maintenance",
+    primaryMessage:
+      displayMessage || resolveFallbackMessage(isDraining, inGame),
+    secondaryMessage: resolveSecondaryMessage(isDraining, inGame),
+    recoveryHint,
+  };
+}
+
+function computeServerWindowLayout(options: {
+  isDesktop: boolean;
+  desktopWindow: DesktopWindowState | null;
+  mobileCollapsedOrigin: { x: number; y: number } | null;
+  isCollapsed: boolean;
+  collapsedPanelHeight: number;
+}): {
+  dragOrigin: { x: number; y: number } | null;
+  style: CSSProperties | null;
+} {
+  const viewport = currentViewportBox();
+  if (options.isDesktop) {
+    const resolved = clampServerWindowForMode({
+      state: options.desktopWindow ?? defaultServerWindowState(viewport),
+      viewport,
+      isCollapsed: options.isCollapsed,
+      collapsedHeight: options.collapsedPanelHeight,
+    });
+    const panel = getServerDesktopPanelRect({
+      state: resolved,
+      viewport,
+      isCollapsed: options.isCollapsed,
+      collapsedHeight: options.collapsedPanelHeight,
+    });
+    return {
+      dragOrigin: { x: panel.x, y: panel.y },
+      style: {
+        left: panel.x,
+        top: panel.y,
+        width: panel.width,
+        maxWidth: Math.max(1, viewport.width - WINDOW_MARGIN_PX * 2),
+        maxHeight: Math.max(1, viewport.height - WINDOW_MARGIN_PX * 2),
+      },
+    };
+  }
+
+  const collapsedRect = computeMobileCollapsedRect(
+    viewport,
+    options.mobileCollapsedOrigin,
+    options.collapsedPanelHeight,
+  );
+  const expandedWidth = Math.min(
+    MOBILE_PANEL_MAX_WIDTH_PX,
+    viewport.width - WINDOW_MARGIN_PX * 2,
+  );
+  const expandedLeft =
+    viewport.left + Math.round((viewport.width - expandedWidth) / 2);
+
+  return {
+    dragOrigin: options.isCollapsed
+      ? { x: collapsedRect.x, y: collapsedRect.y }
+      : null,
+    style: {
+      left: options.isCollapsed ? collapsedRect.x : expandedLeft,
+      top: options.isCollapsed
+        ? collapsedRect.y
+        : viewport.top + MOBILE_PANEL_TOP_GAP_PX,
+      width: options.isCollapsed ? collapsedRect.width : expandedWidth,
+      maxHeight: viewport.height - WINDOW_MARGIN_PX * 2,
+    },
+  };
+}
+
+function ServerNoticeBody({
+  copy,
+  isDesktop,
+}: {
+  copy: ServerNoticeCopy;
+  isDesktop: boolean;
+}): ReactElement {
+  return (
+    <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      <div className="px-4 py-4 overflow-y-auto">
+        <h2
+          className={`${isDesktop ? "text-lg" : "text-base"} font-semibold text-[var(--ivory)]`}
+        >
+          {copy.heading}
+        </h2>
+        <div className="mt-3">
+          <p className="text-sm text-[var(--ivory)] leading-snug">
+            {copy.primaryMessage}
+          </p>
+          <p className="mt-1 text-xs text-[var(--ivory-muted)] leading-snug">
+            {copy.secondaryMessage}
+          </p>
+          {copy.recoveryHint && (
+            <p className="mt-2 text-xs text-amber-200/90">
+              {copy.recoveryHint}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useServerStatusDrag(options: {
+  interaction: InteractionState;
+  hidden: boolean;
+  isDesktop: boolean;
+  isCollapsed: boolean;
+  collapsedPanelHeight: number;
+  setMobileCollapsedOrigin: (origin: { x: number; y: number }) => void;
+  setDesktopWindow: React.Dispatch<
+    React.SetStateAction<DesktopWindowState | null>
+  >;
+  onEnd: () => void;
+}): void {
+  const {
+    interaction,
+    hidden,
+    isDesktop,
+    isCollapsed,
+    collapsedPanelHeight,
+    setMobileCollapsedOrigin,
+    setDesktopWindow,
+    onEnd,
+  } = options;
+  useFloatingWindowPointerInteraction({
+    active: Boolean(interaction && !hidden && (isDesktop || isCollapsed)),
+    cursor: "grabbing",
+    onMove: (event) => {
+      if (!interaction) return;
+      const viewport = currentViewportBox();
+      const nextX =
+        interaction.startX + (event.clientX - interaction.startPointerX);
+      const nextY =
+        interaction.startY + (event.clientY - interaction.startPointerY);
+      if (!isDesktop) {
+        const panel = collapsedPanelSize(viewport, collapsedPanelHeight);
+        setMobileCollapsedOrigin(
+          clampDesktopPanelOrigin({ x: nextX, y: nextY }, panel, viewport),
+        );
+        return;
+      }
+      setDesktopWindow((previous) => {
+        const current = previous ?? defaultServerWindowState(viewport);
+        return clampServerWindowForMode({
+          state: { ...current, x: nextX, y: nextY },
+          viewport,
+          isCollapsed,
+          collapsedHeight: collapsedPanelHeight,
+        });
+      });
+    },
+    onEnd,
+  });
+}
+
 export function ServerStatusWindow({
   status,
   hidden,
   onDismiss,
   inGame = false,
   zIndex = 2147483647,
-}: ServerStatusWindowProps) {
+}: ServerStatusWindowProps): ReactElement | null {
   const [isDesktop, setIsDesktop] = useState(() => isDesktopViewport());
   const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(
     () => resolveInitialDesktopWindowState(),
@@ -242,24 +482,7 @@ export function ServerStatusWindow({
   const collapsedPanelRef = useRef<HTMLDivElement | null>(null);
   const expandedPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const isDraining = status.mode === "draining";
-  const easternScheduled = status.scheduled_for_utc
-    ? formatEasternTime(status.scheduled_for_utc)
-    : null;
-  const heading = isDraining ? "Scheduled Server Update" : "Server Maintenance";
-  const fallbackMessage = isDraining
-    ? "A server update is scheduled soon. New games are paused while current games continue."
-    : inGame
-      ? "The server is temporarily unavailable while maintenance is in progress."
-      : "The server is currently updating. Please wait a few minutes and retry.";
-  const displayMessage = isDraining
-    ? drainingMessageWithEasternTime(status.message, easternScheduled)
-    : status.message;
-  const recoveryHint = status.estimated_recovery_minutes
-    ? `Estimated recovery: about ${status.estimated_recovery_minutes} minute${status.estimated_recovery_minutes === 1 ? "" : "s"}.`
-    : null;
-  const collapsedLabel = isDraining ? "Server Update" : "Maintenance";
-
+  const copy = resolveServerNoticeCopy(status, inGame);
   const stopInteraction = useCallback(() => {
     setInteraction(null);
   }, []);
@@ -267,24 +490,23 @@ export function ServerStatusWindow({
   const collapsedPanelHeight = useCollapsedPanelHeight(
     collapsedPanelRef,
     isCollapsed,
-    [collapsedLabel],
+    [copy.collapsedLabel],
   );
 
   const syncDesktopWindow = useCallback(
     (collapsed: boolean) => {
-      if (!isDesktopViewport()) {
-        return;
-      }
+      if (!isDesktopViewport()) return;
       const viewport = currentViewportBox();
       setDesktopWindow((previous) =>
-        clampServerWindowForMode(
-          previous ??
+        clampServerWindowForMode({
+          state:
+            previous ??
             loadStoredWindowState()?.windowState ??
             defaultServerWindowState(viewport),
           viewport,
-          collapsed,
-          collapsedPanelHeight,
-        ),
+          isCollapsed: collapsed,
+          collapsedHeight: collapsedPanelHeight,
+        }),
       );
     },
     [collapsedPanelHeight],
@@ -300,92 +522,41 @@ export function ServerStatusWindow({
     syncDesktopWindow(isCollapsed);
   });
 
-  const handleCollapse = useCallback(() => {
-    stopInteraction();
-    if (isDesktopViewport()) {
-      syncDesktopWindow(true);
-    }
-    setIsCollapsed(true);
-  }, [stopInteraction, syncDesktopWindow]);
-
-  const handleRestore = useCallback(() => {
-    stopInteraction();
-    if (isDesktopViewport()) {
-      syncDesktopWindow(false);
-    }
-    setIsCollapsed(false);
-  }, [stopInteraction, syncDesktopWindow]);
+  const handleToggleCollapsed = useCallback(
+    (nextCollapsed: boolean) => {
+      stopInteraction();
+      if (isDesktopViewport()) syncDesktopWindow(nextCollapsed);
+      setIsCollapsed(nextCollapsed);
+    },
+    [stopInteraction, syncDesktopWindow],
+  );
 
   const handleDismiss = useCallback(() => {
     stopInteraction();
     onDismiss();
   }, [onDismiss, stopInteraction]);
 
-  const badge = isDraining ? "Update" : "Maintenance";
-  const desktopViewport = isDesktop ? currentViewportBox() : null;
-  const resolvedDesktopWindow =
-    isDesktop && desktopViewport
-      ? clampServerWindowForMode(
-          desktopWindow ?? defaultServerWindowState(desktopViewport),
-          desktopViewport,
-          isCollapsed,
-          collapsedPanelHeight,
-        )
-      : null;
-  const desktopPanel =
-    resolvedDesktopWindow && desktopViewport
-      ? getServerDesktopPanelRect(
-          resolvedDesktopWindow,
-          desktopViewport,
-          isCollapsed,
-          collapsedPanelHeight,
-        )
-      : null;
-  const mobileViewport = !isDesktop ? currentViewportBox() : null;
-  const mobileCollapsedRect = mobileViewport
-    ? (() => {
-        const panel = collapsedPanelSize(mobileViewport, collapsedPanelHeight);
-        const origin =
-          mobileCollapsedOrigin ??
-          defaultMobileCollapsedOrigin(mobileViewport, collapsedPanelHeight);
-        return {
-          width: panel.width,
-          height: panel.height,
-          ...clampDesktopPanelOrigin(origin.x, origin.y, panel, mobileViewport),
-        };
-      })()
-    : null;
+  const layout = computeServerWindowLayout({
+    isDesktop,
+    desktopWindow,
+    mobileCollapsedOrigin,
+    isCollapsed,
+    collapsedPanelHeight,
+  });
 
   const beginDrag = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (isDesktop) {
-        if (!desktopPanel) {
-          return;
-        }
-        event.preventDefault();
-        setInteraction({
-          type: "drag",
-          startPointerX: event.clientX,
-          startPointerY: event.clientY,
-          startX: desktopPanel.x,
-          startY: desktopPanel.y,
-        });
-        return;
-      }
-
-      if (!isCollapsed || !mobileCollapsedRect) {
-        return;
-      }
+      if (!layout.dragOrigin) return;
       event.preventDefault();
       setInteraction({
         type: "drag",
         startPointerX: event.clientX,
         startPointerY: event.clientY,
-        startX: mobileCollapsedRect.x,
-        startY: mobileCollapsedRect.y,
+        startX: layout.dragOrigin.x,
+        startY: layout.dragOrigin.y,
       });
     },
-    [desktopPanel, isCollapsed, isDesktop, mobileCollapsedRect],
+    [layout.dragOrigin],
   );
 
   useResizeObserver(
@@ -393,146 +564,35 @@ export function ServerStatusWindow({
     (node) => {
       const nextHeight = Math.ceil(node.getBoundingClientRect().height);
       setDesktopWindow((previous) => {
-        if (!previous || previous.height === nextHeight) {
-          return previous;
-        }
+        if (!previous || previous.height === nextHeight) return previous;
         return { ...previous, height: nextHeight };
       });
     },
-    !isCollapsed && isDesktop,
-    [displayMessage, heading, recoveryHint],
+    {
+      enabled: !isCollapsed && isDesktop,
+      deps: [copy.primaryMessage, copy.heading, copy.recoveryHint],
+    },
   );
 
   useLocalStorageSync(
     WINDOW_STORAGE_KEY,
     desktopWindow
-      ? serializeStoredWindowState({
-          windowState: desktopWindow,
-          isCollapsed,
-        })
+      ? serializeStoredWindowState({ windowState: desktopWindow, isCollapsed })
       : null,
   );
 
-  useFloatingWindowPointerInteraction({
-    active: Boolean(interaction && !hidden && (isDesktop || isCollapsed)),
-    cursor: "grabbing",
-    onMove: (event) => {
-      if (!interaction) return;
-      if (!isDesktop) {
-        const viewport = currentViewportBox();
-        const panel = collapsedPanelSize(viewport, collapsedPanelHeight);
-        const nextX =
-          interaction.startX + (event.clientX - interaction.startPointerX);
-        const nextY =
-          interaction.startY + (event.clientY - interaction.startPointerY);
-        setMobileCollapsedOrigin(
-          clampDesktopPanelOrigin(nextX, nextY, panel, viewport),
-        );
-        return;
-      }
-
-      setDesktopWindow((previous) => {
-        const viewport = currentViewportBox();
-        const current = previous ?? defaultServerWindowState(viewport);
-        const nextX =
-          interaction.startX + (event.clientX - interaction.startPointerX);
-        const nextY =
-          interaction.startY + (event.clientY - interaction.startPointerY);
-        return clampServerWindowForMode(
-          { ...current, x: nextX, y: nextY },
-          viewport,
-          isCollapsed,
-          collapsedPanelHeight,
-        );
-      });
-    },
+  useServerStatusDrag({
+    interaction,
+    hidden,
+    isDesktop,
+    isCollapsed,
+    collapsedPanelHeight,
+    setMobileCollapsedOrigin,
+    setDesktopWindow,
     onEnd: stopInteraction,
   });
 
-  if (hidden) {
-    return null;
-  }
-
-  const body = (
-    <>
-      <p className="text-sm text-[var(--ivory)] leading-snug">
-        {displayMessage || fallbackMessage}
-      </p>
-      {isDraining ? (
-        <p className="mt-1 text-xs text-[var(--ivory-muted)] leading-snug">
-          {inGame
-            ? "New games are paused temporarily. Your current game can continue and reconnect automatically if needed."
-            : "New games are paused temporarily. Active games may continue and reconnect automatically."}
-        </p>
-      ) : (
-        <p className="mt-1 text-xs text-[var(--ivory-muted)] leading-snug">
-          {inGame
-            ? "Keep this tab open and we'll reconnect automatically when service returns."
-            : "Please wait a few minutes and retry once maintenance is complete."}
-        </p>
-      )}
-      {recoveryHint && (
-        <p className="mt-2 text-xs text-amber-200/90">{recoveryHint}</p>
-      )}
-    </>
-  );
-
-  if (!isDesktop) {
-    if (!mobileViewport) {
-      return null;
-    }
-
-    const expandedWidth = Math.min(
-      MOBILE_PANEL_MAX_WIDTH_PX,
-      mobileViewport.width - WINDOW_MARGIN_PX * 2,
-    );
-    const expandedLeft =
-      mobileViewport.left +
-      Math.round((mobileViewport.width - expandedWidth) / 2);
-
-    return (
-      <div className="fixed inset-0 pointer-events-none" style={{ zIndex }}>
-        <FloatingWindow
-          ref={isCollapsed ? collapsedPanelRef : expandedPanelRef}
-          name="server notice"
-          title="Server Notice"
-          badge={badge}
-          collapsed={isCollapsed}
-          draggable={isCollapsed}
-          dragging={interaction?.type === "drag"}
-          onDragStart={beginDrag}
-          onMinimize={handleCollapse}
-          onRestore={handleRestore}
-          onClose={handleDismiss}
-          closeLabel="Dismiss"
-          collapsedCaption="Current notice"
-          collapsedText={collapsedLabel}
-          instant={!!interaction}
-          style={{
-            left: isCollapsed ? mobileCollapsedRect?.x : expandedLeft,
-            top: isCollapsed
-              ? mobileCollapsedRect?.y
-              : mobileViewport.top + MOBILE_PANEL_TOP_GAP_PX,
-            width: isCollapsed ? mobileCollapsedRect?.width : expandedWidth,
-            maxHeight: mobileViewport.height - WINDOW_MARGIN_PX * 2,
-          }}
-        >
-          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-            <div className="px-4 py-4 overflow-y-auto">
-              <h2 className="text-base font-semibold text-[var(--ivory)]">
-                {heading}
-              </h2>
-              <div className="mt-3">{body}</div>
-            </div>
-          </div>
-        </FloatingWindow>
-      </div>
-    );
-  }
-
-  if (!desktopViewport || !desktopPanel) {
-    return null;
-  }
+  if (hidden || !layout.style) return null;
 
   return (
     <div className="fixed inset-0 pointer-events-none" style={{ zIndex }}>
@@ -540,34 +600,21 @@ export function ServerStatusWindow({
         ref={isCollapsed ? collapsedPanelRef : expandedPanelRef}
         name="server notice"
         title="Server Notice"
-        badge={badge}
+        badge={copy.badge}
         collapsed={isCollapsed}
-        draggable
+        draggable={isDesktop || isCollapsed}
         dragging={interaction?.type === "drag"}
         onDragStart={beginDrag}
-        onMinimize={handleCollapse}
-        onRestore={handleRestore}
+        onMinimize={() => handleToggleCollapsed(true)}
+        onRestore={() => handleToggleCollapsed(false)}
         onClose={handleDismiss}
         closeLabel="Dismiss"
         collapsedCaption="Current notice"
-        collapsedText={collapsedLabel}
-        instant={!!interaction}
-        style={{
-          left: desktopPanel.x,
-          top: desktopPanel.y,
-          width: desktopPanel.width,
-          maxWidth: Math.max(1, desktopViewport.width - WINDOW_MARGIN_PX * 2),
-          maxHeight: Math.max(1, desktopViewport.height - WINDOW_MARGIN_PX * 2),
-        }}
+        collapsedText={copy.collapsedLabel}
+        instant={Boolean(interaction)}
+        style={layout.style}
       >
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          <div className="px-4 py-4 overflow-y-auto">
-            <h2 className="text-lg font-semibold text-[var(--ivory)]">
-              {heading}
-            </h2>
-            <div className="mt-3">{body}</div>
-          </div>
-        </div>
+        <ServerNoticeBody copy={copy} isDesktop={isDesktop} />
       </FloatingWindow>
     </div>
   );

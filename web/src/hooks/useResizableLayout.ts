@@ -56,14 +56,13 @@ export function useResizableLayout({
   const zoneNodesRef = useRef<Record<string, HTMLDivElement | null>>({});
   const zoneRefs = useMemo(() => {
     const result: Record<string, React.RefCallback<HTMLDivElement>> = {};
-    for (const id of allZoneIds) {
-      result[id] = (node: HTMLDivElement | null) => {
+    const ids = allZoneIdsKey ? allZoneIdsKey.split("\0") : [];
+    for (const id of ids) {
+      result[id] = (node: HTMLDivElement | null): void => {
         zoneNodesRef.current[id] = node;
       };
     }
     return result;
-    // allZoneIdsKey changes only when the set of zones changes, keeping refs stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allZoneIdsKey]);
 
   const layout = useLayoutDrag(constraints, onConstraintsChange);

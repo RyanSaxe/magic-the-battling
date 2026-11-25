@@ -50,31 +50,55 @@ function readTrackedPlayerMap(): TrackedPlayerMap {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseTrackedPlayerEntry(value: unknown): TrackedPlayerEntry | null {
+  if (!isRecord(value)) return null;
+  const {
+    name,
+    seen_at: seenAt,
+    seat_token: seatToken,
+    join_code: joinCode,
+  } = value;
+  if (typeof name !== "string" || !name) return null;
+  if (typeof seenAt !== "number") return null;
+  const entry: TrackedPlayerEntry = { name, seen_at: seenAt };
+  if (typeof seatToken === "string" && seatToken) {
+    entry.seat_token = seatToken;
+  }
+  if (typeof joinCode === "string" && joinCode) {
+    entry.join_code = joinCode;
+  }
+  return entry;
+}
+
 function parseTrackedPlayerMap(raw: string | null): TrackedPlayerMap {
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return {};
 
     const result: TrackedPlayerMap = {};
     for (const [gameId, value] of Object.entries(parsed)) {
-      if (!value || typeof value !== "object") continue;
-      const name = (value as { name?: unknown }).name;
-      const seenAt = (value as { seen_at?: unknown }).seen_at;
-      const seatToken = (value as { seat_token?: unknown }).seat_token;
-      const joinCode = (value as { join_code?: unknown }).join_code;
-      if (typeof name !== "string" || !name) continue;
-      if (typeof seenAt !== "number") continue;
-      result[gameId] = { name, seen_at: seenAt };
-      if (typeof seatToken === "string" && seatToken)
-        result[gameId].seat_token = seatToken;
-      if (typeof joinCode === "string" && joinCode)
-        result[gameId].join_code = joinCode;
+      const entry = parseTrackedPlayerEntry(value);
+      if (entry) result[gameId] = entry;
     }
     return result;
   } catch {
     return {};
   }
+}
+
+function parseNewPlayerPreferenceEntry(
+  value: unknown,
+): NewPlayerPreferenceEntry | null {
+  if (!isRecord(value)) return null;
+  const { is_new_player: isNewPlayer, seen_at: seenAt } = value;
+  if (typeof isNewPlayer !== "boolean") return null;
+  if (typeof seenAt !== "number") return null;
+  return { is_new_player: isNewPlayer, seen_at: seenAt };
 }
 
 function readNewPlayerPreferenceMap(): NewPlayerPreferenceMap {
@@ -83,17 +107,13 @@ function readNewPlayerPreferenceMap(): NewPlayerPreferenceMap {
   try {
     const raw = window.localStorage.getItem(GAME_NEW_PLAYER_PREF_MAP_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return {};
 
     const result: NewPlayerPreferenceMap = {};
     for (const [gameId, value] of Object.entries(parsed)) {
-      if (!value || typeof value !== "object") continue;
-      const isNewPlayer = (value as { is_new_player?: unknown }).is_new_player;
-      const seenAt = (value as { seen_at?: unknown }).seen_at;
-      if (typeof isNewPlayer !== "boolean") continue;
-      if (typeof seenAt !== "number") continue;
-      result[gameId] = { is_new_player: isNewPlayer, seen_at: seenAt };
+      const entry = parseNewPlayerPreferenceEntry(value);
+      if (entry) result[gameId] = entry;
     }
     return result;
   } catch {
@@ -141,9 +161,11 @@ function pruneNewPlayerPreferenceMap(
 }
 
 function generateDeviceId(): string {
-  const randomUUID = globalThis.crypto?.randomUUID;
-  if (typeof randomUUID === "function") {
-    return randomUUID.call(globalThis.crypto);
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return globalThis.crypto.randomUUID();
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
@@ -163,6 +185,19 @@ export function getOrCreateDeviceId(): string {
   return next;
 }
 
+function buildTrackedPlayerEntry(
+  playerName: string,
+  details: { seatToken?: string; joinCode?: string },
+  previous?: TrackedPlayerEntry,
+): TrackedPlayerEntry {
+  const entry: TrackedPlayerEntry = { name: playerName, seen_at: Date.now() };
+  const token = details.seatToken ?? previous?.seat_token;
+  const joinCode = details.joinCode ?? previous?.join_code;
+  if (token) entry.seat_token = token;
+  if (joinCode) entry.join_code = joinCode;
+  return entry;
+}
+
 /** Remember this browser's seat in a game. Details not given keep what the same seat already had. */
 export function rememberPlayerForGame(
   gameId: string,
@@ -174,14 +209,7 @@ export function rememberPlayerForGame(
 
   const map = readTrackedPlayerMap();
   const previous = map[gameId]?.name === playerName ? map[gameId] : undefined;
-  const token = details.seatToken ?? previous?.seat_token;
-  const joinCode = details.joinCode ?? previous?.join_code;
-  map[gameId] = {
-    name: playerName,
-    seen_at: Date.now(),
-    ...(token ? { seat_token: token } : {}),
-    ...(joinCode ? { join_code: joinCode } : {}),
-  };
+  map[gameId] = buildTrackedPlayerEntry(playerName, details, previous);
   writeTrackedPlayerMap(pruneTrackedPlayerMap(map));
 }
 
@@ -218,9 +246,11 @@ export function findRememberedSeatByJoinCode(
 
 /** Seats this browser can reclaim, most recently seen first. */
 export function listReclaimableSeats(limit: number): RememberedSeat[] {
-  return Object.entries(readTrackedPlayerMap())
-    .filter(([, entry]) => entry.seat_token)
-    .sort((a, b) => b[1].seen_at - a[1].seen_at)
+  const reclaimable = Object.entries(readTrackedPlayerMap()).filter(
+    ([, entry]) => entry.seat_token,
+  );
+  reclaimable.sort((a, b) => b[1].seen_at - a[1].seen_at);
+  return reclaimable
     .slice(0, limit)
     .map(([gameId, entry]) => toRememberedSeat(gameId, entry));
 }
@@ -237,8 +267,9 @@ export function forgetAccountSeats(
   seats: { game_id: string; player_name: string }[],
 ): void {
   for (const seat of seats) {
-    if (getRememberedSeat(seat.game_id)?.name === seat.player_name)
+    if (getRememberedSeat(seat.game_id)?.name === seat.player_name) {
       forgetSeatForGame(seat.game_id);
+    }
   }
 }
 
@@ -251,8 +282,9 @@ export function hasForgottenSeat(gameId: string): boolean {
   if (
     !canUseStorage() ||
     window.localStorage.getItem(GAME_PLAYER_MAP_KEY) === null
-  )
+  ) {
     return false;
+  }
   return !getRememberedSeat(gameId)?.seatToken;
 }
 
@@ -260,7 +292,7 @@ export function hasForgottenSeat(gameId: string): boolean {
 export function onSeatsForgotten(
   listener: (gameIds: string[]) => void,
 ): () => void {
-  const onStorage = (event: StorageEvent) => {
+  const onStorage = (event: StorageEvent): void => {
     if (event.key !== GAME_PLAYER_MAP_KEY) return;
     const kept = parseTrackedPlayerMap(event.newValue);
     listener(

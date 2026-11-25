@@ -3,6 +3,7 @@ import {
   initialPhaseActionState,
   reducePhaseAction,
   type PhaseActionServerState,
+  type PhaseActionState,
 } from "./pendingPhaseAction";
 
 const inBuild: PhaseActionServerState = {
@@ -11,7 +12,7 @@ const inBuild: PhaseActionServerState = {
   connected: true,
 };
 
-function sentFromBuild() {
+function sentFromBuild(): PhaseActionState {
   return reducePhaseAction(initialPhaseActionState(inBuild), {
     type: "sent",
     action: "build_ready",

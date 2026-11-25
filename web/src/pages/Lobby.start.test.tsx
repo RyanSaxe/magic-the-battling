@@ -17,12 +17,16 @@ import { Lobby } from "./Lobby";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
 const toasts: string[] = [];
@@ -38,10 +42,15 @@ vi.mock("../api/client", () => ({
   })),
 }));
 vi.mock("../contexts", () => ({
-  useToast: () => ({ addToast: (message: string) => toasts.push(message) }),
+  useToast: (): { addToast: (message: string) => number } => ({
+    addToast: (message: string): number => toasts.push(message),
+  }),
 }));
 vi.mock("../contexts/authState", () => ({
-  useAuth: () => ({ user: null, loading: false }),
+  useAuth: (): { user: null; loading: boolean } => ({
+    user: null,
+    loading: false,
+  }),
 }));
 
 function lobby(overrides: Partial<LobbyState> = {}): LobbyState {
@@ -108,12 +117,16 @@ async function openLobbyAs(playerId: string): Promise<FakeWebSocket> {
   return socket;
 }
 
-function send(socket: FakeWebSocket, message: unknown) {
+function send(socket: FakeWebSocket, message: unknown): void {
   act(() => socket.serverMessage(message));
 }
 
 function button(name: string): HTMLButtonElement {
-  return screen.getByRole("button", { name }) as HTMLButtonElement;
+  return screen.getByRole<HTMLButtonElement>("button", { name });
+}
+
+function pressBodyKey(key: string): boolean {
+  return fireEvent.keyDown(document.body, { key });
 }
 
 function sentActions(socket: FakeWebSocket): string[] {
@@ -247,9 +260,9 @@ describe("Lobby: hotkeys beside the Guide", () => {
     vi.stubGlobal(
       "ResizeObserver",
       class {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
       },
     );
     FakeWebSocket.instances = [];
@@ -263,29 +276,28 @@ describe("Lobby: hotkeys beside the Guide", () => {
   it("work while the Guide is minimized, and wait while it is open", async () => {
     const socket = await openLobbyAs("guest");
     send(socket, { type: "lobby_state", payload: lobby() });
-    const readyToggles = () =>
+    const readyToggles = (): number =>
       sentActions(socket).filter((action) => action === "set_ready").length;
-    const press = (key: string) => fireEvent.keyDown(document.body, { key });
 
-    press("?");
-    press("r");
+    pressBodyKey("?");
+    pressBodyKey("r");
     expect(readyToggles()).toBe(0);
 
     fireEvent.click(button("Minimize guide"));
-    press("r");
+    pressBodyKey("r");
     expect(readyToggles()).toBe(1);
 
     fireEvent.click(button("Open guide"));
-    press("r");
+    pressBodyKey("r");
     expect(readyToggles()).toBe(1);
 
     fireEvent.click(button("Minimize guide"));
-    press("?");
+    pressBodyKey("?");
     expect(
       screen.queryByRole("button", { name: "Minimize guide" }),
     ).not.toBeNull();
 
-    press("?");
+    pressBodyKey("?");
     expect(screen.queryByRole("button", { name: "Minimize guide" })).toBeNull();
   });
 });

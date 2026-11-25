@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactElement, RefObject } from "react";
 import { SHOWCASE_STAGES } from "../../constants/showcaseCards";
 import {
   useCardShowcase,
@@ -9,6 +10,58 @@ import { Card } from "../card/Card";
 import { BasicLandCard } from "../common/BasicLandCard";
 import { TreasureCard } from "../common/TreasureCard";
 import { UpgradeStack } from "../sidebar/UpgradeStack";
+
+const ENLARGED_PHASES: ReadonlySet<UpgradePhase> = new Set([
+  "enlarge",
+  "slide-in",
+  "linger",
+  "glow",
+]);
+const STACK_PHASES: ReadonlySet<UpgradePhase> = new Set([
+  "glow",
+  "shrink",
+  "done",
+]);
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(value, max));
+}
+
+function keyedLands(lands: string[]): { key: string; name: string }[] {
+  const counts = new Map<string, number>();
+  return lands.map((name) => {
+    const count = (counts.get(name) ?? 0) + 1;
+    counts.set(name, count);
+    return { key: `${name}#${count}`, name };
+  });
+}
+
+function computeSourcePosition({
+  enlargedWidth,
+  enlargedHeight,
+  targetPosition,
+  bounds,
+}: {
+  enlargedWidth: number;
+  enlargedHeight: number;
+  targetPosition: { centerY: number; right: number } | null;
+  bounds: ShowcaseBounds | null;
+}): { top: number; left: number } {
+  const gap = window.innerWidth < 640 ? 8 : 16;
+  const centerY = targetPosition?.centerY ?? window.innerHeight / 2;
+  const rawTop = centerY - enlargedHeight / 2;
+  const rawLeft = targetPosition
+    ? targetPosition.right + gap
+    : window.innerWidth / 2;
+  return {
+    top: bounds
+      ? clamp(rawTop, bounds.top, bounds.bottom - enlargedHeight)
+      : rawTop,
+    left: bounds
+      ? clamp(rawLeft, bounds.left, bounds.right - enlargedWidth)
+      : rawLeft,
+  };
+}
 
 function UpgradeSourceCard({
   card,
@@ -22,28 +75,19 @@ function UpgradeSourceCard({
   phase: UpgradePhase;
   targetPosition: { centerY: number; right: number } | null;
   bounds: ShowcaseBounds | null;
-}) {
+}): ReactElement {
   const isVisible = phase === "slide-in" || phase === "linger";
   const isFading = phase === "glow";
-
   const enlargedWidth = Math.round(dimensions.width * 1.5);
   const enlargedHeight = Math.round(dimensions.height * 1.5);
-  const gap = window.innerWidth < 640 ? 8 : 16;
+  const { top, left } = computeSourcePosition({
+    enlargedWidth,
+    enlargedHeight,
+    targetPosition,
+    bounds,
+  });
 
-  const centerY = targetPosition?.centerY ?? window.innerHeight / 2;
-  const rawTop = centerY - enlargedHeight / 2;
-  const rawLeft = targetPosition
-    ? targetPosition.right + gap
-    : window.innerWidth / 2;
-
-  const top = bounds
-    ? Math.max(bounds.top, Math.min(rawTop, bounds.bottom - enlargedHeight))
-    : rawTop;
-  const left = bounds
-    ? Math.max(bounds.left, Math.min(rawLeft, bounds.right - enlargedWidth))
-    : rawLeft;
-
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     top,
     left,
     width: enlargedWidth,
@@ -56,7 +100,7 @@ function UpgradeSourceCard({
 
   const className = [
     "upgrade-source",
-    (isVisible || isFading) && !isFading && "phase-slide-in",
+    isVisible && "phase-slide-in",
     isFading && "phase-fade-out",
   ]
     .filter(Boolean)
@@ -72,7 +116,84 @@ function UpgradeSourceCard({
   );
 }
 
-export function CardShowcase() {
+function handCardTargetClass(
+  isTarget: boolean,
+  isEnlarged: boolean,
+  upgradePhase: UpgradePhase,
+): string {
+  if (!isTarget) return "";
+  return [
+    "upgrade-target",
+    isEnlarged && "phase-enlarge",
+    upgradePhase === "glow" && "phase-glow",
+    upgradePhase === "shrink" && "phase-shrink",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function handCardOverlapStyle({
+  handGap,
+  index,
+  elevated,
+  handLength,
+}: {
+  handGap: number;
+  index: number;
+  elevated: boolean;
+  handLength: number;
+}): CSSProperties | undefined {
+  if (handGap >= 0) return undefined;
+  return {
+    marginLeft: index > 0 ? handGap : undefined,
+    zIndex: elevated ? handLength + 1 : index,
+  };
+}
+
+function ShowcaseHandCard({
+  card,
+  index,
+  handLength,
+  dimensions,
+  handGap,
+  isTarget,
+  isEnlarged,
+  upgradePhase,
+  myrUpgraded,
+  targetCardRef,
+}: {
+  card: CardType;
+  index: number;
+  handLength: number;
+  dimensions: { width: number; height: number };
+  handGap: number;
+  isTarget: boolean;
+  isEnlarged: boolean;
+  upgradePhase: UpgradePhase;
+  myrUpgraded: boolean;
+  targetCardRef: RefObject<HTMLDivElement | null>;
+}): ReactElement {
+  return (
+    <div
+      ref={isTarget ? targetCardRef : undefined}
+      className={handCardTargetClass(isTarget, isEnlarged, upgradePhase)}
+      style={handCardOverlapStyle({
+        handGap,
+        index,
+        elevated: isTarget && isEnlarged,
+        handLength,
+      })}
+    >
+      <Card
+        card={card}
+        dimensions={dimensions}
+        upgraded={isTarget && myrUpgraded}
+      />
+    </div>
+  );
+}
+
+export function CardShowcase(): ReactElement {
   const {
     sizes,
     containerRef,
@@ -90,15 +211,8 @@ export function CardShowcase() {
   } = useCardShowcase();
 
   const stage = SHOWCASE_STAGES[currentStage];
-  const isEnlarged =
-    upgradePhase === "enlarge" ||
-    upgradePhase === "slide-in" ||
-    upgradePhase === "linger" ||
-    upgradePhase === "glow";
-  const showBattlefieldStack =
-    upgradePhase === "glow" ||
-    upgradePhase === "shrink" ||
-    upgradePhase === "done";
+  const isEnlarged = ENLARGED_PHASES.has(upgradePhase);
+  const showBattlefieldStack = STACK_PHASES.has(upgradePhase);
 
   return (
     <div
@@ -118,51 +232,28 @@ export function CardShowcase() {
             className="flex items-end justify-center"
             style={{ gap: sizes.handGap >= 0 ? sizes.handGap : 0 }}
           >
-            {stage.hand.map((card, i) => {
-              const isTarget = stage.upgrade?.targetCardId === card.id;
-              const targetClass = isTarget
-                ? [
-                    "upgrade-target",
-                    isEnlarged && "phase-enlarge",
-                    upgradePhase === "glow" && "phase-glow",
-                    upgradePhase === "shrink" && "phase-shrink",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                : "";
-
-              return (
-                <div
-                  key={card.id}
-                  ref={isTarget ? targetCardRef : undefined}
-                  className={targetClass}
-                  style={{
-                    ...(sizes.handGap < 0 && i > 0
-                      ? { marginLeft: sizes.handGap }
-                      : undefined),
-                    ...(sizes.handGap < 0
-                      ? {
-                          zIndex:
-                            isTarget && isEnlarged ? stage.hand.length + 1 : i,
-                        }
-                      : undefined),
-                  }}
-                >
-                  <Card
-                    card={card}
-                    dimensions={sizes.hand}
-                    upgraded={isTarget && myrUpgraded}
-                  />
-                </div>
-              );
-            })}
+            {stage.hand.map((card, i) => (
+              <ShowcaseHandCard
+                key={card.id}
+                card={card}
+                index={i}
+                handLength={stage.hand.length}
+                dimensions={sizes.hand}
+                handGap={sizes.handGap}
+                isTarget={stage.upgrade?.targetCardId === card.id}
+                isEnlarged={isEnlarged}
+                upgradePhase={upgradePhase}
+                myrUpgraded={myrUpgraded}
+                targetCardRef={targetCardRef}
+              />
+            ))}
           </div>
 
           <div className="flex items-center justify-center gap-2">
-            {stage.battlefield.lands.map((land, i) => (
+            {keyedLands(stage.battlefield.lands).map((land) => (
               <BasicLandCard
-                key={`${land}-${i}`}
-                name={land}
+                key={land.key}
+                name={land.name}
                 dimensions={sizes.field}
               />
             ))}
@@ -188,9 +279,9 @@ export function CardShowcase() {
       </div>
 
       <div ref={dotsRef} className="shrink-0 flex gap-2">
-        {SHOWCASE_STAGES.map((_, i) => (
+        {SHOWCASE_STAGES.map((stageItem, i) => (
           <button
-            key={i}
+            key={stageItem.tagline}
             onClick={() => handleDotClick(i)}
             className={`w-2.5 h-2.5 rounded-full transition-colors ${
               i === currentStage

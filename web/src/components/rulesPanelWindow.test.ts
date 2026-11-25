@@ -42,7 +42,7 @@ describe("rules panel window helpers", () => {
     const clamped = clampDesktopWindowForMode(
       { width: 840, height: 700, x: 900, y: 760 },
       viewport,
-      true,
+      { isCollapsed: true },
     );
 
     expect(clamped).toEqual({
@@ -57,7 +57,7 @@ describe("rules panel window helpers", () => {
     const rect = getDesktopPanelRect(
       { width: 840, height: 700, x: 900, y: 760 },
       viewport,
-      true,
+      { isCollapsed: true },
     );
 
     expect(rect).toEqual({

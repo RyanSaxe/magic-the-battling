@@ -4,7 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SidePanel } from "./SidePanel";
 import { SidePanelHostContext } from "./sidePanelHost";
 
-function openPanel({ closeOnBoardTap = false } = {}) {
+function openPanel({ closeOnBoardTap = false } = {}): {
+  host: HTMLDivElement;
+  lifeField: HTMLElement;
+  onClose: ReturnType<typeof vi.fn>;
+} {
   const board = document.createElement("div");
   const host = document.createElement("div");
   board.append(host);
@@ -61,7 +65,9 @@ describe("SidePanel", () => {
     fireEvent.click(lifeField);
     expect(onClose).not.toHaveBeenCalled();
 
-    const boardTap = host.querySelector(".board-backdrop")!;
+    const boardTap = host.querySelector(".board-backdrop");
+    expect(boardTap).not.toBeNull();
+    if (!boardTap) return;
     fireEvent.pointerDown(boardTap);
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.click(boardTap);

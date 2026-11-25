@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { POISON_COUNTER_IMAGE } from "../../constants/assets";
 import { TokenCounterBadge } from "./TokenCounterBadge";
 
@@ -15,7 +16,7 @@ export function PoisonCard({
   className = "",
   badgeTextClassName = "text-purple-400",
   owner,
-}: PoisonCardProps) {
+}: PoisonCardProps): ReactElement {
   return (
     <div
       className={`relative overflow-hidden ${className}`.trim()}

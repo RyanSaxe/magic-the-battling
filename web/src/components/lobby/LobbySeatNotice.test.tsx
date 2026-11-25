@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ReactElement } from "react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -7,10 +8,21 @@ import { createAppError } from "../../utils/appError";
 import { rememberGuestName } from "../../utils/deviceIdentity";
 import { LobbySeatNotice } from "./LobbySeatNotice";
 
-const auth = vi.hoisted(() => ({ user: null as { username: string } | null }));
-vi.mock("../../contexts/authState", () => ({ useAuth: () => auth }));
+interface MockAuthState {
+  user: { username: string } | null;
+}
+
+const auth = vi.hoisted((): MockAuthState => ({ user: null }));
+vi.mock("../../contexts/authState", () => ({
+  useAuth: (): MockAuthState => auth,
+}));
 vi.mock("../../api/client", () => ({
-  getLobby: async () => ({
+  getLobby: async (): Promise<{
+    join_code: string;
+    players: never[];
+    puppet_count: number;
+    target_player_count: number;
+  }> => ({
     join_code: "ABC123",
     players: [],
     puppet_count: 0,
@@ -18,15 +30,8 @@ vi.mock("../../api/client", () => ({
   }),
 }));
 
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-});
-
-it("offers a guest's remembered name until the login check finds an account, whose name wins", async () => {
-  installMemoryLocalStorage();
-  rememberGuestName("Kellogg");
-  const notice = () => (
+function renderJoinNotice(): ReactElement {
+  return (
     <MemoryRouter>
       <LobbySeatNotice
         gameId="game-1"
@@ -37,13 +42,23 @@ it("offers a guest's remembered name until the login check finds an account, who
       />
     </MemoryRouter>
   );
-  const { rerender } = render(notice());
+}
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+it("offers a guest's remembered name until the login check finds an account, whose name wins", async () => {
+  installMemoryLocalStorage();
+  rememberGuestName("Kellogg");
+  const { rerender } = render(renderJoinNotice());
   await act(async () => {});
   const name = screen.getByLabelText<HTMLInputElement>("Your Name");
   expect(name.value).toBe("Kellogg");
 
   auth.user = { username: "Jaya" };
-  rerender(notice());
+  rerender(renderJoinNotice());
 
   expect(name.value).toBe("Jaya");
 });

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactElement, type ReactNode } from "react";
 import type { CubeLook } from "../../hooks/useCubeLook";
 import { useResizeObserver } from "../../hooks/useDomEffects";
 import type { ResumableSeat } from "../../hooks/useResumableGames";
@@ -30,7 +30,7 @@ export function BoardCubeTitle({
   look: CubeLook | null;
   playMode: PlayMode;
   href?: string;
-}) {
+}): ReactElement {
   const name = look?.name ?? "No deck yet";
   return (
     <div className="board-title">
@@ -61,7 +61,7 @@ export function BoardArt({
 }: {
   look: CubeLook | null;
   empty?: ReactNode;
-}) {
+}): ReactElement {
   if (look === null) return <div className="board-art board-slot">{empty}</div>;
   return (
     <div className="board-art board-picture">
@@ -75,7 +75,7 @@ export function BoardArt({
 }
 
 /** Shown from 1024 to 1119 so the seats sit where the game's Players drawer opens them. */
-export function BoardDrawerHead() {
+export function BoardDrawerHead(): ReactElement {
   return (
     <div
       className="side-panel-header board-drawer-head"
@@ -89,42 +89,57 @@ export function BoardDrawerHead() {
 }
 
 /** The rank's column, holding who sits here until there are standings. */
-export function SeatLead({ who }: { who: "person" | "puppet" | "open" }) {
+export function SeatLead({
+  who,
+}: {
+  who: "person" | "puppet" | "open";
+}): ReactElement {
+  let icon: ReactNode = null;
+  if (who === "puppet") {
+    icon = <GoldfishIcon className="board-who" />;
+  } else if (who === "person") {
+    icon = (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="board-who"
+      >
+        <path d={PEOPLE_PATH} />
+      </svg>
+    );
+  }
   return (
     <span aria-hidden="true" className="standings-rank">
-      {who === "puppet" ? (
-        <GoldfishIcon className="board-who" />
-      ) : who === "person" ? (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="board-who"
-        >
-          <path d={PEOPLE_PATH} />
-        </svg>
-      ) : null}
+      {icon}
     </span>
   );
 }
 
-function boardSeatMic(
-  player: LobbyPlayer,
-  isSelf: boolean,
-  voiceChat: VoiceChat,
-  voiceOn: boolean,
-  hasOtherPlayers: boolean,
-) {
+interface BoardSeatMicOptions {
+  player: LobbyPlayer;
+  isSelf: boolean;
+  voiceChat: VoiceChat;
+  voiceOn: boolean;
+  hasOtherPlayers: boolean;
+}
+
+function boardSeatMic({
+  player,
+  isSelf,
+  voiceChat,
+  voiceOn,
+  hasOtherPlayers,
+}: BoardSeatMicOptions): ReactElement | null {
   const { state, toggleSelfMute, togglePeerMute } = voiceChat;
+  const canConnect = voiceOn && hasOtherPlayers && state.isAvailable;
   if (isSelf) {
-    if (
-      state.peers.length === 0 &&
-      (!voiceOn || !hasOtherPlayers || !state.isAvailable)
-    )
+    if (state.peers.length === 0 && !canConnect) {
       return null;
+    }
     return (
       <MicToggle
         variant="player-row"
@@ -136,7 +151,7 @@ function boardSeatMic(
   }
   const peer = state.peers.find((p) => p.name === player.name);
   if (!peer) {
-    if (!voiceOn || !hasOtherPlayers || !state.isAvailable) return null;
+    if (!canConnect) return null;
     return (
       <MicToggle
         variant="player-row"
@@ -159,6 +174,43 @@ function boardSeatMic(
   );
 }
 
+function LobbyPlayerStatus({ player }: { player: LobbyPlayer }): ReactElement {
+  const showsReady = player.is_ready || player.is_connected;
+  return (
+    <span className="player-card-label">
+      {player.is_host && "Host · "}
+      {!player.is_connected && "Away"}
+      {!player.is_connected && player.is_ready && " · "}
+      {showsReady && (
+        <span className={player.is_ready ? "board-ready" : undefined}>
+          {player.is_ready ? "Ready" : "Not ready"}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function PuppetSeatStatus({
+  index,
+  available,
+}: {
+  index: number;
+  available: number | null;
+}): ReactElement {
+  if (available === null) {
+    return (
+      <>
+        <Spinner className="mr-1 inline h-2.5 w-2.5" />
+        Finding
+      </>
+    );
+  }
+  if (index >= available) {
+    return <span className="player-card-label-out">No data</span>;
+  }
+  return <span className="board-ready">Ready</span>;
+}
+
 export function BoardLobbySeats({
   lobby,
   isHost,
@@ -179,7 +231,7 @@ export function BoardLobbySeats({
     removePuppet: () => void;
   };
   onPuppetHelp: () => void;
-}) {
+}): ReactElement {
   const {
     players,
     puppet_count: puppets,
@@ -211,20 +263,19 @@ export function BoardLobbySeats({
       <div className={PLAYER_ROW_STACK_CLASS}>
         {players.map((player) => {
           const isSelf = player.player_id === selfId;
-          const showsReady = player.is_ready || player.is_connected;
           return (
             <PlayerCard
               key={player.player_id}
               isSelf={isSelf}
               lead={<SeatLead who="person" />}
               name={player.name}
-              control={boardSeatMic(
+              control={boardSeatMic({
                 player,
                 isSelf,
                 voiceChat,
-                lobby.voice_chat_enabled,
+                voiceOn: lobby.voice_chat_enabled,
                 hasOtherPlayers,
-              )}
+              })}
               actions={
                 isHost &&
                 !player.is_host && (
@@ -240,17 +291,7 @@ export function BoardLobbySeats({
                 )
               }
             >
-              <span className="player-card-label">
-                {player.is_host && "Host"}
-                {player.is_host && " · "}
-                {!player.is_connected && "Away"}
-                {!player.is_connected && player.is_ready && " · "}
-                {showsReady && (
-                  <span className={player.is_ready ? "board-ready" : undefined}>
-                    {player.is_ready ? "Ready" : "Not ready"}
-                  </span>
-                )}
-              </span>
+              <LobbyPlayerStatus player={player} />
             </PlayerCard>
           );
         })}
@@ -279,16 +320,7 @@ export function BoardLobbySeats({
             }
           >
             <span className="player-card-label">
-              {available === null ? (
-                <>
-                  <Spinner className="mr-1 inline h-2.5 w-2.5" />
-                  Finding
-                </>
-              ) : index >= available ? (
-                <span className="player-card-label-out">No data</span>
-              ) : (
-                <span className="board-ready">Ready</span>
-              )}
+              <PuppetSeatStatus index={index} available={available} />
             </span>
           </PlayerCard>
         ))}
@@ -329,24 +361,17 @@ const ROW_STEP_NORMAL = 66;
 const ROW_STEP_SHORT = 58;
 const HEAD_HEIGHT = 34;
 
-/**
- * Play's sidebar games list. Sizes its fold from the height the seats leave inside a flex: 1 1 0 box,
- * so games never push the seats up or down.
- */
-export function BoardPlayGames({
-  seats,
-  onShowAll,
-  onClose,
-}: {
-  seats: ResumableSeat[];
-  onShowAll: () => void;
-  onClose: (seat: ResumableSeat) => void;
-}) {
-  const boxRef = useRef<HTMLDivElement>(null);
-  const [boxHeight, setBoxHeight] = useState(0);
+interface PlayGamesFold {
+  headed: boolean;
+  visibleSeats: ResumableSeat[];
+  hiddenCount: number;
+  folds: boolean;
+}
 
-  useResizeObserver(boxRef, (el) => setBoxHeight(el.clientHeight));
-
+function computePlayGamesFold(
+  seats: ResumableSeat[],
+  boxHeight: number,
+): PlayGamesFold {
   const rowStep =
     typeof window !== "undefined" && window.innerHeight < SHORT_WINDOW_HEIGHT
       ? ROW_STEP_SHORT
@@ -360,7 +385,37 @@ export function BoardPlayGames({
     boxHeight === 0 ? 1 : Math.max(1, Math.floor(availableForRows / rowStep));
   const folds = seats.length > shown;
   const visibleSeats = folds ? seats.slice(0, shown - 1) : seats;
-  const hiddenCount = seats.length - visibleSeats.length;
+  return {
+    headed,
+    visibleSeats,
+    hiddenCount: seats.length - visibleSeats.length,
+    folds,
+  };
+}
+
+/**
+ * Play's sidebar games list. Sizes its fold from the height the seats leave inside a flex: 1 1 0 box,
+ * so games never push the seats up or down.
+ */
+export function BoardPlayGames({
+  seats,
+  onShowAll,
+  onClose,
+}: {
+  seats: ResumableSeat[];
+  onShowAll: () => void;
+  onClose: (seat: ResumableSeat) => void;
+}): ReactElement {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxHeight, setBoxHeight] = useState(0);
+
+  useResizeObserver(boxRef, (el) => setBoxHeight(el.clientHeight));
+
+  const { headed, visibleSeats, hiddenCount, folds } = computePlayGamesFold(
+    seats,
+    boxHeight,
+  );
+  const foldLabel = `${hiddenCount}${visibleSeats.length ? " more" : ""} games`;
 
   return (
     <div ref={boxRef} className={`board-games ${headed ? "" : "is-bare"}`}>
@@ -381,6 +436,7 @@ export function BoardPlayGames({
                   type="button"
                   className="board-game-open"
                   onClick={onShowAll}
+                  aria-label={`Show all ${seats.length} games`}
                 >
                   <span aria-hidden="true" className="resume-stage">
                     <span className="resume-stage-number">
@@ -388,9 +444,7 @@ export function BoardPlayGames({
                     </span>
                   </span>
                   <span className="resume-summary">
-                    <span className="resume-title">
-                      {`${hiddenCount}${visibleSeats.length ? " more" : ""} games`}
-                    </span>
+                    <span className="resume-title">{foldLabel}</span>
                     <span className="resume-detail">
                       Show all {seats.length}
                     </span>

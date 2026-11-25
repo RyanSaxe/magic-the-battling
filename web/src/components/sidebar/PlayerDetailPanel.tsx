@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useObservedElement } from "../../hooks/pages/useObservedElement";
 import type { Card as CardType, PlayerView } from "../../types";
 import type { ScoutingTab } from "../../hooks/useGameSurfaces";
@@ -67,8 +67,9 @@ function getState(
         : "Out, fights on with their last build",
     };
   }
-  if (standing === "out")
+  if (standing === "out") {
     return { title: "Out", detail: "No longer fights", tone: "out" };
+  }
   if (player.is_puppet) {
     return player.in_sudden_death
       ? {
@@ -80,12 +81,13 @@ function getState(
   }
   const round = `Round ${player.stage}-${player.round}`;
   const activity = getPlayerActivity(player) ?? "Game Over";
-  if (player.in_sudden_death)
+  if (player.in_sudden_death) {
     return {
       title: "Sudden Death",
       detail: `${activity} · ${round}`,
       tone: "out",
     };
+  }
   const ready = player.phase === "build" && player.build_ready;
   return { title: activity, detail: round, tone: ready ? "ready" : undefined };
 }
@@ -105,7 +107,7 @@ function TokenCount({
   count: number;
   outOf?: number;
   label: string;
-}) {
+}): ReactNode {
   return (
     <div className="scouting-cell scouting-token-count">
       <img src={image} alt="" className="scouting-token" />
@@ -120,6 +122,28 @@ function TokenCount({
   );
 }
 
+function NextFightCell({
+  odds,
+  oddsUnknown,
+}: {
+  odds: number;
+  oddsUnknown: boolean;
+}): ReactNode {
+  return (
+    <div className="scouting-cell">
+      <div className="scouting-key">Next fight</div>
+      {oddsUnknown ? (
+        <div className="scouting-value scouting-none">Not known yet</div>
+      ) : (
+        <div className="scouting-value">
+          {Math.round(odds * 100)}%
+          <span className="scouting-note">to face you</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Standings({
   player,
   players,
@@ -130,7 +154,7 @@ function Standings({
   players: PlayerView[];
   isSelf: boolean;
   viewerFighting: boolean;
-}) {
+}): ReactNode {
   const { title, detail, tone } = getState(player, players);
   const result = player.last_result;
   const odds = isSelf ? null : player.pairing_probability;
@@ -180,24 +204,20 @@ function Standings({
           )}
         </div>
         {odds !== null && (
-          <div className="scouting-cell">
-            <div className="scouting-key">Next fight</div>
-            {oddsUnknown ? (
-              <div className="scouting-value scouting-none">Not known yet</div>
-            ) : (
-              <div className="scouting-value">
-                {Math.round(odds * 100)}%
-                <span className="scouting-note">to face you</span>
-              </div>
-            )}
-          </div>
+          <NextFightCell odds={odds} oddsUnknown={oddsUnknown} />
         )}
       </div>
     </div>
   );
 }
 
-function SectionHeading({ title, count }: { title: string; count?: number }) {
+function SectionHeading({
+  title,
+  count,
+}: {
+  title: string;
+  count?: number;
+}): ReactNode {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ivory-muted)]">
@@ -238,19 +258,19 @@ function AdaptiveCardSection({
   minWidth?: number;
   minColumns?: number;
   measureKey?: string;
-}) {
+}): ReactNode {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_CARD_DIMS);
 
   const resolveBestFit = useCallback(
     (width: number, height: number) => {
-      const next = bestFitNoClip(
-        cards.length,
-        width,
-        height,
-        8,
+      const next = bestFitNoClip({
+        count: cards.length,
+        availWidth: width,
+        availHeight: height,
+        gap: 8,
         maxWidth,
-        minWidth,
-      );
+        preferredMinWidth: minWidth,
+      });
 
       if (cards.length < minColumns || next.columns >= minColumns) {
         return next;
@@ -353,6 +373,37 @@ const DETAIL_TABS: SegmentOption<ScoutingTab>[] = [
   { value: "overview", label: "Overview" },
 ];
 
+function OverviewUpgradesSection({
+  useUpgrades,
+  upgrades,
+}: {
+  useUpgrades: boolean;
+  upgrades: CardType[];
+}): ReactNode {
+  if (!useUpgrades) return null;
+  if (upgrades.length === 0) {
+    return (
+      <section>
+        <SectionHeading title="Upgrades" />
+        <div className="mt-1 border-t gold-divider" />
+        <p className="pt-3 text-center text-sm text-[var(--ivory-muted)]">
+          None applied
+        </p>
+      </section>
+    );
+  }
+  return (
+    <AdaptiveCardSection
+      title="Upgrades"
+      cards={upgrades}
+      showUpgradeTargets
+      emptyText="No upgrades applied."
+      maxWidth={128}
+      minWidth={36}
+    />
+  );
+}
+
 /** What a player has shown: the cards seen in their last fight, or an overview of their state. */
 export function PlayerDetailPanel({
   player,
@@ -362,7 +413,7 @@ export function PlayerDetailPanel({
   activeTab,
   onTabChange,
   onBack,
-}: PlayerDetailPanelProps) {
+}: PlayerDetailPanelProps): ReactNode {
   const isViewingSelf = player.name === currentPlayer.name;
   const viewerFighting = currentPlayer.phase === "battle";
   const seenHidden = viewerFighting && !isViewingSelf;
@@ -380,51 +431,7 @@ export function PlayerDetailPanel({
     upgradeDisplayScope,
   );
   const companionIds = new Set(player.command_zone.map((card) => card.id));
-  const overviewContent = (
-    <div className="scouting-overview flex h-full min-h-0 flex-col">
-      <Standings
-        player={player}
-        players={players}
-        isSelf={isViewingSelf}
-        viewerFighting={viewerFighting}
-      />
-
-      {useUpgrades && allUpgrades.length === 0 && (
-        <section>
-          <SectionHeading title="Upgrades" />
-          <div className="mt-1 border-t gold-divider" />
-          <p className="pt-3 text-center text-sm text-[var(--ivory-muted)]">
-            None applied
-          </p>
-        </section>
-      )}
-      {useUpgrades && allUpgrades.length > 0 && (
-        <AdaptiveCardSection
-          title="Upgrades"
-          cards={allUpgrades}
-          showUpgradeTargets
-          emptyText="No upgrades applied."
-          maxWidth={128}
-          minWidth={36}
-        />
-      )}
-    </div>
-  );
-
-  const seenContent = (
-    <AdaptiveCardSection
-      title="Seen in Fight"
-      cards={player.most_recently_revealed_cards}
-      companionIds={companionIds}
-      upgradedCardIds={upgradedCardIds}
-      appliedUpgradesByCardId={appliedUpgradesByCardId}
-      emptyText="Nothing was revealed in a fight yet."
-      guideTarget="sidebar-seen-in-battle"
-      maxWidth={104}
-      minColumns={onBack ? 1 : 2}
-      measureKey={`${player.name}:${activeTab}`}
-    />
-  );
+  const showOverview = seenHidden || activeTab === "overview";
 
   return (
     <div
@@ -462,7 +469,33 @@ export function PlayerDetailPanel({
       <div
         className={`flex flex-col flex-1 min-h-0 px-4 pb-4 ${seenHidden ? "pt-3" : ""}`}
       >
-        {seenHidden || activeTab === "overview" ? overviewContent : seenContent}
+        {showOverview ? (
+          <div className="scouting-overview flex h-full min-h-0 flex-col">
+            <Standings
+              player={player}
+              players={players}
+              isSelf={isViewingSelf}
+              viewerFighting={viewerFighting}
+            />
+            <OverviewUpgradesSection
+              useUpgrades={useUpgrades}
+              upgrades={allUpgrades}
+            />
+          </div>
+        ) : (
+          <AdaptiveCardSection
+            title="Seen in Fight"
+            cards={player.most_recently_revealed_cards}
+            companionIds={companionIds}
+            upgradedCardIds={upgradedCardIds}
+            appliedUpgradesByCardId={appliedUpgradesByCardId}
+            emptyText="Nothing was revealed in a fight yet."
+            guideTarget="sidebar-seen-in-battle"
+            maxWidth={104}
+            minColumns={onBack ? 1 : 2}
+            measureKey={`${player.name}:${activeTab}`}
+          />
+        )}
       </div>
     </div>
   );

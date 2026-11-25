@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { useMemo, useState, type ReactElement } from "react";
+import { afterEach, expect, it, onTestFinished, vi } from "vitest";
 import { useHotkeys } from "../../hooks/useHotkeys";
 import type { Card as CardType } from "../../types";
 import { CardSlot } from "../common/CardSlot";
@@ -11,12 +11,18 @@ import { CardPreviewModal } from "./CardPreviewModal";
 
 // A touch screen: utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  });
 });
 
 const ANCIENT_TOMB: CardType = {
@@ -41,10 +47,14 @@ function BattlefieldCard({
 }: {
   onTap: () => void;
   onPreview: () => void;
-}) {
+}): ReactElement {
   const [selected, setSelected] = useState(false);
+  const previewValue = useMemo(
+    () => ({ setPreviewCard: onPreview }),
+    [onPreview],
+  );
   return (
-    <CardPreviewContext.Provider value={{ setPreviewCard: onPreview }}>
+    <CardPreviewContext.Provider value={previewValue}>
       <Card
         card={ANCIENT_TOMB}
         selected={selected}
@@ -68,7 +78,9 @@ it("taps a card on a double tap whose second tap lands on the magnifier the firs
   );
   const card = container.querySelector<HTMLElement>(
     '[data-guide-card-id="ancient-tomb"]',
-  )!;
+  );
+  expect(card).not.toBeNull();
+  if (!card) return;
 
   fireEvent.touchEnd(card);
   fireEvent.click(card);
@@ -81,18 +93,27 @@ it("taps a card on a double tap whose second tap lands on the magnifier the firs
   expect(onPreview).not.toHaveBeenCalled();
 });
 
-function CardWithItsZoom({ counters }: { counters: Record<string, number> }) {
+function CardWithItsZoom({
+  counters,
+}: {
+  counters: Record<string, number>;
+}): ReactElement {
   const [zoomed, setZoomed] = useState<{
     card: CardType;
     counters?: Record<string, number>;
   } | null>(null);
+  const previewValue = useMemo(
+    () => ({
+      setPreviewCard: (
+        card: CardType | null,
+        _upgrades?: CardType[],
+        previewCounters?: Record<string, number>,
+      ): void => setZoomed(card && { card, counters: previewCounters }),
+    }),
+    [],
+  );
   return (
-    <CardPreviewContext.Provider
-      value={{
-        setPreviewCard: (card, _upgrades, counters) =>
-          setZoomed(card && { card, counters }),
-      }}
-    >
+    <CardPreviewContext.Provider value={previewValue}>
       <Card
         card={ANCIENT_TOMB}
         dimensions={{ width: 40, height: 56 }}
@@ -112,14 +133,30 @@ function CardWithItsZoom({ counters }: { counters: Record<string, number> }) {
 
 it("shows a name too long for the card as its number, and every counter in full in the zoom", () => {
   // jsdom has no canvas, so every character here is half as wide as the text is tall.
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-    font: "",
-    measureText(this: { font: string }, text: string) {
-      return {
-        width: (text.length * parseFloat(this.font.replace(/^600 /, ""))) / 2,
-      };
-    },
-  } as unknown as CanvasRenderingContext2D);
+  const originalGetContext = Object.getOwnPropertyDescriptor(
+    HTMLCanvasElement.prototype,
+    "getContext",
+  );
+  onTestFinished(() => {
+    if (originalGetContext) {
+      Object.defineProperty(
+        HTMLCanvasElement.prototype,
+        "getContext",
+        originalGetContext,
+      );
+    }
+  });
+  Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+    configurable: true,
+    value: () => ({
+      font: "",
+      measureText(this: { font: string }, text: string): { width: number } {
+        return {
+          width: (text.length * parseFloat(this.font.replace(/^600 /, ""))) / 2,
+        };
+      },
+    }),
+  });
   render(
     <CardWithItsZoom counters={{ "-1/-1": 1, "Indestructible Shield": 3 }} />,
   );
@@ -139,7 +176,7 @@ function CardWithPhaseEnter({
 }: {
   onSelect: () => void;
   onAdvance: () => void;
-}) {
+}): ReactElement {
   const [selected, setSelected] = useState(false);
   useHotkeys({ Enter: onAdvance });
   return (
@@ -188,8 +225,11 @@ it("triggers the focused card on Enter without firing global phase Enter, and st
   const cardButton = screen.getByRole("button", { name: "Ancient Tomb" });
   const nativeMatches = cardButton.matches.bind(cardButton);
   let focusVisible = true;
-  cardButton.matches = (selector: string) =>
-    selector === ":focus-visible" ? focusVisible : nativeMatches(selector);
+  Object.defineProperty(cardButton, "matches", {
+    configurable: true,
+    value: (selector: string): boolean =>
+      selector === ":focus-visible" ? focusVisible : nativeMatches(selector),
+  });
 
   // Keyboard focus: Enter activates the card and does not submit the phase.
   cardButton.focus();
@@ -212,14 +252,28 @@ it("triggers the focused card on Enter without firing global phase Enter, and st
   expect(onAdvance).toHaveBeenCalledTimes(1);
 });
 
+function SelectedCardWithPreview({
+  onSelect,
+  onPreview,
+}: {
+  onSelect: () => void;
+  onPreview: () => void;
+}): ReactElement {
+  const previewValue = useMemo(
+    () => ({ setPreviewCard: onPreview }),
+    [onPreview],
+  );
+  return (
+    <CardPreviewContext.Provider value={previewValue}>
+      <Card card={ANCIENT_TOMB} selected onClick={onSelect} />
+    </CardPreviewContext.Provider>
+  );
+}
+
 it("does not trigger card onClick when Enter or Space is pressed on a nested button", () => {
   const onSelect = vi.fn();
   const onPreview = vi.fn();
-  render(
-    <CardPreviewContext.Provider value={{ setPreviewCard: onPreview }}>
-      <Card card={ANCIENT_TOMB} selected onClick={onSelect} />
-    </CardPreviewContext.Provider>,
-  );
+  render(<SelectedCardWithPreview onSelect={onSelect} onPreview={onPreview} />);
 
   const previewButton = screen.getByTitle("Preview card");
   previewButton.focus();
@@ -232,7 +286,7 @@ it("makes interactive CardSlot keyboard-focusable and activates on Enter and Spa
   const onSlotClick = vi.fn();
   const onAdvance = vi.fn();
 
-  function SlotWithPhaseEnter() {
+  function SlotWithPhaseEnter(): ReactElement {
     useHotkeys({ Enter: onAdvance });
     return (
       <CardSlot

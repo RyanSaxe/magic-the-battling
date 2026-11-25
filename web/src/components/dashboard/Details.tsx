@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 /** Read-only facts about a cube or a game, such as "3 opponents · Upgrades On", as plain text between gold middots. */
 export function DetailLine({
   items,
@@ -5,7 +7,7 @@ export function DetailLine({
 }: {
   items: string[];
   className?: string;
-}) {
+}): ReactElement {
   return (
     <div
       className={`detail-line text-xs text-[var(--ivory-soft)] ${className ?? ""}`}
@@ -31,7 +33,7 @@ export function HeroDetails({
 }: {
   details: Detail[];
   className?: string;
-}) {
+}): ReactElement {
   return (
     <dl
       className={`flex flex-wrap gap-x-4 gap-y-1 text-[13px] leading-5 ${className ?? ""}`}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { SelfPlayerView } from "../types";
 import { DeckDisplay } from "./common";
 import type { DeckDisplayResizeState } from "./common/DeckDisplay";
@@ -23,7 +23,7 @@ export function GameSummary({
   layoutStateKey,
   resizeState,
   showLayoutReset = false,
-}: GameSummaryProps) {
+}: GameSummaryProps): ReactNode {
   const [frozenPlayer] = useState(() => ({
     hand: [...player.hand],
     sideboard: [...player.sideboard],

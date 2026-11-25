@@ -1,4 +1,10 @@
-import { useCallback, useState } from "react";
+/** Reward phase board: shows battle loot, stage-end upgrade choices, and the player's card pool. */
+import {
+  useCallback,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from "react";
 import { Card } from "../../components/card";
 import { CardGrid } from "../../components/common/CardGrid";
 import { LayoutResetControl } from "../../components/common/LayoutResetControl";
@@ -10,7 +16,11 @@ import {
 } from "../../constants/assets";
 import { useSavedLayout, type BoardSize } from "../../hooks/useSavedLayout";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
-import type { GameState, Card as CardType } from "../../types";
+import type {
+  GameState,
+  Card as CardType,
+  LastBattleResult,
+} from "../../types";
 import { rewardLayoutConfig } from "./phaseLayouts";
 import { rewardZoneStyles } from "./rewardZoneStyles";
 
@@ -29,13 +39,21 @@ interface RewardPhaseProps {
 
 type RewardItem = { key: string; card: CardType };
 
+interface AppliedUpgradeCard extends CardType {
+  upgrade_target: CardType;
+}
+
+function hasUpgradeTarget(card: CardType): card is AppliedUpgradeCard {
+  return card.upgrade_target !== null;
+}
+
 function EmptyZoneTile({
   dimensions,
   label,
 }: {
   dimensions: { width: number; height: number };
   label: string;
-}) {
+}): ReactElement {
   return (
     <div
       className="modal-chrome border gold-border rounded-lg flex items-center justify-center px-3 text-center text-xs text-[var(--ivory-muted)] shadow-md"
@@ -46,28 +64,293 @@ function EmptyZoneTile({
   );
 }
 
-function createRewardCard(
-  key: string,
-  name: string,
-  imageUrl: string,
-  typeLine: string,
-  oracleText: string | null,
-): CardType {
+function createRewardCard(options: {
+  id: string;
+  name: string;
+  imageUrl: string;
+  typeLine: string;
+  oracleText: string | null;
+}): CardType {
   return {
-    id: key,
-    name,
-    image_url: imageUrl,
+    id: options.id,
+    name: options.name,
+    image_url: options.imageUrl,
     flip_image_url: null,
-    png_url: imageUrl,
+    png_url: options.imageUrl,
     flip_png_url: null,
-    type_line: typeLine,
+    type_line: options.typeLine,
     tokens: [],
     elo: null,
     upgrade_target: null,
-    oracle_text: oracleText,
+    oracle_text: options.oracleText,
     colors: [],
     cmc: 0,
   };
+}
+
+function buildRewardItems(
+  lastBattleResult: LastBattleResult | null,
+): RewardItem[] {
+  const items: RewardItem[] = [];
+  if (lastBattleResult?.treasures_gained) {
+    items.push({
+      key: "treasure",
+      card: createRewardCard({
+        id: "reward:treasure",
+        name: `Treasure x${lastBattleResult.treasures_gained}`,
+        imageUrl: TREASURE_TOKEN_IMAGE,
+        typeLine: "Token Artifact — Treasure",
+        oracleText: "Tap, Sacrifice this artifact: Add one mana of any color.",
+      }),
+    });
+  }
+  if (lastBattleResult?.vanquisher_gained) {
+    items.push({
+      key: "vanquisher",
+      card: createRewardCard({
+        id: "reward:vanquisher",
+        name: "The Vanquisher",
+        imageUrl: THE_VANQUISHER_IMAGE,
+        typeLine: "Artifact",
+        oracleText: "Your hand size increases by 1.",
+      }),
+    });
+  }
+  if (lastBattleResult?.card_gained) {
+    items.push({
+      key: lastBattleResult.card_gained.id,
+      card: lastBattleResult.card_gained,
+    });
+  }
+  return items;
+}
+
+function LootContent({
+  rewardItems,
+  hasUpgradeSection,
+  columns,
+  rewardsDims,
+  selectedRewardCardId,
+  onToggleRewardCard,
+}: {
+  rewardItems: RewardItem[];
+  hasUpgradeSection: boolean;
+  columns: number;
+  rewardsDims: { width: number; height: number };
+  selectedRewardCardId: string | null;
+  onToggleRewardCard: (cardId: string) => void;
+}): ReactElement {
+  if (rewardItems.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-full">
+        <EmptyZoneTile dimensions={rewardsDims} label="No loot this round" />
+      </div>
+    );
+  }
+  const grid = (
+    <CardGrid columns={columns} cardWidth={rewardsDims.width}>
+      {rewardItems.map((item) => (
+        <Card
+          key={item.key}
+          card={item.card}
+          dimensions={rewardsDims}
+          selected={selectedRewardCardId === item.card.id}
+          onClick={() => onToggleRewardCard(item.card.id)}
+        />
+      ))}
+    </CardGrid>
+  );
+  if (hasUpgradeSection) return grid;
+  return (
+    <div className="flex items-center justify-center min-h-full">{grid}</div>
+  );
+}
+
+type DividerCallbacks = ReturnType<
+  typeof useResizableLayout
+>["dividerCallbacks"];
+
+function RewardUpgradesSection({
+  availableUpgrades,
+  poolCards,
+  selectedUpgradeId,
+  onUpgradeSelect,
+  selectedPoolCardId,
+  onPoolCardSelect,
+  upgradesDims,
+  upgradesColumns,
+  poolDims,
+  poolColumns,
+  upgradesStyle,
+  poolStyle,
+  cappedZoneAlignment,
+  isMobile,
+  dividerCallbacks,
+  setUpgradesNode,
+  setPoolNode,
+  upgradedCardIds,
+  getAppliedUpgrades,
+}: {
+  availableUpgrades: CardType[];
+  poolCards: CardType[];
+  selectedUpgradeId: string | null;
+  onUpgradeSelect: (upgradeId: string | null) => void;
+  selectedPoolCardId: string | null;
+  onPoolCardSelect: (cardId: string | null) => void;
+  upgradesDims: { width: number; height: number };
+  upgradesColumns: number;
+  poolDims: { width: number; height: number };
+  poolColumns: number;
+  upgradesStyle: CSSProperties;
+  poolStyle: CSSProperties;
+  cappedZoneAlignment: string;
+  isMobile: boolean;
+  dividerCallbacks: DividerCallbacks;
+  setUpgradesNode: (node: HTMLDivElement | null) => void;
+  setPoolNode: (node: HTMLDivElement | null) => void;
+  upgradedCardIds: ReadonlySet<string>;
+  getAppliedUpgrades: (cardId: string) => CardType[];
+}): ReactElement {
+  return (
+    <div
+      className="flex flex-col min-h-0 w-full"
+      style={{ flex: "1 1 auto", minHeight: 0 }}
+    >
+      <div
+        ref={setUpgradesNode}
+        className={`zone-upgrades w-full px-3 pt-5 pb-3 relative ${cappedZoneAlignment}`}
+        style={upgradesStyle}
+        data-guide-target="reward-upgrades"
+      >
+        <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
+          Upgrades
+        </ZoneLabel>
+        <CardGrid columns={upgradesColumns} cardWidth={upgradesDims.width}>
+          {availableUpgrades.map((upgrade) => (
+            <Card
+              key={upgrade.id}
+              card={upgrade}
+              dimensions={upgradesDims}
+              selected={selectedUpgradeId === upgrade.id}
+              onClick={() =>
+                onUpgradeSelect(
+                  selectedUpgradeId === upgrade.id ? null : upgrade.id,
+                )
+              }
+            />
+          ))}
+        </CardGrid>
+      </div>
+
+      {dividerCallbacks.bottomLeftSplitDivider && (
+        <ZoneDivider
+          orientation="horizontal"
+          interactive={!isMobile}
+          {...dividerCallbacks.bottomLeftSplitDivider}
+        />
+      )}
+
+      <div
+        ref={setPoolNode}
+        className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${cappedZoneAlignment}`}
+        style={poolStyle}
+      >
+        <ZoneLabel dragCallbacks={dividerCallbacks.bottomLeftSplitDivider}>
+          Pool
+        </ZoneLabel>
+        {poolCards.length === 0 ? (
+          <div className="flex items-center justify-center min-h-full">
+            <EmptyZoneTile dimensions={poolDims} label="No pool cards" />
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${poolColumns}, ${poolDims.width}px)`,
+              gap: "6px",
+              justifyContent: "center",
+              alignContent: "start",
+              maxWidth: "100%",
+              overflow: "hidden",
+            }}
+          >
+            {poolCards.map((card) => (
+              <Card
+                key={card.id}
+                card={card}
+                dimensions={poolDims}
+                upgraded={upgradedCardIds.has(card.id)}
+                appliedUpgrades={getAppliedUpgrades(card.id)}
+                selected={selectedPoolCardId === card.id}
+                onClick={() =>
+                  onPoolCardSelect(
+                    selectedPoolCardId === card.id ? null : card.id,
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RewardResetOverlay({
+  show,
+  stage,
+  round,
+  persistedLayout,
+  onClearConstraints,
+  isMobile,
+}: {
+  show: boolean;
+  stage: number;
+  round: number;
+  persistedLayout: ReturnType<typeof useSavedLayout>["resolution"];
+  onClearConstraints: () => void;
+  isMobile: boolean;
+}): ReactElement | null {
+  if (!show || !persistedLayout.canReset) return null;
+  return (
+    <LayoutResetControl
+      phaseLabel="Round Wrap-Up"
+      currentStage={stage}
+      currentRound={round}
+      originStage={persistedLayout.originStage}
+      originRound={persistedLayout.originRound}
+      isInherited={persistedLayout.source === "inherited"}
+      onConfirm={onClearConstraints}
+      position={isMobile ? "bottom-right" : "top-right"}
+    />
+  );
+}
+
+function showRewardUpgrades(gameState: GameState): boolean {
+  return (
+    gameState.use_upgrades &&
+    gameState.self_player.is_stage_increasing &&
+    gameState.available_upgrades.length > 0
+  );
+}
+
+function RewardTopDivider({
+  show,
+  topDivider,
+  isMobile,
+}: {
+  show: boolean;
+  topDivider: DividerCallbacks["topDivider"];
+  isMobile: boolean;
+}): ReactElement | null {
+  if (!show || !topDivider) return null;
+  return (
+    <ZoneDivider
+      orientation="horizontal"
+      interactive={!isMobile}
+      {...topDivider}
+    />
+  );
 }
 
 export function RewardPhase({
@@ -79,7 +362,7 @@ export function RewardPhase({
   onPoolCardSelect,
   isMobile = false,
   isDesktop,
-}: RewardPhaseProps) {
+}: RewardPhaseProps): ReactElement {
   void actions;
 
   const [selectedRewardCardId, setSelectedRewardCardId] = useState<
@@ -87,53 +370,15 @@ export function RewardPhase({
   >(null);
 
   const { self_player, available_upgrades } = gameState;
-  const { last_battle_result } = self_player;
-  const isStageIncreasing = self_player.is_stage_increasing;
-  const hasUpgradeSection =
-    gameState.use_upgrades &&
-    isStageIncreasing &&
-    available_upgrades.length > 0;
-  const appliedUpgradesList = self_player.upgrades.filter(
-    (u) => u.upgrade_target,
-  );
+  const hasUpgradeSection = showRewardUpgrades(gameState);
+  const appliedUpgradesList = self_player.upgrades.filter(hasUpgradeTarget);
   const upgradedCardIds = new Set(
-    appliedUpgradesList.map((u) => u.upgrade_target!.id),
+    appliedUpgradesList.map((u) => u.upgrade_target.id),
   );
-  const getAppliedUpgrades = (cardId: string) =>
-    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId);
+  const getAppliedUpgrades = (cardId: string): CardType[] =>
+    appliedUpgradesList.filter((u) => u.upgrade_target.id === cardId);
 
-  const rewardItems: RewardItem[] = [];
-  if (last_battle_result?.treasures_gained) {
-    rewardItems.push({
-      key: "treasure",
-      card: createRewardCard(
-        "reward:treasure",
-        `Treasure x${last_battle_result.treasures_gained}`,
-        TREASURE_TOKEN_IMAGE,
-        "Token Artifact — Treasure",
-        "Tap, Sacrifice this artifact: Add one mana of any color.",
-      ),
-    });
-  }
-  if (last_battle_result?.vanquisher_gained) {
-    rewardItems.push({
-      key: "vanquisher",
-      card: createRewardCard(
-        "reward:vanquisher",
-        "The Vanquisher",
-        THE_VANQUISHER_IMAGE,
-        "Artifact",
-        "Your hand size increases by 1.",
-      ),
-    });
-  }
-  if (last_battle_result?.card_gained) {
-    rewardItems.push({
-      key: last_battle_result.card_gained.id,
-      card: last_battle_result.card_gained,
-    });
-  }
-
+  const rewardItems = buildRewardItems(self_player.last_battle_result);
   const poolCards = [...self_player.hand, ...self_player.sideboard];
   const rewardsCount = Math.max(rewardItems.length, 1);
   const poolCount = hasUpgradeSection ? Math.max(poolCards.length, 1) : 0;
@@ -153,15 +398,6 @@ export function RewardPhase({
     measuredBoard,
   );
 
-  const activeConstraints = hasUpgradeSection ? constraints : null;
-  const layoutConfig = rewardLayoutConfig({
-    rewardCount: rewardsCount,
-    hasUpgradeSection,
-    upgradeCount: available_upgrades.length,
-    poolCount,
-    isDesktop,
-  });
-
   const {
     containerRef,
     dims,
@@ -170,17 +406,20 @@ export function RewardPhase({
     zoneRefs,
     dividerCallbacks,
   } = useResizableLayout({
-    layoutConfig,
-    constraints: activeConstraints,
+    layoutConfig: rewardLayoutConfig({
+      rewardCount: rewardsCount,
+      hasUpgradeSection,
+      upgradeCount: available_upgrades.length,
+      poolCount,
+      isDesktop,
+    }),
+    constraints: hasUpgradeSection ? constraints : null,
     onConstraintsChange: setConstraints,
     onConstraintsClear: clearConstraints,
     allowHorizontalResize: false,
   });
   // A saved layout belongs to a board size band, known once the board is measured.
   if (measuredBoard !== containerSize) setMeasuredBoard(containerSize);
-  // Wrap each refCallback in a stable useCallback so the react-hooks/refs
-  // lint rule (which can't see through hook-returned member access) doesn't
-  // false-positive on `ref={zoneRefs.X}`.
   const rewardsRefSetter = zoneRefs.rewards;
   const upgradesRefSetter = zoneRefs.upgrades;
   const poolRefSetter = zoneRefs.pool;
@@ -216,8 +455,6 @@ export function RewardPhase({
     pool: poolStyle,
   } = rewardZoneStyles(zoneFrames, hasUpgradeSection);
 
-  void last_battle_result;
-
   // The desktop cap can leave cards shorter than their zone, so center them there as the loot is on its own.
   const cappedZoneAlignment = isDesktop ? "flex flex-col justify-center" : "";
 
@@ -228,18 +465,14 @@ export function RewardPhase({
         className="relative flex flex-col flex-1 min-h-0"
         style={{ gap: dividerCallbacks.topDivider ? 0 : 2 }}
       >
-        {hasUpgradeSection && persistedLayout.canReset && (
-          <LayoutResetControl
-            phaseLabel="Round Wrap-Up"
-            currentStage={self_player.stage}
-            currentRound={self_player.round}
-            originStage={persistedLayout.originStage}
-            originRound={persistedLayout.originRound}
-            isInherited={persistedLayout.source === "inherited"}
-            onConfirm={clearConstraints}
-            position={isMobile ? "bottom-right" : "top-right"}
-          />
-        )}
+        <RewardResetOverlay
+          show={hasUpgradeSection}
+          stage={self_player.stage}
+          round={self_player.round}
+          persistedLayout={persistedLayout}
+          onClearConstraints={clearConstraints}
+          isMobile={isMobile}
+        />
 
         <div
           ref={setRewardsNode}
@@ -248,151 +481,48 @@ export function RewardPhase({
           data-guide-target="reward-summary"
         >
           <ZoneLabel>Loot</ZoneLabel>
-          {rewardItems.length === 0 ? (
-            <div className="flex items-center justify-center min-h-full">
-              <EmptyZoneTile
-                dimensions={rewardsDims}
-                label="No loot this round"
-              />
-            </div>
-          ) : !hasUpgradeSection ? (
-            <div className="flex items-center justify-center min-h-full">
-              <CardGrid
-                columns={dims.rewards.columns}
-                cardWidth={rewardsDims.width}
-              >
-                {rewardItems.map((item) => (
-                  <Card
-                    key={item.key}
-                    card={item.card}
-                    dimensions={rewardsDims}
-                    selected={selectedRewardCardId === item.card.id}
-                    onClick={() =>
-                      setSelectedRewardCardId((current) =>
-                        current === item.card.id ? null : item.card.id,
-                      )
-                    }
-                  />
-                ))}
-              </CardGrid>
-            </div>
-          ) : (
-            <CardGrid
-              columns={dims.rewards.columns}
-              cardWidth={rewardsDims.width}
-            >
-              {rewardItems.map((item) => (
-                <Card
-                  key={item.key}
-                  card={item.card}
-                  dimensions={rewardsDims}
-                  selected={selectedRewardCardId === item.card.id}
-                  onClick={() =>
-                    setSelectedRewardCardId((current) =>
-                      current === item.card.id ? null : item.card.id,
-                    )
-                  }
-                />
-              ))}
-            </CardGrid>
-          )}
+          <LootContent
+            rewardItems={rewardItems}
+            hasUpgradeSection={hasUpgradeSection}
+            columns={dims.rewards.columns}
+            rewardsDims={rewardsDims}
+            selectedRewardCardId={selectedRewardCardId}
+            onToggleRewardCard={(cardId) =>
+              setSelectedRewardCardId((current) =>
+                current === cardId ? null : cardId,
+              )
+            }
+          />
         </div>
 
-        {hasUpgradeSection && dividerCallbacks.topDivider && (
-          <ZoneDivider
-            orientation="horizontal"
-            interactive={!isMobile}
-            {...dividerCallbacks.topDivider}
-          />
-        )}
+        <RewardTopDivider
+          show={hasUpgradeSection}
+          topDivider={dividerCallbacks.topDivider}
+          isMobile={isMobile}
+        />
 
         {hasUpgradeSection && (
-          <div
-            className="flex flex-col min-h-0 w-full"
-            style={{ flex: "1 1 auto", minHeight: 0 }}
-          >
-            <div
-              ref={setUpgradesNode}
-              className={`zone-upgrades w-full px-3 pt-5 pb-3 relative ${cappedZoneAlignment}`}
-              style={upgradesStyle}
-              data-guide-target="reward-upgrades"
-            >
-              <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
-                Upgrades
-              </ZoneLabel>
-              <CardGrid
-                columns={dims.upgrades.columns}
-                cardWidth={upgradesDims.width}
-              >
-                {available_upgrades.map((upgrade) => (
-                  <Card
-                    key={upgrade.id}
-                    card={upgrade}
-                    dimensions={upgradesDims}
-                    selected={selectedUpgradeId === upgrade.id}
-                    onClick={() =>
-                      onUpgradeSelect(
-                        selectedUpgradeId === upgrade.id ? null : upgrade.id,
-                      )
-                    }
-                  />
-                ))}
-              </CardGrid>
-            </div>
-
-            {dividerCallbacks.bottomLeftSplitDivider && (
-              <ZoneDivider
-                orientation="horizontal"
-                interactive={!isMobile}
-                {...dividerCallbacks.bottomLeftSplitDivider}
-              />
-            )}
-
-            <div
-              ref={setPoolNode}
-              className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${cappedZoneAlignment}`}
-              style={poolStyle}
-            >
-              <ZoneLabel
-                dragCallbacks={dividerCallbacks.bottomLeftSplitDivider}
-              >
-                Pool
-              </ZoneLabel>
-              {poolCards.length === 0 ? (
-                <div className="flex items-center justify-center min-h-full">
-                  <EmptyZoneTile dimensions={poolDims} label="No pool cards" />
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${dims.pool.columns}, ${poolDims.width}px)`,
-                    gap: "6px",
-                    justifyContent: "center",
-                    alignContent: "start",
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                  }}
-                >
-                  {poolCards.map((card) => (
-                    <Card
-                      key={card.id}
-                      card={card}
-                      dimensions={poolDims}
-                      upgraded={upgradedCardIds.has(card.id)}
-                      appliedUpgrades={getAppliedUpgrades(card.id)}
-                      selected={selectedPoolCardId === card.id}
-                      onClick={() =>
-                        onPoolCardSelect(
-                          selectedPoolCardId === card.id ? null : card.id,
-                        )
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <RewardUpgradesSection
+            availableUpgrades={available_upgrades}
+            poolCards={poolCards}
+            selectedUpgradeId={selectedUpgradeId}
+            onUpgradeSelect={onUpgradeSelect}
+            selectedPoolCardId={selectedPoolCardId}
+            onPoolCardSelect={onPoolCardSelect}
+            upgradesDims={upgradesDims}
+            upgradesColumns={dims.upgrades.columns}
+            poolDims={poolDims}
+            poolColumns={dims.pool.columns}
+            upgradesStyle={upgradesStyle}
+            poolStyle={poolStyle}
+            cappedZoneAlignment={cappedZoneAlignment}
+            isMobile={isMobile}
+            dividerCallbacks={dividerCallbacks}
+            setUpgradesNode={setUpgradesNode}
+            setPoolNode={setPoolNode}
+            upgradedCardIds={upgradedCardIds}
+            getAppliedUpgrades={getAppliedUpgrades}
+          />
         )}
       </div>
     </div>

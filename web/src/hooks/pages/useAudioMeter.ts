@@ -13,9 +13,9 @@ export function useAudioMeter(
   const barRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (!audioLevelKey) return;
+    if (!audioLevelKey) return undefined;
     let rafId = 0;
-    const tick = () => {
+    const tick = (): void => {
       rafId = requestAnimationFrame(tick);
       const el = barRef.current;
       if (!el) return;
@@ -25,7 +25,7 @@ export function useAudioMeter(
       );
     };
     rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    return (): void => cancelAnimationFrame(rafId);
   }, [audioLevelKey]);
 
   return barRef;

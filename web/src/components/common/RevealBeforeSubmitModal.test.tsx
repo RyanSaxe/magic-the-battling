@@ -6,13 +6,24 @@ import { RevealBeforeSubmitModal } from "./RevealBeforeSubmitModal";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = () =>
-    ({
-      matches: false,
-      addEventListener() {},
-      removeEventListener() {},
-    }) as unknown as MediaQueryList;
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  });
 });
+
+// True when nothing took the key, so the browser presses the button.
+function enterPresses(button: HTMLElement): boolean {
+  return fireEvent.keyDown(button, { key: "Enter" });
+}
 
 afterEach(() => {
   cleanup();
@@ -23,19 +34,27 @@ it("leaves Enter to the dialog's own outlined button, and reveals with no outlin
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
     },
   );
   const reveal = vi.fn();
-  const upgrade = {
+  const upgrade: Card = {
     id: "upgrade",
     name: "Upgrade",
     type_line: "Conspiracy",
     image_url: "",
+    flip_image_url: null,
+    png_url: null,
+    flip_png_url: null,
+    tokens: [],
+    elo: null,
     upgrade_target: null,
-  } as Card;
+    oracle_text: null,
+    colors: [],
+    cmc: 0,
+  };
   render(
     <>
       <button>Submit Result</button>
@@ -49,9 +68,6 @@ it("leaves Enter to the dialog's own outlined button, and reveals with no outlin
   );
   const skip = screen.getByRole("button", { name: "Submit Without Revealing" });
   const covered = screen.getByRole("button", { name: "Submit Result" });
-  // True when nothing took the key, so the browser presses the button.
-  const enterPresses = (button: HTMLElement) =>
-    fireEvent.keyDown(button, { key: "Enter" });
 
   // jsdom outlines whatever has focus, as a browser does after Tab.
   skip.focus();
@@ -63,8 +79,11 @@ it("leaves Enter to the dialog's own outlined button, and reveals with no outlin
   expect(reveal).toHaveBeenCalledTimes(1);
 
   const matches = skip.matches.bind(skip);
-  skip.matches = (selector: string) =>
-    selector !== ":focus-visible" && matches(selector);
+  Object.defineProperty(skip, "matches", {
+    configurable: true,
+    value: (selector: string): boolean =>
+      selector !== ":focus-visible" && matches(selector),
+  });
   skip.focus();
   expect(enterPresses(skip)).toBe(false);
   expect(reveal).toHaveBeenCalledTimes(2);

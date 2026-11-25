@@ -6,6 +6,9 @@
  * across two animation frames when layout keys change.
  */
 import { useEffect, useEffectEvent, useLayoutEffect, useState } from "react";
+import { useDepsVersion } from "../useAsyncResource";
+
+const EMPTY_DEPS: readonly unknown[] = [];
 
 interface UseObservedElementOptions {
   deps?: readonly unknown[];
@@ -18,25 +21,25 @@ export function useObservedElement<T extends HTMLElement>(
   options?: UseObservedElementOptions,
 ): (node: T | null) => void {
   const [node, setNode] = useState<T | null>(null);
-  const deps = options?.deps ?? [];
+  const depsVersion = useDepsVersion(options?.deps ?? EMPTY_DEPS);
   const remeasureFrames = options?.remeasureFrames ?? false;
   const remeasureKey = options?.remeasureKey;
   const measureNode = useEffectEvent(onMeasure);
 
   useLayoutEffect(() => {
-    if (!node) return;
+    if (!node || depsVersion < 0) return undefined;
     measureNode(node);
 
-    if (typeof ResizeObserver === "undefined") return;
+    if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(() => measureNode(node));
     observer.observe(node);
-    return () => observer.disconnect();
-    // Callers pass layout-affecting triggers via `options.deps`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, ...deps]);
+    return (): void => observer.disconnect();
+  }, [node, depsVersion]);
 
   useEffect(() => {
-    if (!node || !remeasureFrames) return;
+    if (!node || !remeasureFrames || depsVersion < 0 || remeasureKey === null) {
+      return undefined;
+    }
     let frameOne = 0;
     let frameTwo = 0;
 
@@ -47,13 +50,11 @@ export function useObservedElement<T extends HTMLElement>(
       });
     });
 
-    return () => {
+    return (): void => {
       cancelAnimationFrame(frameOne);
       cancelAnimationFrame(frameTwo);
     };
-    // Callers pass re-measurement triggers via `remeasureKey` and `options.deps`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, remeasureFrames, remeasureKey, ...deps]);
+  }, [node, remeasureFrames, remeasureKey, depsVersion]);
 
   return setNode;
 }

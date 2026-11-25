@@ -1,8 +1,10 @@
+import type { ReactElement } from "react";
+
 export function GoldfishIcon({
   className = "w-7 h-7 text-amber-400",
 }: {
   className?: string;
-}) {
+}): ReactElement {
   return (
     <svg
       viewBox="0 0 24 24"

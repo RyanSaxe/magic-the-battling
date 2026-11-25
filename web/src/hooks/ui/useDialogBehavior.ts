@@ -14,7 +14,7 @@ import { shouldCloseSubmitPopoverOnOutsideClick } from "../../components/common/
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-function focusFirst(controls: HTMLElement[]) {
+function focusFirst(controls: HTMLElement[]): void {
   for (const control of controls) {
     control.focus();
     // A hidden control doesn't take focus.
@@ -31,39 +31,48 @@ function isTopDialog(dialog: HTMLElement): boolean {
   return !topDialog || dialog.contains(topDialog);
 }
 
+function reversedCopy<T>(items: readonly T[]): T[] {
+  const out: T[] = [];
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    out.push(items[i]);
+  }
+  return out;
+}
+
 // Not inert on the page: that would also switch off clicks on toasts and the other layers drawn over a dialog.
 function keepFocusInside(dialog: HTMLElement, controls: () => HTMLElement[]) {
   // A request to watch or a second dialog can open over this one, and Tab/focus must stay in the top layer.
-  const isOnTop = () => {
+  const isOnTop = (): boolean => {
     if (!isTopDialog(dialog)) return false;
     return typeof document.elementFromPoint === "function"
       ? dialog.contains(document.elementFromPoint(0, 0))
       : true;
   };
 
-  const handleTab = (event: KeyboardEvent) => {
+  const handleTab = (event: KeyboardEvent): void => {
     if (event.key !== "Tab" || event.isComposing || !isOnTop()) return;
     event.preventDefault();
-    const order = event.shiftKey ? controls().reverse() : controls();
+    const order = event.shiftKey ? reversedCopy(controls()) : controls();
     const active = document.activeElement;
     const next = active instanceof HTMLElement ? order.indexOf(active) + 1 : 0;
     focusFirst([...order.slice(next), ...order.slice(0, next)]);
   };
   // Tab from the browser's address bar lands on the page without a keydown, and with no element losing focus.
-  const handleFocus = (event: FocusEvent) => {
+  const handleFocus = (event: FocusEvent): void => {
     const target = event.target;
     if (
       event.relatedTarget ||
       (target instanceof Node && dialog.contains(target)) ||
       !isOnTop()
-    )
+    ) {
       return;
+    }
     focusFirst(controls());
   };
 
   window.addEventListener("keydown", handleTab);
   document.addEventListener("focusin", handleFocus);
-  return () => {
+  return (): void => {
     window.removeEventListener("keydown", handleTab);
     document.removeEventListener("focusin", handleFocus);
   };
@@ -84,15 +93,15 @@ export function useDialogFocusTrap({
     const dialog = dialogRef.current;
     const body = bodyRef.current;
     const close = closeRef.current;
-    if (!dialog || !body || !close) return;
+    if (!dialog || !body || !close) return undefined;
     // The ✕ comes first on the page and last here, so that the body's first control is where focus starts.
-    const controls = () => [
+    const controls = (): HTMLElement[] => [
       ...body.querySelectorAll<HTMLElement>(FOCUSABLE),
       close,
     ];
     if (!dialog.contains(document.activeElement)) controls()[0].focus();
     const stopKeepingFocusInside = keepFocusInside(dialog, controls);
-    return () => {
+    return (): void => {
       stopKeepingFocusInside();
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
     };
@@ -106,9 +115,14 @@ export function useDialogEscape(
   const handleClose = useEffectEvent(onClose);
 
   useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing)
+    const handleKey = (event: KeyboardEvent): void => {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        event.isComposing
+      ) {
         return;
+      }
       const dialog = dialogRef.current;
       // When one dialog opens over another, only the top one answers Escape.
       if (!dialog || !isTopDialog(dialog)) return;
@@ -117,7 +131,7 @@ export function useDialogEscape(
       handleClose();
     };
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    return (): void => window.removeEventListener("keydown", handleKey);
   }, [dialogRef]);
 }
 
@@ -142,14 +156,14 @@ export function useSubmitPopoverDismiss({
 
   useEffect(() => {
     let pressWasOutside = true;
-    const handlePointerDown = (e: PointerEvent) => {
+    const handlePointerDown = (e: PointerEvent): void => {
       const pressed = e.target;
       if (!(pressed instanceof Node)) return;
       pressWasOutside =
         !popoverRef.current?.contains(pressed) &&
         !backdropRef.current?.contains(pressed);
     };
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent): void => {
       const target = e.target;
       if (
         !popoverRef.current ||
@@ -182,7 +196,7 @@ export function useSubmitPopoverDismiss({
         handleClose();
       }
     };
-    const handleKey = (e: KeyboardEvent) => {
+    const handleKey = (e: KeyboardEvent): void => {
       if (e.key !== "Escape") return;
       // Closing can bring a minimized Guide back, which would otherwise close on this same press.
       e.preventDefault();
@@ -192,7 +206,7 @@ export function useSubmitPopoverDismiss({
     document.addEventListener("pointerdown", handlePointerDown, true);
     document.addEventListener("click", handleClick, true);
     document.addEventListener("keydown", handleKey);
-    return () => {
+    return (): void => {
       document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener("click", handleClick, true);
       document.removeEventListener("keydown", handleKey);

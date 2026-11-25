@@ -58,8 +58,7 @@ export function useCollapsedPanelHeight(
         previous === nextHeight ? previous : nextHeight,
       );
     },
-    enabled,
-    deps,
+    { enabled, deps },
   );
 
   return height;

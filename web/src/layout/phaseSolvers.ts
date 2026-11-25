@@ -26,16 +26,26 @@ import {
   type ZoneDims,
 } from "./types";
 
-function fitFillZones(
-  zones: ResolvedZone[],
-  fillRows: number[],
-  remainingH: number,
-  availW: number,
-  primaryCapW: number,
-  minCardWidth: number,
-  sectionGap: number,
-  padPerSectionV: number,
-): Record<string, ZoneDims> | null {
+function fitFillZones(args: {
+  zones: ResolvedZone[];
+  fillRows: number[];
+  remainingH: number;
+  availW: number;
+  primaryCapW: number;
+  minCardWidth: number;
+  sectionGap: number;
+  padPerSectionV: number;
+}): Record<string, ZoneDims> | null {
+  const {
+    zones,
+    fillRows,
+    remainingH,
+    availW,
+    primaryCapW,
+    minCardWidth,
+    sectionGap,
+    padPerSectionV,
+  } = args;
   const fillDims: Record<string, ZoneDims> = {};
   const fillMinW = Math.max(minCardWidth, Math.round(primaryCapW * 0.5));
   const fillSectionH =
@@ -56,7 +66,13 @@ function fitFillZones(
       fz.gap,
     );
     const wCap = Math.min(
-      widthCapForRows(fz.count, availW, rows, fz.gap, fz.maxCardWidth),
+      widthCapForRows({
+        count: fz.count,
+        availableWidth: availW,
+        rows,
+        gap: fz.gap,
+        maxCardWidth: fz.maxCardWidth,
+      }),
       primaryCapW,
     );
     const width = Math.min(wCap, wFromH);
@@ -87,12 +103,13 @@ function computeBottomRightPlacement(
   return { dims, overflow: Math.max(0, brGridH - brActualAvailH) };
 }
 
-function buildResult(
-  ctx: LayoutContext,
-  entries: Array<[string, ZoneDims]>,
-  fillDims: Record<string, ZoneDims>,
-  brDims: ZoneDims | null,
-): CardLayoutResult {
+function buildResult(args: {
+  ctx: LayoutContext;
+  entries: Array<[string, ZoneDims]>;
+  fillDims: Record<string, ZoneDims>;
+  brDims: ZoneDims | null;
+}): CardLayoutResult {
+  const { ctx, entries, fillDims, brDims } = args;
   const result = makeDefaultDims(ctx.zoneIds);
   for (const [id, dims] of entries) result[id] = dims;
   for (const [id, dims] of Object.entries(fillDims)) result[id] = dims;
@@ -100,13 +117,15 @@ function buildResult(
   return result;
 }
 
-function sumFillBlockHeight(
-  fillDims: Record<string, ZoneDims>,
-  fillBL: ResolvedZone[],
-  bottomPrimaryCount: number,
-  sectionGap: number,
-  sectionPadV: number,
-): number {
+function sumFillBlockHeight(args: {
+  fillDims: Record<string, ZoneDims>;
+  fillBL: ResolvedZone[];
+  bottomPrimaryCount: number;
+  sectionGap: number;
+  sectionPadV: number;
+}): number {
+  const { fillDims, fillBL, bottomPrimaryCount, sectionGap, sectionPadV } =
+    args;
   const fillGap = fillBL[0]?.gap ?? DEFAULT_CARD_GAP;
   const gridsH = Object.values(fillDims).reduce(
     (sum, dims) =>
@@ -178,13 +197,13 @@ function validRowOptions(
   const maxR = Math.min(zone.count, zone.maxRows);
   for (let rows = 1; rows <= maxR; rows++) {
     if (Math.ceil(zone.count / Math.ceil(zone.count / rows)) !== rows) continue;
-    const wCap = widthCapForRows(
-      zone.count,
-      availW,
+    const wCap = widthCapForRows({
+      count: zone.count,
+      availableWidth: availW,
       rows,
-      zone.gap,
-      zone.maxCardWidth,
-    );
+      gap: zone.gap,
+      maxCardWidth: zone.maxCardWidth,
+    });
     if (wCap >= minCardWidth) options.push({ rows, wCap });
   }
   return options;
@@ -219,25 +238,25 @@ export function evaluateSinglePrimary(
 
     const pDims = makeZoneDims(pW, pRows, Math.ceil(pZone.count / pRows));
     const pGridH = pRows * pDims.height + pVG;
-    const fillDims = fitFillZones(
-      ctx.fillBL,
+    const fillDims = fitFillZones({
+      zones: ctx.fillBL,
       fillRows,
-      ctx.gridAvailH - pGridH,
-      budget.blAvailW,
-      pW,
-      ctx.minCardWidth,
-      ctx.sectionGap,
-      0,
-    );
+      remainingH: ctx.gridAvailH - pGridH,
+      availW: budget.blAvailW,
+      primaryCapW: pW,
+      minCardWidth: ctx.minCardWidth,
+      sectionGap: ctx.sectionGap,
+      padPerSectionV: 0,
+    });
     if (!fillDims) continue;
 
-    const fillTotalH = sumFillBlockHeight(
+    const fillTotalH = sumFillBlockHeight({
       fillDims,
-      ctx.fillBL,
-      isTop ? 0 : 1,
-      ctx.sectionGap,
-      ctx.sectionPadV,
-    );
+      fillBL: ctx.fillBL,
+      bottomPrimaryCount: isTop ? 0 : 1,
+      sectionGap: ctx.sectionGap,
+      sectionPadV: ctx.sectionPadV,
+    });
     const totalH = ctx.sectionPadV + pGridH + ctx.columnGap + fillTotalH;
     const score =
       pW *
@@ -249,27 +268,47 @@ export function evaluateSinglePrimary(
 
     recordCandidate(
       tracker,
-      buildResult(ctx, [[pZone.id, pDims]], fillDims, br.dims),
-      score,
-      overflow,
+      buildResult({
+        ctx,
+        entries: [[pZone.id, pDims]],
+        fillDims,
+        brDims: br.dims,
+      }),
+      { score, overflow },
     );
   }
 }
 
-function evaluatePrimaryPairRow(
-  ctx: LayoutContext,
-  budget: ColumnVariantBudget,
-  tracker: CandidateTracker,
-  pA: ResolvedZone,
-  pB: ResolvedZone,
-  aRows: number,
-  bRows: number,
-  aWCap: number,
-  bWCap: number,
-  fillRows: number[],
-  fillWeightedRows: number,
-  fillVGapsTotal: number,
-): void {
+interface PrimaryPairRowArgs {
+  ctx: LayoutContext;
+  budget: ColumnVariantBudget;
+  tracker: CandidateTracker;
+  pA: ResolvedZone;
+  pB: ResolvedZone;
+  aRows: number;
+  bRows: number;
+  aWCap: number;
+  bWCap: number;
+  fillRows: number[];
+  fillWeightedRows: number;
+  fillVGapsTotal: number;
+}
+
+function evaluatePrimaryPairRow(args: PrimaryPairRowArgs): void {
+  const {
+    ctx,
+    budget,
+    tracker,
+    pA,
+    pB,
+    aRows,
+    bRows,
+    aWCap,
+    bWCap,
+    fillRows,
+    fillWeightedRows,
+    fillVGapsTotal,
+  } = args;
   const pAIsTop = ctx.primaryTop.includes(pA);
   const pBIsTop = ctx.primaryTop.includes(pB);
   const aVG = verticalGaps(aRows, pA.gap);
@@ -317,26 +356,26 @@ function evaluatePrimaryPairRow(
   const bGridH = bRows * bDims.height + bVG;
   const smallerPrimaryW = Math.min(balanced.aW, balanced.bW);
 
-  const fillDims = fitFillZones(
-    ctx.fillBL,
+  const fillDims = fitFillZones({
+    zones: ctx.fillBL,
     fillRows,
-    ctx.gridAvailH - (aGridH + bGridH),
-    budget.blAvailW,
-    smallerPrimaryW,
-    ctx.minCardWidth,
-    ctx.sectionGap,
-    ctx.sectionPadV,
-  );
+    remainingH: ctx.gridAvailH - (aGridH + bGridH),
+    availW: budget.blAvailW,
+    primaryCapW: smallerPrimaryW,
+    minCardWidth: ctx.minCardWidth,
+    sectionGap: ctx.sectionGap,
+    padPerSectionV: ctx.sectionPadV,
+  });
   if (!fillDims) return;
 
   const bottomPrimaryCount = (pAIsTop ? 0 : 1) + (pBIsTop ? 0 : 1);
-  const fillTotalH = sumFillBlockHeight(
+  const fillTotalH = sumFillBlockHeight({
     fillDims,
-    ctx.fillBL,
+    fillBL: ctx.fillBL,
     bottomPrimaryCount,
-    ctx.sectionGap,
-    ctx.sectionPadV,
-  );
+    sectionGap: ctx.sectionGap,
+    sectionPadV: ctx.sectionPadV,
+  });
   const totalH =
     aGridH + bGridH + 2 * ctx.sectionPadV + ctx.columnGap + fillTotalH;
   const score =
@@ -344,7 +383,12 @@ function evaluatePrimaryPairRow(
     Math.sqrt(Math.min(1, totalH / ctx.availH)) *
     Math.pow(0.9, aRows + bRows - 2);
 
-  const topGridH = pAIsTop ? aGridH : pBIsTop ? bGridH : 0;
+  let topGridH = 0;
+  if (pAIsTop) {
+    topGridH = aGridH;
+  } else if (pBIsTop) {
+    topGridH = bGridH;
+  }
   const topActualH =
     topGridH > 0 ? topGridH + ctx.sectionPadV : ctx.topOverhead;
   const br = computeBottomRightPlacement(ctx, budget, topActualH);
@@ -352,17 +396,16 @@ function evaluatePrimaryPairRow(
 
   recordCandidate(
     tracker,
-    buildResult(
+    buildResult({
       ctx,
-      [
+      entries: [
         [pA.id, aDims],
         [pB.id, bDims],
       ],
       fillDims,
-      br.dims,
-    ),
-    score,
-    overflow,
+      brDims: br.dims,
+    }),
+    { score, overflow },
   );
 }
 
@@ -389,39 +432,56 @@ export function evaluatePrimaryPair(
   const bOptions = validRowOptions(pB, pBAvailW, ctx.minCardWidth);
   for (const a of aOptions) {
     for (const b of bOptions) {
-      evaluatePrimaryPairRow(
+      evaluatePrimaryPairRow({
         ctx,
         budget,
         tracker,
         pA,
         pB,
-        a.rows,
-        b.rows,
-        a.wCap,
-        b.wCap,
+        aRows: a.rows,
+        bRows: b.rows,
+        aWCap: a.wCap,
+        bWCap: b.wCap,
         fillRows,
         fillWeightedRows,
         fillVGapsTotal,
-      );
+      });
     }
   }
 }
 
-function evaluateTopFillPairRow(
-  ctx: LayoutContext,
-  budget: ColumnVariantBudget,
-  tracker: CandidateTracker,
-  fillZone: ResolvedZone,
-  pA: ResolvedZone,
-  pB: ResolvedZone,
-  fillRows: number,
-  fillCols: number,
-  fillVG: number,
-  aRows: number,
-  bRows: number,
-  aWCap: number,
-  bWCap: number,
-): void {
+interface TopFillPairRowArgs {
+  ctx: LayoutContext;
+  budget: ColumnVariantBudget;
+  tracker: CandidateTracker;
+  fillZone: ResolvedZone;
+  pA: ResolvedZone;
+  pB: ResolvedZone;
+  fillRows: number;
+  fillCols: number;
+  fillVG: number;
+  aRows: number;
+  bRows: number;
+  aWCap: number;
+  bWCap: number;
+}
+
+function evaluateTopFillPairRow(args: TopFillPairRowArgs): void {
+  const {
+    ctx,
+    budget,
+    tracker,
+    fillZone,
+    pA,
+    pB,
+    fillRows,
+    fillCols,
+    fillVG,
+    aRows,
+    bRows,
+    aWCap,
+    bWCap,
+  } = args;
   const aVG = verticalGaps(aRows, pA.gap);
   const bVG = verticalGaps(bRows, pB.gap);
   const idealW =
@@ -461,13 +521,13 @@ function evaluateTopFillPairRow(
     fillZone.gap,
   );
   const fillWCap = Math.min(
-    widthCapForRows(
-      fillZone.count,
-      budget.topAvailW,
-      fillRows,
-      fillZone.gap,
-      fillZone.maxCardWidth,
-    ),
+    widthCapForRows({
+      count: fillZone.count,
+      availableWidth: budget.topAvailW,
+      rows: fillRows,
+      gap: fillZone.gap,
+      maxCardWidth: fillZone.maxCardWidth,
+    }),
     smallerPrimaryW,
   );
   const fillMinW = Math.max(
@@ -492,18 +552,17 @@ function evaluateTopFillPairRow(
 
   recordCandidate(
     tracker,
-    buildResult(
+    buildResult({
       ctx,
-      [
+      entries: [
         [fillZone.id, fillDims],
         [pA.id, aDims],
         [pB.id, bDims],
       ],
-      {},
-      null,
-    ),
-    score,
-    overflow,
+      fillDims: {},
+      brDims: null,
+    }),
+    { score, overflow },
   );
 }
 
@@ -522,7 +581,7 @@ export function evaluateTopFillWithBottomPrimaryPair(
   const bOptions = validRowOptions(pB, budget.blAvailW, ctx.minCardWidth);
   for (const a of aOptions) {
     for (const b of bOptions) {
-      evaluateTopFillPairRow(
+      evaluateTopFillPairRow({
         ctx,
         budget,
         tracker,
@@ -532,11 +591,11 @@ export function evaluateTopFillWithBottomPrimaryPair(
         fillRows,
         fillCols,
         fillVG,
-        a.rows,
-        b.rows,
-        a.wCap,
-        b.wCap,
-      );
+        aRows: a.rows,
+        bRows: b.rows,
+        aWCap: a.wCap,
+        bWCap: b.wCap,
+      });
     }
   }
 }

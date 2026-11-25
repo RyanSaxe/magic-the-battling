@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactElement, type ReactNode } from "react";
 import { SECTION_TITLE_TYPE } from "./typography";
 
 export interface SegmentOption<T extends string> {
@@ -31,25 +31,38 @@ export function SegmentedFilter<T extends string>({
    */
   variant?: "filter" | "heading" | "field";
   className?: string;
-}) {
+}): ReactElement {
+  const groupName = useId();
   return (
     <div
       role="radiogroup"
       aria-label={label}
       className={`segmented-track ${variant === "field" ? "segmented-field" : ""} ${className ?? ""}`}
     >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={option.value === value}
-          onClick={() => onChange(option.value)}
-          className={`segmented-option flex-1 whitespace-nowrap transition-colors ${OPTION_LOOK[variant]}`}
-        >
-          {option.label}
-        </button>
-      ))}
+      {options.map((option) => {
+        const checked = option.value === value;
+        return (
+          <label
+            key={option.value}
+            className={`segmented-option flex-1 cursor-pointer text-center whitespace-nowrap transition-colors ${OPTION_LOOK[variant]} ${
+              checked
+                ? "bg-[var(--btn-secondary-fill)] text-[var(--gold-pale)] shadow-[inset_0_1px_0_var(--btn-raise-edge),0_1px_2px_rgba(0,0,0,0.35)]"
+                : ""
+            }`}
+          >
+            <input
+              type="radio"
+              name={groupName}
+              value={option.value}
+              checked={checked}
+              aria-checked={checked}
+              onChange={() => onChange(option.value)}
+              className="sr-only"
+            />
+            {option.label}
+          </label>
+        );
+      })}
     </div>
   );
 }

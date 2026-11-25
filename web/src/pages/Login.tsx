@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, type ReactElement } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/authState";
 import { useAsyncAction } from "../hooks/useAsyncResource";
@@ -13,7 +13,7 @@ import {
   TEXT_INPUT,
 } from "../components/common/styles";
 
-export function Login() {
+export function Login(): ReactElement {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/";
@@ -21,22 +21,30 @@ export function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const focusedRef = useRef(false);
 
   const { run: submitLogin, pending: loading } = useAsyncAction(
     useCallback(async () => {
       setError("");
       try {
         await login(username, password);
-        navigate(returnTo);
+        void navigate(returnTo);
       } catch (err) {
         setError(unknownToAppError(err, "login", "Login failed").message);
       }
     }, [login, username, password, navigate, returnTo]),
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     void submitLogin();
+  };
+
+  const focusUsernameOnce = (el: HTMLInputElement | null): void => {
+    if (el && !focusedRef.current) {
+      focusedRef.current = true;
+      el.focus();
+    }
   };
 
   return (
@@ -57,12 +65,12 @@ export function Login() {
             Username
           </label>
           <input
+            ref={focusUsernameOnce}
             id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className={TEXT_INPUT}
-            autoFocus
             required
           />
         </div>
@@ -97,7 +105,7 @@ export function Login() {
         <p className="text-center text-[var(--ivory-muted)] text-sm mt-4">
           Don't have an account?{" "}
           <Link
-            to={`/register${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
+            to={`/register${returnTo === "/" ? "" : `?returnTo=${encodeURIComponent(returnTo)}`}`}
             className={LINK}
           >
             Create one

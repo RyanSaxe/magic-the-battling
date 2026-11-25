@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
@@ -14,7 +14,7 @@ import { useHomeSession } from "../hooks/pages/useAuthSession";
 import type { ResumableSeat } from "../hooks/useResumableGames";
 import { LINK } from "../components/common/styles";
 
-export function Home() {
+export function Home(): ReactElement | null {
   const navigate = useNavigate();
   const { user, loading, seats, markSeatClosed } = useHomeSession();
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -31,7 +31,9 @@ export function Home() {
             helpers={
               <>
                 <button
-                  onClick={() => navigate("/login")}
+                  onClick={() => {
+                    void navigate("/login");
+                  }}
                   className="btn btn-secondary hidden sm:inline-block"
                 >
                   Log in
@@ -46,7 +48,9 @@ export function Home() {
             }
             primary={
               <button
-                onClick={() => navigate("/play")}
+                onClick={() => {
+                  void navigate("/play");
+                }}
                 className="btn btn-primary font-semibold animate-gentle-glow"
               >
                 <BarLabel desktop="Play Game" phone="Play" />

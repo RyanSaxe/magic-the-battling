@@ -4,7 +4,13 @@
  * Centralizes cancellation-safe list loading, stale-filter stamping, retry
  * handling, and pagination without `try ... finally` blocks in TSX components.
  */
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   discoverCubes,
   followCube,
@@ -55,13 +61,22 @@ export function useGameHistory(
   loadGames: LoadGames,
   initialFilters: GameFilters,
   onLoadMoreError: () => void,
-) {
+): {
+  filters: GameFilters;
+  change: (update: Partial<GameFilters>) => void;
+  current: LoadedHistoryGames | null;
+  failed: boolean;
+  retry: () => void;
+  loadingMore: boolean;
+  loadMore: () => Promise<void>;
+} {
   const [filters, setFilters] = useState<GameFilters>(initialFilters);
   const [loaded, setLoaded] = useState<LoadedHistoryGames | null>(null);
   const [failedFilters, setFailedFilters] = useState<GameFilters | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (attempt < 0) return undefined;
     let cancelled = false;
     loadGames(filters, 0)
       .then((page) => {
@@ -76,7 +91,7 @@ export function useGameHistory(
       .catch(() => {
         if (!cancelled) setFailedFilters(filters);
       });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [filters, loadGames, attempt]);
@@ -134,7 +149,20 @@ interface LoadedDashboardGames {
   totalWins: number;
 }
 
-export function useDashboardGames(user: unknown, onLoadMoreError: () => void) {
+export function useDashboardGames(
+  user: unknown,
+  onLoadMoreError: () => void,
+): {
+  searchText: string;
+  setSearchText: Dispatch<SetStateAction<string>>;
+  search: string;
+  current: LoadedDashboardGames | null;
+  shown: LoadedDashboardGames | null;
+  failed: boolean;
+  retry: () => void;
+  loadingMore: boolean;
+  loadMore: () => Promise<void>;
+} {
   const [searchText, setSearchText] = useState("");
   const search = useDebouncedValue(searchText.trim(), SEARCH_DELAY_MS);
   const [loaded, setLoaded] = useState<LoadedDashboardGames | null>(null);
@@ -142,7 +170,7 @@ export function useDashboardGames(user: unknown, onLoadMoreError: () => void) {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || attempt < 0) return undefined;
     let cancelled = false;
     getMyGames(0, search)
       .then((data) => {
@@ -158,7 +186,7 @@ export function useDashboardGames(user: unknown, onLoadMoreError: () => void) {
       .catch(() => {
         if (!cancelled) setFailedSearch(search);
       });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [user, search, attempt]);
@@ -217,7 +245,20 @@ interface LoadedCubes {
 export function useDashboardDiscover(
   user: unknown,
   onError: (msg: string) => void,
-) {
+): {
+  searchText: string;
+  setSearchText: Dispatch<SetStateAction<string>>;
+  search: string;
+  current: LoadedCubes | null;
+  shown: LoadedCubes | null;
+  failed: boolean;
+  retry: () => void;
+  loadingMore: boolean;
+  loadMore: () => Promise<void>;
+  follows: Follows;
+  follow: (result: DiscoverResult) => Promise<void>;
+  unfollow: (cubeId: string) => Promise<void>;
+} {
   const [searchText, setSearchText] = useState("");
   const search = useDebouncedValue(searchText.trim(), SEARCH_DELAY_MS);
   const [loaded, setLoaded] = useState<LoadedCubes | null>(null);
@@ -226,7 +267,7 @@ export function useDashboardDiscover(
   const [follows, setFollows] = useState<Follows>(NO_FOLLOWS);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) return undefined;
     let cancelled = false;
     getFollowing(0)
       .then((page) => {
@@ -235,13 +276,13 @@ export function useDashboardDiscover(
       .catch(() => {
         // Without the first Following page, unfollowing still finds the follow by paging Following then.
       });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [user]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || attempt < 0) return undefined;
     let cancelled = false;
     discoverCubes(0, search)
       .then((data) => {
@@ -257,7 +298,7 @@ export function useDashboardDiscover(
       .catch(() => {
         if (!cancelled) setFailedSearch(search);
       });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [user, search, attempt]);

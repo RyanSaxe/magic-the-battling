@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { FIELD_SURFACE } from "../common/styles";
 
 /** A search field styled like the dashboard's join code box, with a button that clears it. */
@@ -14,10 +15,9 @@ export function SearchBox({
   value: string;
   onChange: (value: string) => void;
   className?: string;
-}) {
+}): ReactElement {
   return (
-    <div
-      role="search"
+    <search
       className={`flex h-9 items-center rounded-md ${FIELD_SURFACE} pl-2.5 pr-1 ${className ?? ""}`}
     >
       <input
@@ -38,6 +38,6 @@ export function SearchBox({
           ✕
         </button>
       )}
-    </div>
+    </search>
   );
 }

@@ -48,7 +48,37 @@ function initialSpectateState(gameId: string): SpectateState {
   return { kind: "waiting", target: saved.target, requestId: saved.requestId };
 }
 
-export function useSpectateRequest(gameId: string) {
+export interface SpectateRequestControls {
+  state: SpectateState;
+  request: (target: string, spectatorName: string) => Promise<void>;
+  cancel: () => void;
+  dismiss: () => void;
+  connectionEnded: (error: AppError) => void;
+}
+
+function getSavedSpectate(state: SpectateState): {
+  target: string | null;
+  requestId: string | null;
+  sessionId: string | null;
+} {
+  if (state.kind === "watching") {
+    return {
+      target: state.target,
+      requestId: state.requestId,
+      sessionId: state.sessionId,
+    };
+  }
+  if (state.kind === "waiting") {
+    return {
+      target: state.target,
+      requestId: state.requestId,
+      sessionId: null,
+    };
+  }
+  return { target: null, requestId: null, sessionId: null };
+}
+
+export function useSpectateRequest(gameId: string): SpectateRequestControls {
   const [stored, setStored] = useState(() => ({
     gameId,
     state: initialSpectateState(gameId),
@@ -61,15 +91,15 @@ export function useSpectateRequest(gameId: string) {
     [gameId],
   );
 
-  const saved =
-    state.kind === "waiting" || state.kind === "watching" ? state : null;
-  const savedTarget = saved?.target ?? null;
-  const savedRequestId = saved?.requestId ?? null;
-  const savedSessionId = state.kind === "watching" ? state.sessionId : null;
+  const {
+    target: savedTarget,
+    requestId: savedRequestId,
+    sessionId: savedSessionId,
+  } = getSavedSpectate(state);
   useEffect(() => {
     if (!savedTarget || !savedRequestId) {
       clearTabSpectate(gameId);
-      return;
+      return undefined;
     }
     saveTabSpectate(gameId, {
       target: savedTarget,
@@ -77,7 +107,7 @@ export function useSpectateRequest(gameId: string) {
       sessionId: savedSessionId,
     });
     // A reload never unmounts the page, so only leaving it within the app clears what it saved.
-    return () => clearTabSpectate(gameId);
+    return (): void => clearTabSpectate(gameId);
   }, [gameId, savedTarget, savedRequestId, savedSessionId]);
 
   const request = useCallback(
@@ -105,15 +135,14 @@ export function useSpectateRequest(gameId: string) {
     [gameId, state.kind, setState],
   );
 
-  const waitingFor = state.kind === "waiting" ? state : null;
-  const waitingTarget = waitingFor?.target;
-  const waitingRequestId = waitingFor?.requestId;
+  const waitingTarget = state.kind === "waiting" ? state.target : null;
+  const waitingRequestId = state.kind === "waiting" ? state.requestId : null;
   useEffect(() => {
-    if (!waitingTarget || !waitingRequestId) return;
+    if (!waitingTarget || !waitingRequestId) return undefined;
     let stopped = false;
     let timeout: number | null = null;
 
-    const poll = async () => {
+    const poll = async (): Promise<void> => {
       try {
         const result = await getSpectateRequestStatus(gameId, waitingRequestId);
         if (stopped) return;
@@ -148,9 +177,9 @@ export function useSpectateRequest(gameId: string) {
     };
     void poll();
 
-    return () => {
+    return (): void => {
       stopped = true;
-      if (timeout != null) clearTimeout(timeout);
+      if (timeout !== null) clearTimeout(timeout);
     };
   }, [gameId, waitingTarget, waitingRequestId, setState]);
 
@@ -176,13 +205,12 @@ export function useSpectateRequest(gameId: string) {
   /** React to the server ending the spectator's connection, which no reload can bring back. */
   const connectionEnded = useCallback(
     (error: AppError) => {
-      if (state.kind === "watching")
+      if (state.kind === "watching") {
         setState({ kind: "ended", target: state.target, error });
+      }
     },
     [state, setState],
   );
 
   return { state, request, cancel, dismiss, connectionEnded };
 }
-
-export type SpectateRequestControls = ReturnType<typeof useSpectateRequest>;

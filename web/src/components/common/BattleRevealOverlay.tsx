@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactElement } from "react";
 import { useThreePhaseOverlay } from "../../hooks/ui/useOverlayAnimations";
 import { Card } from "../card";
 import type { Card as CardType } from "../../types";
@@ -23,7 +23,7 @@ export function BattleRevealOverlay({
   playerName,
   selfName,
   onComplete,
-}: BattleRevealOverlayProps) {
+}: BattleRevealOverlayProps): ReactElement {
   const phase = useThreePhaseOverlay(REVEAL_OVERLAY_TIMINGS, onComplete);
 
   const dims = useMemo(() => {

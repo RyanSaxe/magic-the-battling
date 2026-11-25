@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 export type TagTone = "gold" | "stone" | "muted" | "crimson" | "emerald";
 
@@ -24,7 +24,7 @@ export function Tag({
   title?: string;
   className?: string;
   children: ReactNode;
-}) {
+}): ReactElement {
   const classes = [
     "tag",
     `tag-${tone}`,

@@ -2,24 +2,30 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { gameBootstrap } from "../../../e2e/gameStates";
-import type { PlayerView } from "../../types";
+import { hydrateGameState } from "../../utils/catalogHydration";
 import { PlayerDetailPanel } from "./PlayerDetailPanel";
 
 // Cards read matchMedia when they're imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  });
 });
 
 afterEach(cleanup);
 
-function scoutBob(phase: "build" | "battle", odds: number) {
-  const players = gameBootstrap({ phase, counts: {} }).state
-    .players as unknown as PlayerView[];
+function scoutBob(phase: "build" | "battle", odds: number): void {
+  const bootstrap = gameBootstrap({ phase, counts: {} });
+  const players = hydrateGameState(bootstrap.state, bootstrap.catalog).players;
   const bob = { ...players[1], pairing_probability: odds };
   render(
     <PlayerDetailPanel

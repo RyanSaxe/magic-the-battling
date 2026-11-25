@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 interface InfoIconProps {
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -9,7 +11,10 @@ const sizes = {
   lg: 20,
 };
 
-export function InfoIcon({ size = "sm", className = "" }: InfoIconProps) {
+export function InfoIcon({
+  size = "sm",
+  className = "",
+}: InfoIconProps): ReactElement {
   const px = sizes[size];
   return (
     <svg

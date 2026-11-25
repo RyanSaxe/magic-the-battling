@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { COMPACT_BANNER_HEIGHT, GAME_BANNER_HEIGHT } from "./bannerSizes";
 import { POPOVER_CHROME } from "./styles";
 
@@ -29,7 +30,7 @@ export function Banner({
   size = "game",
   note,
   info,
-}: BannerProps) {
+}: BannerProps): ReactElement {
   const compact = size === "compact";
   return (
     <div

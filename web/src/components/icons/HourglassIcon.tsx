@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 interface HourglassIconProps {
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -12,7 +14,7 @@ const sizes = {
 export function HourglassIcon({
   size = "md",
   className = "",
-}: HourglassIconProps) {
+}: HourglassIconProps): ReactElement {
   const px = sizes[size];
   return (
     <svg

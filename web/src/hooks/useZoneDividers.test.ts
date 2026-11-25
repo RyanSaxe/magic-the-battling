@@ -16,18 +16,30 @@ const config = buildLayoutConfig({
   upgradeRailCount: 0,
 });
 
+interface FrameHeights {
+  hand: number;
+  battlefield: number;
+  sideboard: number;
+}
+
 /** The dividers of a board drawn with a saved layout, wired to a drag the way useResizableLayout wires them. */
 function dividersFor(
   saved: ZoneConstraints | null,
   layoutConfig: CardLayoutConfig = config,
   board = BOARD,
-) {
+): {
+  grab: (divider: keyof DividerCallbacks, deltas: number[]) => void;
+  writes: ZoneConstraints[];
+  rendered: ReturnType<typeof layoutForContainer>;
+  before: FrameHeights;
+  frameHeights: (constraints: ZoneConstraints | null) => FrameHeights;
+} {
   const rendered = layoutForContainer(board.width, board.height, {
     ...layoutConfig,
     constraints: saved,
   });
   const writes: ZoneConstraints[] = [];
-  const save = (constraints: ZoneConstraints) => {
+  const save = (constraints: ZoneConstraints): void => {
     writes.push(constraints);
   };
   const { result } = renderHook(() => {
@@ -43,15 +55,16 @@ function dividersFor(
       onConstraintsClear: () => {},
     });
   });
-  const grab = (divider: keyof DividerCallbacks, deltas: number[]) => {
-    const handle = result.current[divider]!;
+  const grab = (divider: keyof DividerCallbacks, deltas: number[]): void => {
+    const handle = result.current[divider];
+    if (!handle) throw new Error(`Expected ${divider} handle`);
     act(() => {
       handle.onDragStart();
       for (const delta of deltas) handle.onDrag(delta);
       handle.onDragEnd();
     });
   };
-  const frameHeights = (constraints: ZoneConstraints | null) => {
+  const frameHeights = (constraints: ZoneConstraints | null): FrameHeights => {
     const { frames } = layoutForContainer(board.width, board.height, {
       ...layoutConfig,
       constraints,

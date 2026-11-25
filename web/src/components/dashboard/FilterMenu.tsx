@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactElement, type ReactNode } from "react";
 import { useDocumentEvent, useLayoutMeasure } from "../../hooks/useDomEffects";
 import { useHotkeys } from "../../hooks/useHotkeys";
 import { BoardBackdrop } from "../common/BoardBackdrop";
@@ -12,7 +12,7 @@ export function FilterMenu({
 }: {
   shown: string;
   children: ReactNode;
-}) {
+}): ReactElement {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -23,8 +23,7 @@ export function FilterMenu({
   useLayoutMeasure(
     panelRef,
     (panel) => panel.scrollIntoView({ block: "nearest" }),
-    [],
-    open,
+    { enabled: open },
   );
 
   useDocumentEvent(
@@ -97,7 +96,7 @@ export function FilterGroup({
 }: {
   title: string;
   children: ReactNode;
-}) {
+}): ReactElement {
   return (
     <div>
       <div className={`${SECTION_TITLE_TYPE} mb-1.5 text-[var(--ivory-muted)]`}>

@@ -15,11 +15,16 @@ function sessionKey(gameId: string): string {
   return `${SESSION_KEY_PREFIX}${gameId}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function parseSession(raw: string | null): TabSession | null {
   if (!raw) return null;
   try {
-    const value = JSON.parse(raw) as Partial<TabSession>;
+    const value: unknown = JSON.parse(raw);
     if (
+      isRecord(value) &&
       typeof value.sessionId === "string" &&
       typeof value.playerId === "string"
     ) {
@@ -91,8 +96,9 @@ export function readTabSpectate(gameId: string): TabSpectate | null {
   const raw = sessionStorage.getItem(spectateKey(gameId));
   if (!raw) return null;
   try {
-    const value = JSON.parse(raw) as Partial<TabSpectate>;
+    const value: unknown = JSON.parse(raw);
     if (
+      isRecord(value) &&
       typeof value.target === "string" &&
       typeof value.requestId === "string"
     ) {

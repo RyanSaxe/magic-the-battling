@@ -13,8 +13,9 @@ export async function joinLobbyByCode(
   const joinCode = typedCode.replace(/\s/g, "").toUpperCase();
   // This browser already holds that seat: the lobby page takes it back with the seat token.
   const heldSeat = findRememberedSeatByJoinCode(joinCode);
-  if (heldSeat && heldSeat.name === playerName)
+  if (heldSeat && heldSeat.name === playerName) {
     return `/game/${heldSeat.gameId}/lobby`;
+  }
 
   const response = await joinGame(joinCode, playerName);
   saveTabSession(response.game_id, {

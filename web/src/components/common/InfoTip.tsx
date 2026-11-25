@@ -1,8 +1,14 @@
-import { useId, useRef, useState, type CSSProperties } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from "react";
 import { createPortal } from "react-dom";
 import { useEscapeKey, useWindowEvent } from "../../hooks/useDomEffects";
 import { InfoIcon } from "../icons/InfoIcon";
-import { usePanelHoldsEnter } from "../../utils/enterKey";
+import { usePanelHoldsEnter } from "../../hooks/usePanelHoldsEnter";
 import { BoardBackdrop } from "./BoardBackdrop";
 import { POPOVER_CHROME } from "./styles";
 
@@ -22,7 +28,13 @@ function placeBeside(anchor: DOMRect): CSSProperties {
 }
 
 /** An ⓘ that explains the setting beside it on hover or focus, and until the next press when clicked or tapped. */
-export function InfoTip({ label, text }: { label: string; text: string }) {
+export function InfoTip({
+  label,
+  text,
+}: {
+  label: string;
+  text: string;
+}): ReactElement {
   const id = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -33,7 +45,7 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
   const isOpen = tip !== null;
   usePanelHoldsEnter(!!tip?.pinned);
 
-  const show = (pinned: boolean) => {
+  const show = (pinned: boolean): void => {
     const button = buttonRef.current;
     if (!button) return;
     const placement = placeBeside(button.getBoundingClientRect());
@@ -48,8 +60,9 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
       if (
         buttonRef.current?.contains(target) ||
         backdropRef.current?.contains(target)
-      )
+      ) {
         return;
+      }
       setTip(null);
     },
     { enabled: isOpen },
@@ -83,8 +96,9 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
             event.pointerType === "mouse" &&
             !tip?.pinned &&
             document.activeElement !== buttonRef.current
-          )
+          ) {
             setTip(null);
+          }
         }}
         className="icon-target"
       >

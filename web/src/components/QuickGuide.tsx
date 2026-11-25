@@ -1,4 +1,12 @@
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FaDiscord } from "react-icons/fa6";
 import { DOCS, getPhaseDoc, type DocEntry } from "../docs";
 import { useQuickGuideEffects } from "../hooks/ui/useDialogBehavior";
@@ -82,6 +90,33 @@ function tipsSectionLabel(section: TipsSection): string {
   return section === "global" ? "General" : getPhaseTipsLabel(section);
 }
 
+const BROWSE_DETAIL_LABELS: Record<CardType, string | null> = {
+  cards: null,
+  upgrades: "Upgrades",
+  vanguards: "Vanguards",
+};
+
+const STATIC_DOC_TARGETS: Record<string, ResolvedTarget> = {
+  __cards__: { tab: "browse" },
+  "game-pieces": { tab: "guide", guideSection: "game-pieces" },
+  "winning-the-game": { tab: "faq", faqSlug: FINALS_FAQ_SLUG },
+  "non-human-players": { tab: "faq", faqSlug: FACE_UP_FAQ_SLUG },
+  overview: { tab: "guide", guideSection: "overview" },
+  "quick-overview": { tab: "guide", guideSection: "overview" },
+};
+
+const HEADER_TABS: SegmentOption<HeaderTab>[] = [
+  { value: "guide", label: "Rules" },
+  { value: "controls", label: "Controls" },
+  { value: "tips", label: "Tips" },
+  { value: "browse", label: "Cards" },
+  { value: "faq", label: "FAQ" },
+];
+
+function findPhase(value: string): Phase | undefined {
+  return PHASES.find((phase) => phase === value);
+}
+
 function buildLocationLabel({
   activeTab,
   guideSection,
@@ -115,12 +150,7 @@ function buildLocationLabel({
       break;
     case "browse":
       tabLabel = "Cards";
-      detail =
-        cardType === "cards"
-          ? null
-          : cardType === "upgrades"
-            ? "Upgrades"
-            : "Vanguards";
+      detail = BROWSE_DETAIL_LABELS[cardType];
       break;
     case "faq":
       tabLabel = "FAQ";
@@ -162,67 +192,55 @@ function normalizeFaqSlug(raw?: string): string | undefined {
   return slug;
 }
 
+function resolvePhaseTarget(
+  phase: Phase,
+  normalizedTab: string,
+): ResolvedTarget {
+  if (normalizedTab === "controls") {
+    return { tab: "controls", controlsSection: phase };
+  }
+  if (normalizedTab === "tips") {
+    return { tab: "tips", tipsSection: phase };
+  }
+  return { tab: "guide", guideSection: phase };
+}
+
 function resolveTarget(docId?: string, tab?: string): ResolvedTarget {
   const normalizedDocId = (docId ?? "").toLowerCase();
   const normalizedTab = (tab ?? "").toLowerCase();
-  const phaseMatch = PHASES.find((phase) => phase === normalizedDocId);
 
-  if (!normalizedDocId) {
-    return { tab: "guide", guideSection: "overview" };
+  const staticTarget = STATIC_DOC_TARGETS[normalizedDocId];
+  if (staticTarget) {
+    return staticTarget;
   }
 
-  if (normalizedDocId === "__cards__") {
-    return { tab: "browse" };
-  }
-
+  const phaseMatch = findPhase(normalizedDocId);
   if (phaseMatch) {
-    if (normalizedTab === "controls") {
-      return { tab: "controls", controlsSection: phaseMatch };
-    }
-    if (normalizedTab === "tips") {
-      return { tab: "tips", tipsSection: phaseMatch };
-    }
-    return { tab: "guide", guideSection: phaseMatch };
+    return resolvePhaseTarget(phaseMatch, normalizedTab);
   }
 
   if (normalizedDocId === "controls") {
-    if (normalizedTab && PHASES.includes(normalizedTab as Phase)) {
-      return { tab: "controls", controlsSection: normalizedTab as Phase };
-    }
-    return { tab: "controls", controlsSection: "global" };
+    return {
+      tab: "controls",
+      controlsSection: findPhase(normalizedTab) ?? "global",
+    };
   }
 
   if (normalizedDocId === "tips") {
-    if (normalizedTab && PHASES.includes(normalizedTab as Phase)) {
-      return { tab: "tips", tipsSection: normalizedTab as Phase };
-    }
-    return { tab: "tips", tipsSection: "global" };
-  }
-
-  if (normalizedDocId === "game-pieces") {
-    return { tab: "guide", guideSection: "game-pieces" };
-  }
-
-  if (normalizedDocId === "winning-the-game") {
-    return { tab: "faq", faqSlug: FINALS_FAQ_SLUG };
-  }
-
-  if (normalizedDocId === "non-human-players") {
-    return { tab: "faq", faqSlug: FACE_UP_FAQ_SLUG };
+    return {
+      tab: "tips",
+      tipsSection: findPhase(normalizedTab) ?? "global",
+    };
   }
 
   if (normalizedDocId === "faq") {
     return { tab: "faq", faqSlug: normalizeFaqSlug(normalizedTab) };
   }
 
-  if (normalizedDocId === "overview" || normalizedDocId === "quick-overview") {
-    return { tab: "guide", guideSection: "overview" };
-  }
-
   return { tab: "guide", guideSection: "overview" };
 }
 
-function scrollToLinkTarget(page: HTMLElement, anchor?: string) {
+function scrollToLinkTarget(page: HTMLElement, anchor?: string): void {
   const heading = anchor
     ? Array.from(page.querySelectorAll("h2")).find(
         (h2) => toSlug(h2.textContent ?? "") === anchor,
@@ -253,15 +271,15 @@ function Book<T extends string>({
   pages: BookPage<T>[];
   openId: T;
   onOpen: (id: T) => void;
-  pageRef: React.Ref<HTMLDivElement>;
-}) {
+  pageRef: Ref<HTMLDivElement>;
+}): ReactNode {
   const [contentsOpen, setContentsOpen] = useState(false);
   const contentsId = useId();
   const index = pages.findIndex((page) => page.id === openId);
   const page = pages[index];
   const next = pages[index + 1];
 
-  const turnTo = (id: T) => {
+  const turnTo = (id: T): void => {
     onOpen(id);
     setContentsOpen(false);
   };
@@ -384,7 +402,7 @@ function buildPhaseGuideContent(doc: DocEntry): string {
   return additional ? `${overview}\n\n${additional}` : overview;
 }
 
-function docBody(content: string | undefined, missing: string) {
+function docBody(content: string | undefined, missing: string): ReactNode {
   return content ? (
     <DocRenderer content={content} />
   ) : (
@@ -392,7 +410,7 @@ function docBody(content: string | undefined, missing: string) {
   );
 }
 
-function PhaseControlsContent({ phase }: { phase: Phase }) {
+function PhaseControlsContent({ phase }: { phase: Phase }): ReactNode {
   const phaseDoc = getPhaseDoc(phase);
   const controlsMarkdown = phaseDoc?.parsed.sections["controls"];
   const hotkeys = canHover ? (PHASE_HOTKEYS[phase] ?? []) : [];
@@ -437,6 +455,187 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
   );
 }
 
+function extractFaqEntries(faqDoc: DocEntry | undefined): FaqEntry[] {
+  if (!faqDoc) {
+    return [];
+  }
+  const titleBySection = getH2TitleMap(faqDoc.raw);
+  const sectionEntries = faqDoc.parsed.sectionOrder
+    .filter((sectionKey) => sectionKey !== "overview")
+    .map((sectionKey) => {
+      const answer = faqDoc.parsed.sections[sectionKey]?.trim() ?? "";
+      if (!answer) {
+        return null;
+      }
+      const question = titleBySection.get(sectionKey) ?? sectionKey;
+      return { question, answer };
+    })
+    .filter(
+      (entry): entry is { question: string; answer: string } => entry !== null,
+    );
+
+  const fallbackEntries =
+    sectionEntries.length > 0
+      ? sectionEntries
+      : parseFaqPairs(faqDoc.parsed.sections["overview"] ?? faqDoc.parsed.body);
+
+  return fallbackEntries.map((pair) => ({
+    question: pair.question,
+    answer: pair.answer,
+    slug: toSlug(pair.question),
+  }));
+}
+
+function buildGuidePages(
+  quickOverviewDoc: DocEntry | undefined,
+  gamePiecesDoc: DocEntry | undefined,
+): BookPage<GuideSection>[] {
+  return GUIDE_SECTIONS.map((id) => {
+    const title = guideSectionLabel(id);
+    if (id === "overview") {
+      const content =
+        quickOverviewDoc && buildPhaseGuideContent(quickOverviewDoc);
+      return {
+        id,
+        title,
+        body: docBody(content, "Overview content not found."),
+      };
+    }
+    if (id === "game-pieces") {
+      return {
+        id,
+        title,
+        body: docBody(
+          gamePiecesDoc?.parsed.body,
+          "Game pieces content not found.",
+        ),
+      };
+    }
+    const phaseDoc = getPhaseDoc(id);
+    const content = phaseDoc && buildPhaseGuideContent(phaseDoc);
+    return {
+      id,
+      title,
+      body: docBody(content, "Rules are not defined for this phase yet."),
+    };
+  });
+}
+
+function buildControlsPages(
+  controlsDoc: DocEntry | undefined,
+): BookPage<ControlsSection>[] {
+  return CONTROLS_SECTIONS.map((id) => ({
+    id,
+    title: controlsSectionLabel(id),
+    body:
+      id === "global" ? (
+        docBody(controlsDoc?.parsed.body, "Controls content not found.")
+      ) : (
+        <PhaseControlsContent phase={id} />
+      ),
+  }));
+}
+
+function buildTipsPages(
+  tipsDoc: DocEntry | undefined,
+): BookPage<TipsSection>[] {
+  return TIPS_SECTIONS.map((id) => ({
+    id,
+    title: tipsSectionLabel(id),
+    body: docBody(
+      tipsDoc?.parsed.sections[id],
+      id === "global"
+        ? "Global tips are not defined yet."
+        : "Tips are not defined for this phase yet.",
+    ),
+  }));
+}
+
+function buildCardTypes(
+  useUpgrades: boolean | undefined,
+  useVanguards: boolean | undefined,
+): SegmentOption<CardType>[] {
+  const options: SegmentOption<CardType>[] = [
+    { value: "cards", label: "Cards" },
+  ];
+  if (useUpgrades !== false) {
+    options.push({ value: "upgrades", label: "Upgrades" });
+  }
+  if (useVanguards) {
+    options.push({ value: "vanguards", label: "Vanguards" });
+  }
+  return options;
+}
+
+function BrowseCardsTab({
+  gameId,
+  playerName,
+  cardType,
+  cardTypes,
+  onCardTypeChange,
+}: {
+  gameId?: string;
+  playerName?: string;
+  cardType: CardType;
+  cardTypes: SegmentOption<CardType>[];
+  onCardTypeChange: (value: CardType) => void;
+}): ReactNode {
+  if (!gameId) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-[var(--ivory-muted)] text-center py-8 text-sm">
+        Join a game to browse cards.
+      </div>
+    );
+  }
+  return (
+    <div className="guide-cards-frame">
+      <div className="guide-cards flex h-full flex-col min-h-0 px-4 pt-3">
+        <SegmentedFilter
+          label="Card list"
+          options={cardTypes}
+          value={cardType}
+          onChange={onCardTypeChange}
+          className="mb-2 shrink-0 self-start"
+        />
+        <CardsView
+          gameId={gameId}
+          which={cardType === "vanguards" ? "cards" : cardType}
+          playerName={playerName}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FaqTab({
+  faqPages,
+  faqSlug,
+  onSelectSlug,
+  pageRef,
+}: {
+  faqPages: BookPage<string>[];
+  faqSlug: string;
+  onSelectSlug: (slug: string) => void;
+  pageRef: Ref<HTMLDivElement>;
+}): ReactNode {
+  if (faqPages.length === 0) {
+    return (
+      <p className="flex-1 px-4 py-3 text-sm text-[var(--ivory-muted)]">
+        FAQ content not found.
+      </p>
+    );
+  }
+  return (
+    <Book
+      key="faq"
+      pages={faqPages}
+      openId={faqSlug}
+      onOpen={onSelectSlug}
+      pageRef={pageRef}
+    />
+  );
+}
+
 export function QuickGuide({
   initialDocId,
   initialTab,
@@ -445,45 +644,14 @@ export function QuickGuide({
   useUpgrades,
   useVanguards,
   onLocationChange,
-}: QuickGuideProps) {
+}: QuickGuideProps): ReactNode {
   const quickOverviewDoc = DOCS.find((d) => d.id === "quick-overview");
   const gamePiecesDoc = DOCS.find((d) => d.id === "game-pieces");
   const controlsDoc = DOCS.find((d) => d.id === "controls");
   const tipsDoc = DOCS.find((d) => d.id === "tips");
   const faqDoc = DOCS.find((d) => d.id === "faq");
 
-  const faqEntries = useMemo<FaqEntry[]>(() => {
-    if (!faqDoc) {
-      return [];
-    }
-    const titleBySection = getH2TitleMap(faqDoc.raw);
-    const sectionEntries = faqDoc.parsed.sectionOrder
-      .filter((sectionKey) => sectionKey !== "overview")
-      .map((sectionKey) => {
-        const answer = faqDoc.parsed.sections[sectionKey]?.trim() ?? "";
-        if (!answer) {
-          return null;
-        }
-        const question = titleBySection.get(sectionKey) ?? sectionKey;
-        return { question, answer };
-      })
-      .filter(
-        (entry): entry is { question: string; answer: string } =>
-          entry !== null,
-      );
-
-    const fallbackEntries =
-      sectionEntries.length > 0
-        ? sectionEntries
-        : parseFaqPairs(
-            faqDoc.parsed.sections["overview"] ?? faqDoc.parsed.body,
-          );
-
-    return fallbackEntries.map((pair) => ({
-      ...pair,
-      slug: toSlug(pair.question),
-    }));
-  }, [faqDoc]);
+  const faqEntries = useMemo(() => extractFaqEntries(faqDoc), [faqDoc]);
 
   const getFaqSlug = useCallback(
     (rawSlug?: string) => {
@@ -546,31 +714,13 @@ export function QuickGuide({
 
   const docNav = useMemo(
     () => ({
-      navigate: (docId: string, tab?: string) => {
+      navigate: (docId: string, tab?: string): void => {
         applyTarget(docId, tab);
         setLinkJump({ anchor: tab });
       },
     }),
     [applyTarget],
   );
-
-  const headerTabs: SegmentOption<HeaderTab>[] = [
-    { value: "guide", label: "Rules" },
-    { value: "controls", label: "Controls" },
-    { value: "tips", label: "Tips" },
-    { value: "browse", label: "Cards" },
-    { value: "faq", label: "FAQ" },
-  ];
-
-  const cardTypes: SegmentOption<CardType>[] = [
-    { value: "cards", label: "Cards" },
-    ...(useUpgrades !== false
-      ? [{ value: "upgrades", label: "Upgrades" } as const]
-      : []),
-    ...(useVanguards
-      ? [{ value: "vanguards", label: "Vanguards" } as const]
-      : []),
-  ];
 
   const faqQuestion = faqEntries.find(
     (entry) => entry.slug === faqSlug,
@@ -593,63 +743,15 @@ export function QuickGuide({
     onLocationChange,
   });
 
-  const guidePages = GUIDE_SECTIONS.map((id) => {
-    const title = guideSectionLabel(id);
-    if (id === "overview") {
-      const content =
-        quickOverviewDoc && buildPhaseGuideContent(quickOverviewDoc);
-      return {
-        id,
-        title,
-        body: docBody(content, "Overview content not found."),
-      };
-    }
-    if (id === "game-pieces") {
-      return {
-        id,
-        title,
-        body: docBody(
-          gamePiecesDoc?.parsed.body,
-          "Game pieces content not found.",
-        ),
-      };
-    }
-    const phaseDoc = getPhaseDoc(id);
-    const content = phaseDoc && buildPhaseGuideContent(phaseDoc);
-    return {
-      id,
-      title,
-      body: docBody(content, "Rules are not defined for this phase yet."),
-    };
-  });
-
-  const controlsPages = CONTROLS_SECTIONS.map((id) => ({
-    id,
-    title: controlsSectionLabel(id),
-    body:
-      id === "global" ? (
-        docBody(controlsDoc?.parsed.body, "Controls content not found.")
-      ) : (
-        <PhaseControlsContent phase={id} />
-      ),
-  }));
-
-  const tipsPages = TIPS_SECTIONS.map((id) => ({
-    id,
-    title: tipsSectionLabel(id),
-    body: docBody(
-      tipsDoc?.parsed.sections[id],
-      id === "global"
-        ? "Global tips are not defined yet."
-        : "Tips are not defined for this phase yet.",
-    ),
-  }));
-
+  const guidePages = buildGuidePages(quickOverviewDoc, gamePiecesDoc);
+  const controlsPages = buildControlsPages(controlsDoc);
+  const tipsPages = buildTipsPages(tipsDoc);
   const faqPages = faqEntries.map(({ slug, question, answer }) => ({
     id: slug,
     title: question,
     body: <DocRenderer content={answer} />,
   }));
+  const cardTypes = buildCardTypes(useUpgrades, useVanguards);
 
   return (
     <DocNavContext.Provider value={docNav}>
@@ -657,7 +759,7 @@ export function QuickGuide({
         <div className="shrink-0 overflow-x-auto overscroll-contain px-3 py-3">
           <SegmentedFilter
             label="Guide tab"
-            options={headerTabs}
+            options={HEADER_TABS}
             value={activeTab}
             onChange={setActiveTab}
             className="min-w-max"
@@ -694,45 +796,24 @@ export function QuickGuide({
           />
         )}
 
-        {activeTab === "browse" && gameId && (
-          <div className="guide-cards-frame">
-            <div className="guide-cards flex h-full flex-col min-h-0 px-4 pt-3">
-              <SegmentedFilter
-                label="Card list"
-                options={cardTypes}
-                value={cardType}
-                onChange={setCardType}
-                className="mb-2 shrink-0 self-start"
-              />
-              <CardsView
-                gameId={gameId}
-                which={cardType === "vanguards" ? "cards" : cardType}
-                playerName={playerName}
-              />
-            </div>
-          </div>
+        {activeTab === "browse" && (
+          <BrowseCardsTab
+            gameId={gameId}
+            playerName={playerName}
+            cardType={cardType}
+            cardTypes={cardTypes}
+            onCardTypeChange={setCardType}
+          />
         )}
 
-        {activeTab === "browse" && !gameId && (
-          <div className="flex-1 flex items-center justify-center text-[var(--ivory-muted)] text-center py-8 text-sm">
-            Join a game to browse cards.
-          </div>
+        {activeTab === "faq" && (
+          <FaqTab
+            faqPages={faqPages}
+            faqSlug={faqSlug}
+            onSelectSlug={setFaqSlug}
+            pageRef={pageRef}
+          />
         )}
-
-        {activeTab === "faq" &&
-          (faqPages.length > 0 ? (
-            <Book
-              key="faq"
-              pages={faqPages}
-              openId={faqSlug}
-              onOpen={setFaqSlug}
-              pageRef={pageRef}
-            />
-          ) : (
-            <p className="flex-1 px-4 py-3 text-sm text-[var(--ivory-muted)]">
-              FAQ content not found.
-            </p>
-          ))}
 
         <div className="shrink-0 px-4 py-3.5 border-t gold-divider">
           <div className="flex items-center justify-between gap-3">

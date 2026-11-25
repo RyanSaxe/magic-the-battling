@@ -1,10 +1,16 @@
 import { devices } from "@playwright/test";
-import { expect, serveWithoutBackend, swipeIntoView, test } from "./helpers";
+import {
+  expect,
+  requireBaseUrl,
+  serveWithoutBackend,
+  swipeIntoView,
+  test,
+} from "./helpers";
 
 test.use(devices["iPhone SE"]);
 
 test.beforeEach(async ({ page, baseURL }) => {
-  await serveWithoutBackend(page, baseURL!);
+  await serveWithoutBackend(page, requireBaseUrl(baseURL));
   await page.goto("/play");
 });
 

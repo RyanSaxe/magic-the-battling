@@ -1,8 +1,9 @@
+import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { NoticeFrame } from "../components/common/NoticeFrame";
 import { StatusNotice } from "../components/common/StatusNotice";
 
-export function NotFound() {
+export function NotFound(): ReactElement {
   const navigate = useNavigate();
   return (
     <NoticeFrame>
@@ -11,13 +12,17 @@ export function NotFound() {
         actions={
           <>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => {
+                void navigate("/");
+              }}
               className="btn btn-primary flex-1 py-2"
             >
               Home
             </button>
             <button
-              onClick={() => navigate("/play")}
+              onClick={() => {
+                void navigate("/play");
+              }}
               className="btn btn-secondary flex-1 py-2"
             >
               Play

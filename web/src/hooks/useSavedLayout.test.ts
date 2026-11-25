@@ -159,14 +159,18 @@ describe("useSavedLayout helpers", () => {
   });
 });
 
-function createStorageMock() {
+function createStorageMock(): {
+  readonly length: number;
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+} {
   const store = new Map<string, string>();
   return {
-    get length() {
+    get length(): number {
       return store.size;
     },
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => {
+    getItem: (key: string): string | null => store.get(key) ?? null,
+    setItem: (key: string, value: string): void => {
       store.set(key, value);
     },
   };

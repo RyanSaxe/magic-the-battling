@@ -43,13 +43,13 @@ function buildScalableZones(
     if (!zone) return [];
     const dims = chosen[id];
     const zAvailW = ctx.topIds.includes(id) ? topAvailWFinal : blAvailWFinal;
-    const ceiling = widthCapForRows(
-      zone.count,
-      zAvailW,
-      dims.rows,
-      zone.gap,
-      zone.maxCardWidth,
-    );
+    const ceiling = widthCapForRows({
+      count: zone.count,
+      availableWidth: zAvailW,
+      rows: dims.rows,
+      gap: zone.gap,
+      maxCardWidth: zone.maxCardWidth,
+    });
     return [
       {
         id,

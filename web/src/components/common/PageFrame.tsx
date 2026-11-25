@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import { FaDiscord } from "react-icons/fa6";
 import { CubeCobraPrimerLink } from "./CubeCobraPrimerLink";
 import { BottomBar } from "./FrameBar";
@@ -25,7 +25,11 @@ interface PageFrameProps {
 }
 
 /** A sidebar docked between the board and the right rail, inside the felt's gold edge. */
-export function FrameSidebar({ children }: { children: ReactNode }) {
+export function FrameSidebar({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement {
   return (
     <div className="frame-sidebar zone-divider-bg shrink-0 flex min-h-0">
       {children}
@@ -34,7 +38,11 @@ export function FrameSidebar({ children }: { children: ReactNode }) {
 }
 
 /** The board between the rails. It alone draws the board's gold edge, on every screen, so what fills it draws none. */
-export function FrameBoard({ children }: { children: ReactNode }) {
+export function FrameBoard({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement {
   return (
     <main
       className="flex-1 flex flex-col min-h-0 min-w-0"
@@ -57,7 +65,7 @@ export function FrameFelt({
   /** The frame the side panels open in, over the board and its sidebar and under the banner. */
   sidePanels?: ReactNode;
   children: ReactNode;
-}) {
+}): ReactElement {
   return (
     <div className="flex-1 flex min-h-0 game-surface">
       <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
@@ -83,7 +91,7 @@ export function PageFrame({
   aside,
   shelf,
   footer,
-}: PageFrameProps) {
+}: PageFrameProps): ReactElement {
   const [sidePanelHost, setSidePanelHost] = useState<HTMLElement | null>(null);
   const centerClass = center ? "page-center" : "";
   const scrollClass = scroll

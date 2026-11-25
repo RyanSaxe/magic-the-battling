@@ -63,9 +63,13 @@ describe("player placement ordering", () => {
       makePlayer({ name: "Bravo", placement: 4 }),
     ];
 
-    expect(
-      [...players].sort(comparePlayersForSidebar).map((player) => player.name),
-    ).toEqual(["Charlie", "Alpha", "Bravo"]);
+    const ordered = [...players];
+    ordered.sort(comparePlayersForSidebar);
+    expect(ordered.map((player) => player.name)).toEqual([
+      "Charlie",
+      "Alpha",
+      "Bravo",
+    ]);
   });
 
   it("gives alive players tied on poison the same place", () => {

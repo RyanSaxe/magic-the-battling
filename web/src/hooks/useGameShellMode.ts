@@ -21,12 +21,12 @@ export function useGameShellMode(): GameShellMode {
   );
 
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = (): void => {
       setMode(computeGameShellMode(window.innerWidth));
     };
 
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    return (): void => window.removeEventListener("resize", handleResize);
   }, []);
 
   return mode;

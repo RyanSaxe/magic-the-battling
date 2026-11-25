@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { OPTION_BOX } from "../common/styles";
 import { SegmentedFilter } from "./SegmentedFilter";
 
@@ -15,7 +16,7 @@ export function DefaultOpponentsField({
 }: {
   value: number;
   onChange: (count: (typeof OPPONENT_COUNTS)[number]) => void;
-}) {
+}): ReactElement {
   return (
     <div className={`${OPTION_BOX} p-3`}>
       <label className="block text-[var(--ivory-muted)] text-sm mb-2">
@@ -25,9 +26,10 @@ export function DefaultOpponentsField({
         label={LABEL}
         options={OPPONENT_OPTIONS}
         value={String(value)}
-        onChange={(count) =>
-          onChange(Number(count) as (typeof OPPONENT_COUNTS)[number])
-        }
+        onChange={(count) => {
+          const matched = OPPONENT_COUNTS.find((c) => String(c) === count);
+          if (matched !== undefined) onChange(matched);
+        }}
         className="h-9"
       />
     </div>

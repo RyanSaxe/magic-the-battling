@@ -1,4 +1,11 @@
-import { useState, useCallback, useRef, type ReactNode } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { ToastContext, type Toast, type ToastVariant } from "./toastState";
 import { POPOVER_CHROME } from "../components/common/styles";
 
@@ -44,7 +51,11 @@ const variantIcon: Record<ToastVariant, ReactNode> = {
   ),
 };
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
@@ -64,15 +75,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [removeToast],
   );
 
+  const value = useMemo(() => ({ addToast }), [addToast]);
+
   return (
-    <ToastContext.Provider value={{ addToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       {/* Below the top bar, 8px clear of the felt's 2px gold edge, rather than over the bar's buttons. */}
       <div className="fixed top-[calc(var(--frame-bar-height)+2px+0.5rem)] inset-x-0 px-3 z-[100] flex flex-col items-center gap-2 pointer-events-none">
         {toasts.map((toast) => (
-          <div
+          <output
             key={toast.id}
-            role="status"
             className={`pointer-events-auto animate-toast-fade ${POPOVER_CHROME} toast-slim is-${toast.variant}`}
           >
             <span className="toast-slim-icon" aria-hidden="true">
@@ -94,7 +106,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 />
               </svg>
             </button>
-          </div>
+          </output>
         ))}
       </div>
     </ToastContext.Provider>

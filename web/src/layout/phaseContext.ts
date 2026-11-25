@@ -71,9 +71,9 @@ export function createTracker(zoneIds: string[]): CandidateTracker {
 export function recordCandidate(
   tracker: CandidateTracker,
   candidate: CardLayoutResult,
-  score: number,
-  overflow: number,
+  metrics: { score: number; overflow: number },
 ): void {
+  const { score, overflow } = metrics;
   if (overflow > 0) {
     if (overflow < tracker.bestOverflow) {
       tracker.bestOverflow = overflow;
@@ -123,7 +123,23 @@ interface NormalizedOptions {
   minBottomRightOuterWidth: number;
 }
 
-function readSpacingOptions(config: CardLayoutConfig) {
+interface SpacingOptions {
+  fixedHeight: number;
+  padding: number;
+  sectionPadH: number;
+  sectionPadV: number;
+  sectionGap: number;
+}
+
+interface LayoutOverheads {
+  topOverhead: number;
+  blOverhead: number;
+  brOverhead: number;
+  columnGap: number;
+  lrGap: number;
+}
+
+function readSpacingOptions(config: CardLayoutConfig): SpacingOptions {
   const padTop = config.sectionPadTop ?? 0;
   const padBottom = config.sectionPadBottom ?? 0;
   return {
@@ -146,13 +162,14 @@ function readNormalizedOptions(config: CardLayoutConfig): NormalizedOptions {
   };
 }
 
-function computeOverheads(
-  topCount: number,
-  blCount: number,
-  brCount: number,
-  sectionPadV: number,
-  sectionGap: number,
-) {
+function computeOverheads(args: {
+  topCount: number;
+  blCount: number;
+  brCount: number;
+  sectionPadV: number;
+  sectionGap: number;
+}): LayoutOverheads {
+  const { topCount, blCount, brCount, sectionPadV, sectionGap } = args;
   const hasBottom = blCount > 0 || brCount > 0;
   return {
     topOverhead: topCount > 0 ? sectionPadV : 0,
@@ -189,13 +206,13 @@ export function buildContext(
   const fillTop = topZones.filter((z) => z.priority === "fill");
   const primaryBL = blZones.filter((z) => z.priority === "primary");
   const fillBL = blZones.filter((z) => z.priority === "fill");
-  const overheads = computeOverheads(
-    topIds.length,
-    blIds.length,
-    brIds.length,
-    opts.sectionPadV,
-    opts.sectionGap,
-  );
+  const overheads = computeOverheads({
+    topCount: topIds.length,
+    blCount: blIds.length,
+    brCount: brIds.length,
+    sectionPadV: opts.sectionPadV,
+    sectionGap: opts.sectionGap,
+  });
 
   return {
     zoneIds,

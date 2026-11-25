@@ -29,9 +29,12 @@ export const DOCS: DocEntry[] = Object.entries(mdModules).map(([path, raw]) => {
   return makeEntry(id, category, raw);
 });
 
-const phaseDocMap = new Map<string, DocEntry>(
-  DOCS.filter((d) => d.parsed.meta.phase).map((d) => [d.parsed.meta.phase!, d]),
-);
+const phaseDocMap = new Map<string, DocEntry>();
+for (const doc of DOCS) {
+  if (doc.parsed.meta.phase) {
+    phaseDocMap.set(doc.parsed.meta.phase, doc);
+  }
+}
 
 export function getPhaseDoc(phase: Phase): DocEntry | undefined {
   return phaseDocMap.get(phase);

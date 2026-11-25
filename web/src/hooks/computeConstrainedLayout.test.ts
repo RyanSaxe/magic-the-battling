@@ -5,21 +5,46 @@ import {
   computeConstrainedLayoutState,
   deriveConstraintsFromLayout,
 } from "./computeConstrainedLayout";
-import { computeLayout, ZONE_LAYOUT_PADDING } from "./useCardLayout";
+import {
+  computeLayout,
+  ZONE_LAYOUT_PADDING,
+  type CardLayoutConfig,
+} from "./useCardLayout";
 import { CARD_ASPECT_RATIO } from "./cardSizeUtils";
+
+function buildSweepConfig(cz: number): CardLayoutConfig {
+  return {
+    zones: {
+      hand: { count: 6 },
+      battlefield: { count: 5, priority: "fill", maxRows: 1 },
+      sideboard: { count: 9 },
+      commandZone: {
+        count: cz,
+        minColumns: cz >= 4 ? 2 : 1,
+        maxColumns: cz >= 4 ? 2 : 1,
+      },
+    },
+    layout: {
+      top: ["hand"],
+      bottomLeft: ["battlefield", "sideboard"],
+      bottomRight: ["commandZone"],
+    },
+    ...ZONE_LAYOUT_PADDING,
+  };
+}
 
 describe("computeConstrainedLayout", () => {
   describe("single zone with constraints", () => {
     it("ignores constraints when only one zone is active", () => {
-      const result = computeConstrainedLayout(
-        800,
-        600,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 800,
+        containerH: 600,
+        config: {
           zones: { hand: { count: 7 }, sideboard: { count: 0 } },
           layout: { top: ["hand"], bottomLeft: ["sideboard"] },
         },
-        { topFraction: 0.5 },
-      );
+        constraints: { topFraction: 0.5 },
+      });
       expect(result.hand.width).toBeGreaterThan(0);
       expect(result.hand.height).toBe(
         Math.round(result.hand.width * CARD_ASPECT_RATIO),
@@ -29,47 +54,47 @@ describe("computeConstrainedLayout", () => {
 
   describe("two zones with topFraction", () => {
     it("splits evenly with topFraction = 0.5", () => {
-      const result = computeConstrainedLayout(
-        1000,
-        600,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 1000,
+        containerH: 600,
+        config: {
           zones: {
             pack: { count: 10, maxCardWidth: 300 },
             pool: { count: 10, maxCardWidth: 300 },
           },
           layout: { top: ["pack"], bottomLeft: ["pool"] },
         },
-        { topFraction: 0.5 },
-      );
+        constraints: { topFraction: 0.5 },
+      });
       expect(result.pack.width).toBeGreaterThan(0);
       expect(result.pool.width).toBeGreaterThan(0);
     });
 
     it("gives more space to top when topFraction is high", () => {
-      const high = computeConstrainedLayout(
-        1000,
-        600,
-        {
+      const high = computeConstrainedLayout({
+        containerW: 1000,
+        containerH: 600,
+        config: {
           zones: {
             pack: { count: 10, maxCardWidth: 300 },
             pool: { count: 10, maxCardWidth: 300 },
           },
           layout: { top: ["pack"], bottomLeft: ["pool"] },
         },
-        { topFraction: 0.7 },
-      );
-      const low = computeConstrainedLayout(
-        1000,
-        600,
-        {
+        constraints: { topFraction: 0.7 },
+      });
+      const low = computeConstrainedLayout({
+        containerW: 1000,
+        containerH: 600,
+        config: {
           zones: {
             pack: { count: 10, maxCardWidth: 300 },
             pool: { count: 10, maxCardWidth: 300 },
           },
           layout: { top: ["pack"], bottomLeft: ["pool"] },
         },
-        { topFraction: 0.3 },
-      );
+        constraints: { topFraction: 0.3 },
+      });
       expect(high.pack.width).toBeGreaterThanOrEqual(low.pack.width);
       expect(low.pool.width).toBeGreaterThanOrEqual(high.pool.width);
     });
@@ -77,10 +102,10 @@ describe("computeConstrainedLayout", () => {
 
   describe("three zones with topFraction + bottomLeftSplit", () => {
     it("produces valid dimensions for all zones", () => {
-      const result = computeConstrainedLayout(
-        1000,
-        700,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 1000,
+        containerH: 700,
+        config: {
           zones: {
             hand: { count: 7 },
             battlefield: { count: 5, priority: "fill", maxRows: 1 },
@@ -92,18 +117,18 @@ describe("computeConstrainedLayout", () => {
           },
           ...ZONE_LAYOUT_PADDING,
         },
-        { topFraction: 0.4, bottomLeftSplit: 0.3 },
-      );
+        constraints: { topFraction: 0.4, bottomLeftSplit: 0.3 },
+      });
       expect(result.hand.width).toBeGreaterThan(0);
       expect(result.battlefield.width).toBeGreaterThan(0);
       expect(result.sideboard.width).toBeGreaterThan(0);
     });
 
     it("returns zone frames that sum to the constrained vertical space", () => {
-      const frames = computeConstrainedFrames(
-        1000,
-        700,
-        {
+      const frames = computeConstrainedFrames({
+        containerW: 1000,
+        containerH: 700,
+        config: {
           zones: {
             hand: { count: 7 },
             battlefield: { count: 5, priority: "fill", maxRows: 1 },
@@ -115,8 +140,8 @@ describe("computeConstrainedLayout", () => {
           },
           ...ZONE_LAYOUT_PADDING,
         },
-        { topFraction: 0.4, bottomLeftSplit: 0.3 },
-      );
+        constraints: { topFraction: 0.4, bottomLeftSplit: 0.3 },
+      });
 
       const usedHeight =
         frames.hand.outerHeight +
@@ -148,13 +173,18 @@ describe("computeConstrainedLayout", () => {
       };
 
       const unconstrained = computeLayout(1100, 650, config);
-      const derived = deriveConstraintsFromLayout(
+      const derived = deriveConstraintsFromLayout({
         unconstrained,
         config,
-        650,
-        1100,
-      );
-      const frames = computeConstrainedFrames(1100, 650, config, derived);
+        containerH: 650,
+        containerW: 1100,
+      });
+      const frames = computeConstrainedFrames({
+        containerW: 1100,
+        containerH: 650,
+        config,
+        constraints: derived,
+      });
 
       const usedHeight =
         frames.rewards.outerHeight +
@@ -198,18 +228,18 @@ describe("computeConstrainedLayout", () => {
       const containerH = 800;
 
       const unconstrained = computeLayout(containerW, containerH, draftConfig);
-      const derived = deriveConstraintsFromLayout(
+      const derived = deriveConstraintsFromLayout({
         unconstrained,
-        draftConfig,
+        config: draftConfig,
         containerH,
         containerW,
-      );
-      const { dims, frames } = computeConstrainedLayoutState(
+      });
+      const { dims, frames } = computeConstrainedLayoutState({
         containerW,
         containerH,
-        draftConfig,
-        derived,
-      );
+        config: draftConfig,
+        constraints: derived,
+      });
 
       const sectionPadV =
         ZONE_LAYOUT_PADDING.sectionPadTop +
@@ -255,18 +285,18 @@ describe("computeConstrainedLayout", () => {
       };
 
       const unconstrained = computeLayout(1200, 520, config);
-      const derived = deriveConstraintsFromLayout(
+      const derived = deriveConstraintsFromLayout({
         unconstrained,
         config,
-        520,
-        1200,
-      );
-      const { dims, frames } = computeConstrainedLayoutState(
-        1200,
-        520,
+        containerH: 520,
+        containerW: 1200,
+      });
+      const { dims, frames } = computeConstrainedLayoutState({
+        containerW: 1200,
+        containerH: 520,
         config,
-        derived,
-      );
+        constraints: derived,
+      });
 
       const rewardsGridHeight =
         dims.rewards.rows * dims.rewards.height +
@@ -290,10 +320,10 @@ describe("computeConstrainedLayout", () => {
 
   describe("four zones with all constraint types", () => {
     it("handles topFraction + leftFraction + bottomLeftSplit", () => {
-      const result = computeConstrainedLayout(
-        1200,
-        800,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 1200,
+        containerH: 800,
+        config: {
           zones: {
             hand: { count: 7 },
             battlefield: { count: 5, priority: "fill", maxRows: 1 },
@@ -307,8 +337,12 @@ describe("computeConstrainedLayout", () => {
           },
           ...ZONE_LAYOUT_PADDING,
         },
-        { topFraction: 0.35, leftFraction: 0.75, bottomLeftSplit: 0.3 },
-      );
+        constraints: {
+          topFraction: 0.35,
+          leftFraction: 0.75,
+          bottomLeftSplit: 0.3,
+        },
+      });
       expect(result.hand.width).toBeGreaterThan(0);
       expect(result.battlefield.width).toBeGreaterThan(0);
       expect(result.sideboard.width).toBeGreaterThan(0);
@@ -333,15 +367,17 @@ describe("computeConstrainedLayout", () => {
       };
 
       const unconstrained = computeLayout(420, 620, config);
-      const derived = deriveConstraintsFromLayout(
+      const derived = deriveConstraintsFromLayout({
         unconstrained,
         config,
-        620,
-        420,
-      );
-      const frames = computeConstrainedFrames(420, 620, config, {
-        ...derived,
-        leftFraction: 0.95,
+        containerH: 620,
+        containerW: 420,
+      });
+      const frames = computeConstrainedFrames({
+        containerW: 420,
+        containerH: 620,
+        config,
+        constraints: { ...derived, leftFraction: 0.95 },
       });
 
       expect(frames.commandZone.outerWidth).toBeGreaterThanOrEqual(112);
@@ -353,18 +389,18 @@ describe("computeConstrainedLayout", () => {
 
   describe("min fraction clamping", () => {
     it("extreme topFraction values still produce valid output", () => {
-      const result = computeConstrainedLayout(
-        1000,
-        600,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 1000,
+        containerH: 600,
+        config: {
           zones: {
             pack: { count: 10 },
             pool: { count: 10 },
           },
           layout: { top: ["pack"], bottomLeft: ["pool"] },
         },
-        { topFraction: 0.01 },
-      );
+        constraints: { topFraction: 0.01 },
+      });
       expect(result.pack.width).toBeGreaterThan(0);
       expect(result.pool.width).toBeGreaterThan(0);
     });
@@ -372,10 +408,10 @@ describe("computeConstrainedLayout", () => {
 
   describe("zero-count zones ignored", () => {
     it("only active zones get real dimensions", () => {
-      const result = computeConstrainedLayout(
-        1000,
-        600,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 1000,
+        containerH: 600,
+        config: {
           zones: {
             hand: { count: 7 },
             sideboard: { count: 0 },
@@ -386,18 +422,18 @@ describe("computeConstrainedLayout", () => {
             bottomLeft: ["battlefield", "sideboard"],
           },
         },
-        { topFraction: 0.5 },
-      );
+        constraints: { topFraction: 0.5 },
+      });
       expect(result.hand.width).toBeGreaterThan(0);
     });
   });
 
   describe("aspect ratio maintained", () => {
     it("all zones maintain 7/5 ratio", () => {
-      const result = computeConstrainedLayout(
-        1000,
-        700,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 1000,
+        containerH: 700,
+        config: {
           zones: {
             hand: { count: 7 },
             battlefield: { count: 5, priority: "fill", maxRows: 1 },
@@ -411,8 +447,12 @@ describe("computeConstrainedLayout", () => {
           },
           ...ZONE_LAYOUT_PADDING,
         },
-        { topFraction: 0.4, leftFraction: 0.7, bottomLeftSplit: 0.4 },
-      );
+        constraints: {
+          topFraction: 0.4,
+          leftFraction: 0.7,
+          bottomLeftSplit: 0.4,
+        },
+      });
       for (const zone of [
         "hand",
         "sideboard",
@@ -429,18 +469,18 @@ describe("computeConstrainedLayout", () => {
 
   describe("manual overrides ignore default max card caps", () => {
     it("allows cards to grow past the zone maxCardWidth when space exists", () => {
-      const result = computeConstrainedLayout(
-        1600,
-        900,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 1600,
+        containerH: 900,
+        config: {
           zones: {
             pack: { count: 2, maxCardWidth: 120 },
             pool: { count: 2, maxCardWidth: 120 },
           },
           layout: { top: ["pack"], bottomLeft: ["pool"] },
         },
-        { topFraction: 0.5 },
-      );
+        constraints: { topFraction: 0.5 },
+      });
 
       expect(result.pack.width).toBeGreaterThan(120);
       expect(result.pool.width).toBeGreaterThan(120);
@@ -449,51 +489,51 @@ describe("computeConstrainedLayout", () => {
 
   describe("pass 2 ceiling (pass2MaxCardWidth)", () => {
     it("caps cards at the default 500px ceiling on huge containers", () => {
-      const result = computeConstrainedLayout(
-        4000,
-        2000,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 4000,
+        containerH: 2000,
+        config: {
           zones: {
             pack: { count: 2, maxCardWidth: 200 },
             pool: { count: 2, maxCardWidth: 200 },
           },
           layout: { top: ["pack"], bottomLeft: ["pool"] },
         },
-        { topFraction: 0.5 },
-      );
+        constraints: { topFraction: 0.5 },
+      });
 
       expect(result.pack.width).toBeLessThanOrEqual(500);
       expect(result.pool.width).toBeLessThanOrEqual(500);
     });
 
     it("does not shrink below pass 1's per-zone maxCardWidth (Math.max wins)", () => {
-      const result = computeConstrainedLayout(
-        4000,
-        2000,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 4000,
+        containerH: 2000,
+        config: {
           zones: {
             pack: { count: 2, maxCardWidth: 600 },
           },
           layout: { top: ["pack"], bottomLeft: [] },
         },
-        { topFraction: 1 },
-      );
+        constraints: { topFraction: 1 },
+      });
       expect(result.pack.width).toBeGreaterThanOrEqual(600);
     });
 
     it("respects an explicit pass2MaxCardWidth override", () => {
-      const result = computeConstrainedLayout(
-        4000,
-        2000,
-        {
+      const result = computeConstrainedLayout({
+        containerW: 4000,
+        containerH: 2000,
+        config: {
           zones: {
             pack: { count: 2, maxCardWidth: 200 },
           },
           layout: { top: ["pack"], bottomLeft: [] },
           pass2MaxCardWidth: 250,
         },
-        { topFraction: 1 },
-      );
+        constraints: { topFraction: 1 },
+      });
       expect(result.pack.width).toBeLessThanOrEqual(250);
     });
   });
@@ -523,18 +563,18 @@ describe("computeConstrainedLayout", () => {
       const containerH = 800;
 
       const pass1 = computeLayout(containerW, containerH, config);
-      const derived = deriveConstraintsFromLayout(
-        pass1,
+      const derived = deriveConstraintsFromLayout({
+        unconstrained: pass1,
         config,
         containerH,
         containerW,
-      );
-      const { dims: pass2, frames } = computeConstrainedLayoutState(
+      });
+      const { dims: pass2, frames } = computeConstrainedLayoutState({
         containerW,
         containerH,
         config,
-        derived,
-      );
+        constraints: derived,
+      });
 
       expect(pass2.sideboard.width).toBeGreaterThanOrEqual(
         pass1.sideboard.width,
@@ -546,24 +586,6 @@ describe("computeConstrainedLayout", () => {
     });
 
     it("holds across a sweep of realistic resolutions", () => {
-      const config = (cz: number) => ({
-        zones: {
-          hand: { count: 6 },
-          battlefield: { count: 5, priority: "fill" as const, maxRows: 1 },
-          sideboard: { count: 9 },
-          commandZone: {
-            count: cz,
-            minColumns: cz >= 4 ? 2 : 1,
-            maxColumns: cz >= 4 ? 2 : 1,
-          },
-        },
-        layout: {
-          top: ["hand"],
-          bottomLeft: ["battlefield", "sideboard"],
-          bottomRight: ["commandZone"],
-        },
-        ...ZONE_LAYOUT_PADDING,
-      });
       const widths = [1024, 1280, 1366, 1440, 1600, 1920];
       const heights = [600, 700, 800, 900, 1080];
       const upgradeCounts = [1, 2, 3, 4, 5];
@@ -571,15 +593,20 @@ describe("computeConstrainedLayout", () => {
       for (const w of widths) {
         for (const h of heights) {
           for (const cz of upgradeCounts) {
-            const cfg = config(cz);
+            const cfg = buildSweepConfig(cz);
             const pass1 = computeLayout(w, h, cfg);
-            const derived = deriveConstraintsFromLayout(pass1, cfg, h, w);
-            const { dims: pass2 } = computeConstrainedLayoutState(
-              w,
-              h,
-              cfg,
-              derived,
-            );
+            const derived = deriveConstraintsFromLayout({
+              unconstrained: pass1,
+              config: cfg,
+              containerH: h,
+              containerW: w,
+            });
+            const { dims: pass2 } = computeConstrainedLayoutState({
+              containerW: w,
+              containerH: h,
+              config: cfg,
+              constraints: derived,
+            });
             expect(
               pass2.sideboard.width,
               `sideboard shrank at ${w}x${h} cz=${cz}: ${pass1.sideboard.width} -> ${pass2.sideboard.width}`,
@@ -613,24 +640,24 @@ describe("computeConstrainedLayout", () => {
       const containerH = 800;
 
       const pass1 = computeLayout(containerW, containerH, config);
-      const derived1 = deriveConstraintsFromLayout(
-        pass1,
+      const derived1 = deriveConstraintsFromLayout({
+        unconstrained: pass1,
         config,
         containerH,
         containerW,
-      );
-      const { dims: pass2 } = computeConstrainedLayoutState(
+      });
+      const { dims: pass2 } = computeConstrainedLayoutState({
         containerW,
         containerH,
         config,
-        derived1,
-      );
-      const derived2 = deriveConstraintsFromLayout(
-        pass2,
+        constraints: derived1,
+      });
+      const derived2 = deriveConstraintsFromLayout({
+        unconstrained: pass2,
         config,
         containerH,
         containerW,
-      );
+      });
 
       // Allow tiny rounding deltas (≤ 1px-equivalent in fraction space).
       expect(

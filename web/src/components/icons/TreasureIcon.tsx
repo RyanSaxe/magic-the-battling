@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 interface TreasureIconProps {
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -12,7 +14,7 @@ const sizes = {
 export function TreasureIcon({
   size = "md",
   className = "",
-}: TreasureIconProps) {
+}: TreasureIconProps): ReactElement {
   const px = sizes[size];
   return (
     <svg

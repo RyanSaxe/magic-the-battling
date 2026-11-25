@@ -31,12 +31,13 @@ interface ZoneSlackInfo {
   growPriority: number;
 }
 
-function measureZoneSlacks(
-  config: CardLayoutConfig,
-  dims: CardLayoutResult,
-  frames: ZoneFrameResult,
-  ids: string[],
-): ZoneSlackInfo[] {
+function measureZoneSlacks(args: {
+  config: CardLayoutConfig;
+  dims: CardLayoutResult;
+  frames: ZoneFrameResult;
+  ids: string[];
+}): ZoneSlackInfo[] {
+  const { config, dims, frames, ids } = args;
   const result: ZoneSlackInfo[] = [];
   for (const id of ids) {
     const spec = config.zones[id];
@@ -87,13 +88,14 @@ function adjustBottomLeftSplit(
   return Math.max(FRACTION_MIN, Math.min(FRACTION_MAX, current + delta));
 }
 
-function adjustTopFraction(
-  current: number,
-  topZones: ZoneSlackInfo[],
-  blZones: ZoneSlackInfo[],
-  brZones: ZoneSlackInfo[],
-  usableH: number,
-): number {
+function adjustTopFraction(args: {
+  current: number;
+  topZones: ZoneSlackInfo[];
+  blZones: ZoneSlackInfo[];
+  brZones: ZoneSlackInfo[];
+  usableH: number;
+}): number {
+  const { current, topZones, blZones, brZones, usableH } = args;
   if (usableH <= 0) return current;
 
   const topSlack = topZones.reduce((acc, z) => acc + z.slack, 0);
@@ -126,12 +128,13 @@ function adjustTopFraction(
   return current;
 }
 
-function totalBottomLeftInnerHeight(
-  config: CardLayoutConfig,
-  containerH: number,
-  topFraction: number,
-  blIdsCount: number,
-): number {
+function totalBottomLeftInnerHeight(args: {
+  config: CardLayoutConfig;
+  containerH: number;
+  topFraction: number;
+  blIdsCount: number;
+}): number {
+  const { config, containerH, topFraction, blIdsCount } = args;
   const sectionPadV =
     (config.sectionPadTop ?? 0) + (config.sectionPadBottom ?? 0);
   const sectionGap = config.sectionGap ?? 0;
@@ -162,34 +165,44 @@ function isConverged(
   );
 }
 
-function stepRedistribution(
-  current: Required<ZoneConstraints>,
-  config: CardLayoutConfig,
-  containerW: number,
-  containerH: number,
-  topIds: string[],
-  blIds: string[],
-  brIds: string[],
-  usableH: number,
-): Required<ZoneConstraints> {
-  const { dims, frames } = computeConstrainedLayoutState(
+function stepRedistribution(args: {
+  current: Required<ZoneConstraints>;
+  config: CardLayoutConfig;
+  containerW: number;
+  containerH: number;
+  topIds: string[];
+  blIds: string[];
+  brIds: string[];
+  usableH: number;
+}): Required<ZoneConstraints> {
+  const {
+    current,
+    config,
+    containerW,
+    containerH,
+    topIds,
+    blIds,
+    brIds,
+    usableH,
+  } = args;
+  const { dims, frames } = computeConstrainedLayoutState({
     containerW,
     containerH,
     config,
-    current,
-  );
-  const topZones = measureZoneSlacks(config, dims, frames, topIds);
-  const blZones = measureZoneSlacks(config, dims, frames, blIds);
-  const brZones = measureZoneSlacks(config, dims, frames, brIds);
+    constraints: current,
+  });
+  const topZones = measureZoneSlacks({ config, dims, frames, ids: topIds });
+  const blZones = measureZoneSlacks({ config, dims, frames, ids: blIds });
+  const brZones = measureZoneSlacks({ config, dims, frames, ids: brIds });
   const next: Required<ZoneConstraints> = { ...current };
 
   if (blZones.length >= 2) {
-    const totalInnerH = totalBottomLeftInnerHeight(
+    const totalInnerH = totalBottomLeftInnerHeight({
       config,
       containerH,
-      current.topFraction,
-      blZones.length,
-    );
+      topFraction: current.topFraction,
+      blIdsCount: blZones.length,
+    });
     next.bottomLeftSplit = adjustBottomLeftSplit(
       current.bottomLeftSplit,
       blZones,
@@ -198,13 +211,13 @@ function stepRedistribution(
   }
 
   if (topIds.length > 0 && blIds.length + brIds.length > 0) {
-    next.topFraction = adjustTopFraction(
-      current.topFraction,
+    next.topFraction = adjustTopFraction({
+      current: current.topFraction,
       topZones,
       blZones,
       brZones,
       usableH,
-    );
+    });
   }
 
   return next;
@@ -218,13 +231,21 @@ function stepRedistribution(
  * Must NOT run while a user is actively dragging dividers — the caller is
  * responsible for skipping this when explicit user constraints exist.
  */
-export function redistributeSlack(
-  initial: Required<ZoneConstraints>,
-  config: CardLayoutConfig,
-  containerW: number,
-  containerH: number,
+export interface RedistributeSlackOptions {
+  initial: Required<ZoneConstraints>;
+  config: CardLayoutConfig;
+  containerW: number;
+  containerH: number;
+  maxIterations?: number;
+}
+
+export function redistributeSlack({
+  initial,
+  config,
+  containerW,
+  containerH,
   maxIterations = 4,
-): RedistributeSlackResult {
+}: RedistributeSlackOptions): RedistributeSlackResult {
   let current: Required<ZoneConstraints> = { ...initial };
 
   const { topIds, blIds, brIds } = getActiveZoneIds(config);
@@ -237,7 +258,7 @@ export function redistributeSlack(
   const usableH = availH - (hasColumnGap ? (config.sectionGap ?? 0) : 0);
 
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
-    const next = stepRedistribution(
+    const next = stepRedistribution({
       current,
       config,
       containerW,
@@ -246,7 +267,7 @@ export function redistributeSlack(
       blIds,
       brIds,
       usableH,
-    );
+    });
     if (isConverged(current, next)) {
       return { constraints: next, iterations: iteration };
     }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { SharePlayerData, SharePlayerSnapshot } from "../../types";
 import {
   getShareHiddenZones,
@@ -28,7 +29,7 @@ export function ShareRoundDetail({
   layoutStateKey,
   resizeState,
   showLayoutReset = false,
-}: ShareRoundDetailProps) {
+}: ShareRoundDetailProps): ReactNode {
   const upgrades = useUpgrades ? getShareUpgrades(snapshot) : [];
   const companionIds = new Set(snapshot.command_zone.map((c) => c.id));
   const hiddenZones = getShareHiddenZones(snapshot).filter(

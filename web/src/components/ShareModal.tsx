@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { type ReactNode, useState, useCallback } from "react";
 import type { IconType } from "react-icons";
 import {
   FaXTwitter,
@@ -70,7 +70,11 @@ const PLATFORMS: Platform[] = [
 const SHARE_TILE =
   "btn-secondary flex flex-col items-center gap-1.5 p-3 rounded-lg";
 
-export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
+export function ShareModal({
+  url,
+  shareText,
+  onClose,
+}: ShareModalProps): ReactNode {
   const [copied, setCopied] = useState(false);
 
   useEscapeKey(onClose);
@@ -105,7 +109,12 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
           ),
         )}
 
-        <button onClick={handleCopyLink} className={SHARE_TILE}>
+        <button
+          onClick={() => {
+            void handleCopyLink();
+          }}
+          className={SHARE_TILE}
+        >
           <FaLink className="text-2xl" />
           <span className="text-xs">{copied ? "Copied!" : "Copy Link"}</span>
         </button>

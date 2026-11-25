@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, type ReactElement } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../contexts";
 import { useRedirectWhen, useRequireAuth } from "../hooks/pages/useAuthSession";
@@ -36,7 +36,79 @@ import {
 } from "../components/common/styles";
 import { Dialog } from "../components/common/Dialog";
 
-export function BattlerView() {
+function BattlerHero({
+  battler,
+  onEdit,
+  onPlay,
+}: {
+  battler: UserBattler;
+  onEdit: () => void;
+  onPlay: () => void;
+}): ReactElement {
+  const title = cubeTitle(battler);
+  const mode = modeLabel(battler.play_mode);
+  const upgradesText = battler.use_upgrades ? "On" : "Off";
+
+  return (
+    <DetailHero
+      imageUri={battler.cube_image_uri}
+      badge={{ label: `Saved ${mode} Preset`, tone: mode }}
+      title={title}
+      links={
+        <>
+          <span>
+            Source:{" "}
+            <HeroLink
+              href={`https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`}
+            >
+              {battler.cube_id} on CubeCobra ↗
+            </HeroLink>
+          </span>
+          <HeroLink to={`/cube/${encodeURIComponent(battler.cube_id)}`}>
+            View Public Cube Page →
+          </HeroLink>
+        </>
+      }
+      details={[
+        {
+          label: "Mode",
+          value: mode === "Deck" ? "Deck (Constructed)" : "Cube (Limited)",
+        },
+        { label: "Upgrades", value: upgradesText },
+        { label: "Default Opponents", value: String(battler.puppet_count) },
+      ]}
+      actions={[{ label: "Edit", onClick: onEdit }]}
+      play={{ label: "Play", onClick: onPlay }}
+      stats={[
+        { label: "Your Games", value: battler.my_game_count },
+        {
+          label: "Your Wins",
+          value: battler.my_win_count,
+          detail:
+            battler.my_game_count > 0
+              ? `(${winRate(battler.my_win_count, battler.my_game_count)})`
+              : undefined,
+        },
+        {
+          label: "Avg Finish",
+          value: battler.my_average_placement?.toFixed(1) ?? "—",
+        },
+        {
+          label: "All Cube Games",
+          value: battler.game_count,
+          detail: (
+            <span className="block whitespace-nowrap">
+              {countLabel(battler.human_player_count, "player")}
+            </span>
+          ),
+        },
+      ]}
+      caption={`Your games, wins and finish count your finished games on this cube in ${mode} mode with upgrades ${upgradesText.toLowerCase()}.`}
+    />
+  );
+}
+
+export function BattlerView(): ReactElement {
   const { listId } = useParams<{ listId: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useRequireAuth();
@@ -94,69 +166,17 @@ export function BattlerView() {
   }
 
   const title = cubeTitle(battler);
-  const mode = modeLabel(battler.play_mode);
 
   return (
     <>
       <DashboardFrame>
         <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
-        <DetailHero
-          imageUri={battler.cube_image_uri}
-          badge={{ label: `Saved ${mode} Preset`, tone: mode }}
-          title={title}
-          links={
-            <>
-              <span>
-                Source:{" "}
-                <HeroLink
-                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`}
-                >
-                  {battler.cube_id} on CubeCobra ↗
-                </HeroLink>
-              </span>
-              <HeroLink to={`/cube/${encodeURIComponent(battler.cube_id)}`}>
-                View Public Cube Page →
-              </HeroLink>
-            </>
-          }
-          details={[
-            {
-              label: "Mode",
-              value: mode === "Deck" ? "Deck (Constructed)" : "Cube (Limited)",
-            },
-            { label: "Upgrades", value: battler.use_upgrades ? "On" : "Off" },
-            { label: "Default Opponents", value: String(battler.puppet_count) },
-          ]}
-          actions={[{ label: "Edit", onClick: () => setShowSettings(true) }]}
-          play={{
-            label: "Play",
-            onClick: () => navigate(battlerPlayUrl(battler)),
+        <BattlerHero
+          battler={battler}
+          onEdit={() => setShowSettings(true)}
+          onPlay={() => {
+            void navigate(battlerPlayUrl(battler));
           }}
-          stats={[
-            { label: "Your Games", value: battler.my_game_count },
-            {
-              label: "Your Wins",
-              value: battler.my_win_count,
-              detail:
-                battler.my_game_count > 0
-                  ? `(${winRate(battler.my_win_count, battler.my_game_count)})`
-                  : undefined,
-            },
-            {
-              label: "Avg Finish",
-              value: battler.my_average_placement?.toFixed(1) ?? "—",
-            },
-            {
-              label: "All Cube Games",
-              value: battler.game_count,
-              detail: (
-                <span className="block whitespace-nowrap">
-                  {countLabel(battler.human_player_count, "player")}
-                </span>
-              ),
-            },
-          ]}
-          caption={`Your games, wins and finish count your finished games on this cube in ${mode} mode with upgrades ${battler.use_upgrades ? "on" : "off"}.`}
         />
         <GameHistory
           key={`${battler.play_mode}-${battler.use_upgrades}`}
@@ -190,7 +210,7 @@ export function BattlerView() {
           onDelete={async () => {
             try {
               await deleteBattler(battler.id);
-              navigate("/dashboard", { replace: true });
+              void navigate("/dashboard", { replace: true });
             } catch (err) {
               addToast(
                 unknownToAppError(err, "delete-battler", "Failed to delete")
@@ -215,7 +235,7 @@ function SettingsModal({
   onClose: () => void;
   onSave: (updates: Record<string, unknown>) => Promise<void>;
   onDelete: () => Promise<void>;
-}) {
+}): ReactElement {
   const [displayName, setDisplayName] = useState(battler.display_name || "");
   const [useUpgrades, setUseUpgrades] = useState(battler.use_upgrades);
   const [playMode, setPlayMode] = useState<PlayMode>(battler.play_mode);
@@ -224,7 +244,7 @@ function SettingsModal({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setSaving(true);
     await onSave({
@@ -238,13 +258,29 @@ function SettingsModal({
     setSaving(false);
   };
 
+  const handleDelete = async (): Promise<void> => {
+    setDeleting(true);
+    await onDelete();
+    setDeleting(false);
+    setConfirmingDelete(false);
+  };
+
   return (
     <>
-      <Dialog title="Settings" onClose={onClose} onSubmit={handleSave}>
+      <Dialog
+        title="Settings"
+        onClose={onClose}
+        onSubmit={(e) => {
+          void handleSave(e);
+        }}
+      >
         <div className="space-y-3">
           <div>
-            <label className={FIELD_LABEL}>Display Name</label>
+            <label htmlFor="battler-display-name" className={FIELD_LABEL}>
+              Display Name
+            </label>
             <input
+              id="battler-display-name"
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -312,11 +348,8 @@ function SettingsModal({
           imageUri={battler.cube_image_uri}
           deleting={deleting}
           onKeep={() => setConfirmingDelete(false)}
-          onDelete={async () => {
-            setDeleting(true);
-            await onDelete();
-            setDeleting(false);
-            setConfirmingDelete(false);
+          onDelete={() => {
+            void handleDelete();
           }}
         />
       )}

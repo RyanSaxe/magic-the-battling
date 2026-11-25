@@ -51,14 +51,16 @@ function clampBetween(value: number, low: number, high: number): number {
   return Math.max(low, Math.min(high, value));
 }
 
-function deriveTopFraction(
-  unconstrained: CardLayoutResult,
-  config: CardLayoutConfig,
-  topIds: string[],
-  hasBottom: boolean,
-  usableH: number,
-  sectionPadV: number,
-): { topFraction: number; topPixels: number } {
+function deriveTopFraction(args: {
+  unconstrained: CardLayoutResult;
+  config: CardLayoutConfig;
+  topIds: string[];
+  hasBottom: boolean;
+  usableH: number;
+  sectionPadV: number;
+}): { topFraction: number; topPixels: number } {
+  const { unconstrained, config, topIds, hasBottom, usableH, sectionPadV } =
+    args;
   let topPixels = 0;
   for (const id of topIds) {
     const dims = unconstrained[id];
@@ -77,15 +79,24 @@ function deriveTopFraction(
   return { topFraction, topPixels };
 }
 
-function deriveLeftFraction(
-  unconstrained: CardLayoutResult,
-  config: CardLayoutConfig,
-  blIds: string[],
-  brIds: string[],
-  availW: number,
-  sectionPadH: number,
-  sectionGap: number,
-): number {
+function deriveLeftFraction(args: {
+  unconstrained: CardLayoutResult;
+  config: CardLayoutConfig;
+  blIds: string[];
+  brIds: string[];
+  availW: number;
+  sectionPadH: number;
+  sectionGap: number;
+}): number {
+  const {
+    unconstrained,
+    config,
+    blIds,
+    brIds,
+    availW,
+    sectionPadH,
+    sectionGap,
+  } = args;
   let rightPixels = 0;
   for (const id of brIds) {
     const dims = unconstrained[id];
@@ -120,18 +131,30 @@ function measureBottomLeftHeights(
   return { firstGridH, totalGridH };
 }
 
-function deriveBottomLeftSplit(
-  unconstrained: CardLayoutResult,
-  config: CardLayoutConfig,
-  blIds: string[],
-  hasTop: boolean,
-  hasBottom: boolean,
-  availH: number,
-  usableH: number,
-  topPixels: number,
-  sectionPadV: number,
-  sectionGap: number,
-): number {
+function deriveBottomLeftSplit(args: {
+  unconstrained: CardLayoutResult;
+  config: CardLayoutConfig;
+  blIds: string[];
+  hasTop: boolean;
+  hasBottom: boolean;
+  availH: number;
+  usableH: number;
+  topPixels: number;
+  sectionPadV: number;
+  sectionGap: number;
+}): number {
+  const {
+    unconstrained,
+    config,
+    blIds,
+    hasTop,
+    hasBottom,
+    availH,
+    usableH,
+    topPixels,
+    sectionPadV,
+    sectionGap,
+  } = args;
   if (blIds.length < 2) return 0.5;
 
   const { firstGridH, totalGridH } = measureBottomLeftHeights(
@@ -146,12 +169,19 @@ function deriveBottomLeftSplit(
   return totalInnerH > 0 && totalInner > 0 ? firstGridH / totalInner : 0.5;
 }
 
-export function deriveConstraintsFromLayout(
-  unconstrained: CardLayoutResult,
-  config: CardLayoutConfig,
-  containerH: number,
-  containerW: number,
-): Required<ZoneConstraints> {
+export interface DeriveConstraintsOptions {
+  unconstrained: CardLayoutResult;
+  config: CardLayoutConfig;
+  containerH: number;
+  containerW: number;
+}
+
+export function deriveConstraintsFromLayout({
+  unconstrained,
+  config,
+  containerH,
+  containerW,
+}: DeriveConstraintsOptions): Required<ZoneConstraints> {
   const pad = readSectionPadding(config);
   const availH = containerH - pad.fixedHeight;
   const availW = containerW - pad.padding;
@@ -162,24 +192,24 @@ export function deriveConstraintsFromLayout(
   const hasBottom = blIds.length > 0 || brIds.length > 0;
   const usableH = availH - (hasTop && hasBottom ? pad.sectionGap : 0);
 
-  const { topFraction, topPixels } = deriveTopFraction(
+  const { topFraction, topPixels } = deriveTopFraction({
     unconstrained,
     config,
     topIds,
     hasBottom,
     usableH,
-    pad.sectionPadV,
-  );
-  const leftFraction = deriveLeftFraction(
+    sectionPadV: pad.sectionPadV,
+  });
+  const leftFraction = deriveLeftFraction({
     unconstrained,
     config,
     blIds,
     brIds,
     availW,
-    pad.sectionPadH,
-    pad.sectionGap,
-  );
-  const bottomLeftSplit = deriveBottomLeftSplit(
+    sectionPadH: pad.sectionPadH,
+    sectionGap: pad.sectionGap,
+  });
+  const bottomLeftSplit = deriveBottomLeftSplit({
     unconstrained,
     config,
     blIds,
@@ -188,19 +218,26 @@ export function deriveConstraintsFromLayout(
     availH,
     usableH,
     topPixels,
-    pad.sectionPadV,
-    pad.sectionGap,
-  );
+    sectionPadV: pad.sectionPadV,
+    sectionGap: pad.sectionGap,
+  });
 
   return { topFraction, leftFraction, bottomLeftSplit };
 }
 
-export function resolveConstraints(
-  containerW: number,
-  containerH: number,
-  config: CardLayoutConfig,
-  constraints: ZoneConstraints,
-): Required<ZoneConstraints> {
+export interface ResolveConstraintsOptions {
+  containerW: number;
+  containerH: number;
+  config: CardLayoutConfig;
+  constraints: ZoneConstraints;
+}
+
+export function resolveConstraints({
+  containerW,
+  containerH,
+  config,
+  constraints,
+}: ResolveConstraintsOptions): Required<ZoneConstraints> {
   const { topFraction, leftFraction, bottomLeftSplit } = constraints;
   if (
     topFraction !== undefined &&
@@ -209,12 +246,12 @@ export function resolveConstraints(
   ) {
     return { topFraction, leftFraction, bottomLeftSplit };
   }
-  const derived = deriveConstraintsFromLayout(
-    computePhaseLayout(containerW, containerH, config),
+  const derived = deriveConstraintsFromLayout({
+    unconstrained: computePhaseLayout(containerW, containerH, config),
     config,
     containerH,
     containerW,
-  );
+  });
   return {
     topFraction: topFraction ?? derived.topFraction,
     leftFraction: leftFraction ?? derived.leftFraction,
@@ -222,16 +259,26 @@ export function resolveConstraints(
   };
 }
 
-function clampTopFraction(
-  topFraction: number,
-  topIds: string[],
-  blIds: string[],
-  brIds: string[],
-  usableH: number,
-  sectionPadV: number,
-  sectionGap: number,
-  automaticFrames: ZoneFrameResult,
-): number {
+function clampTopFraction(args: {
+  topFraction: number;
+  topIds: string[];
+  blIds: string[];
+  brIds: string[];
+  usableH: number;
+  sectionPadV: number;
+  sectionGap: number;
+  automaticFrames: ZoneFrameResult;
+}): number {
+  const {
+    topFraction,
+    topIds,
+    blIds,
+    brIds,
+    usableH,
+    sectionPadV,
+    sectionGap,
+    automaticFrames,
+  } = args;
   if (topIds.length === 0 || (blIds.length === 0 && brIds.length === 0)) {
     return topFraction;
   }
@@ -257,14 +304,22 @@ function clampTopFraction(
   return clampBetween(topFraction, minTopH / usableH, 1 - bottomMinH / usableH);
 }
 
-function clampBottomLeftSplitValue(
-  bottomLeftSplit: number,
-  blIds: string[],
-  bottomOuterH: number,
-  sectionPadV: number,
-  sectionGap: number,
-  automaticFrames: ZoneFrameResult,
-): number {
+function clampBottomLeftSplitValue(args: {
+  bottomLeftSplit: number;
+  blIds: string[];
+  bottomOuterH: number;
+  sectionPadV: number;
+  sectionGap: number;
+  automaticFrames: ZoneFrameResult;
+}): number {
+  const {
+    bottomLeftSplit,
+    blIds,
+    bottomOuterH,
+    sectionPadV,
+    sectionGap,
+    automaticFrames,
+  } = args;
   if (blIds.length < 2) return bottomLeftSplit;
   const totalInnerH =
     bottomOuterH - blIds.length * sectionPadV - (blIds.length - 1) * sectionGap;
@@ -290,15 +345,24 @@ function clampBottomLeftSplitValue(
   );
 }
 
-function clampLeftFractionValue(
-  leftFraction: number,
-  blIds: string[],
-  brIds: string[],
-  availW: number,
-  sectionPadH: number,
-  sectionGap: number,
-  automaticFrames: ZoneFrameResult,
-): number {
+function clampLeftFractionValue(args: {
+  leftFraction: number;
+  blIds: string[];
+  brIds: string[];
+  availW: number;
+  sectionPadH: number;
+  sectionGap: number;
+  automaticFrames: ZoneFrameResult;
+}): number {
+  const {
+    leftFraction,
+    blIds,
+    brIds,
+    availW,
+    sectionPadH,
+    sectionGap,
+    automaticFrames,
+  } = args;
   if (blIds.length === 0 || brIds.length === 0) return leftFraction;
   const rowW = availW - sectionGap;
   if (rowW <= 0) return leftFraction;
@@ -315,13 +379,21 @@ function clampLeftFractionValue(
  * automatic layout's room when that is smaller). The saved values themselves
  * stay unchanged so a larger board in the same band recovers them.
  */
-export function clampSavedConstraints(
-  containerW: number,
-  containerH: number,
-  config: CardLayoutConfig,
-  savedFractions: ZoneConstraints,
-  automaticFrames: ZoneFrameResult,
-): Required<ZoneConstraints> {
+export interface ClampSavedConstraintsOptions {
+  containerW: number;
+  containerH: number;
+  config: CardLayoutConfig;
+  savedFractions: ZoneConstraints;
+  automaticFrames: ZoneFrameResult;
+}
+
+export function clampSavedConstraints({
+  containerW,
+  containerH,
+  config,
+  savedFractions,
+  automaticFrames,
+}: ClampSavedConstraintsOptions): Required<ZoneConstraints> {
   const pad = readSectionPadding(config);
   const { topIds, blIds, brIds } = getActiveZoneIds(config);
   const hasTop = topIds.length > 0;
@@ -330,45 +402,45 @@ export function clampSavedConstraints(
   const availW = containerW - pad.padding;
   const usableH = availH - (hasTop && hasBottom ? pad.sectionGap : 0);
 
-  const clamped = resolveConstraints(
+  const clamped = resolveConstraints({
     containerW,
     containerH,
     config,
-    savedFractions,
-  );
+    constraints: savedFractions,
+  });
 
-  clamped.topFraction = clampTopFraction(
-    clamped.topFraction,
+  clamped.topFraction = clampTopFraction({
+    topFraction: clamped.topFraction,
     topIds,
     blIds,
     brIds,
     usableH,
-    pad.sectionPadV,
-    pad.sectionGap,
+    sectionPadV: pad.sectionPadV,
+    sectionGap: pad.sectionGap,
     automaticFrames,
-  );
+  });
 
   const bottomOuterH = hasTop
     ? usableH - Math.round(usableH * clamped.topFraction)
     : availH;
-  clamped.bottomLeftSplit = clampBottomLeftSplitValue(
-    clamped.bottomLeftSplit,
+  clamped.bottomLeftSplit = clampBottomLeftSplitValue({
+    bottomLeftSplit: clamped.bottomLeftSplit,
     blIds,
     bottomOuterH,
-    pad.sectionPadV,
-    pad.sectionGap,
+    sectionPadV: pad.sectionPadV,
+    sectionGap: pad.sectionGap,
     automaticFrames,
-  );
+  });
 
-  clamped.leftFraction = clampLeftFractionValue(
-    clamped.leftFraction,
+  clamped.leftFraction = clampLeftFractionValue({
+    leftFraction: clamped.leftFraction,
     blIds,
     brIds,
     availW,
-    pad.sectionPadH,
-    pad.sectionGap,
+    sectionPadH: pad.sectionPadH,
+    sectionGap: pad.sectionGap,
     automaticFrames,
-  );
+  });
 
   return clamped;
 }

@@ -40,19 +40,18 @@ export function reducePhaseAction(
   state: PhaseActionState,
   event: PhaseActionEvent,
 ): PhaseActionState {
-  switch (event.type) {
-    case "sent":
-      return state.pending
-        ? state
-        : { ...state, pending: { action: event.action } };
-    case "failed":
-      return state.pending ? { ...state, pending: null } : state;
-    case "server_state":
-      // Other players' updates arrive with this player's state unchanged, so only a change here answers the action.
-      return serverStateChanged(state.server, event.server)
-        ? { pending: null, server: event.server }
-        : state;
+  if (event.type === "sent") {
+    return state.pending
+      ? state
+      : { ...state, pending: { action: event.action } };
   }
+  if (event.type === "failed") {
+    return state.pending ? { ...state, pending: null } : state;
+  }
+  // Other players' updates arrive with this player's state unchanged, so only a change here answers the action.
+  return serverStateChanged(state.server, event.server)
+    ? { pending: null, server: event.server }
+    : state;
 }
 
 export function isPhaseActionPending(

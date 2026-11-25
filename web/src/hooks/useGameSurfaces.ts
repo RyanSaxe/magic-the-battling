@@ -159,48 +159,62 @@ function isSameSurface(a: GameSurface, b: GameSurface): boolean {
   return true;
 }
 
+function openOverlaySurface(
+  surfaces: readonly GameSurface[],
+  surface: Extract<
+    GameSurface,
+    { kind: "zone" | "actions" | "submitResult" | "cardMenu" }
+  >,
+  keptGuide: GuideSurface | null,
+): readonly GameSurface[] {
+  if (surface.kind === "cardMenu") {
+    const base: GameSurface[] = [];
+    if (keptGuide?.minimized) base.push(keptGuide);
+    const openZone = findZone(surfaces);
+    if (openZone) base.push(openZone);
+    base.push(surface);
+    return base;
+  }
+  return keptGuide?.minimized ? [keptGuide, surface] : [surface];
+}
+
+function openScoutingSurface(
+  surfaces: readonly GameSurface[],
+  surface: ScoutingSurface,
+  keptGuide: GuideSurface | null,
+): readonly GameSurface[] {
+  const base: GameSurface[] = [];
+  if (keptGuide) base.push(keptGuide);
+  if (surfaces.some((item) => item.kind === "players")) {
+    base.push({ kind: "players" });
+  }
+  base.push(surface);
+  return base;
+}
+
 function openSurfaceStack(
   surfaces: readonly GameSurface[],
   surface: GameSurface,
 ): readonly GameSurface[] {
   const keptGuide = findGuide(surfaces);
 
-  switch (surface.kind) {
-    case "guide":
-      return [
-        {
-          kind: "guide",
-          target: surface.target ?? keptGuide?.target,
-        },
-      ];
-    case "players":
-      return keptGuide ? [keptGuide, surface] : [surface];
-    case "scouting": {
-      const base: GameSurface[] = [];
-      if (keptGuide) base.push(keptGuide);
-      if (surfaces.some((item) => item.kind === "players")) {
-        base.push({ kind: "players" });
-      }
-      base.push(surface);
-      return base;
-    }
-    case "zone":
-    case "actions":
-    case "submitResult":
-      return keptGuide?.minimized ? [keptGuide, surface] : [surface];
-    case "cardMenu": {
-      const base: GameSurface[] = [];
-      if (keptGuide?.minimized) base.push(keptGuide);
-      const openZone = findZone(surfaces);
-      if (openZone) base.push(openZone);
-      base.push(surface);
-      return base;
-    }
-    case "submitHand":
-    case "upgrades":
-    case "share":
-      return [surface];
+  if (surface.kind === "guide") {
+    return [{ kind: "guide", target: surface.target ?? keptGuide?.target }];
   }
+  if (surface.kind === "players") {
+    return keptGuide ? [keptGuide, surface] : [surface];
+  }
+  if (surface.kind === "scouting") {
+    return openScoutingSurface(surfaces, surface, keptGuide);
+  }
+  if (
+    surface.kind === "submitHand" ||
+    surface.kind === "upgrades" ||
+    surface.kind === "share"
+  ) {
+    return [surface];
+  }
+  return openOverlaySurface(surfaces, surface, keptGuide);
 }
 
 function closeSurfaceKind(
@@ -276,27 +290,27 @@ function clearSurfacesForPhase(
   return changed ? next : surfaces;
 }
 
+const FIGHT_END_CLOSED_KINDS = new Set<GameSurfaceKind>([
+  "zone",
+  "actions",
+  "cardMenu",
+  "submitResult",
+  "scouting",
+]);
+
+function isClosedOnFightEnd(surface: GameSurface): boolean {
+  return (
+    FIGHT_END_CLOSED_KINDS.has(surface.kind) ||
+    (surface.kind === "upgrades" && surface.mode === "reveal")
+  );
+}
+
 function clearSurfacesForFightEnd(
   surfaces: readonly GameSurface[],
 ): readonly GameSurface[] {
   if (surfaces.length === 0) return surfaces;
-  let changed = false;
-  const next: GameSurface[] = [];
-  for (const surface of surfaces) {
-    if (
-      surface.kind === "zone" ||
-      surface.kind === "actions" ||
-      surface.kind === "cardMenu" ||
-      surface.kind === "submitResult" ||
-      surface.kind === "scouting" ||
-      (surface.kind === "upgrades" && surface.mode === "reveal")
-    ) {
-      changed = true;
-      continue;
-    }
-    next.push(surface);
-  }
-  return changed ? next : surfaces;
+  const next = surfaces.filter((surface) => !isClosedOnFightEnd(surface));
+  return next.length === surfaces.length ? surfaces : next;
 }
 
 function keepsSelectedCard(
@@ -346,9 +360,36 @@ function withSurfaces(
   };
 }
 
-export function reduceGameSurfaces(
+function reducePhaseChanged(
   state: GameSurfacesState,
-  event: GameSurfacesEvent,
+  phase: string | undefined,
+): GameSurfacesState {
+  const nextSurfaces = clearSurfacesForPhase(state.surfaces, phase);
+  const keepSelected =
+    phase === "battle" &&
+    keepsSelectedCard(state.surfaces, nextSurfaces, state.selectedCard);
+  const nextSelected = keepSelected ? state.selectedCard : null;
+  if (
+    state.phase === phase &&
+    nextSurfaces === state.surfaces &&
+    nextSelected === state.selectedCard
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    phase,
+    surfaces: nextSurfaces,
+    selectedCard: nextSelected,
+  };
+}
+
+function reduceSurfaceNavigationEvent(
+  state: GameSurfacesState,
+  event: Extract<
+    GameSurfacesEvent,
+    { type: "open" | "toggle" | "close" | "escape" | "scout" | "closeOverlays" }
+  >,
 ): GameSurfacesState {
   switch (event.type) {
     case "open":
@@ -356,7 +397,6 @@ export function reduceGameSurfaces(
         state,
         openSurfaceStack(state.surfaces, event.surface),
       );
-
     case "toggle": {
       const top = state.surfaces[state.surfaces.length - 1];
       if (top && isSameSurface(top, event.surface)) {
@@ -367,15 +407,12 @@ export function reduceGameSurfaces(
         openSurfaceStack(state.surfaces, event.surface),
       );
     }
-
     case "close":
       return withSurfaces(state, closeSurfaceKind(state.surfaces, event.kind));
-
-    case "escape": {
-      if (state.surfaces.length === 0) return state;
-      return withSurfaces(state, state.surfaces.slice(0, -1));
-    }
-
+    case "escape":
+      return state.surfaces.length === 0
+        ? state
+        : withSurfaces(state, state.surfaces.slice(0, -1));
     case "scout":
       return withSurfaces(
         state,
@@ -385,69 +422,138 @@ export function reduceGameSurfaces(
           tab: event.tab,
         }),
       );
-
-    case "guideMinimized": {
-      const guide = findGuide(state.surfaces);
-      if (!guide || !!guide.minimized === event.minimized) return state;
-      return withSurfaces(state, [{ ...guide, minimized: event.minimized }]);
-    }
-
     case "closeOverlays":
       return withSurfaces(
         state,
         closeOverlaySurfaces(state.surfaces, event.except),
       );
-
-    case "phaseChanged": {
-      const nextSurfaces = clearSurfacesForPhase(state.surfaces, event.phase);
-      const nextSelected =
-        event.phase !== "battle"
-          ? null
-          : keepsSelectedCard(state.surfaces, nextSurfaces, state.selectedCard)
-            ? state.selectedCard
-            : null;
-      if (
-        state.phase === event.phase &&
-        nextSurfaces === state.surfaces &&
-        nextSelected === state.selectedCard
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        phase: event.phase,
-        surfaces: nextSurfaces,
-        selectedCard: nextSelected,
-      };
-    }
-
-    case "fightEnded": {
-      const nextSurfaces = clearSurfacesForFightEnd(state.surfaces);
-      if (nextSurfaces === state.surfaces && state.selectedCard === null) {
-        return state;
-      }
-      return {
-        ...state,
-        surfaces: nextSurfaces,
-        selectedCard: null,
-      };
-    }
-
-    case "selectCard":
-      return event.card === state.selectedCard
-        ? state
-        : { ...state, selectedCard: event.card };
-
-    case "cardMoved":
-      return event.cardId === state.selectedCard?.card.id
-        ? { ...state, selectedCard: null }
-        : state;
-
-    case "dismissServerStatus":
-      return state.dismissedServerNoticeAt === event.updatedAt
-        ? state
-        : { ...state, dismissedServerNoticeAt: event.updatedAt };
+    default:
+      return state;
   }
+}
+
+function reduceSurfaceSelectionEvent(
+  state: GameSurfacesState,
+  event: Extract<
+    GameSurfacesEvent,
+    { type: "selectCard" | "cardMoved" | "dismissServerStatus" }
+  >,
+): GameSurfacesState {
+  if (event.type === "selectCard") {
+    return event.card === state.selectedCard
+      ? state
+      : { ...state, selectedCard: event.card };
+  }
+  if (event.type === "cardMoved") {
+    return event.cardId === state.selectedCard?.card.id
+      ? { ...state, selectedCard: null }
+      : state;
+  }
+  return state.dismissedServerNoticeAt === event.updatedAt
+    ? state
+    : { ...state, dismissedServerNoticeAt: event.updatedAt };
+}
+
+function reduceSurfaceLifecycleEvent(
+  state: GameSurfacesState,
+  event: Extract<
+    GameSurfacesEvent,
+    { type: "guideMinimized" | "phaseChanged" | "fightEnded" }
+  >,
+): GameSurfacesState {
+  if (event.type === "guideMinimized") {
+    const guide = findGuide(state.surfaces);
+    if (!guide || Boolean(guide.minimized) === event.minimized) return state;
+    return withSurfaces(state, [{ ...guide, minimized: event.minimized }]);
+  }
+  if (event.type === "phaseChanged") {
+    return reducePhaseChanged(state, event.phase);
+  }
+  const nextSurfaces = clearSurfacesForFightEnd(state.surfaces);
+  if (nextSurfaces === state.surfaces && state.selectedCard === null) {
+    return state;
+  }
+  return { ...state, surfaces: nextSurfaces, selectedCard: null };
+}
+
+export function reduceGameSurfaces(
+  state: GameSurfacesState,
+  event: GameSurfacesEvent,
+): GameSurfacesState {
+  if (
+    event.type === "selectCard" ||
+    event.type === "cardMoved" ||
+    event.type === "dismissServerStatus"
+  ) {
+    return reduceSurfaceSelectionEvent(state, event);
+  }
+  if (
+    event.type === "guideMinimized" ||
+    event.type === "phaseChanged" ||
+    event.type === "fightEnded"
+  ) {
+    return reduceSurfaceLifecycleEvent(state, event);
+  }
+  return reduceSurfaceNavigationEvent(state, event);
+}
+
+interface ExtractedSurfaces {
+  guide: GuideSurface | null;
+  scouting: ScoutingSurface | null;
+  zone: ZonePanelSurface | null;
+  cardMenu: CardMenuSurface | null;
+  upgrades: UpgradesSurface | null;
+  kinds: Set<GameSurfaceKind>;
+}
+
+function extractSurfaces(surfaces: readonly GameSurface[]): ExtractedSurfaces {
+  let guide: GuideSurface | null = null;
+  let scouting: ScoutingSurface | null = null;
+  let zone: ZonePanelSurface | null = null;
+  let cardMenu: CardMenuSurface | null = null;
+  let upgrades: UpgradesSurface | null = null;
+  const kinds = new Set<GameSurfaceKind>();
+
+  for (const surface of surfaces) {
+    kinds.add(surface.kind);
+    if (surface.kind === "guide") guide = surface;
+    else if (surface.kind === "scouting") scouting = surface;
+    else if (surface.kind === "zone") zone = surface;
+    else if (surface.kind === "cardMenu") cardMenu = surface;
+    else if (surface.kind === "upgrades") upgrades = surface;
+  }
+
+  return { guide, scouting, zone, cardMenu, upgrades, kinds };
+}
+
+function computeGuideVisibility(
+  guide: GuideSurface | null,
+  topSurface: GameSurface | null,
+): {
+  guideOnScreen: boolean;
+  guideExpanded: boolean;
+  guideMinimized: boolean;
+  guideBlocksGuides: boolean;
+} {
+  const guideMinimized = Boolean(guide?.minimized);
+  const notSubmitResult = topSurface?.kind !== "submitResult";
+  const guideOnScreen =
+    topSurface?.kind === "guide" || (guideMinimized && notSubmitResult);
+  return {
+    guideOnScreen,
+    guideExpanded: guideOnScreen && !guideMinimized,
+    guideMinimized,
+    guideBlocksGuides: guide !== null && notSubmitResult,
+  };
+}
+
+function hasModalBlockingSurface(found: ExtractedSurfaces): boolean {
+  return (
+    found.upgrades !== null ||
+    found.kinds.has("actions") ||
+    found.kinds.has("share") ||
+    found.cardMenu !== null
+  );
 }
 
 export function selectGameSurfacesView(
@@ -455,90 +561,36 @@ export function selectGameSurfacesView(
 ): GameSurfacesView {
   const { surfaces } = state;
   const topSurface = surfaces[surfaces.length - 1] ?? null;
-  let guideSurface: GuideSurface | null = null;
-  let scoutingSurface: ScoutingSurface | null = null;
-  let zoneSurface: ZonePanelSurface | null = null;
-  let cardMenuSurface: CardMenuSurface | null = null;
-  let upgradesWindow: UpgradesSurface | null = null;
-  let drawerOpen = false;
-  let actionMenuOpen = false;
-  let submitHandOpen = false;
-  let submitResultOpen = false;
-  let shareOpen = false;
-
-  for (const surface of surfaces) {
-    switch (surface.kind) {
-      case "guide":
-        guideSurface = surface;
-        break;
-      case "players":
-        drawerOpen = true;
-        break;
-      case "scouting":
-        scoutingSurface = surface;
-        break;
-      case "zone":
-        zoneSurface = surface;
-        break;
-      case "actions":
-        actionMenuOpen = true;
-        break;
-      case "cardMenu":
-        cardMenuSurface = surface;
-        break;
-      case "submitHand":
-        submitHandOpen = true;
-        break;
-      case "submitResult":
-        submitResultOpen = true;
-        break;
-      case "upgrades":
-        upgradesWindow = surface;
-        break;
-      case "share":
-        shareOpen = true;
-        break;
-    }
-  }
-
-  const guideMinimized = !!guideSurface?.minimized;
-  const guideOnScreen =
-    topSurface?.kind === "guide" ||
-    (guideMinimized && topSurface?.kind !== "submitResult");
-  const guideExpanded = guideOnScreen && !guideMinimized;
-  const modalBlocking =
-    upgradesWindow !== null ||
-    actionMenuOpen ||
-    shareOpen ||
-    cardMenuSurface !== null;
+  const found = extractSurfaces(surfaces);
+  const drawerOpen = found.kinds.has("players");
+  const guideVis = computeGuideVisibility(found.guide, topSurface);
+  const modalBlocking = hasModalBlockingSurface(found);
 
   return {
     topSurface,
-    guideSurface,
-    guideOnScreen,
-    guideExpanded,
-    guideMinimized,
+    guideSurface: found.guide,
+    guideOnScreen: guideVis.guideOnScreen,
+    guideExpanded: guideVis.guideExpanded,
+    guideMinimized: guideVis.guideMinimized,
     drawerOpen,
-    scouting: scoutingSurface
+    scouting: found.scouting
       ? {
-          player: scoutingSurface.player,
-          tab: scoutingSurface.tab,
+          player: found.scouting.player,
+          tab: found.scouting.tab,
           fromDrawer: drawerOpen,
         }
       : null,
-    zonePanel: zoneSurface
-      ? { zone: zoneSurface.zone, owner: zoneSurface.owner }
+    zonePanel: found.zone
+      ? { zone: found.zone.zone, owner: found.zone.owner }
       : null,
-    cardMenu: cardMenuSurface?.menu ?? null,
-    upgradesWindow,
-    actionMenuOpen,
-    submitHandOpen,
-    submitResultOpen,
-    shareOpen,
-    blocksHotkeys: guideExpanded || modalBlocking,
-    blocksGuides:
-      (guideSurface !== null && topSurface?.kind !== "submitResult") ||
-      modalBlocking,
+    cardMenu: found.cardMenu?.menu ?? null,
+    upgradesWindow: found.upgrades,
+    actionMenuOpen: found.kinds.has("actions"),
+    submitHandOpen: found.kinds.has("submitHand"),
+    submitResultOpen: found.kinds.has("submitResult"),
+    shareOpen: found.kinds.has("share"),
+    blocksHotkeys: guideVis.guideExpanded || modalBlocking,
+    blocksGuides: guideVis.guideBlocksGuides || modalBlocking,
   };
 }
 
@@ -559,7 +611,35 @@ export function isServerStatusHidden(
   return state.dismissedServerNoticeAt === notice.updated_at;
 }
 
-export function useGameSurfaces(phase: string | undefined) {
+export interface UseGameSurfacesResult extends Omit<
+  GameSurfacesView,
+  "scouting"
+> {
+  state: GameSurfacesState;
+  scouting: { player: string; tab: ScoutingTab } | null;
+  selectedCard: BattleSelectedCard | null;
+  isZonePanelOpen: (zone: PanelZone, owner: ZoneOwner) => boolean;
+  isServerStatusHidden: (
+    notice: ServerNoticeStatus | null | undefined,
+  ) => boolean;
+  open: (surface: GameSurface) => void;
+  toggle: (surface: GameSurface) => void;
+  close: (kind: GameSurfaceKind) => void;
+  escape: () => void;
+  scout: (player: string | null, tab?: ScoutingTab) => void;
+  setDrawerOpen: (openDrawer: boolean) => void;
+  setGuideMinimized: (minimized: boolean) => void;
+  closeOverlays: (except?: GameSurfaceKind) => void;
+  fightEnded: () => void;
+  setSelectedCard: (card: BattleSelectedCard | null) => void;
+  notifyCardMoved: (cardId: string) => void;
+  setCardMenu: (menu: BattleCardMenu | null) => void;
+  dismissServerStatus: (updatedAt: string) => void;
+}
+
+export function useGameSurfaces(
+  phase: string | undefined,
+): UseGameSurfacesResult {
   const [state, setState] = useState<GameSurfacesState>(() =>
     createGameSurfacesState(phase),
   );
@@ -654,10 +734,11 @@ export function useGameSurfaces(phase: string | undefined) {
     ...view,
     scouting,
     selectedCard: state.selectedCard,
-    isZonePanelOpen: (zone: PanelZone, owner: ZoneOwner) =>
+    isZonePanelOpen: (zone: PanelZone, owner: ZoneOwner): boolean =>
       isZonePanelOpen(state, zone, owner),
-    isServerStatusHidden: (notice: ServerNoticeStatus | null | undefined) =>
-      isServerStatusHidden(state, notice),
+    isServerStatusHidden: (
+      notice: ServerNoticeStatus | null | undefined,
+    ): boolean => isServerStatusHidden(state, notice),
     open,
     toggle,
     close,

@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, type RenderHookResult } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeWebSocket } from "../test/fakeWebSocket";
 import { connectAfterCurrentTask, useWebSocket } from "./useWebSocket";
 
-function renderSocket(gameId: string, sessionId: string) {
-  return renderHook(({ game, session }) => useWebSocket(game, session, null), {
-    initialProps: { game: gameId, session: sessionId },
-  });
+function renderSocket(
+  gameId: string,
+  sessionId: string,
+): RenderHookResult<
+  ReturnType<typeof useWebSocket>,
+  { game: string; session: string }
+> {
+  return renderHook(
+    ({ game, session }) =>
+      useWebSocket({ gameId: game, sessionId: session, spectatorConfig: null }),
+    {
+      initialProps: { game: gameId, session: sessionId },
+    },
+  );
 }
 
 async function openSocket(): Promise<FakeWebSocket> {

@@ -13,13 +13,13 @@ import {
   authRegister,
   getResumableGames,
 } from "../../api/client";
-import { useAuth } from "../../contexts/authState";
-import { useResumableGames } from "../useResumableGames";
+import { useAuth, type AuthState } from "../../contexts/authState";
+import { useResumableGames, type ResumableSeat } from "../useResumableGames";
 import { forgetAccountSeats } from "../../utils/deviceIdentity";
 import { prefetchLegendaryName } from "../../utils/prefetchName";
 import { dropForgottenSessions } from "../../utils/tabSession";
 
-export function useAuthSession() {
+export function useAuthSession(): AuthState {
   const [user, setUser] = useState<{
     user_id: string;
     username: string;
@@ -28,12 +28,12 @@ export function useAuthSession() {
 
   useEffect(() => {
     let cancelled = false;
-    authGetMe().then((u) => {
+    void authGetMe().then((u) => {
       if (cancelled) return;
       setUser(u);
       setLoading(false);
     });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, []);
@@ -64,7 +64,7 @@ export function useAuthSession() {
   return { user, loading, login, register, logout };
 }
 
-export function useRequireAuth(returnTo?: string) {
+export function useRequireAuth(returnTo?: string): AuthState {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuth();
@@ -72,7 +72,7 @@ export function useRequireAuth(returnTo?: string) {
 
   useEffect(() => {
     if (!auth.loading && !auth.user) {
-      navigate(`/login?returnTo=${targetReturnTo}`, { replace: true });
+      void navigate(`/login?returnTo=${targetReturnTo}`, { replace: true });
     }
   }, [auth.loading, auth.user, navigate, targetReturnTo]);
 
@@ -88,12 +88,17 @@ export function useRedirectWhen(
 
   useEffect(() => {
     if (condition) {
-      navigate(to, { replace });
+      void navigate(to, { replace });
     }
   }, [condition, to, replace, navigate]);
 }
 
-export function useHomeSession() {
+export function useHomeSession(): {
+  user: AuthState["user"];
+  loading: boolean;
+  seats: ResumableSeat[];
+  markSeatClosed: (gameId: string) => void;
+} {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const resumableGames = useResumableGames();
@@ -105,7 +110,7 @@ export function useHomeSession() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate("/dashboard", { replace: true });
+      void navigate("/dashboard", { replace: true });
     }
   }, [loading, user, navigate]);
 

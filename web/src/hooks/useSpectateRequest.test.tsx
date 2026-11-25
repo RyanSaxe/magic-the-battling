@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, type RenderHookResult } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cancelSpectateRequest,
@@ -20,18 +20,20 @@ const create = vi.mocked(createSpectateRequest);
 const getStatus = vi.mocked(getSpectateRequestStatus);
 const cancelRequest = vi.mocked(cancelSpectateRequest);
 
-function answers(...statuses: SpectateRequestStatus[]) {
+function answers(...statuses: SpectateRequestStatus[]): void {
   for (const status of statuses) getStatus.mockResolvedValueOnce(status);
   getStatus.mockResolvedValue(statuses[statuses.length - 1]);
 }
 
-async function settle(ms = 0) {
+async function settle(ms = 0): Promise<void> {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
   });
 }
 
-async function requestToWatch(target = "Alice") {
+async function requestToWatch(
+  target = "Alice",
+): Promise<RenderHookResult<ReturnType<typeof useSpectateRequest>, unknown>> {
   const hook = renderHook(() => useSpectateRequest("game-1"));
   await act(async () => {
     await hook.result.current.request(target, "Carol");

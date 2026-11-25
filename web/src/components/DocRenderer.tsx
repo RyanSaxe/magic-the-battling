@@ -1,3 +1,4 @@
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
@@ -11,7 +12,7 @@ import { selectInputBlocks } from "../docs/parse";
 import { canHover } from "../utils/inputMode";
 import { LINK } from "./common/styles";
 
-function urlTransform(url: string) {
+function urlTransform(url: string): string {
   if (url.startsWith("doc:") || url.startsWith("docs:")) return url;
   return defaultUrlTransform(url);
 }
@@ -27,95 +28,120 @@ const calloutOptions = {
 
 const HOTKEY_RE = /\{\{hotkeys:(\w[\w-]*)\}\}/;
 
+function DocLink({ href, children }: ComponentPropsWithoutRef<"a">): ReactNode {
+  const docNav = useDocNav();
+  if (href?.startsWith("doc:") || href?.startsWith("docs:")) {
+    const rest = href.startsWith("docs:") ? href.slice(5) : href.slice(4);
+    const [docId, tab] = rest.split("#");
+    return (
+      <button
+        onClick={() => docNav.navigate(docId, tab)}
+        className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors cursor-pointer`}
+      >
+        {children}
+      </button>
+    );
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors`}
+    >
+      {children}
+    </a>
+  );
+}
+
+const MARKDOWN_COMPONENTS: Components = {
+  h2: ({ children }): ReactNode => (
+    <h2 className="text-sm font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 first:mt-0 border-b border-amber-400/15 pb-1">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }): ReactNode => (
+    <h3 className="text-sm font-semibold text-amber-400/80 uppercase tracking-wider mt-4 mb-1.5">
+      {children}
+    </h3>
+  ),
+  p: ({ children }): ReactNode => (
+    <p className="text-sm text-[var(--ivory-muted)] mb-3 leading-relaxed">
+      {children}
+    </p>
+  ),
+  ul: ({ children }): ReactNode => (
+    <ul className="doc-list space-y-1.5 mb-3">{children}</ul>
+  ),
+  li: ({ children }): ReactNode => (
+    <li className="doc-list-item flex gap-2 text-sm text-[var(--ivory-muted)] leading-relaxed">
+      <span>{children}</span>
+    </li>
+  ),
+  table: ({ children }): ReactNode => (
+    <table className="w-full text-sm text-[var(--ivory-muted)] mb-3 [&_tr:nth-child(even)]:bg-white/3">
+      {children}
+    </table>
+  ),
+  th: ({ children }): ReactNode => (
+    <th className="text-left text-[var(--ivory-muted)] font-medium pb-1 pr-3 border-b border-amber-400/15">
+      {children}
+    </th>
+  ),
+  td: ({ children }): ReactNode => <td className="pb-1 pr-3">{children}</td>,
+  strong: ({ children }): ReactNode => (
+    <strong className="text-amber-200 font-semibold">{children}</strong>
+  ),
+  hr: (): ReactNode => <hr className="border-t border-amber-400/20 my-4" />,
+  blockquote: ({ children }): ReactNode => (
+    <blockquote className="border-l-3 border-amber-400/40 pl-4 italic text-[var(--ivory-muted)] my-3">
+      {children}
+    </blockquote>
+  ),
+  a: DocLink,
+};
+
+interface DocSegment {
+  key: string;
+  kind: "hotkeys" | "markdown";
+  value: string;
+}
+
+function splitDocSegments(content: string): DocSegment[] {
+  const parts = selectInputBlocks(content, canHover).split(HOTKEY_RE);
+  const seen = new Map<string, number>();
+  const segments: DocSegment[] = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    const value = parts[i];
+    const kind = i % 2 === 1 ? "hotkeys" : "markdown";
+    if (kind === "markdown" && !value) continue;
+    const base = `${kind}:${value}`;
+    const count = (seen.get(base) ?? 0) + 1;
+    seen.set(base, count);
+    segments.push({ key: `${base}#${count}`, kind, value });
+  }
+  return segments;
+}
+
 interface DocRendererProps {
   content: string;
   className?: string;
 }
 
-export function DocRenderer({ content, className }: DocRendererProps) {
-  const docNav = useDocNav();
-
-  const components: Components = {
-    h2: ({ children }) => (
-      <h2 className="text-sm font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 first:mt-0 border-b border-amber-400/15 pb-1">
-        {children}
-      </h2>
-    ),
-    h3: ({ children }) => (
-      <h3 className="text-sm font-semibold text-amber-400/80 uppercase tracking-wider mt-4 mb-1.5">
-        {children}
-      </h3>
-    ),
-    p: ({ children }) => (
-      <p className="text-sm text-[var(--ivory-muted)] mb-3 leading-relaxed">
-        {children}
-      </p>
-    ),
-    ul: ({ children }) => (
-      <ul className="doc-list space-y-1.5 mb-3">{children}</ul>
-    ),
-    li: ({ children }) => (
-      <li className="doc-list-item flex gap-2 text-sm text-[var(--ivory-muted)] leading-relaxed">
-        <span>{children}</span>
-      </li>
-    ),
-    table: ({ children }) => (
-      <table className="w-full text-sm text-[var(--ivory-muted)] mb-3 [&_tr:nth-child(even)]:bg-white/3">
-        {children}
-      </table>
-    ),
-    th: ({ children }) => (
-      <th className="text-left text-[var(--ivory-muted)] font-medium pb-1 pr-3 border-b border-amber-400/15">
-        {children}
-      </th>
-    ),
-    td: ({ children }) => <td className="pb-1 pr-3">{children}</td>,
-    strong: ({ children }) => (
-      <strong className="text-amber-200 font-semibold">{children}</strong>
-    ),
-    hr: () => <hr className="border-t border-amber-400/20 my-4" />,
-    blockquote: ({ children }) => (
-      <blockquote className="border-l-3 border-amber-400/40 pl-4 italic text-[var(--ivory-muted)] my-3">
-        {children}
-      </blockquote>
-    ),
-    a: ({ href, children }) => {
-      if (href?.startsWith("doc:") || href?.startsWith("docs:")) {
-        const rest = href.startsWith("docs:") ? href.slice(5) : href.slice(4);
-        const [docId, tab] = rest.split("#");
-        return (
-          <button
-            onClick={() => docNav.navigate(docId, tab)}
-            className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors cursor-pointer`}
-          >
-            {children}
-          </button>
-        );
-      }
-      return (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors`}
-        >
-          {children}
-        </a>
-      );
-    },
-  };
-
-  const segments = selectInputBlocks(content, canHover).split(HOTKEY_RE);
+export function DocRenderer({
+  content,
+  className,
+}: DocRendererProps): ReactNode {
+  const segments = splitDocSegments(content);
 
   return (
     <div className={className}>
-      {segments.map((segment, i) => {
-        if (i % 2 === 1) {
-          const key = segment;
-          const hotkeys = PHASE_HOTKEYS[key] ?? [];
-          const hoverHotkeys = PHASE_HOTKEYS[`${key}-hover`] ?? [];
+      {segments.map((segment) => {
+        if (segment.kind === "hotkeys") {
+          const hotkeys = PHASE_HOTKEYS[segment.value] ?? [];
+          const hoverHotkeys = PHASE_HOTKEYS[`${segment.value}-hover`] ?? [];
           return (
-            <div key={i} className="space-y-4">
+            <div key={segment.key} className="space-y-4">
               {hotkeys.length > 0 && (
                 <div className="space-y-1.5">
                   {hotkeys.map((entry) => (
@@ -138,10 +164,9 @@ export function DocRenderer({ content, className }: DocRendererProps) {
             </div>
           );
         }
-        if (!segment) return null;
         return (
           <Markdown
-            key={i}
+            key={segment.key}
             remarkPlugins={[
               remarkGfm,
               remarkDirective,
@@ -149,9 +174,9 @@ export function DocRenderer({ content, className }: DocRendererProps) {
             ]}
             rehypePlugins={[rehypeRaw]}
             urlTransform={urlTransform}
-            components={components}
+            components={MARKDOWN_COMPONENTS}
           >
-            {segment}
+            {segment.value}
           </Markdown>
         );
       })}

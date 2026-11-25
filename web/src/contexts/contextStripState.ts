@@ -19,7 +19,7 @@ export interface ContextStripContextValue {
 export const ContextStripContext =
   createContext<ContextStripContextValue | null>(null);
 
-export function useContextStrip() {
+export function useContextStrip(): ContextStripContextValue {
   const context = useContext(ContextStripContext);
   if (!context) {
     throw new Error(

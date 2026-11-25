@@ -9,14 +9,23 @@ export interface ZoneDims {
   columns: number;
 }
 
-export function bestFit(
-  count: number,
-  availWidth: number,
-  availHeight: number,
-  gap: number,
-  maxWidth: number,
-  minWidth: number,
-): ZoneDims {
+export interface BestFitOptions {
+  count: number;
+  availWidth: number;
+  availHeight: number;
+  gap: number;
+  maxWidth: number;
+  minWidth: number;
+}
+
+export function bestFit({
+  count,
+  availWidth,
+  availHeight,
+  gap,
+  maxWidth,
+  minWidth,
+}: BestFitOptions): ZoneDims {
   if (count === 0) {
     return {
       width: maxWidth,
@@ -76,35 +85,43 @@ export function bestFit(
 
 function fitsWithinBounds(
   dims: ZoneDims,
-  availWidth: number,
-  availHeight: number,
-  gap: number,
+  bounds: { availWidth: number; availHeight: number; gap: number },
 ): boolean {
   const totalWidth =
-    dims.columns * dims.width + gap * Math.max(0, dims.columns - 1);
+    dims.columns * dims.width + bounds.gap * Math.max(0, dims.columns - 1);
   const totalHeight =
-    dims.rows * dims.height + gap * Math.max(0, dims.rows - 1);
+    dims.rows * dims.height + bounds.gap * Math.max(0, dims.rows - 1);
 
-  return totalWidth <= availWidth && totalHeight <= availHeight;
+  return totalWidth <= bounds.availWidth && totalHeight <= bounds.availHeight;
 }
 
-export function bestFitNoClip(
-  count: number,
-  availWidth: number,
-  availHeight: number,
-  gap: number,
-  maxWidth: number,
-  preferredMinWidth: number,
-): ZoneDims {
-  const preferred = bestFit(
+export interface BestFitNoClipOptions {
+  count: number;
+  availWidth: number;
+  availHeight: number;
+  gap: number;
+  maxWidth: number;
+  preferredMinWidth: number;
+}
+
+export function bestFitNoClip({
+  count,
+  availWidth,
+  availHeight,
+  gap,
+  maxWidth,
+  preferredMinWidth,
+}: BestFitNoClipOptions): ZoneDims {
+  const bounds = { availWidth, availHeight, gap };
+  const preferred = bestFit({
     count,
     availWidth,
     availHeight,
     gap,
     maxWidth,
-    preferredMinWidth,
-  );
-  if (fitsWithinBounds(preferred, availWidth, availHeight, gap)) {
+    minWidth: preferredMinWidth,
+  });
+  if (fitsWithinBounds(preferred, bounds)) {
     return preferred;
   }
 
@@ -131,7 +148,7 @@ export function bestFitNoClip(
       columns,
     };
 
-    if (!fitsWithinBounds(candidate, availWidth, availHeight, gap)) continue;
+    if (!fitsWithinBounds(candidate, bounds)) continue;
 
     const totalHeight = rows * candidate.height + gap * Math.max(0, rows - 1);
     const fill = availHeight > 0 ? Math.min(1, totalHeight / availHeight) : 0;

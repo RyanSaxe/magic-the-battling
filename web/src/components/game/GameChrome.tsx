@@ -26,6 +26,32 @@ import { SubmitPopover } from "../common/SubmitPopover";
 import { PhaseTimeline } from "../PhaseTimeline";
 import type { RulesPanelTarget } from "../RulesPanel";
 
+function OutTopBarSummary({
+  stage,
+  round,
+  isSpectator,
+  outPlace,
+}: {
+  stage: number;
+  round: number;
+  isSpectator: boolean;
+  outPlace: string;
+}): ReactNode {
+  return (
+    <div className="flex flex-1 min-w-0 items-center gap-2 max-lg:-translate-y-0.5 whitespace-nowrap">
+      <span className="text-xs sm:text-sm text-[#e2d8cb] font-mono">
+        {stage}-{round}
+      </span>
+      <span className="out-title text-[13px] sm:text-[14px]">
+        {isSpectator ? "Out" : "You’re out"}
+      </span>
+      <span className="min-w-0 truncate text-xs sm:text-sm text-[var(--ivory-muted)]">
+        {outPlace}
+      </span>
+    </div>
+  );
+}
+
 export function GameTopBar({
   gameState,
   timelinePhase,
@@ -54,9 +80,13 @@ export function GameTopBar({
   onToggleSidebar: () => void;
   onOpenRulesPanel: (target?: RulesPanelTarget) => void;
   onCloseActions: () => void;
-}) {
+}): ReactNode {
   const { self_player } = gameState;
   const isStageIncreasing = self_player.is_stage_increasing;
+  const timelineTitle =
+    isEndPhase && !displayBattleResolution
+      ? `${getOrdinal(selfPlacement)} Place`
+      : undefined;
 
   return (
     <div className="relative">
@@ -65,17 +95,12 @@ export function GameTopBar({
           <>
             <BrandMark className="hidden sm:block mr-2" />
             {isOut ? (
-              <div className="flex flex-1 min-w-0 items-center gap-2 max-lg:-translate-y-0.5 whitespace-nowrap">
-                <span className="text-xs sm:text-sm text-[#e2d8cb] font-mono">
-                  {self_player.stage}-{self_player.round}
-                </span>
-                <span className="out-title text-[13px] sm:text-[14px]">
-                  {isSpectator ? "Out" : "You’re out"}
-                </span>
-                <span className="min-w-0 truncate text-xs sm:text-sm text-[var(--ivory-muted)]">
-                  {outPlace}
-                </span>
-              </div>
+              <OutTopBarSummary
+                stage={self_player.stage}
+                round={self_player.round}
+                isSpectator={isSpectator}
+                outPlace={outPlace}
+              />
             ) : (
               <PhaseTimeline
                 currentPhase={timelinePhase}
@@ -92,11 +117,7 @@ export function GameTopBar({
                 useUpgrades={gameState.use_upgrades}
                 onOpenRules={onOpenRulesPanel}
                 onStepClick={onCloseActions}
-                title={
-                  isEndPhase && !displayBattleResolution
-                    ? `${getOrdinal(selfPlacement)} Place`
-                    : undefined
-                }
+                title={timelineTitle}
               />
             )}
           </>
@@ -245,13 +266,10 @@ function buildDraftActionSlots(props: GameBottomBarProps): {
   };
 }
 
-function buildBuildActionSlots(props: GameBottomBarProps): {
-  left: ReactNode;
-  right: ReactNode;
-} {
-  const { self_player } = props.gameState;
-  const left =
-    self_player.upgrades.length === 0 ? null : props.hasPendingBuildUpgrades ? (
+function buildBuildLeftSlot(props: GameBottomBarProps): ReactNode {
+  if (props.gameState.self_player.upgrades.length === 0) return null;
+  if (props.hasPendingBuildUpgrades) {
+    return (
       <button
         onClick={() => props.onOpenUpgradesModal(undefined, "auto")}
         className="btn btn-game btn-pending"
@@ -259,14 +277,24 @@ function buildBuildActionSlots(props: GameBottomBarProps): {
       >
         Apply Upgrade
       </button>
-    ) : (
-      <button
-        onClick={() => props.onOpenUpgradesModal(undefined, "view")}
-        className="btn btn-secondary"
-      >
-        View Upgrades
-      </button>
     );
+  }
+  return (
+    <button
+      onClick={() => props.onOpenUpgradesModal(undefined, "view")}
+      className="btn btn-secondary"
+    >
+      View Upgrades
+    </button>
+  );
+}
+
+function buildBuildActionSlots(props: GameBottomBarProps): {
+  left: ReactNode;
+  right: ReactNode;
+} {
+  const { self_player } = props.gameState;
+  const left = buildBuildLeftSlot(props);
 
   const right = self_player.build_ready ? (
     <div
@@ -293,12 +321,12 @@ function buildBuildActionSlots(props: GameBottomBarProps): {
           options={[
             {
               label: "Play",
-              onClick: () => props.onBuildReadySubmit("play"),
+              onClick: (): void => props.onBuildReadySubmit("play"),
               className: "btn btn-success text-sm py-1.5",
             },
             {
               label: "Draw",
-              onClick: () => props.onBuildReadySubmit("draw"),
+              onClick: (): void => props.onBuildReadySubmit("draw"),
               className: "btn btn-success text-sm py-1.5",
             },
           ]}
@@ -318,16 +346,11 @@ function buildBuildActionSlots(props: GameBottomBarProps): {
   return { left, right };
 }
 
-function buildBattleActionSlots(
-  props: GameBottomBarProps,
-  battle: BattleView,
-): { left: ReactNode; right: ReactNode } {
-  const { self_player } = props.gameState;
-  const { opponent_name, result_submissions } = battle;
-  const mySubmission = result_submissions[self_player.name];
-  const opponentSubmission = result_submissions[opponent_name];
-
-  const left = (
+function buildBattleLeftSlot(props: GameBottomBarProps): ReactNode {
+  const handleActionsClick = props.actionMenuOpen
+    ? (): void => props.onCloseSurface("actions")
+    : props.onOpenActionMenu;
+  return (
     <div className="flex items-center gap-1.5 sm:gap-2">
       {props.hasUnrevealedBattleUpgrades && (
         <button
@@ -339,11 +362,7 @@ function buildBattleActionSlots(
         </button>
       )}
       <button
-        onClick={
-          props.actionMenuOpen
-            ? () => props.onCloseSurface("actions")
-            : props.onOpenActionMenu
-        }
+        onClick={handleActionsClick}
         className="btn btn-secondary"
         data-guide-target="battle-actions"
       >
@@ -351,6 +370,17 @@ function buildBattleActionSlots(
       </button>
     </div>
   );
+}
+
+function buildBattleActionSlots(
+  props: GameBottomBarProps,
+  battle: BattleView,
+): { left: ReactNode; right: ReactNode } {
+  const { self_player } = props.gameState;
+  const { opponent_name, result_submissions } = battle;
+  const mySubmission = result_submissions[self_player.name];
+  const opponentSubmission = result_submissions[opponent_name];
+  const left = buildBattleLeftSlot(props);
 
   if (mySubmission && !props.changingResult) {
     const resultsConflict = hasBattleResultConflict({
@@ -408,17 +438,18 @@ function buildBattleActionSlots(
             options={[
               {
                 label: "I Won",
-                onClick: () => props.onBattleResultSubmit(self_player.name),
+                onClick: (): void =>
+                  props.onBattleResultSubmit(self_player.name),
                 className: "btn btn-success text-sm py-1.5",
               },
               {
                 label: "Draw",
-                onClick: () => props.onBattleResultSubmit("draw"),
+                onClick: (): void => props.onBattleResultSubmit("draw"),
                 className: "btn btn-secondary text-sm py-1.5",
               },
               {
                 label: "I Lost",
-                onClick: () => props.onBattleResultSubmit(opponent_name),
+                onClick: (): void => props.onBattleResultSubmit(opponent_name),
                 className: "btn btn-danger text-sm py-1.5",
               },
             ]}
@@ -437,6 +468,14 @@ function buildBattleActionSlots(
   };
 }
 
+function getRewardButtonLabel(
+  needsUpgrade: boolean,
+  selectedUpgradeId: string | null,
+): string {
+  if (!needsUpgrade) return REWARD_CONTINUE_BUTTON_LABEL;
+  return selectedUpgradeId ? "Claim & Continue" : "Select Upgrade";
+}
+
 function buildPhaseActionSlots(props: GameBottomBarProps): {
   left: ReactNode;
   right: ReactNode;
@@ -447,11 +486,10 @@ function buildPhaseActionSlots(props: GameBottomBarProps): {
     return buildBattleActionSlots(props, props.actionBarBattle);
   }
   if (props.actionBarPhase === "reward") {
-    const buttonLabel = props.needsUpgrade
-      ? props.selectedUpgradeId
-        ? "Claim & Continue"
-        : "Select Upgrade"
-      : REWARD_CONTINUE_BUTTON_LABEL;
+    const buttonLabel = getRewardButtonLabel(
+      props.needsUpgrade,
+      props.selectedUpgradeId,
+    );
     return {
       left: null,
       right: (
@@ -473,9 +511,69 @@ function buildPhaseActionSlots(props: GameBottomBarProps): {
   return { left: null, right: null };
 }
 
-export function GameBottomBar(props: GameBottomBarProps) {
+function EndOfGameSecondaryActions({
+  shareUrl,
+  watchUrl,
+  canSpectate,
+  isSpectator,
+}: {
+  shareUrl: string;
+  watchUrl: string;
+  canSpectate: boolean;
+  isSpectator: boolean;
+}): ReactNode {
+  return (
+    <>
+      <button
+        className="btn btn-secondary"
+        onClick={() => window.open(shareUrl, "_blank", "noopener,noreferrer")}
+      >
+        Review
+      </button>
+      {canSpectate && !isSpectator && (
+        <button
+          onClick={() => window.open(watchUrl, "_blank", "noopener")}
+          className="btn btn-secondary"
+        >
+          Spectate
+        </button>
+      )}
+    </>
+  );
+}
+
+function EndOfGameMainAction({
+  watchesOutPlayer,
+  canSpectate,
+  watchUrl,
+  onOpenShareModal,
+}: {
+  watchesOutPlayer: boolean;
+  canSpectate: boolean;
+  watchUrl: string;
+  onOpenShareModal: () => void;
+}): ReactNode {
+  if (!watchesOutPlayer) {
+    return (
+      <button className="btn btn-primary" onClick={onOpenShareModal}>
+        Share Game
+      </button>
+    );
+  }
+  if (!canSpectate) return null;
+  return (
+    <button
+      className="btn btn-primary"
+      onClick={() => window.open(watchUrl, "_blank", "noopener")}
+    >
+      Watch Another
+    </button>
+  );
+}
+
+export function GameBottomBar(props: GameBottomBarProps): ReactNode {
   const endOfGame =
-    props.isEndPhase && !!props.gameId && !props.displayBattleResolution;
+    props.isEndPhase && Boolean(props.gameId) && !props.displayBattleResolution;
   const slots = endOfGame
     ? { left: null, right: null }
     : buildPhaseActionSlots(props);
@@ -487,51 +585,24 @@ export function GameBottomBar(props: GameBottomBarProps) {
       inert={props.isSpectator && !props.watchesOutPlayer}
       secondary={
         endOfGame ? (
-          <>
-            <button
-              className="btn btn-secondary"
-              onClick={() =>
-                window.open(props.shareUrl, "_blank", "noopener,noreferrer")
-              }
-            >
-              Review
-            </button>
-            {props.canSpectate && !props.isSpectator && (
-              <button
-                onClick={() =>
-                  window.open(props.watchUrl, "_blank", "noopener")
-                }
-                className="btn btn-secondary"
-              >
-                Spectate
-              </button>
-            )}
-          </>
+          <EndOfGameSecondaryActions
+            shareUrl={props.shareUrl}
+            watchUrl={props.watchUrl}
+            canSpectate={props.canSpectate}
+            isSpectator={props.isSpectator}
+          />
         ) : (
           slots.left
         )
       }
       main={
         endOfGame ? (
-          props.watchesOutPlayer ? (
-            props.canSpectate && (
-              <button
-                className="btn btn-primary"
-                onClick={() =>
-                  window.open(props.watchUrl, "_blank", "noopener")
-                }
-              >
-                Watch Another
-              </button>
-            )
-          ) : (
-            <button
-              className="btn btn-primary"
-              onClick={props.onOpenShareModal}
-            >
-              Share Game
-            </button>
-          )
+          <EndOfGameMainAction
+            watchesOutPlayer={props.watchesOutPlayer}
+            canSpectate={props.canSpectate}
+            watchUrl={props.watchUrl}
+            onOpenShareModal={props.onOpenShareModal}
+          />
         ) : (
           slots.right
         )

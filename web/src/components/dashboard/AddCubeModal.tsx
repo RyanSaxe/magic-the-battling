@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useId, useRef, useState, type ReactElement } from "react";
 import { createBattler } from "../../api/client";
 import { useAsyncAction } from "../../hooks/useAsyncResource";
 import type { PlayMode, UserBattler } from "../../types";
@@ -19,7 +19,10 @@ export function AddCubeModal({
   onClose: () => void;
   onCreated: (b: UserBattler) => void;
   addToast: (msg: string, type: "error" | "info") => void;
-}) {
+}): ReactElement {
+  const cubeInputId = useId();
+  const displayNameInputId = useId();
+  const focusedRef = useRef(false);
   const [cubeId, setCubeId] = useState(initialCubeId);
   const [displayName, setDisplayName] = useState("");
   const [playMode, setPlayMode] = useState<PlayMode>("limited");
@@ -51,7 +54,7 @@ export function AddCubeModal({
     ),
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     const trimmed = cubeId.trim();
     if (!trimmed) {
@@ -65,24 +68,33 @@ export function AddCubeModal({
     <Dialog title="Add Cube / Deck" onClose={onClose} onSubmit={handleSubmit}>
       <div className="space-y-3">
         <div>
-          <label className={FIELD_LABEL}>CubeCobra ID</label>
+          <label htmlFor={cubeInputId} className={FIELD_LABEL}>
+            CubeCobra ID
+          </label>
           <input
+            id={cubeInputId}
             type="text"
             value={cubeId}
             onChange={(e) => setCubeId(e.target.value)}
             className={TEXT_INPUT}
             placeholder="e.g. auto, or paste the cube's link"
-            autoFocus
+            ref={(el): void => {
+              if (el && !focusedRef.current) {
+                focusedRef.current = true;
+                el.focus();
+              }
+            }}
             required
           />
         </div>
 
         <div>
-          <label className={FIELD_LABEL}>
+          <label htmlFor={displayNameInputId} className={FIELD_LABEL}>
             Display Name{" "}
             <span className="text-[var(--ivory-muted)]">(optional)</span>
           </label>
           <input
+            id={displayNameInputId}
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}

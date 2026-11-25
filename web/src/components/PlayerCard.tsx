@@ -22,6 +22,29 @@ export interface PlayerCardProps {
   guideName?: string;
 }
 
+interface PlayerCardClassFlags {
+  hasLead: boolean;
+  isSelf: boolean;
+  isOut: boolean;
+  hasControl: boolean;
+  isOpen: boolean;
+  hasActions: boolean;
+}
+
+function getPlayerCardClassName(flags: PlayerCardClassFlags): string {
+  return [
+    "player-card",
+    !flags.hasLead && "is-unranked",
+    flags.isSelf && "is-self",
+    flags.isOut && "is-out",
+    flags.hasControl && "has-control",
+    flags.isOpen && "is-open",
+    flags.hasActions && "has-actions",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /**
  * A player's card. The card is one button that selects the player, and an optional control such as the mic sits
  * beside it, over a space kept free at the start of the name line, because a button can't hold another button.
@@ -40,18 +63,15 @@ export function PlayerCard({
   onSelect,
   disabled,
   guideName,
-}: PlayerCardProps) {
-  const className = [
-    "player-card",
-    !lead && "is-unranked",
-    isSelf && "is-self",
-    isOut && "is-out",
-    control && "has-control",
-    isOpen && "is-open",
-    actions && "has-actions",
-  ]
-    .filter(Boolean)
-    .join(" ");
+}: PlayerCardProps): ReactNode {
+  const className = getPlayerCardClassName({
+    hasLead: Boolean(lead),
+    isSelf,
+    isOut,
+    hasControl: Boolean(control),
+    isOpen,
+    hasActions: Boolean(actions),
+  });
   const face = (
     <>
       {lead}

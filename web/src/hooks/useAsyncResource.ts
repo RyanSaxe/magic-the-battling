@@ -18,12 +18,29 @@ interface UseAsyncResourceOptions<T> {
   initialData?: T;
 }
 
+export function useDepsVersion(deps: readonly unknown[]): number {
+  const [tracked, setTracked] = useState<{
+    deps: readonly unknown[];
+    version: number;
+  }>({ deps, version: 0 });
+  const changed =
+    tracked.deps.length !== deps.length ||
+    deps.some((value, index) => !Object.is(value, tracked.deps[index]));
+  if (changed) {
+    const next = { deps, version: tracked.version + 1 };
+    setTracked(next);
+    return next.version;
+  }
+  return tracked.version;
+}
+
 export function useAsyncResource<T>(
   load: (signal: AbortSignal) => Promise<T>,
   deps: readonly unknown[],
   options?: UseAsyncResourceOptions<T>,
 ): AsyncResourceState<T> {
   const enabled = options?.enabled ?? true;
+  const depsVersion = useDepsVersion(deps);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{
     data: T | undefined;
@@ -38,7 +55,7 @@ export function useAsyncResource<T>(
   const runLoad = useEffectEvent((signal: AbortSignal) => load(signal));
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || attempt < 0 || depsVersion < 0) return undefined;
     const controller = new AbortController();
     let cancelled = false;
 
@@ -55,13 +72,11 @@ export function useAsyncResource<T>(
       },
     );
 
-    return () => {
+    return (): void => {
       cancelled = true;
       controller.abort();
     };
-    // Callers supply the exact cache key dependencies via `deps`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, attempt, ...deps]);
+  }, [enabled, attempt, depsVersion]);
 
   const reload = useCallback(() => {
     setState((prev) => ({ data: prev.data, error: null, loading: true }));
@@ -90,6 +105,7 @@ export function usePollingResource<T>(
 ): AsyncResourceState<T> {
   const enabled = options.enabled ?? true;
   const maxFailures = options.maxConsecutiveFailures ?? 3;
+  const depsVersion = useDepsVersion(deps);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{
     data: T | undefined;
@@ -107,19 +123,19 @@ export function usePollingResource<T>(
   );
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || attempt < 0 || depsVersion < 0) return undefined;
     let intervalId: number | null = null;
     let failures = 0;
     let cancelled = false;
 
-    const stopPolling = () => {
+    const stopPolling = (): void => {
       if (intervalId !== null) {
         window.clearInterval(intervalId);
         intervalId = null;
       }
     };
 
-    const fetchOnce = () => {
+    const fetchOnce = (): void => {
       runLoad().then(
         (data) => {
           failures = 0;
@@ -142,13 +158,11 @@ export function usePollingResource<T>(
     fetchOnce();
     intervalId = window.setInterval(fetchOnce, options.intervalMs);
 
-    return () => {
+    return (): void => {
       cancelled = true;
       stopPolling();
     };
-    // Callers supply the exact cache key dependencies via `deps`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, attempt, options.intervalMs, maxFailures, ...deps]);
+  }, [enabled, attempt, options.intervalMs, maxFailures, depsVersion]);
 
   const reload = useCallback(() => {
     setState((prev) => ({ data: prev.data, error: null, loading: true }));

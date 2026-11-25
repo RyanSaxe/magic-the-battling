@@ -12,7 +12,7 @@ interface FittedCounter {
   paddingInline: number;
 }
 
-function isPowerToughness(type: string) {
+function isPowerToughness(type: string): boolean {
   return type === "+1/+1" || type === "-1/-1";
 }
 
@@ -24,10 +24,21 @@ export function formatCounter(type: string, count: number): string {
 
 let canvasContext: CanvasRenderingContext2D | undefined;
 
+function getCanvasContext(): CanvasRenderingContext2D {
+  if (!canvasContext) {
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) {
+      throw new Error("2D canvas context unavailable");
+    }
+    canvasContext = ctx;
+  }
+  return canvasContext;
+}
+
 function measureText(text: string, fontSize: number): number {
-  canvasContext ??= document.createElement("canvas").getContext("2d")!;
-  canvasContext.font = `600 ${fontSize}px ${getComputedStyle(document.body).fontFamily}`;
-  return canvasContext.measureText(text).width;
+  const ctx = getCanvasContext();
+  ctx.font = `600 ${fontSize}px ${getComputedStyle(document.body).fontFamily}`;
+  return ctx.measureText(text).width;
 }
 
 /** Each counter whole inside its card: as large as fits, with a name too long for the card left to the zoom. */
@@ -49,8 +60,9 @@ export function fitCounters(
   return entries.map(([type, count]) => {
     const label = formatCounter(type, count);
     for (let fontSize = largest; fontSize >= SMALLEST_FONT; fontSize -= 0.5) {
-      if (measureText(label, fontSize) <= room)
+      if (measureText(label, fontSize) <= room) {
         return { type, text: label, fontSize, paddingInline };
+      }
     }
     // Power and toughness mean nothing as a lone number, so they shrink instead.
     const text = isPowerToughness(type) ? label : String(count);

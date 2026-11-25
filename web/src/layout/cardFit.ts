@@ -56,13 +56,21 @@ export function zoneGridHeight(dims: ZoneDims, gap: number): number {
   return dims.rows * dims.height + verticalGaps(dims.rows, gap);
 }
 
-export function widthCapForRows(
-  count: number,
-  availableWidth: number,
-  rows: number,
-  gap: number,
-  maxCardWidth: number,
-): number {
+export interface WidthCapForRowsArgs {
+  count: number;
+  availableWidth: number;
+  rows: number;
+  gap: number;
+  maxCardWidth: number;
+}
+
+export function widthCapForRows({
+  count,
+  availableWidth,
+  rows,
+  gap,
+  maxCardWidth,
+}: WidthCapForRowsArgs): number {
   const cols = Math.ceil(count / rows);
   const hGaps = horizontalGaps(cols, gap);
   return Math.min(maxCardWidth, Math.floor((availableWidth - hGaps) / cols));
@@ -78,15 +86,27 @@ export function widthCapForHeight(
   );
 }
 
+interface ResolvedCardFitBox {
+  count: number;
+  availableWidth: number;
+  availableHeight: number;
+  gap: number;
+  minCardWidth: number;
+  maxCardWidth: number;
+}
+
 function fitFannedRow(
-  count: number,
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  minCardWidth: number,
-  maxCardWidth: number,
+  box: ResolvedCardFitBox,
   maxOverlapRatio: number,
 ): CardFitResult {
+  const {
+    count,
+    availableWidth,
+    availableHeight,
+    gap,
+    minCardWidth,
+    maxCardWidth,
+  } = box;
   const heightCap = Math.floor(availableHeight / CARD_ASPECT_RATIO);
   const idealWidth = Math.max(minCardWidth, Math.min(heightCap, maxCardWidth));
 
@@ -114,38 +134,41 @@ function fitFannedRow(
   return { ...makeZoneDims(shrunkWidth, 1, count), gap: minGap };
 }
 
-function fitFixedRows(
-  count: number,
-  rows: number,
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  minCardWidth: number,
-  maxCardWidth: number,
-): CardFitResult {
-  const safeRows = Math.max(1, rows);
-  const columns = Math.ceil(count / safeRows);
-  const wFromW = widthCapForRows(
+function fitFixedRows(box: ResolvedCardFitBox, rows: number): CardFitResult {
+  const {
     count,
     availableWidth,
-    safeRows,
+    availableHeight,
+    gap,
+    minCardWidth,
+    maxCardWidth,
+  } = box;
+  const safeRows = Math.max(1, rows);
+  const columns = Math.ceil(count / safeRows);
+  const wFromW = widthCapForRows({
+    count,
+    availableWidth,
+    rows: safeRows,
     gap,
     maxCardWidth,
-  );
+  });
   const wFromH = widthCapForHeight(availableHeight, safeRows, gap);
   const width = Math.max(minCardWidth, Math.min(wFromW, wFromH));
   return { ...makeZoneDims(width, safeRows, columns), gap };
 }
 
 function fitFixedColumns(
-  count: number,
+  box: ResolvedCardFitBox,
   columns: number,
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  minCardWidth: number,
-  maxCardWidth: number,
 ): CardFitResult {
+  const {
+    count,
+    availableWidth,
+    availableHeight,
+    gap,
+    minCardWidth,
+    maxCardWidth,
+  } = box;
   const safeCols = Math.max(1, columns);
   const rows = Math.ceil(count / safeCols);
   const wFromW = Math.min(
@@ -157,26 +180,30 @@ function fitFixedColumns(
   return { ...makeZoneDims(width, rows, safeCols), gap };
 }
 
-function scoreGridCandidate(
-  width: number,
-  rows: number,
-  totalHeight: number,
-  availableHeight: number,
-): number {
+function scoreGridCandidate(args: {
+  width: number;
+  rows: number;
+  totalHeight: number;
+  availableHeight: number;
+}): number {
+  const { width, rows, totalHeight, availableHeight } = args;
   const fill =
     availableHeight > 0 ? Math.min(1, totalHeight / availableHeight) : 0;
   return width * Math.sqrt(fill) * Math.pow(0.9, rows - 1);
 }
 
 function fitGridRowCount(
-  count: number,
+  box: ResolvedCardFitBox,
   rows: number,
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  minCardWidth: number,
-  maxCardWidth: number,
 ): { dims: ZoneDims; score: number } | null {
+  const {
+    count,
+    availableWidth,
+    availableHeight,
+    gap,
+    minCardWidth,
+    maxCardWidth,
+  } = box;
   const columns = Math.ceil(count / rows);
   const naturalWidth =
     (availableWidth - horizontalGaps(columns, gap)) / columns;
@@ -196,30 +223,31 @@ function fitGridRowCount(
 
   return {
     dims: { width, height, rows, columns },
-    score: scoreGridCandidate(width, rows, totalHeight, availableHeight),
+    score: scoreGridCandidate({ width, rows, totalHeight, availableHeight }),
   };
 }
 
-function fitGridNoClip(
-  count: number,
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  preferredMinWidth: number,
-  maxCardWidth: number,
-): CardFitResult {
+function fitGridNoClip(box: ResolvedCardFitBox): CardFitResult {
+  const {
+    count,
+    availableWidth,
+    availableHeight,
+    gap,
+    minCardWidth: preferredMinWidth,
+    maxCardWidth,
+  } = box;
   let bestScore = -1;
   let bestDims: ZoneDims | null = null;
 
   for (let rows = 1; rows <= count; rows++) {
     const columns = Math.ceil(count / rows);
-    const wFromW = widthCapForRows(
+    const wFromW = widthCapForRows({
       count,
       availableWidth,
       rows,
       gap,
       maxCardWidth,
-    );
+    });
     const wFromH = widthCapForHeight(availableHeight, rows, gap);
     const width = Math.floor(Math.min(maxCardWidth, wFromW, wFromH));
     if (width < 1) continue;
@@ -235,7 +263,8 @@ function fitGridNoClip(
     const totalHeight = zoneGridHeight(candidate, gap);
     const penalty = width < preferredMinWidth ? 0.96 : 1;
     const score =
-      scoreGridCandidate(width, rows, totalHeight, availableHeight) * penalty;
+      scoreGridCandidate({ width, rows, totalHeight, availableHeight }) *
+      penalty;
 
     if (score > bestScore) {
       bestScore = score;
@@ -264,86 +293,52 @@ function fitGridNoClip(
   };
 }
 
-function searchBestGrid(
-  count: number,
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  minCardWidth: number,
-  maxCardWidth: number,
-): CardFitResult {
+function searchBestGrid(box: ResolvedCardFitBox): CardFitResult {
   let bestScore = -1;
   let bestDims: ZoneDims | null = null;
 
-  for (let rows = 1; rows <= count; rows++) {
-    const candidate = fitGridRowCount(
-      count,
-      rows,
-      availableWidth,
-      availableHeight,
-      gap,
-      minCardWidth,
-      maxCardWidth,
-    );
+  for (let rows = 1; rows <= box.count; rows++) {
+    const candidate = fitGridRowCount(box, rows);
     if (candidate && candidate.score > bestScore) {
       bestScore = candidate.score;
       bestDims = candidate.dims;
     }
   }
 
-  if (bestDims) return { ...bestDims, gap };
-  return { ...makeZoneDims(minCardWidth, 1, count), gap };
+  if (bestDims) return { ...bestDims, gap: box.gap };
+  return { ...makeZoneDims(box.minCardWidth, 1, box.count), gap: box.gap };
 }
 
 function fitGridWithLimits(
-  count: number,
-  availableWidth: number,
-  availableHeight: number,
-  gap: number,
-  minCardWidth: number,
-  maxCardWidth: number,
+  box: ResolvedCardFitBox,
   maxRows: number,
   noClip: boolean,
 ): CardFitResult {
-  const fit = searchBestGrid(
-    count,
-    availableWidth,
-    availableHeight,
-    gap,
-    minCardWidth,
-    maxCardWidth,
-  );
+  const fit = searchBestGrid(box);
 
   if (fit.rows > maxRows) {
-    return fitFixedRows(
-      count,
-      maxRows,
-      availableWidth,
-      availableHeight,
-      gap,
-      minCardWidth,
-      maxCardWidth,
-    );
+    return fitFixedRows(box, maxRows);
   }
 
   const overflows =
-    zoneGridWidth(fit, gap) > availableWidth ||
-    zoneGridHeight(fit, gap) > availableHeight;
+    zoneGridWidth(fit, box.gap) > box.availableWidth ||
+    zoneGridHeight(fit, box.gap) > box.availableHeight;
   if (noClip && overflows) {
-    return fitGridNoClip(
-      count,
-      availableWidth,
-      availableHeight,
-      gap,
-      minCardWidth,
-      maxCardWidth,
-    );
+    return fitGridNoClip(box);
   }
 
   return fit;
 }
 
-function resolveCardFitDefaults(options: CardFitOptions) {
+interface CardFitDefaults {
+  gap: number;
+  minCardWidth: number;
+  maxCardWidth: number;
+  maxRows: number;
+  noClip: boolean;
+}
+
+function resolveCardFitDefaults(options: CardFitOptions): CardFitDefaults {
   return {
     gap: options.gap ?? DEFAULT_CARD_GAP,
     minCardWidth: options.minCardWidth ?? MIN_CARD_WIDTH,
@@ -369,50 +364,26 @@ export function fitCards(options: CardFitOptions): CardFitResult {
     return { ...makeZoneDims(maxCardWidth, 1, 1), gap };
   }
 
-  if (maxOverlapRatio !== undefined && maxOverlapRatio > 0) {
-    return fitFannedRow(
-      count,
-      availableWidth,
-      availableHeight,
-      gap,
-      minCardWidth,
-      maxCardWidth,
-      maxOverlapRatio,
-    );
-  }
-
-  if (fixedColumns !== undefined) {
-    return fitFixedColumns(
-      count,
-      fixedColumns,
-      availableWidth,
-      availableHeight,
-      gap,
-      minCardWidth,
-      maxCardWidth,
-    );
-  }
-
-  if (fixedRows !== undefined) {
-    return fitFixedRows(
-      count,
-      fixedRows,
-      availableWidth,
-      availableHeight,
-      gap,
-      minCardWidth,
-      maxCardWidth,
-    );
-  }
-
-  return fitGridWithLimits(
+  const box: ResolvedCardFitBox = {
     count,
     availableWidth,
     availableHeight,
     gap,
     minCardWidth,
     maxCardWidth,
-    maxRows,
-    noClip,
-  );
+  };
+
+  if (maxOverlapRatio !== undefined && maxOverlapRatio > 0) {
+    return fitFannedRow(box, maxOverlapRatio);
+  }
+
+  if (fixedColumns !== undefined) {
+    return fitFixedColumns(box, fixedColumns);
+  }
+
+  if (fixedRows !== undefined) {
+    return fitFixedRows(box, fixedRows);
+  }
+
+  return fitGridWithLimits(box, maxRows, noClip);
 }

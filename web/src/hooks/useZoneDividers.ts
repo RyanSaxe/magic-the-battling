@@ -126,14 +126,14 @@ export function useZoneDividers(cfg: {
       readMeasuredSpace: (measured: MeasuredConstraints | null) => number,
       fallbackSpace: () => number,
     ): DividerDragCallbacks => ({
-      onDragStart: () => {
+      onDragStart: (): void => {
         const measured = constraints
           ? null
           : (measureInitialConstraints?.() ?? null);
         dragSpaceRef.current[key] = readMeasuredSpace(measured);
         startDrag(key);
       },
-      onDrag: (deltaPx: number) => {
+      onDrag: (deltaPx: number): void => {
         dragTo(key, deltaPx, dragSpaceRef.current[key] || fallbackSpace());
       },
       onDragEnd: drag.end,

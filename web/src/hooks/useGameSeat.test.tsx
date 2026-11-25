@@ -2,7 +2,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { rejoinGame } from "../api/client";
-import { createAppError } from "../utils/appError";
+import { createAppError, type AppError } from "../utils/appError";
 import {
   getRememberedSeat,
   rememberPlayerForGame,
@@ -14,7 +14,7 @@ import { useGameSeat } from "./useGameSeat";
 vi.mock("../api/client", () => ({ rejoinGame: vi.fn() }));
 const rejoin = vi.mocked(rejoinGame);
 
-function refused(code: Parameters<typeof createAppError>[0]["code"]) {
+function refused(code: Parameters<typeof createAppError>[0]["code"]): AppError {
   return createAppError({
     code,
     context: "rejoin-game",
@@ -22,7 +22,12 @@ function refused(code: Parameters<typeof createAppError>[0]["code"]) {
   });
 }
 
-function grant(n: number) {
+function grant(n: number): {
+  game_id: string;
+  session_id: string;
+  player_id: string;
+  seat_token: string;
+} {
   return {
     game_id: "game-1",
     session_id: `session-${n}`,

@@ -9,6 +9,13 @@ import {
 import { afterEach, expect, it, vi } from "vitest";
 import { Dialog } from "./Dialog";
 
+function pressTab(shiftKey = false): Element | null {
+  const active = document.activeElement;
+  if (!active) throw new Error("Expected activeElement");
+  fireEvent.keyDown(active, { key: "Tab", shiftKey });
+  return document.activeElement;
+}
+
 afterEach(() => {
   cleanup();
   Reflect.deleteProperty(document, "elementFromPoint");
@@ -46,10 +53,6 @@ it("keeps Tab and Shift+Tab off the page it covers", () => {
     configurable: true,
     value: () => dialog,
   });
-  const pressTab = (shiftKey = false) => {
-    fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey });
-    return document.activeElement;
-  };
   const [close, keep, confirm] = within(dialog).getAllByRole("button");
 
   expect(document.activeElement).toBe(keep);

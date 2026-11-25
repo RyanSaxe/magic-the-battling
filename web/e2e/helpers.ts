@@ -16,7 +16,7 @@ type MockResponse = { status?: number; json: unknown };
 /** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
 const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === "real";
 
-const isLoopback = (ipAddress: string) =>
+const isLoopback = (ipAddress: string): boolean =>
   ipAddress.startsWith("127.") || ipAddress === "::1" || ipAddress === "[::1]";
 
 /** Google Fonts' hosts, which the helpers answer from copies in fixtures/fonts. */
@@ -24,7 +24,7 @@ const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
 /** Scryfall's card art hosts, which the helpers answer with a placeholder unless LAYOUT_CARD_ART=real. */
 const CARD_ART_HOSTS = new Set(["cards.scryfall.io", "backs.scryfall.io"]);
 
-const isLocalUrl = (url: string) => {
+const isLocalUrl = (url: string): boolean => {
   const { hostname } = new URL(url);
   // The helpers answer the font and card art hosts themselves, so those responses never leave this machine.
   return (
@@ -41,15 +41,16 @@ async function outsideUrl(
 ): Promise<string | null> {
   const address = await response.serverAddr().catch(() => undefined);
   // A response still arriving as the test ends can't report its address, so judge it by where it was sent.
-  if (address === undefined)
+  if (address === undefined) {
     return isLocalUrl(response.url()) ? null : response.url();
+  }
   return address && !isLoopback(address.ipAddress) ? response.url() : null;
 }
 
 /** Fails a test when any response came from a server other than this machine, so the tests never depend on the network. */
 export const test = base.extend<{ stayOffline: void }>({
   stayOffline: [
-    async ({ page }, use) => {
+    async ({ page }, use): Promise<void> => {
       const outsideResponses: Promise<string | null>[] = [];
       page.on("response", (response) => {
         outsideResponses.push(outsideUrl(response));
@@ -94,7 +95,7 @@ const FONT_FIXTURES = fileURLToPath(
 
 // The header's Cinzel title sets how much room its buttons have, so the tests serve the
 // Google Fonts stylesheet and font files the app loads from copies in fixtures/fonts.
-function serveGoogleFont(route: Route, url: URL) {
+function serveGoogleFont(route: Route, url: URL): Promise<void> {
   const headers = { "Access-Control-Allow-Origin": "*" };
   if (url.hostname === "fonts.googleapis.com") {
     return route.fulfill({
@@ -110,7 +111,10 @@ function serveGoogleFont(route: Route, url: URL) {
   });
 }
 
-export async function serveWithoutBackend(page: Page, baseURL: string) {
+export async function serveWithoutBackend(
+  page: Page,
+  baseURL: string,
+): Promise<void> {
   const appOrigin = new URL(baseURL).origin;
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
@@ -118,8 +122,9 @@ export async function serveWithoutBackend(page: Page, baseURL: string) {
     if (url.origin !== appOrigin) return route.abort();
     if (!url.pathname.startsWith("/api/")) return route.continue();
     const response = RESPONSES[url.pathname];
-    if (!response)
+    if (!response) {
       return route.fulfill({ status: 404, json: { detail: "Not mocked" } });
+    }
     return route.fulfill(response);
   });
 }
@@ -132,18 +137,28 @@ const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
   <rect x="40" y="70" width="408" height="300" rx="6" fill="#55534d"/>
 </svg>`;
 
-interface ServeGameOptions {
+export interface ServeGameArgs {
+  page: Page;
+  baseURL: string;
+  screen: ScreenState;
   /** Receives the game socket, to send more state. */
   onSocket?: (ws: WebSocketRoute) => void;
 }
 
+export function requireBaseUrl(baseURL: string | undefined): string {
+  if (!baseURL) {
+    throw new Error("Playwright baseURL is required");
+  }
+  return baseURL;
+}
+
 /** Opens a game whose server sends `screen` as its state. */
-export async function serveGame(
-  page: Page,
-  baseURL: string,
-  screen: ScreenState,
-  { onSocket }: ServeGameOptions = {},
-) {
+export async function serveGame({
+  page,
+  baseURL,
+  screen,
+  onSocket,
+}: ServeGameArgs): Promise<void> {
   await serveWithoutBackend(page, baseURL);
   await page.route(
     (url) => CARD_ART_HOSTS.has(url.hostname),
@@ -175,12 +190,12 @@ export async function serveGame(
 // Playwright offers no swipe or wheel input in mobile WebKit, and scrollIntoView would also
 // scroll overflow:hidden boxes that no finger can move. Scrolling only the boxes a swipe can
 // scroll keeps a clipped, unscrollable panel failing the way it fails on a phone.
-export async function swipeIntoView(element: Locator) {
+export async function swipeIntoView(element: Locator): Promise<void> {
   await element.evaluate((target) => {
-    const scrollsOnSwipe = (node: Element) =>
-      ["auto", "scroll"].includes(getComputedStyle(node).overflowY);
     for (let node = target.parentElement; node; node = node.parentElement) {
-      if (!scrollsOnSwipe(node)) continue;
+      if (!["auto", "scroll"].includes(getComputedStyle(node).overflowY)) {
+        continue;
+      }
       const offset =
         target.getBoundingClientRect().top - node.getBoundingClientRect().top;
       node.scrollTop +=

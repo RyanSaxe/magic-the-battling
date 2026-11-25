@@ -21,9 +21,9 @@ it("shows the Upgrades tip in Add Cube / Deck without toggling the checkbox", ()
     />,
   );
 
-  const checkbox = screen.getByRole("checkbox", {
+  const checkbox = screen.getByRole<HTMLInputElement>("checkbox", {
     name: "Upgrades",
-  }) as HTMLInputElement;
+  });
   expect(checkbox.checked).toBe(true);
 
   const info = screen.getByRole("button", { name: "What upgrades are" });

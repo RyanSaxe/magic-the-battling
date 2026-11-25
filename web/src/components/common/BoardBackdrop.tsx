@@ -1,4 +1,4 @@
-import { useContext, type Ref } from "react";
+import { useContext, type ReactPortal, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { SidePanelHostContext } from "./sidePanelHost";
 
@@ -13,7 +13,7 @@ export function BoardBackdrop({
 }: {
   onTap: () => void;
   ref?: Ref<HTMLDivElement>;
-}) {
+}): ReactPortal | null {
   const host = useContext(SidePanelHostContext);
   if (!host) return null;
   return createPortal(

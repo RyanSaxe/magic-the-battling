@@ -60,13 +60,13 @@ export function useDividerDrag({
   });
 
   useEffect(() => {
-    if (activePointerId === null) return;
+    if (activePointerId === null) return undefined;
     window.addEventListener("pointermove", handleWindowPointerMove, {
       passive: false,
     });
     window.addEventListener("pointerup", handleWindowPointerEnd);
     window.addEventListener("pointercancel", handleWindowPointerEnd);
-    return () => {
+    return (): void => {
       window.removeEventListener("pointermove", handleWindowPointerMove);
       window.removeEventListener("pointerup", handleWindowPointerEnd);
       window.removeEventListener("pointercancel", handleWindowPointerEnd);

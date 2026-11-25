@@ -15,6 +15,6 @@ export const GameDndContext = createContext<GameDndContextValue>({
   activeDraggableId: null,
 });
 
-export function useGameDnd() {
+export function useGameDnd(): GameDndContextValue {
   return useContext(GameDndContext);
 }
