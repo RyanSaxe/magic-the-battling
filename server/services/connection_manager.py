@@ -137,7 +137,7 @@ class ConnectionManager:
         self._game_manager.note_human_activity(game_id)
         if previous is not None and previous is not websocket:
             self.send(previous, {"type": "seat_moved", "payload": {}})
-            self._close(previous, SEAT_MOVED_CLOSE_CODE, "Seat opened elsewhere")
+            self._close(previous, code=SEAT_MOVED_CLOSE_CODE, reason="Seat opened elsewhere")
         return True
 
     def disconnect(self, game_id: str, player_id: str, websocket: WebSocket) -> None:
@@ -201,29 +201,31 @@ class ConnectionManager:
     async def wait_until_sent(self, websocket: WebSocket) -> None:
         await self._outgoing.wait_until_sent(websocket)
 
-    def _close(self, websocket: WebSocket, code: int, reason: str) -> None:
+    def _close(self, websocket: WebSocket, *, code: int, reason: str) -> None:
         # A close ends only when the other end lets go of it, which behind a proxy takes seconds.
         self._outgoing.add(websocket, partial(websocket.close, code=code, reason=reason))
 
     def _send_registered(
-        self, websocket: WebSocket, messages: list[dict], unregister: Callable[[], None], *, spectator: bool = False
+        self, websocket: WebSocket, messages: list[dict], *, unregister: Callable[[], None], spectator: bool = False
     ) -> list[asyncio.Task]:
         if self._outgoing.has_fallen_behind(websocket):
             logger.warning("Closing a socket that fell behind on its messages")
             unregister()
-            self._close(websocket, FELL_BEHIND_CLOSE_CODE, "Connection fell behind")
+            self._close(websocket, code=FELL_BEHIND_CLOSE_CODE, reason="Connection fell behind")
             return []
         return [self.send(websocket, message, spectator=spectator, on_failure=unregister) for message in messages]
 
-    def _send_player(self, game_id: str, player_id: str, websocket: WebSocket, *messages: dict) -> list[asyncio.Task]:
+    def _send_player(
+        self, game_id: str, player_id: str, *, websocket: WebSocket, messages: list[dict]
+    ) -> list[asyncio.Task]:
         unregister = partial(self.disconnect, game_id, player_id, websocket)
-        return self._send_registered(websocket, list(messages), unregister)
+        return self._send_registered(websocket, messages, unregister=unregister)
 
     def _send_spectator(
-        self, game_id: str, target_player_name: str, websocket: WebSocket, *messages: dict
+        self, game_id: str, target_player_name: str, *, websocket: WebSocket, messages: list[dict]
     ) -> list[asyncio.Task]:
         unregister = partial(self.disconnect_spectator, game_id, target_player_name, websocket)
-        return self._send_registered(websocket, list(messages), unregister, spectator=True)
+        return self._send_registered(websocket, messages, unregister=unregister, spectator=True)
 
     def _send_spectators_their_view(
         self, game_id: str, messages_for: Callable[[GameStateResponse], list[dict]]
@@ -240,22 +242,22 @@ class ConnectionManager:
                 continue
             messages = messages_for(state)
             for ws in list(sockets):
-                sends += self._send_spectator(game_id, target_player_name, ws, *messages)
+                sends += self._send_spectator(game_id, target_player_name, websocket=ws, messages=messages)
         return sends
 
     async def close_spectators(self, game_id: str) -> None:
         for sockets in self._spectators.pop(game_id, {}).values():
             for ws in sockets:
-                self._close(ws, GAME_ENDED_CLOSE_CODE, "Game ended")
+                self._close(ws, code=GAME_ENDED_CLOSE_CODE, reason="Game ended")
 
     def _close_spectators_of(self, game_id: str, target_player_name: str) -> None:
         for ws in self._spectators.get(game_id, {}).pop(target_player_name, []):
-            self._close(ws, SPECTATE_TARGET_GONE_CLOSE_CODE, "Target player not found")
+            self._close(ws, code=SPECTATE_TARGET_GONE_CLOSE_CODE, reason="Target player not found")
 
     def kick(self, game_id: str, player_id: str) -> None:
         if websocket := self._connections.get(game_id, {}).get(player_id):
             self.send(websocket, {"type": "kicked", "payload": {}})
-            self._close(websocket, KICKED_CLOSE_CODE, "Kicked by host")
+            self._close(websocket, code=KICKED_CLOSE_CODE, reason="Kicked by host")
             self.disconnect(game_id, player_id, websocket)
 
     async def send_spectate_requests(self, game_id: str, target_player_name: str) -> None:
@@ -289,11 +291,11 @@ class ConnectionManager:
         if websocket is None:
             return
         self.disconnect(game_id, player_id, websocket)
-        self._close(websocket, GAME_ENDED_CLOSE_CODE, "Game ended")
+        self._close(websocket, code=GAME_ENDED_CLOSE_CODE, reason="Game ended")
 
     async def send_to_player(self, game_id: str, player_id: str, message: dict) -> None:
         if game_id in self._connections and player_id in self._connections[game_id]:
-            self._send_player(game_id, player_id, self._connections[game_id][player_id], message)
+            self._send_player(game_id, player_id, websocket=self._connections[game_id][player_id], messages=[message])
 
     async def broadcast_game_state(self, game_id: str) -> None:
         if game_id not in self._connections:
@@ -310,11 +312,13 @@ class ConnectionManager:
                 sends += self._send_player(
                     game_id,
                     player_id,
-                    websocket,
-                    {
-                        "type": "game_state",
-                        "payload": state.model_dump(),
-                    },
+                    websocket=websocket,
+                    messages=[
+                        {
+                            "type": "game_state",
+                            "payload": state.model_dump(),
+                        }
+                    ],
                 )
 
         sends += self._send_spectators_their_view(
@@ -346,7 +350,7 @@ class ConnectionManager:
         message = {"type": "lobby_state", "payload": lobby.model_dump()}
         sends: list[asyncio.Task] = []
         for player_id, websocket in list(self._connections[game_id].items()):
-            sends += self._send_player(game_id, player_id, websocket, message)
+            sends += self._send_player(game_id, player_id, websocket=websocket, messages=[message])
 
         self._run_soon(
             _record_broadcast(
@@ -383,15 +387,17 @@ class ConnectionManager:
                 sends += self._send_player(
                     game_id,
                     player_id,
-                    websocket,
-                    {
-                        "type": "game_over",
-                        "payload": {"winner_name": winner_name},
-                    },
-                    {
-                        "type": "game_state",
-                        "payload": state.model_dump(),
-                    },
+                    websocket=websocket,
+                    messages=[
+                        {
+                            "type": "game_over",
+                            "payload": {"winner_name": winner_name},
+                        },
+                        {
+                            "type": "game_state",
+                            "payload": state.model_dump(),
+                        },
+                    ],
                 )
 
         sends += self._send_spectators_their_view(
@@ -420,9 +426,9 @@ class ConnectionManager:
         message = {"type": "server_notice", "payload": payload}
         for game_id, recipients in list(self._connections.items()):
             for player_id, websocket in list(recipients.items()):
-                self._send_player(game_id, player_id, websocket, message)
+                self._send_player(game_id, player_id, websocket=websocket, messages=[message])
 
         for game_id, target_map in list(self._spectators.items()):
             for target_player_name, sockets in list(target_map.items()):
                 for websocket in list(sockets):
-                    self._send_spectator(game_id, target_player_name, websocket, message)
+                    self._send_spectator(game_id, target_player_name, websocket=websocket, messages=[message])

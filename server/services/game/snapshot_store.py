@@ -202,6 +202,7 @@ class SnapshotStore(SpectatorService):
         self,
         db_session: Session,
         game_id: str,
+        *,
         player_pairs: list[tuple[str, str]],
         player_user_ids: dict[str, str] | None = None,
         seat_token_hashes: dict[str, str] | None = None,
@@ -237,7 +238,7 @@ class SnapshotStore(SpectatorService):
                 )
             )
 
-    def _restore_human_player_mappings(self, db_session: Session, game_id: str, game: Game) -> int:
+    def _restore_human_player_mappings(self, db_session: Session, game_id: str, *, game: Game) -> int:
         self._clear_runtime_player_mappings_for_game(game_id)
 
         valid_names = {p.name for p in game.players}
@@ -282,7 +283,7 @@ class SnapshotStore(SpectatorService):
         self._dirty_games.discard(snapshot_game_id)
         if self._normalize_restored_game(game):
             self.mark_game_dirty(snapshot_game_id, human_activity=False)
-        self._restore_human_player_mappings(session, snapshot_game_id, game)
+        self._restore_human_player_mappings(session, snapshot_game_id, game=game)
         self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
         return True
 
@@ -300,7 +301,7 @@ class SnapshotStore(SpectatorService):
             self._dirty_games.discard(game_id)
             if self._normalize_restored_game(game):
                 self.mark_game_dirty(game_id, human_activity=False)
-            restored_mappings = self._restore_human_player_mappings(session, game_id, game)
+            restored_mappings = self._restore_human_player_mappings(session, game_id, game=game)
             if restored_mappings == 0:
                 logger.warning("No human player mappings restored for game_id=%s", game_id)
             last_activity = cast(datetime | None, row.last_human_activity_at)
@@ -484,11 +485,11 @@ class SnapshotStore(SpectatorService):
             "pending_after": len(self._pending_games),
         }
 
-    def _schedule_cleanup(self, tasks: dict[str, asyncio.Task], game_id: str, delay: float) -> None:
+    def _schedule_cleanup(self, tasks: dict[str, asyncio.Task], game_id: str, *, delay: float) -> None:
         if existing := tasks.pop(game_id, None):
             existing.cancel()
 
-        async def cleanup_after_delay():
+        async def cleanup_after_delay() -> None:
             await asyncio.sleep(delay)
             async with self.get_action_lock(game_id):
                 self._cleanup_game(game_id)
@@ -503,7 +504,7 @@ class SnapshotStore(SpectatorService):
     def schedule_abandoned_cleanup(self, game_id: str, delay: float = ABANDONED_CLEANUP_SECONDS) -> None:
         """Schedule cleanup for abandoned game (default 24 hours)."""
         logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, delay)
-        self._schedule_cleanup(self._abandoned_cleanup_tasks, game_id, delay)
+        self._schedule_cleanup(self._abandoned_cleanup_tasks, game_id, delay=delay)
 
     def cancel_abandoned_cleanup(self, game_id: str) -> None:
         """Cancel the abandoned-game cleanup when a player reconnects. A finished game's cleanup still runs."""
@@ -519,7 +520,7 @@ class SnapshotStore(SpectatorService):
             if pending._loading_task and not pending._loading_task.done():
                 pending._loading_task.cancel()
             for player_id in list(pending.player_battlers):
-                self._set_player_battler(pending, player_id, BattlerMissing())
+                self._set_player_battler(pending, player_id, slot=BattlerMissing())
             self._join_code_to_game.pop(pending.join_code, None)
 
         self._active_games.pop(game_id, None)

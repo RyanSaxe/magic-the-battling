@@ -119,7 +119,7 @@ def _running_seat_in_game(game: Game, player_name: str) -> _RunningSeat | None:
 
 
 def _running_seat_in_snapshot(
-    config: dict[str, Any], players: list[dict[str, Any]], puppet_count: int, player_name: str
+    config: dict[str, Any], players: list[dict[str, Any]], *, puppet_count: int, player_name: str
 ) -> _RunningSeat | None:
     player = next((p for p in players if p.get("name") == player_name), None)
     if player is None:
@@ -148,7 +148,9 @@ def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> Resumabl
     )
 
 
-def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None) -> ResumableGame:
+def _resumable_game_seat(
+    seat: ResumableSeat, running: _RunningSeat, *, last_active_at: datetime | None
+) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -299,32 +301,14 @@ class SeatService(LobbyService):
                 pending = self._pending_games.get(seat.game_id)
                 if pending is not None and not pending.is_started:
                     holds_token = seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name))
-                    if holds_token or key in account_seats:
-                        resumable.append(_resumable_lobby_seat(seat, pending))
-                        listed_game_ids.add(seat.game_id)
-                    continue
-
-                holds_token = seat_token_matches(seat.seat_token, stored_hashes.get(key))
-                if not holds_token and key not in account_seats:
-                    continue
-                game = self._active_games.get(seat.game_id)
-                if game is not None:
-                    running = _running_seat_in_game(game, seat.player_name)
-                    last_active_at = self._last_human_activity.get(seat.game_id)
-                elif (snapshot := snapshots.get(seat.game_id)) is not None:
-                    running = _running_seat_in_snapshot(
-                        json.loads(snapshot.config_json),
-                        json.loads(snapshot.players_json),
-                        snapshot.puppet_count,
-                        seat.player_name,
-                    )
-                    last_active_at = _utc_or_default(snapshot.last_human_activity_at, datetime.now(UTC))
+                    entry = _resumable_lobby_seat(seat, pending) if holds_token or key in account_seats else None
+                elif seat_token_matches(seat.seat_token, stored_hashes.get(key)) or key in account_seats:
+                    entry = self._resumable_running_seat(seat, snapshots=snapshots)
                 else:
-                    continue
-                if running is None or running.phase in FINISHED_PLAYER_PHASES:
-                    continue
-                resumable.append(_resumable_game_seat(seat, running, last_active_at))
-                listed_game_ids.add(seat.game_id)
+                    entry = None
+                if entry is not None:
+                    resumable.append(entry)
+                    listed_game_ids.add(seat.game_id)
 
             if user_id:
                 # Each device saw different seats last, so an account's list goes by the games' own activity.
@@ -332,6 +316,25 @@ class SeatService(LobbyService):
             return _with_cube_metadata(session, resumable)
         finally:
             session.close()
+
+    def _resumable_running_seat(self, seat: ResumableSeat, *, snapshots: dict[str, Any]) -> ResumableGame | None:
+        game = self._active_games.get(seat.game_id)
+        if game is not None:
+            running = _running_seat_in_game(game, seat.player_name)
+            last_active_at = self._last_human_activity.get(seat.game_id)
+        elif (snapshot := snapshots.get(seat.game_id)) is not None:
+            running = _running_seat_in_snapshot(
+                json.loads(snapshot.config_json),
+                json.loads(snapshot.players_json),
+                puppet_count=snapshot.puppet_count,
+                player_name=seat.player_name,
+            )
+            last_active_at = _utc_or_default(snapshot.last_human_activity_at, datetime.now(UTC))
+        else:
+            return None
+        if running is None or running.phase in FINISHED_PLAYER_PHASES:
+            return None
+        return _resumable_game_seat(seat, running, last_active_at=last_active_at)
 
     def _account_seats(self, session: Session, user_id: str) -> set[tuple[str, str]]:
         # This runs off the event loop, so it reads copies of the dicts that games are added to and removed from.
@@ -408,7 +411,7 @@ class SeatService(LobbyService):
             self._persist_human_player_mappings(
                 session,
                 game_id,
-                [(player_id, player_name)],
+                player_pairs=[(player_id, player_name)],
                 seat_token_hashes={player_name: hash_seat_token(claimed_token)},
             )
             session.commit()

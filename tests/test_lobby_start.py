@@ -157,7 +157,9 @@ def test_a_start_that_fails_after_dealing_leaves_the_cube_and_decks_whole(
     manager = GameManager()
     pending = _two_player_lobby(manager, play_mode=play_mode)
     if play_mode == "limited":
-        pending.battler = manager._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards, play_mode)
+        pending.battler = manager._load_battler(
+            pending.cube_id, pending.use_upgrades, use_vanguards=pending.use_vanguards, play_mode=play_mode
+        )
     else:
         for player_id in pending.player_ids:
             deck = Battler(cards=[card_factory(f"{player_id}-{i}") for i in range(100)], upgrades=[], vanguards=[])

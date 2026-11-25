@@ -2,7 +2,7 @@
 
 import json
 import random
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy import true as sql_true
 from sqlalchemy.orm import Session, joinedload
@@ -21,6 +21,24 @@ from server.db.models import (
 )
 from server.services.game.models import BattlerReady, PendingGame
 from server.services.game.state import GameManagerState
+
+
+def _history_config(db: Session, history: PlayerGameHistory) -> dict[str, Any] | None:
+    game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
+    if not game_record or not game_record.config_json:
+        return None
+    return json.loads(str(game_record.config_json))
+
+
+def _config_matches(
+    config: dict[str, Any], *, play_mode: PlayMode, use_upgrades: bool | None, use_vanguards: bool | None
+) -> bool:
+    saved_play_mode = normalize_play_mode(cast(str | None, config.get("play_mode")))
+    if saved_play_mode != play_mode:
+        return False
+    if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
+        return False
+    return use_vanguards is None or config.get("use_vanguards") == use_vanguards
 
 
 class PuppetLoader(GameManagerState):
@@ -51,6 +69,14 @@ class PuppetLoader(GameManagerState):
         basics = json.loads(first_snapshot.basic_lands_json)
         return len(set(basics)) == 1
 
+    def _is_usable_history(self, history: PlayerGameHistory) -> bool:
+        has_starting_stage = any(s.stage == 3 for s in history.snapshots)
+        return (
+            has_starting_stage
+            and not self._is_suspicious_name(str(history.player_name or ""))
+            and not self._has_triple_same_basic(history)
+        )
+
     def _find_historical_players(
         self,
         db: Session,
@@ -79,26 +105,12 @@ class PuppetLoader(GameManagerState):
         other_cube: list[PlayerGameHistory] = []
 
         for history in all_histories:
-            has_starting_stage = any(s.stage == 3 for s in history.snapshots)
-            if not has_starting_stage:
+            if not self._is_usable_history(history):
                 continue
-
-            if self._is_suspicious_name(str(history.player_name or "")):
-                continue
-
-            if self._has_triple_same_basic(history):
-                continue
-
-            game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
-            if not game_record or not game_record.config_json:
-                continue
-            config = json.loads(str(game_record.config_json))
-            saved_play_mode = normalize_play_mode(cast(str | None, config.get("play_mode")))
-            if saved_play_mode != play_mode:
-                continue
-            if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
-                continue
-            if use_vanguards is not None and config.get("use_vanguards") != use_vanguards:
+            config = _history_config(db, history)
+            if config is None or not _config_matches(
+                config, play_mode=play_mode, use_upgrades=use_upgrades, use_vanguards=use_vanguards
+            ):
                 continue
 
             if play_mode == "limited" and cube_id and config.get("cube_id") == cube_id:
@@ -121,7 +133,7 @@ class PuppetLoader(GameManagerState):
 
         return result
 
-    def _load_fake_player(self, db: Session, history: PlayerGameHistory, existing_names: set[str]) -> Puppet:
+    def _load_fake_player(self, db: Session, history: PlayerGameHistory, *, existing_names: set[str]) -> Puppet:
         snapshots_dict: dict[str, StaticOpponent] = {}
         player_name = cast(str, history.player_name)
         history_id = cast(int, history.id)
@@ -172,7 +184,7 @@ class PuppetLoader(GameManagerState):
             play_mode=play_mode,
         )
         for history in histories:
-            fake_player = self._load_fake_player(db, history, existing_names)
+            fake_player = self._load_fake_player(db, history, existing_names=existing_names)
             existing_names.add(fake_player.name)
             game.puppets.append(fake_player)
 

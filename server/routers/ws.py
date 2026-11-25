@@ -38,8 +38,15 @@ type LobbyResult = tuple[bool, str | None]
 
 
 @dataclass(frozen=True)
+class _LobbyRequest:
+    game_id: str
+    player_id: str
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class _LobbyAction:
-    run: Callable[[str, str, dict[str, Any]], LobbyResult]
+    run: Callable[[_LobbyRequest], LobbyResult]
     failure_message: str
 
 
@@ -278,44 +285,40 @@ async def _run_player_action(game_id: str, player_id: str, *, data: dict, websoc
         )
 
 
-def _kick_player(game_id: str, player_id: str, payload: dict[str, Any]) -> LobbyResult:
-    target_id = payload.get("target_player_id", "")
-    if not game_manager.kick_player(game_id, player_id, target_id):
+def _kick_player(r: _LobbyRequest) -> LobbyResult:
+    target_id = r.payload.get("target_player_id", "")
+    if not game_manager.kick_player(r.game_id, r.player_id, target_id):
         return False, None
-    connection_manager.kick(game_id, target_id)
+    connection_manager.kick(r.game_id, target_id)
     return True, None
 
 
 _LOBBY_ACTIONS: dict[str, _LobbyAction] = {
     "set_ready": _LobbyAction(
-        lambda game_id, player_id, payload: game_manager.set_player_ready(
-            game_id, player_id, payload.get("is_ready", True)
-        ),
+        lambda r: game_manager.set_player_ready(r.game_id, r.player_id, r.payload.get("is_ready", True)),
         "Failed to set ready state",
     ),
     "clear_battler": _LobbyAction(
-        lambda game_id, player_id, _payload: game_manager.clear_player_battler(game_id, player_id),
+        lambda r: game_manager.clear_player_battler(r.game_id, r.player_id),
         "Failed to clear your deck",
     ),
     "add_puppet": _LobbyAction(
-        lambda game_id, player_id, _payload: (game_manager.add_puppet(game_id, player_id), None),
+        lambda r: (game_manager.add_puppet(r.game_id, r.player_id), None),
         "Cannot add puppet",
     ),
     "remove_puppet": _LobbyAction(
-        lambda game_id, player_id, _payload: (game_manager.remove_puppet(game_id, player_id), None),
+        lambda r: (game_manager.remove_puppet(r.game_id, r.player_id), None),
         "Cannot remove puppet",
     ),
     "kick_player": _LobbyAction(_kick_player, "Cannot kick player"),
     "set_target_player_count": _LobbyAction(
-        lambda game_id, player_id, payload: game_manager.set_target_player_count(
-            game_id, player_id, int(payload.get("target_player_count", 0))
+        lambda r: game_manager.set_target_player_count(
+            r.game_id, r.player_id, int(r.payload.get("target_player_count", 0))
         ),
         "Cannot change player cap",
     ),
     "set_voice_chat": _LobbyAction(
-        lambda game_id, player_id, payload: game_manager.set_voice_chat_enabled(
-            game_id, player_id, payload.get("enabled", True)
-        ),
+        lambda r: game_manager.set_voice_chat_enabled(r.game_id, r.player_id, r.payload.get("enabled", True)),
         "Cannot toggle voice chat",
     ),
 }
@@ -349,7 +352,7 @@ async def _handle_lobby_action(
     lobby_action = _LOBBY_ACTIONS.get(action)
     if lobby_action is None:
         return False
-    success, error = lobby_action.run(game_id, player_id, payload)
+    success, error = lobby_action.run(_LobbyRequest(game_id=game_id, player_id=player_id, payload=payload))
     if success:
         await connection_manager.broadcast_lobby_state(game_id)
     else:

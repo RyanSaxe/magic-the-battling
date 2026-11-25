@@ -2,7 +2,7 @@
 and start capacity. Every game service builds on this state and reads it through these lookups."""
 
 import asyncio
-from collections.abc import Callable, Collection
+from collections.abc import AsyncGenerator, Callable, Collection
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -71,7 +71,7 @@ def _start_spectator_session(game_id: str) -> SpectatorSession:
 
 
 class GameManagerState:
-    def __init__(self):
+    def __init__(self) -> None:
         self._pending_games: dict[str, PendingGame] = {}
         self._active_games: dict[str, Game] = {}
         self._player_to_game: dict[str, str] = {}
@@ -154,7 +154,7 @@ class GameManagerState:
         }
 
     @asynccontextmanager
-    async def _acquire_game_start_slot(self):
+    async def _acquire_game_start_slot(self) -> AsyncGenerator[None]:
         if self._game_start_waiters >= MAX_GAME_START_QUEUE:
             raise GameStartQueueFullError("Server is starting many games. Please try again shortly.")
 
@@ -243,7 +243,7 @@ class GameManagerState:
     def get_player_name(self, player_id: str) -> str | None:
         return self._player_id_to_name.get(player_id)
 
-    def _set_player_battler(self, pending: PendingGame, player_id: str, slot: PlayerBattler) -> None:
+    def _set_player_battler(self, pending: PendingGame, player_id: str, *, slot: PlayerBattler) -> None:
         """The one way a constructed player's deck changes. A load it replaces is cancelled."""
         previous = pending.player_battlers.get(player_id)
         if isinstance(previous, BattlerLoading) and previous.task is not _current_task():

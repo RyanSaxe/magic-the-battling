@@ -48,6 +48,18 @@ logger = logging.getLogger(__name__)
 POST_GAME_CLEANUP_SECONDS = 300.0
 
 
+def _start_round_battles(game: Game) -> set[str]:
+    paired_bot_names: set[str] = set()
+    for player, opponent in battle.get_round_table(game).draw_battles():
+        battle.start(game, player, opponent)
+        if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
+            for fp in game.puppets:
+                if fp.player_history_id == opponent.source_player_history_id:
+                    paired_bot_names.add(fp.name)
+                    break
+    return paired_bot_names
+
+
 class RoundService(SnapshotStore):
     def complete_game(self, game_id: str, winner: Player | None, db: Session | None = None) -> None:
         """Complete a game - set phases, persist final state, schedule cleanup."""
@@ -70,29 +82,33 @@ class RoundService(SnapshotStore):
                     game_record.winner_player_id = winner.name  # ty: ignore[invalid-assignment]
                 db.commit()
 
-            self._persist_final_placements(db, game_id, game)
+            self._persist_final_placements(db, game_id, game=game)
 
         self.delete_snapshot(game_id)
-        self._schedule_cleanup(self._post_game_cleanup_tasks, game_id, POST_GAME_CLEANUP_SECONDS)
+        self._schedule_cleanup(self._post_game_cleanup_tasks, game_id, delay=POST_GAME_CLEANUP_SECONDS)
 
-    def _persist_player_placement(self, db: Session | None, game_id: str | None, participant: Player | Puppet) -> None:
+    def _persist_player_placement(
+        self, db: Session | None, game_id: str | None, *, participant: Player | Puppet
+    ) -> None:
         if not db or not game_id:
             return
-        if self._write_final_state(db, game_id, participant):
+        if self._write_final_state(db, game_id, participant=participant):
             db.commit()
 
-    def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
+    def _persist_final_placements(self, db: Session, game_id: str, *, game: Game) -> None:
         participants: list[Player | Puppet] = [p for p in game.players if p.placement > 0]
         participants.extend(fp for fp in game.puppets if fp.placement > 0)
 
         for participant in participants:
-            self._write_final_state(db, game_id, participant)
+            self._write_final_state(db, game_id, participant=participant)
         db.commit()
 
-    def _persist_exit(self, db: Session | None, game_id: str | None, game: Game, participant: Player | Puppet) -> None:
+    def _persist_exit(
+        self, db: Session | None, game_id: str | None, *, game: Game, participant: Player | Puppet
+    ) -> None:
         # Going out can move the places of everyone out in the same round.
         for out in get_same_round_exits(game, participant):
-            self._persist_player_placement(db, game_id, out)
+            self._persist_player_placement(db, game_id, participant=out)
 
     def _apply_resolution_outcome(
         self,
@@ -103,15 +119,15 @@ class RoundService(SnapshotStore):
         db: Session | None,
     ) -> str | None:
         for participant in outcome.eliminated:
-            self._persist_exit(db, game_id, game, participant)
+            self._persist_exit(db, game_id, game=game, participant=participant)
         if outcome.status == "game_over":
             self.complete_game(game_id or "", outcome.winner, db)
             return "game_over"
         if outcome.check_round_start and outcome.status is None:
-            self._start_round_if_ready(game, game_id, db)
+            self._start_round_if_ready(game, game_id, db=db)
         return outcome.status
 
-    def _write_final_state(self, db: Session, game_id: str, participant: Player | Puppet) -> bool:
+    def _write_final_state(self, db: Session, game_id: str, *, participant: Player | Puppet) -> bool:
         history = (
             db.query(PlayerGameHistory)
             .filter(
@@ -131,9 +147,9 @@ class RoundService(SnapshotStore):
         self,
         db: Session,
         game_id: str,
+        *,
         player: Player,
         battler_elo: float,
-        *,
         opponent_name: str | None = None,
         sudden_death_build: int | None = None,
     ) -> BattleSnapshot:
@@ -221,7 +237,7 @@ class RoundService(SnapshotStore):
         return snapshot
 
     def _record_bot_poison(
-        self, db: Session, game_id: str, fp: Puppet, *, battler_elo: float, stage: int, round_num: int
+        self, db: Session, game_id: str, *, fp: Puppet, battler_elo: float, stage: int, round_num: int
     ) -> None:
         history = (
             db.query(PlayerGameHistory)
@@ -274,11 +290,11 @@ class RoundService(SnapshotStore):
                 player.hand = []
                 player.sideboard = []
 
-    def _start_round_if_ready(self, game: Game, game_id: str | None, db: Session | None) -> None:
+    def _start_round_if_ready(self, game: Game, game_id: str | None, *, db: Session | None) -> None:
         if build.all_ready(game):
-            self._start_all_battles(game, game_id, db)
+            self._start_all_battles(game, game_id, db=db)
 
-    def _start_all_battles(self, game: Game, game_id: str | None = None, db: Session | None = None) -> None:
+    def _start_all_battles(self, game: Game, game_id: str | None = None, *, db: Session | None = None) -> None:
         # Clean up draft state before battles
         draft.cleanup_draft(game)
 
@@ -304,25 +320,19 @@ class RoundService(SnapshotStore):
         if db is not None and game_id is not None:
             for player in live_players:
                 battler_elo = player.battler.elo if player.battler is not None else 1200.0
-                snapshots_by_player[player.name] = self._record_snapshot(db, game_id, player, battler_elo)
+                snapshots_by_player[player.name] = self._record_snapshot(
+                    db, game_id, player=player, battler_elo=battler_elo
+                )
             battler_elo = self._get_game_target_elo(game)
             for fp in live_puppets:
-                self._record_bot_poison(db, game_id, fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
+                self._record_bot_poison(db, game_id, fp=fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
 
-        paired_bot_names: set[str] = set()
-        for player, opponent in battle.get_round_table(game).draw_battles():
-            battle.start(game, player, opponent)
-            if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
-                for fp in game.puppets:
-                    if fp.player_history_id == opponent.source_player_history_id:
-                        paired_bot_names.add(fp.name)
-                        break
-
+        paired_bot_names = _start_round_battles(game)
         battle.resolve_unpaired_bot_battles(game, paired_bot_names, stage, round_num, game.config.num_rounds_per_stage)
-        self._record_opponents(db, snapshots_by_player, game.active_battles)
+        self._record_opponents(db, snapshots_by_player, battles=game.active_battles)
 
     def _record_opponents(
-        self, db: Session | None, snapshots_by_player: dict[str, BattleSnapshot], battles: list[Battle]
+        self, db: Session | None, snapshots_by_player: dict[str, BattleSnapshot], *, battles: list[Battle]
     ) -> None:
         if db is None or not snapshots_by_player:
             return
@@ -332,10 +342,12 @@ class RoundService(SnapshotStore):
                     snapshots_by_player[name].opponent_name = opponent_name  # ty: ignore[invalid-assignment]
         db.commit()
 
-    def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> str | None:
+    def _end_battle(
+        self, game: Game, b: Battle, *, game_id: str | None = None, db: Session | None = None
+    ) -> str | None:
         outcome = resolve_battle(game, b)
         return self._apply_resolution_outcome(game, outcome, game_id=game_id, db=db)
 
-    def _check_sudden_death_ready(self, game: Game, game_id: str | None, db: Session | None) -> str | None:
+    def _check_sudden_death_ready(self, game: Game, game_id: str | None, *, db: Session | None) -> str | None:
         outcome = resolve_end_of_round(game)
         return self._apply_resolution_outcome(game, outcome, game_id=game_id, db=db)

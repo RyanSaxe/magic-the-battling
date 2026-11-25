@@ -666,7 +666,7 @@ def test_a_puppet_from_a_game_with_sudden_death_plays_the_ordinary_build_of_that
             for snapshot in history.snapshots
             if (snapshot.stage, snapshot.round) == (3, 2)
         }
-        puppet = gm._load_fake_player(db, history, set())
+        puppet = gm._load_fake_player(db, history, existing_names=set())
     finally:
         db.close()
 
@@ -757,11 +757,11 @@ def test_both_builds_of_a_sudden_death_fight_share_its_number_even_after_a_faile
     record_snapshot = GameManager._record_snapshot
     failed = []
 
-    def fail_bobs_first_sudden_death_build(self, db, game_id, player, battler_elo, **columns):
+    def fail_bobs_first_sudden_death_build(self, db, game_id, *, player, battler_elo, **columns):
         if player.name == "Bob" and columns.get("sudden_death_build") is not None and not failed:
             failed.append(player.name)
             raise OperationalError("INSERT", {}, Exception("database is locked"))
-        return record_snapshot(self, db, game_id, player, battler_elo, **columns)
+        return record_snapshot(self, db, game_id, player=player, battler_elo=battler_elo, **columns)
 
     monkeypatch.setattr(GameManager, "_record_snapshot", fail_bobs_first_sudden_death_build)
     _ready_all(gm, game, game_id, [bob, carol])

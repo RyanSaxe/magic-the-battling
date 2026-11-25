@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable, Coroutine
+from functools import partial
 from typing import Any
 
 from httpx import HTTPStatusError, RequestError
@@ -32,17 +33,17 @@ logger = logging.getLogger(__name__)
 
 
 class BattlerLoader(GameManagerState):
-    def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
+    def _load_battler(self, cube_id: str, use_upgrades: bool, *, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
         battler = build_battler(cube_id, upgrades_id, vanguards_id)
         validate_battler(battler, play_mode=play_mode)
         return battler
 
-    def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
-        return self._load_battler(battler_id, use_upgrades, use_vanguards, play_mode="constructed")
+    def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, *, use_vanguards: bool) -> Battler:
+        return self._load_battler(battler_id, use_upgrades, use_vanguards=use_vanguards, play_mode="constructed")
 
-    def _normalize_battler_error(self, battler_id: str, play_mode: PlayMode, error: Exception) -> str:
+    def _normalize_battler_error(self, battler_id: str, play_mode: PlayMode, *, error: Exception) -> str:
         noun = "deck" if play_mode == "constructed" else "cube"
         if isinstance(error, IllegalBattlerError):
             return f"{noun.capitalize()} '{battler_id}' is illegal: {error.problem}"
@@ -69,15 +70,17 @@ class BattlerLoader(GameManagerState):
                 loop = asyncio.get_running_loop()
                 battler = await loop.run_in_executor(
                     None,
-                    self._load_battler,
-                    pending.cube_id,
-                    pending.use_upgrades,
-                    pending.use_vanguards,
-                    pending.play_mode,
+                    partial(
+                        self._load_battler,
+                        pending.cube_id,
+                        pending.use_upgrades,
+                        use_vanguards=pending.use_vanguards,
+                        play_mode=pending.play_mode,
+                    ),
                 )
         except Exception as e:
             logger.warning("Failed to preload battler %s: %s", pending.cube_id, e)
-            error_message = self._normalize_battler_error(pending.cube_id, pending.play_mode, e)
+            error_message = self._normalize_battler_error(pending.cube_id, pending.play_mode, error=e)
         finally:
             if self._pending_games.get(pending.game_id) is pending:
                 async with self.get_action_lock(pending.game_id):
@@ -105,6 +108,7 @@ class BattlerLoader(GameManagerState):
         self,
         pending: PendingGame,
         player_id: str,
+        *,
         battler_id: str,
         on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
@@ -114,21 +118,23 @@ class BattlerLoader(GameManagerState):
                 loop = asyncio.get_running_loop()
                 battler = await loop.run_in_executor(
                     None,
-                    self._load_constructed_battler,
-                    battler_id,
-                    pending.use_upgrades,
-                    pending.use_vanguards,
+                    partial(
+                        self._load_constructed_battler,
+                        battler_id,
+                        pending.use_upgrades,
+                        use_vanguards=pending.use_vanguards,
+                    ),
                 )
             loaded = BattlerReady(battler_id, battler)
         except Exception as e:
             logger.warning("Failed to preload player battler %s: %s", battler_id, e)
-            loaded = BattlerFailed(battler_id, self._normalize_battler_error(battler_id, "constructed", e))
+            loaded = BattlerFailed(battler_id, self._normalize_battler_error(battler_id, "constructed", error=e))
 
         if self._pending_games.get(pending.game_id) is pending:
             async with self.get_action_lock(pending.game_id):
                 slot = pending.player_battlers.get(player_id)
                 if isinstance(slot, BattlerLoading) and slot.task is _current_task():
-                    self._set_player_battler(pending, player_id, loaded)
+                    self._set_player_battler(pending, player_id, slot=loaded)
         if on_complete:
             await on_complete()
 
@@ -153,12 +159,14 @@ class BattlerLoader(GameManagerState):
             loop = asyncio.get_running_loop()
         except RuntimeError:
             return "Unable to load your deck right now"
-        task = loop.create_task(self._preload_player_battler(pending, player_id, battler_id, on_complete))
-        self._set_player_battler(pending, player_id, BattlerLoading(battler_id, task))
+        task = loop.create_task(
+            self._preload_player_battler(pending, player_id, battler_id=battler_id, on_complete=on_complete)
+        )
+        self._set_player_battler(pending, player_id, slot=BattlerLoading(battler_id, task))
         return None
 
     def record_player_battler_error(self, pending: PendingGame, player_id: str, battler_id: str, error: str) -> None:
-        self._set_player_battler(pending, player_id, BattlerFailed(battler_id, error))
+        self._set_player_battler(pending, player_id, slot=BattlerFailed(battler_id, error))
 
     def _build_constructed_battlers_by_player(self, pending: PendingGame) -> dict[str, Battler]:
         battlers_by_player: dict[str, Battler] = {}
