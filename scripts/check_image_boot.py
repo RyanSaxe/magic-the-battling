@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sqlite3
 import subprocess
 import sys
@@ -29,6 +30,8 @@ DB_PATH_IN_IMAGE = "/data/mtb.db"
 OPS_TOKEN = "image-boot-check"
 BOOT_TIMEOUT_SECONDS = 120
 UNRESTORABLE_GAME_ID = "legacy-unrestorable"
+
+logger = logging.getLogger(__name__)
 
 
 class BootCheckError(Exception):
@@ -48,7 +51,7 @@ def _write_fixture_db(db_path: Path) -> list[str]:
     with sqlite3.connect(db_path) as conn:
         conn.execute(
             "CREATE TABLE active_game_snapshots (game_id VARCHAR NOT NULL PRIMARY KEY, state_json TEXT NOT NULL,"
-            " last_human_activity_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)"
+            " last_human_activity_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
         )
         conn.executemany(
             "INSERT INTO active_game_snapshots VALUES (?, ?, ?, ?)",
@@ -85,11 +88,10 @@ def _loaded_games(container: str) -> int:
         f"x-ops-token: {OPS_TOKEN}",
         "http://127.0.0.1:8000/api/ops/capacity",
     )
-    return json.loads(capacity)["loaded_games"]
+    return int(json.loads(capacity)["loaded_games"])
 
 
 def _boot(image: str, name: str, *, db_file: Path | None, out_dir: Path) -> int:
-    """Boot the image, return how many games it loaded, and copy its /data into out_dir once it has stopped."""
     container = _docker(
         "create",
         "--network",
@@ -110,9 +112,13 @@ def _boot(image: str, name: str, *, db_file: Path | None, out_dir: Path) -> int:
         finally:
             _docker("stop", container)
             log = subprocess.run(
-                ["docker", "logs", container], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False
+                ["docker", "logs", container],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
             )
-            print(f"--- {name}: server log ---\n{log.stdout}", flush=True)
+            logger.info("--- %s: server log ---\n%s", name, log.stdout)
         _docker("cp", f"{container}:/data/.", str(out_dir))
         return loaded
     finally:
@@ -141,16 +147,17 @@ def check(image: str, work_dir: Path) -> None:
     loaded = _boot(image, "fixture snapshots", db_file=fixture_db, out_dir=fixture_out)
     if loaded != len(fixture_ids):
         raise BootCheckError(
-            f"fixture snapshots: expected all {len(fixture_ids)} of {fixture_ids} to load, loaded {loaded}"
+            f"fixture snapshots: expected all {len(fixture_ids)} of {fixture_ids} to load, loaded {loaded}",
         )
     quarantined_ids = _quarantined_ids(fixture_out / "mtb.db")
     if quarantined_ids != [UNRESTORABLE_GAME_ID]:
         raise BootCheckError(
-            f"fixture snapshots: expected only {UNRESTORABLE_GAME_ID} set aside, got {quarantined_ids}"
+            f"fixture snapshots: expected only {UNRESTORABLE_GAME_ID} set aside, got {quarantined_ids}",
         )
 
 
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("image", help="Docker image to boot, such as one built from this repository's Dockerfile")
     args = parser.parse_args(argv)
@@ -158,9 +165,9 @@ def main(argv: list[str] | None = None) -> int:
         try:
             check(args.image, Path(work_dir))
         except BootCheckError as error:
-            print(f"image boot check failed: {error}", file=sys.stderr)
+            logger.error("image boot check failed: %s", error)
             return 1
-    print("image boot check passed: the server boots on an empty volume and restores the fixture games")
+    sys.stdout.write("image boot check passed: the server boots on an empty volume and restores the fixture games\n")
     return 0
 
 
