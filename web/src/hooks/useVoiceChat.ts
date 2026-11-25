@@ -10,8 +10,10 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from "react";
+import { getVoiceIceServers } from "../api/client";
 import { readMigratedItem, removeStorageKeys } from "../utils/storage";
 import {
+  DEFAULT_ICE_SERVERS,
   PeerConnectionController,
   parseStringList,
   queuePendingSignal,
@@ -191,6 +193,60 @@ class MicrophoneRequest {
   }
 }
 
+class IceServerRequest {
+  private scopeKey: string | null = null;
+  private servers: readonly RTCIceServer[] | null = null;
+  private inFlight = false;
+  private epoch = 0;
+
+  resolve(
+    gameId: string | null,
+    sessionId: string | null,
+    onReady: () => void,
+  ): readonly RTCIceServer[] | null {
+    if (!gameId || !sessionId) {
+      return DEFAULT_ICE_SERVERS;
+    }
+    const key = `${gameId}:${sessionId}`;
+    if (this.scopeKey === key && this.servers !== null) {
+      return this.servers;
+    }
+    if (this.scopeKey === key && this.inFlight) {
+      return null;
+    }
+    this.scopeKey = key;
+    this.servers = null;
+    this.inFlight = true;
+    const epoch = ++this.epoch;
+    void getVoiceIceServers(gameId, sessionId)
+      .then(
+        (fetched) => (fetched.length > 0 ? fetched : DEFAULT_ICE_SERVERS),
+        () => DEFAULT_ICE_SERVERS,
+      )
+      .then((resolved) => {
+        if (this.epoch !== epoch) return;
+        this.inFlight = false;
+        this.servers = resolved;
+        onReady();
+      });
+    return null;
+  }
+
+  reset(): void {
+    this.epoch++;
+    this.scopeKey = null;
+    this.servers = null;
+    this.inFlight = false;
+  }
+}
+
+interface VoiceSyncTarget {
+  selfPlayerName: string | null;
+  peerNames: readonly string[];
+  gameId: string | null;
+  sessionId: string | null;
+}
+
 function samePeers(a: readonly VoicePeer[], b: readonly VoicePeer[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -226,11 +282,16 @@ class VoiceSessionController {
   private readonly peers = new Map<string, PeerConnectionController>();
   private readonly pendingSignals = new Map<string, VoiceSignalPayload[]>();
   private readonly microphone = new MicrophoneRequest();
+  private readonly iceServers = new IceServerRequest();
   private readonly listeners = new Set<() => void>();
   private localStream: MediaStream | null = null;
   private selfDetector: AudioDetector | null = null;
   private selfPlayerName: string | null = null;
   private desiredPeers: string[] = [];
+  private iceScope: { gameId: string | null; sessionId: string | null } = {
+    gameId: null,
+    sessionId: null,
+  };
   private host: SessionHostCallbacks | null = null;
   private snapshot: VoiceChatState;
 
@@ -259,10 +320,8 @@ class VoiceSessionController {
     this.host = host;
   }
 
-  syncTargets(
-    selfPlayerName: string | null,
-    peerNames: readonly string[],
-  ): void {
+  syncTargets(target: VoiceSyncTarget): void {
+    const { selfPlayerName, peerNames, gameId, sessionId } = target;
     if (
       this.selfPlayerName !== null &&
       selfPlayerName !== null &&
@@ -273,6 +332,7 @@ class VoiceSessionController {
 
     this.selfPlayerName = selfPlayerName;
     this.desiredPeers = [...peerNames];
+    this.iceScope = { gameId, sessionId };
 
     if (!selfPlayerName) {
       this.microphone.forgetRefusal();
@@ -291,18 +351,7 @@ class VoiceSessionController {
       return;
     }
 
-    if (this.localStream) {
-      this.reconcilePeers(selfPlayerName, this.localStream);
-      return;
-    }
-
-    this.microphone.ask({
-      granted: (stream) => this.handleMicrophoneGranted(stream),
-      refused: () => {
-        this.updateAvailability(false);
-        this.host?.onPermissionDenied();
-      },
-    });
+    this.activateSession();
   }
 
   handleSignal(payload: VoiceSignalPayload): void {
@@ -366,6 +415,29 @@ class VoiceSessionController {
     this.teardownSession(false);
   }
 
+  private activateSession(): void {
+    const iceServers = this.iceServers.resolve(
+      this.iceScope.gameId,
+      this.iceScope.sessionId,
+      () => this.reconcilePeersIfReady(),
+    );
+
+    if (this.localStream) {
+      if (iceServers && this.selfPlayerName) {
+        this.reconcilePeers(this.selfPlayerName, this.localStream, iceServers);
+      }
+      return;
+    }
+
+    this.microphone.ask({
+      granted: (stream) => this.handleMicrophoneGranted(stream),
+      refused: () => {
+        this.updateAvailability(false);
+        this.host?.onPermissionDenied();
+      },
+    });
+  }
+
   private handleMicrophoneGranted(stream: MediaStream): void {
     if (!this.selfPlayerName || this.desiredPeers.length === 0) {
       stream.getTracks().forEach((track) => track.stop());
@@ -378,10 +450,31 @@ class VoiceSessionController {
     }
     this.startSelfSpeakingDetection(stream);
     this.updateAvailability(true);
-    this.reconcilePeers(this.selfPlayerName, stream);
+    this.reconcilePeersIfReady();
   }
 
-  private reconcilePeers(selfPlayerName: string, stream: MediaStream): void {
+  private reconcilePeersIfReady(): void {
+    if (
+      !this.selfPlayerName ||
+      !this.localStream ||
+      this.desiredPeers.length === 0
+    ) {
+      return;
+    }
+    const iceServers = this.iceServers.resolve(
+      this.iceScope.gameId,
+      this.iceScope.sessionId,
+      () => this.reconcilePeersIfReady(),
+    );
+    if (!iceServers) return;
+    this.reconcilePeers(this.selfPlayerName, this.localStream, iceServers);
+  }
+
+  private reconcilePeers(
+    selfPlayerName: string,
+    stream: MediaStream,
+    iceServers: readonly RTCIceServer[],
+  ): void {
     const desired = new Set(this.desiredPeers);
 
     for (const [name, peer] of this.peers) {
@@ -396,6 +489,7 @@ class VoiceSessionController {
         localStream: stream,
         peerMuted: this.snapshot.mutedPeers.has(name),
         callbacks: this.createPeerCallbacks(),
+        iceServers,
       });
       this.peers.set(name, peer);
       const buffered = this.pendingSignals.get(name) ?? [];
@@ -427,6 +521,7 @@ class VoiceSessionController {
   }
 
   private teardownSession(resetAvailability: boolean): void {
+    this.iceServers.reset();
     for (const peer of this.peers.values()) {
       peer.close();
     }
@@ -558,6 +653,8 @@ export interface UseVoiceChatOptions {
   peerNames: string[];
   selfPlayerName: string | null;
   voiceSignalRef: RefObject<((payload: VoiceSignalPayload) => void) | null>;
+  gameId?: string | null;
+  sessionId?: string | null;
   onPermissionDenied?: () => void;
   onRetriesExhausted?: (peerName: string) => void;
 }
@@ -567,6 +664,8 @@ export function useVoiceChat({
   peerNames,
   selfPlayerName,
   voiceSignalRef,
+  gameId = null,
+  sessionId = null,
   onPermissionDenied,
   onRetriesExhausted,
 }: UseVoiceChatOptions): {
@@ -607,8 +706,13 @@ export function useVoiceChat({
   }, [controller, voiceSignalRef]);
 
   useEffect(() => {
-    controller.syncTargets(selfPlayerName, peerNames);
-  }, [controller, selfPlayerName, peerNames]);
+    controller.syncTargets({
+      selfPlayerName,
+      peerNames,
+      gameId,
+      sessionId,
+    });
+  }, [controller, selfPlayerName, peerNames, gameId, sessionId]);
 
   const toggleSelfMute = useCallback(() => {
     controller.toggleSelfMute(send);

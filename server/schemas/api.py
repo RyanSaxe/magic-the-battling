@@ -479,3 +479,7 @@ class ServerStatusResponse(BaseModel):
     new_games_blocked: bool
     scheduled_for_utc: str | None = None
     estimated_recovery_minutes: int | None = None
+
+
+class VoiceIceServersResponse(BaseModel):
+    ice_servers: list[dict[str, str | list[str]]]

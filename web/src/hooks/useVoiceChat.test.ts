@@ -5,6 +5,7 @@ import { useVoiceChat } from "./useVoiceChat";
 import {
   BASE_OFFER_REPEAT_DELAY_MS,
   BASE_RETRY_DELAY_MS,
+  DEFAULT_ICE_SERVERS,
   DISCONNECTED_GRACE_MS,
 } from "../utils/voiceChat";
 
@@ -107,6 +108,7 @@ function createFakeStream(): {
 
 class FakePeerConnection {
   static made: FakePeerConnection[] = [];
+  readonly config: RTCConfiguration | undefined;
   signalingState: RTCSignalingState = "stable";
   connectionState: RTCPeerConnectionState = "new";
   iceConnectionState: RTCIceConnectionState = "new";
@@ -123,7 +125,8 @@ class FakePeerConnection {
   closed = false;
   private offerSeq = 0;
 
-  constructor() {
+  constructor(config?: RTCConfiguration) {
+    this.config = config;
     FakePeerConnection.made.push(this);
   }
 
@@ -824,4 +827,74 @@ it("persists self and peer mute toggles and tracks remote mute_state signals", a
     });
   });
   expect(result.current.state.remoteMutedPeers.has("Bob")).toBe(true);
+});
+
+it("fetches TURN iceServers for the game session and passes them to RTCPeerConnection", async () => {
+  const { stream } = createFakeStream();
+  stubVoiceBrowser(async () => stream);
+
+  const turnServers: RTCIceServer[] = [
+    {
+      urls: [
+        "stun:stun.cloudflare.com:3478",
+        "turn:turn.cloudflare.com:3478?transport=udp",
+      ],
+      username: "cf-user",
+      credential: "cf-cred",
+    },
+  ];
+  const fetchMock = vi.fn(
+    async () =>
+      new Response(JSON.stringify({ ice_servers: turnServers }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  const harness = createSignalHarness();
+  renderHook(() =>
+    useVoiceChat({
+      send: harness.sendFrom("Alice"),
+      peerNames: ["Bob"],
+      selfPlayerName: "Alice",
+      voiceSignalRef: harness.inboxFor("Alice"),
+      gameId: "game-123",
+      sessionId: "sess-abc",
+    }),
+  );
+
+  await advance(0);
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/games/game-123/voice/ice-servers?session_id=sess-abc",
+  );
+  expect(FakePeerConnection.made).toHaveLength(1);
+  expect(FakePeerConnection.made[0].config?.iceServers).toEqual(turnServers);
+});
+
+it("falls back to DEFAULT_ICE_SERVERS when fetching TURN credentials fails", async () => {
+  const { stream } = createFakeStream();
+  stubVoiceBrowser(async () => stream);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
+  const harness = createSignalHarness();
+  renderHook(() =>
+    useVoiceChat({
+      send: harness.sendFrom("Alice"),
+      peerNames: ["Bob"],
+      selfPlayerName: "Alice",
+      voiceSignalRef: harness.inboxFor("Alice"),
+      gameId: "game-123",
+      sessionId: "sess-abc",
+    }),
+  );
+
+  await advance(0);
+  expect(FakePeerConnection.made).toHaveLength(1);
+  expect(FakePeerConnection.made[0].config?.iceServers).toEqual([
+    ...DEFAULT_ICE_SERVERS,
+  ]);
 });

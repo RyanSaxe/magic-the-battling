@@ -297,6 +297,24 @@ export async function getGameStatus(
   return response.json();
 }
 
+export async function getVoiceIceServers(
+  gameId: string,
+  sessionId: string,
+): Promise<RTCIceServer[]> {
+  const response = await fetch(
+    `${API_BASE}/games/${encodeURIComponent(gameId)}/voice/ice-servers?session_id=${encodeURIComponent(sessionId)}`,
+  );
+  if (!response.ok) {
+    await throwResponseError(
+      response,
+      "default",
+      "Failed to load voice relay servers",
+    );
+  }
+  const data: { ice_servers?: RTCIceServer[] } = await response.json();
+  return Array.isArray(data.ice_servers) ? data.ice_servers : [];
+}
+
 export async function createSpectateRequest(
   gameId: string,
   targetPlayerName: string,
