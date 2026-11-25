@@ -5,11 +5,36 @@ import logging
 import os
 from pathlib import Path
 
-from sqlalchemy import ColumnElement, Connection, Index, create_engine, func, select, text
+from sqlalchemy import ColumnElement, Connection, Index, create_engine, event, func, select, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import ConnectionPoolEntry
 
 from pitfight.utils import json_helpers
 from server.db.models import LOWERCASE_UNIQUE_USER_INDEXES, Base
+
+SQLITE_BUSY_TIMEOUT_MS = 5000
+SQLITE_CACHE_SIZE_KIB = -16000
+
+
+def apply_sqlite_pragmas(dbapi_connection: DBAPIConnection, _connection_record: ConnectionPoolEntry) -> None:
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        cursor.execute("PRAGMA synchronous = NORMAL")
+        cursor.execute("PRAGMA temp_store = MEMORY")
+        cursor.execute(f"PRAGMA cache_size = {SQLITE_CACHE_SIZE_KIB}")
+    finally:
+        cursor.close()
+
+
+def configure_sqlite_pragmas(target_engine: Engine) -> None:
+    if target_engine.url.get_backend_name() != "sqlite":
+        return
+    if not event.contains(target_engine, "connect", apply_sqlite_pragmas):
+        event.listen(target_engine, "connect", apply_sqlite_pragmas)
+
 
 if db_path := os.getenv("DATABASE_PATH"):
     DATA_DIR = Path(db_path).parent
@@ -21,6 +46,7 @@ else:
     DATABASE_URL = f"sqlite:///{DATA_DIR}/mtb.db"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+configure_sqlite_pragmas(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

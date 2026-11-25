@@ -25,6 +25,7 @@ from pitfight.models.game import (
 )
 from pitfight.models.types import PlayMode, normalize_play_mode
 from pitfight.phases import draft
+from server.db import database
 from server.db.models import (
     GameRecord,
 )
@@ -258,12 +259,23 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             return "Need at least 2 players to start"
         return _table_refusal(pending, available_bots=available_bots)
 
+    async def _start_refusal_async(self, pending: PendingGame, by: str) -> str | None:
+        refusal = self._start_refusal(pending, by, available_bots=lambda: pending.puppet_count)
+        if refusal is not None:
+            return refusal
+        if pending.puppet_count > 0:
+            available = await asyncio.to_thread(self._count_available_bots, pending)
+            if available is None or available < pending.puppet_count:
+                return "Not enough puppets are available for this table"
+        return self._server_start_refusal()
+
     async def start_lobby(
         self,
         game_id: str,
         by: str,
         *,
-        db: Session | None,
+        db: Session | None = None,
+        persist: bool | None = None,
         on_change: Callable[[], Awaitable[None]],
     ) -> Game:
         """Start a lobby for its host and return the running game.
@@ -272,12 +284,13 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         LobbyStartFailedError when the start began but couldn't finish. `on_change` runs when the lobby
         moves to starting and when a failed start returns it to open, so the caller can show every player.
         """
+        should_persist = persist if persist is not None else (db is not None)
         async with self.get_action_lock(game_id):
             pending = self._pending_games.get(game_id)
             if pending is None:
                 msg = "Game not found"
                 raise LobbyStartRefusedError(msg)
-            refusal = self.start_rules(pending, by) or self._server_start_refusal()
+            refusal = await self._start_refusal_async(pending, by)
             if refusal:
                 raise LobbyStartRefusedError(refusal)
             pending.stage = LobbyStage.STARTING
@@ -287,7 +300,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         game: Game | None = None
         try:
             await on_change()
-            game = await self._run_lobby_start(pending, db)
+            game = await self._run_lobby_start(pending, persist=should_persist)
         except LobbyStartFailedError as exc:
             failure = str(exc)
         except Exception:
@@ -326,7 +339,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             if player_id not in connected:
                 pending.player_ready[player_id] = False
 
-    async def _run_lobby_start(self, pending: PendingGame, db: Session | None) -> Game:
+    async def _run_lobby_start(self, pending: PendingGame, *, persist: bool) -> Game:
         try:
             async with self._acquire_game_start_slot():
                 if pending.play_mode == "limited":
@@ -341,7 +354,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
                     allowed, reason = self.can_accept_loaded_game()
                     if not allowed:
                         raise LobbyStartFailedError(reason)
-                    return self._create_started_game(pending, db)
+                    return await self._create_started_game(pending, persist=persist)
         except GameStartQueueFullError as exc:
             raise LobbyStartFailedError(str(exc)) from exc
 
@@ -373,7 +386,51 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
                 self._normalize_battler_error(pending.cube_id, pending.play_mode, error=e)
             ) from e
 
-    def _create_started_game(self, pending: PendingGame, db: Session | None) -> Game:
+    async def _persist_started_game_async(self, pending: PendingGame, game: Game, *, target_elo: float) -> None:
+        game_id = pending.game_id
+        cube_id = pending.cube_id
+        play_mode = pending.play_mode
+        use_upgrades = pending.use_upgrades
+        use_vanguards = pending.use_vanguards
+        puppet_count = pending.puppet_count
+        player_pairs = list(zip(pending.player_ids, pending.player_names, strict=False))
+        player_user_ids = dict(pending.player_user_ids)
+        seat_token_hashes = dict(pending.seat_token_hashes)
+
+        def _write() -> None:
+            with database.SessionLocal() as session:
+                if puppet_count > 0:
+                    self.load_fake_players_for_game(
+                        session,
+                        game,
+                        count=puppet_count,
+                        target_elo=target_elo,
+                        use_upgrades=use_upgrades,
+                        use_vanguards=use_vanguards,
+                        cube_id=cube_id if play_mode == "limited" else None,
+                        play_mode=play_mode,
+                    )
+
+                # Written last, so a start that fails before here leaves nothing behind for the next attempt.
+                config_data = {
+                    "use_upgrades": use_upgrades,
+                    "use_vanguards": use_vanguards,
+                    "cube_id": cube_id,
+                    "play_mode": play_mode,
+                }
+                session.add(GameRecord(id=game_id, config_json=json.dumps(config_data), cube_id=cube_id))
+                self._persist_human_player_mappings(
+                    session,
+                    game_id,
+                    player_pairs=player_pairs,
+                    player_user_ids=player_user_ids,
+                    seat_token_hashes=seat_token_hashes,
+                )
+                session.commit()
+
+        await asyncio.to_thread(_write)
+
+    async def _create_started_game(self, pending: PendingGame, *, persist: bool) -> Game:
         config = Config(
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
@@ -404,35 +461,8 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             set_player_battlers(game, {name: _copy_for_dealing(b) for name, b in battlers.items()})
             target_elo = self._get_game_target_elo(game)
 
-        if db is not None:
-            if pending.puppet_count > 0:
-                self.load_fake_players_for_game(
-                    db,
-                    game,
-                    count=pending.puppet_count,
-                    target_elo=target_elo,
-                    use_upgrades=pending.use_upgrades,
-                    use_vanguards=pending.use_vanguards,
-                    cube_id=pending.cube_id if pending.play_mode == "limited" else None,
-                    play_mode=pending.play_mode,
-                )
-
-            # Written last, so a start that fails before here leaves nothing behind for the next attempt.
-            config_data = {
-                "use_upgrades": pending.use_upgrades,
-                "use_vanguards": pending.use_vanguards,
-                "cube_id": pending.cube_id,
-                "play_mode": pending.play_mode,
-            }
-            db.add(GameRecord(id=pending.game_id, config_json=json.dumps(config_data), cube_id=pending.cube_id))
-            self._persist_human_player_mappings(
-                db,
-                pending.game_id,
-                player_pairs=list(zip(pending.player_ids, pending.player_names, strict=False)),
-                player_user_ids=pending.player_user_ids,
-                seat_token_hashes=pending.seat_token_hashes,
-            )
-            db.commit()
+        if persist:
+            await self._persist_started_game_async(pending, game, target_elo=target_elo)
 
         logger.info(
             "Game started: game_id=%s cube=%s players=%s",
@@ -461,7 +491,16 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         self._remove_lobby_seat(pending, player_id)
         return True
 
-    def _remove_lobby_seat(self, pending: PendingGame, player_id: str) -> None:
+    async def _remove_player_from_pending_async(self, game_id: str, player_id: str) -> bool:
+        pending = self._pending_games.get(game_id)
+        if not pending or not pending.accepts_changes or player_id not in pending.player_ids:
+            return False
+        emptied = self._remove_lobby_seat(pending, player_id, cleanup_db=False)
+        if emptied:
+            await self.cleanup_game_async(pending.game_id)
+        return True
+
+    def _remove_lobby_seat(self, pending: PendingGame, player_id: str, *, cleanup_db: bool = True) -> bool:
         """Remove a seat from a lobby, whether kicked by host or timed out."""
         self._set_player_battler(pending, player_id, slot=BattlerMissing())
         pending.player_battlers.pop(player_id)
@@ -474,9 +513,12 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         self._player_id_to_name.pop(player_id, None)
 
         if not pending.player_ids:
-            self.cleanup_game(pending.game_id)
-        elif player_id == pending.host_player_id:
+            if cleanup_db:
+                self.cleanup_game(pending.game_id)
+            return True
+        if player_id == pending.host_player_id:
             self._pass_host_after_removal(pending)
+        return False
 
     def schedule_pending_disconnect(
         self,
@@ -499,7 +541,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             removed = False
             if game_id in self._pending_games:
                 async with self.get_action_lock(game_id):
-                    removed = self.remove_player_from_pending(game_id, player_id)
+                    removed = await self._remove_player_from_pending_async(game_id, player_id)
             self._pending_disconnect_tasks.pop(key, None)
             if removed and on_removed:
                 await on_removed()

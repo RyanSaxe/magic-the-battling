@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func
@@ -35,24 +36,231 @@ logger = logging.getLogger(__name__)
 ABANDONED_CLEANUP_SECONDS = 86400.0
 
 
+@dataclass(frozen=True)
+class _SnapshotWrite:
+    game_id: str
+    state_json: str
+    last_human_activity_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class _SnapshotRead:
+    game_id: str
+    state_json: str
+    last_human_activity_at: datetime | None
+    player_mappings: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class _QuarantineWrite:
+    game_id: str
+    state_json: str
+    last_human_activity_at: datetime | None
+    error: str
+
+
+def _upsert_snapshots_db(writes: list[_SnapshotWrite]) -> None:
+    session = db.SessionLocal()
+    try:
+        for item in writes:
+            stmt = sqlite_insert(ActiveGameSnapshot).values(
+                game_id=item.game_id,
+                state_json=item.state_json,
+                last_human_activity_at=item.last_human_activity_at,
+                updated_at=item.updated_at,
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[ActiveGameSnapshot.game_id],
+                set_={
+                    "state_json": item.state_json,
+                    "last_human_activity_at": item.last_human_activity_at,
+                    "updated_at": item.updated_at,
+                },
+            )
+            session.execute(stmt)
+        session.commit()
+    finally:
+        session.close()
+
+
+def _snapshot_exists_db(game_id: str) -> bool:
+    session = db.SessionLocal()
+    try:
+        return (
+            session.query(ActiveGameSnapshot.game_id).filter(ActiveGameSnapshot.game_id == game_id).first() is not None
+        )
+    except Exception:  # noqa: BLE001 -- broad boundary catch
+        return False
+    finally:
+        session.close()
+
+
+def _delete_snapshot_db(game_id: str) -> None:
+    session = db.SessionLocal()
+    try:
+        row = session.get(ActiveGameSnapshot, game_id)
+        if row is not None:
+            session.delete(row)
+            session.commit()
+    except Exception:
+        # Some tests construct GameManager without initializing DB schema.
+        # Snapshot deletion should be best-effort and never break game cleanup.
+        logger.debug("Skipping snapshot delete for game_id=%s", game_id, exc_info=True)
+    finally:
+        session.close()
+
+
+def _close_game_record_db(game_id: str) -> None:
+    session = db.SessionLocal()
+    try:
+        record = session.query(GameRecord).filter(GameRecord.id == game_id).first()
+        if record and record.ended_at is None:
+            record.ended_at = datetime.now(UTC)
+            session.commit()
+    except Exception:
+        logger.debug("Skipping ended_at update for game_id=%s", game_id, exc_info=True)
+    finally:
+        session.close()
+
+
+def _delete_snapshot_and_close_game_db(game_id: str) -> None:
+    _delete_snapshot_db(game_id)
+    _close_game_record_db(game_id)
+
+
+def _cleanup_stale_game_records_db(loaded_ids: list[str], cutoff: datetime, *, max_age_hours: int) -> int:
+    session = db.SessionLocal()
+    try:
+        stale = (
+            session.query(GameRecord)
+            .outerjoin(ActiveGameSnapshot, ActiveGameSnapshot.game_id == GameRecord.id)
+            .filter(
+                GameRecord.ended_at.is_(None),
+                GameRecord.id.not_in(loaded_ids),
+                func.coalesce(ActiveGameSnapshot.last_human_activity_at, GameRecord.created_at) < cutoff,
+            )
+            .all()
+        )
+        # A paused game expires by its last human activity, even when an older eviction stamped ended_at.
+        stale_snapshot_ids = [
+            game_id
+            for (game_id,) in session.query(ActiveGameSnapshot.game_id).filter(
+                ActiveGameSnapshot.last_human_activity_at < cutoff,
+                ActiveGameSnapshot.game_id.not_in(loaded_ids),
+            )
+        ]
+        stale_ids = {str(record.id) for record in stale} | set(stale_snapshot_ids)
+        if not stale_ids:
+            return 0
+
+        session.query(GameRecord).filter(GameRecord.id.in_(stale_ids), GameRecord.ended_at.is_(None)).update(
+            {GameRecord.ended_at: datetime.now(UTC)}, synchronize_session=False
+        )
+        session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id.in_(stale_ids)).delete(
+            synchronize_session=False
+        )
+        session.commit()
+        logger.info("Retired %d stale games older than %dh", len(stale_ids), max_age_hours)
+        return len(stale_ids)
+    except Exception:
+        logger.exception("Error cleaning up stale game records")
+        session.rollback()
+        return 0
+    finally:
+        session.close()
+
+
+def _fetch_player_mappings_by_game(session: Session, game_ids: list[str]) -> dict[str, tuple[tuple[str, str], ...]]:
+    if not game_ids:
+        return {}
+    rows = (
+        session.query(GamePlayerRecord.game_id, GamePlayerRecord.player_id, GamePlayerRecord.player_name)
+        .filter(
+            GamePlayerRecord.game_id.in_(game_ids),
+            GamePlayerRecord.is_puppet.is_(False),
+        )
+        .all()
+    )
+    grouped: dict[str, list[tuple[str, str]]] = {}
+    for row_game_id, player_id, player_name in rows:
+        grouped.setdefault(str(row_game_id), []).append((str(player_id), str(player_name)))
+    return {gid: tuple(pairs) for gid, pairs in grouped.items()}
+
+
+def _to_snapshot_read(row: ActiveGameSnapshot, mappings: tuple[tuple[str, str], ...]) -> _SnapshotRead:
+    last_activity = _v if isinstance(_v := row.last_human_activity_at, datetime) else None
+    return _SnapshotRead(
+        game_id=str(row.game_id),
+        state_json=str(row.state_json),
+        last_human_activity_at=last_activity,
+        player_mappings=mappings,
+    )
+
+
+def _fetch_snapshot_for_restore_db(game_id: str) -> _SnapshotRead | None:
+    session = db.SessionLocal()
+    try:
+        row = session.get(ActiveGameSnapshot, game_id)
+        if row is None:
+            return None
+        mappings = _fetch_player_mappings_by_game(session, [game_id]).get(game_id, ())
+        return _to_snapshot_read(row, mappings)
+    finally:
+        session.close()
+
+
+def _fetch_all_snapshots_for_restore_db() -> list[_SnapshotRead]:
+    session = db.SessionLocal()
+    try:
+        rows = session.query(ActiveGameSnapshot).all()
+        if not rows:
+            return []
+        game_ids = [str(row.game_id) for row in rows]
+        mappings_by_game = _fetch_player_mappings_by_game(session, game_ids)
+        return [_to_snapshot_read(row, mappings_by_game.get(str(row.game_id), ())) for row in rows]
+    finally:
+        session.close()
+
+
+def _quarantine_snapshots_db(entries: list[_QuarantineWrite]) -> None:
+    session = db.SessionLocal()
+    try:
+        for entry in entries:
+            session.add(
+                QuarantinedGameSnapshot(
+                    game_id=entry.game_id,
+                    state_json=entry.state_json,
+                    last_human_activity_at=entry.last_human_activity_at,
+                    error=entry.error,
+                )
+            )
+            row = session.get(ActiveGameSnapshot, entry.game_id)
+            if row is not None:
+                session.delete(row)
+        session.commit()
+    finally:
+        session.close()
+
+
 class SnapshotStore(SpectatorService):
     async def start_background_tasks(self) -> None:
         if self._snapshot_task and not self._snapshot_task.done():
             return
 
         stale_cleanup_interval = int(3600 / self._snapshot_interval_sec)
-        self.cleanup_stale_game_records()
+        await self.cleanup_stale_game_records_async()
 
         async def _loop() -> None:
             tick = 0
             while True:
                 await asyncio.sleep(self._snapshot_interval_sec)
                 tick += 1
-                self.persist_dirty_games()
-                self.evict_cold_games()
+                await self.persist_dirty_games_async()
+                await self.evict_cold_games_async()
                 self.cleanup_expired_spectate_requests()
                 if tick % stale_cleanup_interval == 0:
-                    self.cleanup_stale_game_records()
+                    await self.cleanup_stale_game_records_async()
 
         self._snapshot_task = asyncio.create_task(_loop())
         logger.info("Started snapshot/eviction loop (every %.1fs)", self._snapshot_interval_sec)
@@ -62,52 +270,47 @@ class SnapshotStore(SpectatorService):
             return
         self._snapshot_task.cancel()
         self._snapshot_task = None
-        self.persist_all_games()
+        await self.persist_all_games_async()
 
     def persist_all_games(self) -> int:
         self._dirty_games.update(self._active_games.keys())
         return self.persist_dirty_games()
 
-    def persist_dirty_games(self) -> int:
+    async def persist_all_games_async(self) -> int:
+        self._dirty_games.update(self._active_games.keys())
+        return await self.persist_dirty_games_async()
+
+    def _collect_dirty_snapshot_writes(self) -> list[_SnapshotWrite]:
         # complete_game deleted their snapshots, so a write would restore a finished game on the next boot.
         self._dirty_games -= self._finished_games
         target_ids = [gid for gid in list(self._dirty_games) if gid in self._active_games]
         if not target_ids:
-            return 0
+            return []
 
         now = datetime.now(UTC)
-        session = db.SessionLocal()
-        wrote = 0
-        try:
-            for game_id in target_ids:
-                game = self._active_games.get(game_id)
-                if game is None:
-                    self._dirty_games.discard(game_id)
-                    continue
-
-                state_json = game.snapshot_dump_json()
-                activity_at = self._last_human_activity.get(game_id, now)
-                stmt = sqlite_insert(ActiveGameSnapshot).values(
+        writes: list[_SnapshotWrite] = []
+        for game_id in target_ids:
+            game = self._active_games.get(game_id)
+            if game is None:
+                self._dirty_games.discard(game_id)
+                continue
+            writes.append(
+                _SnapshotWrite(
                     game_id=game_id,
-                    state_json=state_json,
-                    last_human_activity_at=activity_at,
+                    state_json=game.snapshot_dump_json(),
+                    last_human_activity_at=self._last_human_activity.get(game_id, now),
                     updated_at=now,
                 )
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=[ActiveGameSnapshot.game_id],
-                    set_={
-                        "state_json": state_json,
-                        "last_human_activity_at": activity_at,
-                        "updated_at": now,
-                    },
-                )
-                session.execute(stmt)
-                self._dirty_games.discard(game_id)
-                wrote += 1
-            session.commit()
-        finally:
-            session.close()
+            )
+            self._dirty_games.discard(game_id)
+        return writes
 
+    def _requeue_failed_writes(self, writes: list[_SnapshotWrite]) -> None:
+        for item in writes:
+            if item.game_id in self._active_games and item.game_id not in self._finished_games:
+                self._dirty_games.add(item.game_id)
+
+    def _log_snapshot_flush(self, wrote: int) -> None:
         if wrote:
             logger.info(
                 "Snapshot flush: wrote=%d loaded_games=%d dirty_remaining=%d",
@@ -115,7 +318,34 @@ class SnapshotStore(SpectatorService):
                 len(self._active_games),
                 len(self._dirty_games),
             )
-        return wrote
+
+    def persist_dirty_games(self) -> int:
+        writes = self._collect_dirty_snapshot_writes()
+        if not writes:
+            return 0
+        try:
+            _upsert_snapshots_db(writes)
+        except Exception:
+            self._requeue_failed_writes(writes)
+            raise
+        self._log_snapshot_flush(len(writes))
+        return len(writes)
+
+    async def persist_dirty_games_async(self) -> int:
+        writes = self._collect_dirty_snapshot_writes()
+        if not writes:
+            return 0
+        try:
+            await asyncio.to_thread(_upsert_snapshots_db, writes)
+        except Exception:
+            self._requeue_failed_writes(writes)
+            raise
+        # If a game finished or was cleaned up while the DB write was in flight, remove the stale snapshot.
+        for item in writes:
+            if item.game_id in self._finished_games or item.game_id not in self._active_games:
+                await asyncio.to_thread(_delete_snapshot_db, item.game_id)
+        self._log_snapshot_flush(len(writes))
+        return len(writes)
 
     def _player_in_active_battle(self, game: Game, player_name: str) -> bool:
         return any(player_name in (b.player.name, b.opponent.name) for b in game.active_battles)
@@ -236,23 +466,14 @@ class SnapshotStore(SpectatorService):
                 )
             )
 
-    def _restore_human_player_mappings(self, db_session: Session, game_id: str, *, game: Game) -> int:
+    def _apply_restored_player_mappings(
+        self, game_id: str, game: Game, *, player_mappings: tuple[tuple[str, str], ...]
+    ) -> int:
         self._clear_runtime_player_mappings_for_game(game_id)
 
         valid_names = {p.name for p in game.players}
-        rows = (
-            db_session.query(GamePlayerRecord)
-            .filter(
-                GamePlayerRecord.game_id == game_id,
-                GamePlayerRecord.is_puppet.is_(False),
-            )
-            .all()
-        )
-
         restored = 0
-        for row in rows:
-            player_id = str(row.player_id)
-            player_name = str(row.player_name)
+        for player_id, player_name in player_mappings:
             if player_name not in valid_names:
                 continue
             self._player_to_game[player_id] = game_id
@@ -260,72 +481,77 @@ class SnapshotStore(SpectatorService):
             restored += 1
         return restored
 
-    def _restore_snapshot_row(self, session: Session, row: ActiveGameSnapshot) -> bool:
-        snapshot_game_id = str(row.game_id)
+    def _apply_snapshot_read(
+        self, row: _SnapshotRead, *, quarantine_on_error: bool
+    ) -> tuple[bool, _QuarantineWrite | None]:
         try:
-            game = restore_game_from_snapshot(str(row.state_json))
+            game = restore_game_from_snapshot(row.state_json)
         except Exception as exc:
-            logger.exception("Snapshot does not restore; quarantining game_id=%s", snapshot_game_id)
-            session.add(
-                QuarantinedGameSnapshot(
-                    game_id=snapshot_game_id,
+            if quarantine_on_error:
+                logger.exception("Snapshot does not restore; quarantining game_id=%s", row.game_id)
+                return False, _QuarantineWrite(
+                    game_id=row.game_id,
                     state_json=row.state_json,
                     last_human_activity_at=row.last_human_activity_at,
                     error=f"{type(exc).__name__}: {exc}",
                 )
-            )
-            session.delete(row)
-            return False
-        last_activity = _v if isinstance(_v := row.last_human_activity_at, datetime) else None
-        self._active_games[snapshot_game_id] = game
-        self._dirty_games.discard(snapshot_game_id)
+            logger.exception("Failed restoring snapshot for game_id=%s", row.game_id)
+            return False, None
+
+        self._active_games[row.game_id] = game
+        self._dirty_games.discard(row.game_id)
         if self._normalize_restored_game(game):
-            self.mark_game_dirty(snapshot_game_id, human_activity=False)
-        self._restore_human_player_mappings(session, snapshot_game_id, game=game)
-        self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-        return True
+            self.mark_game_dirty(row.game_id, human_activity=False)
+        restored_mappings = self._apply_restored_player_mappings(row.game_id, game, player_mappings=row.player_mappings)
+        if not quarantine_on_error and restored_mappings == 0:
+            logger.warning("No human player mappings restored for game_id=%s", row.game_id)
+        self._last_human_activity[row.game_id] = _utc_or_default(row.last_human_activity_at, datetime.now(UTC))
+        if not quarantine_on_error:
+            logger.info("Restored active game from snapshot: game_id=%s", row.game_id)
+        return True, None
 
     def restore_game_from_snapshot(self, game_id: str) -> bool:
         if game_id in self._active_games:
             return True
-
-        session = db.SessionLocal()
         try:
-            row = session.get(ActiveGameSnapshot, game_id)
-            if row is None:
-                return False
-            game = restore_game_from_snapshot(str(row.state_json))
-            self._active_games[game_id] = game
-            self._dirty_games.discard(game_id)
-            if self._normalize_restored_game(game):
-                self.mark_game_dirty(game_id, human_activity=False)
-            restored_mappings = self._restore_human_player_mappings(session, game_id, game=game)
-            if restored_mappings == 0:
-                logger.warning("No human player mappings restored for game_id=%s", game_id)
-            last_activity = _v if isinstance(_v := row.last_human_activity_at, datetime) else None
-            self._last_human_activity[game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-            logger.info("Restored active game from snapshot: game_id=%s", game_id)
+            row = _fetch_snapshot_for_restore_db(game_id)
         except Exception:
             logger.exception("Failed restoring snapshot for game_id=%s", game_id)
             return False
-        else:
+        if row is None:
+            return False
+        restored, _ = self._apply_snapshot_read(row, quarantine_on_error=False)
+        return restored
+
+    async def restore_game_from_snapshot_async(self, game_id: str) -> bool:
+        if game_id in self._active_games:
             return True
-        finally:
-            session.close()
+        try:
+            row = await asyncio.to_thread(_fetch_snapshot_for_restore_db, game_id)
+        except Exception:
+            logger.exception("Failed restoring snapshot for game_id=%s", game_id)
+            return False
+        if row is None:
+            return False
+        if game_id in self._active_games:
+            return True
+        restored, _ = self._apply_snapshot_read(row, quarantine_on_error=False)
+        return restored
 
     async def restore_all_snapshots(self) -> int:
+        rows = await asyncio.to_thread(_fetch_all_snapshots_for_restore_db)
         restored = 0
-        session = db.SessionLocal()
-        try:
-            rows = session.query(ActiveGameSnapshot).all()
-            for row in rows:
-                snapshot_game_id = str(row.game_id)
-                async with self.get_action_lock(snapshot_game_id):
-                    if self._restore_snapshot_row(session, row):
-                        restored += 1
-            session.commit()
-        finally:
-            session.close()
+        quarantined: list[_QuarantineWrite] = []
+        for row in rows:
+            async with self.get_action_lock(row.game_id):
+                ok, quarantine = self._apply_snapshot_read(row, quarantine_on_error=True)
+                if ok:
+                    restored += 1
+                elif quarantine is not None:
+                    quarantined.append(quarantine)
+
+        if quarantined:
+            await asyncio.to_thread(_quarantine_snapshots_db, quarantined)
 
         if restored:
             logger.info("Restored %d active games from snapshots", restored)
@@ -334,83 +560,29 @@ class SnapshotStore(SpectatorService):
     def has_game(self, game_id: str) -> bool:
         if game_id in self._pending_games or game_id in self._active_games:
             return True
-        session = db.SessionLocal()
-        try:
-            return (
-                session.query(ActiveGameSnapshot.game_id).filter(ActiveGameSnapshot.game_id == game_id).first()
-                is not None
-            )
-        except Exception:  # noqa: BLE001 -- broad boundary catch
-            return False
-        finally:
-            session.close()
+        return _snapshot_exists_db(game_id)
+
+    async def has_game_async(self, game_id: str) -> bool:
+        if game_id in self._pending_games or game_id in self._active_games:
+            return True
+        return await asyncio.to_thread(_snapshot_exists_db, game_id)
 
     def delete_snapshot(self, game_id: str) -> None:
-        session = db.SessionLocal()
-        try:
-            row = session.get(ActiveGameSnapshot, game_id)
-            if row is not None:
-                session.delete(row)
-                session.commit()
-        except Exception:
-            # Some tests construct GameManager without initializing DB schema.
-            # Snapshot deletion should be best-effort and never break game cleanup.
-            logger.debug("Skipping snapshot delete for game_id=%s", game_id, exc_info=True)
-        finally:
-            session.close()
+        _delete_snapshot_db(game_id)
         self._dirty_games.discard(game_id)
-
-    def _close_game_record(self, game_id: str) -> None:
-        session = db.SessionLocal()
-        try:
-            record = session.query(GameRecord).filter(GameRecord.id == game_id).first()
-            if record and record.ended_at is None:
-                record.ended_at = datetime.now(UTC)
-                session.commit()
-        except Exception:
-            logger.debug("Skipping ended_at update for game_id=%s", game_id, exc_info=True)
-        finally:
-            session.close()
 
     def cleanup_stale_game_records(self, max_age_hours: int = STALE_GAME_CLEANUP_HOURS) -> int:
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
-        session = db.SessionLocal()
         loaded_ids = list(self._active_games)
-        try:
-            stale = (
-                session.query(GameRecord)
-                .outerjoin(ActiveGameSnapshot, ActiveGameSnapshot.game_id == GameRecord.id)
-                .filter(
-                    GameRecord.ended_at.is_(None),
-                    GameRecord.id.not_in(loaded_ids),
-                    func.coalesce(ActiveGameSnapshot.last_human_activity_at, GameRecord.created_at) < cutoff,
-                )
-                .all()
-            )
-            # A paused game expires by its last human activity, even when an older eviction stamped ended_at.
-            stale_snapshot_ids = [
-                game_id
-                for (game_id,) in session.query(ActiveGameSnapshot.game_id).filter(
-                    ActiveGameSnapshot.last_human_activity_at < cutoff,
-                    ActiveGameSnapshot.game_id.not_in(loaded_ids),
-                )
-            ]
-            stale_ids = {str(record.id) for record in stale} | set(stale_snapshot_ids)
-            if not stale_ids:
-                return 0
+        return _cleanup_stale_game_records_db(loaded_ids, cutoff, max_age_hours=max_age_hours)
 
-            self._retire_games(session, stale_ids)
-            logger.info("Retired %d stale games older than %dh", len(stale_ids), max_age_hours)
-            return len(stale_ids)
-        except Exception:
-            logger.exception("Error cleaning up stale game records")
-            session.rollback()
-            return 0
-        finally:
-            session.close()
+    async def cleanup_stale_game_records_async(self, max_age_hours: int = STALE_GAME_CLEANUP_HOURS) -> int:
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+        loaded_ids = list(self._active_games)
+        return await asyncio.to_thread(_cleanup_stale_game_records_db, loaded_ids, cutoff, max_age_hours=max_age_hours)
 
-    def _retire_games(self, session: Session, game_ids: set[str]) -> None:
-        """End games nobody will finish. They can't be resumed, and no one in them gets a placement."""
+    @staticmethod
+    def _retire_games(session: Session, game_ids: set[str]) -> None:
         session.query(GameRecord).filter(GameRecord.id.in_(game_ids), GameRecord.ended_at.is_(None)).update(
             {GameRecord.ended_at: datetime.now(UTC)}, synchronize_session=False
         )
@@ -419,10 +591,10 @@ class SnapshotStore(SpectatorService):
         )
         session.commit()
 
-    def evict_cold_games(self) -> int:
+    def _cold_game_candidates(self) -> list[str]:
         cutoff = datetime.now(UTC) - timedelta(minutes=IDLE_EVICT_MINUTES)
         candidates: list[str] = []
-        for game_id in self._active_games:
+        for game_id in list(self._active_games):
             if self._connected_player_ids(game_id):
                 continue
             last_human = _utc_or_default(
@@ -431,7 +603,10 @@ class SnapshotStore(SpectatorService):
             )
             if last_human < cutoff:
                 candidates.append(game_id)
+        return candidates
 
+    def evict_cold_games(self) -> int:
+        candidates = self._cold_game_candidates()
         if not candidates:
             return 0
 
@@ -439,6 +614,24 @@ class SnapshotStore(SpectatorService):
         for game_id in candidates:
             self.mark_game_dirty(game_id, human_activity=False)
             self.persist_dirty_games()
+            self.cleanup_game(game_id, preserve_snapshot=True)
+            evicted += 1
+
+        if evicted:
+            logger.info("Evicted cold games from memory: count=%d", evicted)
+        return evicted
+
+    async def evict_cold_games_async(self) -> int:
+        candidates = self._cold_game_candidates()
+        if not candidates:
+            return 0
+
+        evicted = 0
+        for game_id in candidates:
+            self.mark_game_dirty(game_id, human_activity=False)
+            await self.persist_dirty_games_async()
+            if game_id not in self._active_games or self._connected_player_ids(game_id):
+                continue
             self.cleanup_game(game_id, preserve_snapshot=True)
             evicted += 1
 
@@ -491,7 +684,7 @@ class SnapshotStore(SpectatorService):
         async def cleanup_after_delay() -> None:
             await asyncio.sleep(delay)
             async with self.get_action_lock(game_id):
-                self.cleanup_game(game_id)
+                await self.cleanup_game_async(game_id)
 
         try:
             loop = asyncio.get_running_loop()
@@ -511,8 +704,7 @@ class SnapshotStore(SpectatorService):
             task.cancel()
             logger.info("Cancelled abandoned game cleanup for game_id=%s", game_id)
 
-    def cleanup_game(self, game_id: str, *, preserve_snapshot: bool = False) -> None:
-        """Remove game from memory."""
+    def _cleanup_game_memory(self, game_id: str, *, preserve_snapshot: bool = False) -> None:
         logger.info("Executing cleanup for game_id=%s", game_id)
         pending = self._pending_games.get(game_id)
         if pending:
@@ -540,6 +732,16 @@ class SnapshotStore(SpectatorService):
         self._last_human_activity.pop(game_id, None)
         self._action_locks.pop(game_id, None)
         self._finished_games.discard(game_id)
+
+    def cleanup_game(self, game_id: str, *, preserve_snapshot: bool = False) -> None:
+        """Remove game from memory."""
+        self._cleanup_game_memory(game_id, preserve_snapshot=preserve_snapshot)
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
-            self._close_game_record(game_id)
+            _close_game_record_db(game_id)
+
+    async def cleanup_game_async(self, game_id: str, *, preserve_snapshot: bool = False) -> None:
+        self._cleanup_game_memory(game_id, preserve_snapshot=preserve_snapshot)
+        if not preserve_snapshot:
+            self._dirty_games.discard(game_id)
+            await asyncio.to_thread(_delete_snapshot_and_close_game_db, game_id)
