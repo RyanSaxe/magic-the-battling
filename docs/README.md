@@ -8,7 +8,7 @@ Documentation is organized by task across setup, architecture, operations, and r
 
 ## Concepts
 
-- [Architecture](concepts/architecture.md): how `mtb/`, `server/`, and `web/` fit together, the round phase loop, puppets and ghosts, active-game snapshots, and naming conventions.
+- [Architecture](concepts/architecture.md): system boundaries, the round phase loop, ghosts and historical puppets, real-time state sync and snapshots, and naming conventions.
 
 ## Guides
 
