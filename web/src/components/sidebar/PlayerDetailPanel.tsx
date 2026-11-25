@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Card as CardType, PlayerView } from "../../types";
-import type { ScoutingTab } from "../../pages/gameSurfaces";
+import type { ScoutingTab } from "../../hooks/useGameSurfaces";
 import {
   CARD_ASPECT_RATIO,
   bestFitNoClip,
