@@ -94,6 +94,18 @@ it("takes keys only to its own controls and the target its step lets players use
   expect(submit.closest("[inert]")).toBeNull();
 });
 
+it("measures and displays the guide when mounted alongside its ancestor rootRef on first render", async () => {
+  render(<Board guideId="welcome" stepIndex={0} showGuide />);
+  const home = screen.getByText("Home");
+
+  await waitFor(() =>
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "Playing Pitfight",
+    ),
+  );
+  expect(home.closest("[inert]")).not.toBeNull();
+});
+
 it("shows each step and follows its target while an animation changes the page every frame", async () => {
   let nextId = 0;
   const queued = new Map<number, FrameRequestCallback>();

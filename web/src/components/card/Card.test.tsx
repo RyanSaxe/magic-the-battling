@@ -4,6 +4,7 @@ import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useHotkeys } from "../../hooks/useHotkeys";
 import type { Card as CardType } from "../../types";
+import { BasicLandSlot } from "../common/BasicLandSlot";
 import { CardSlot } from "../common/CardSlot";
 import { Card } from "./Card";
 import { CardPreviewContext } from "./CardPreviewContext";
@@ -255,4 +256,23 @@ it("makes interactive CardSlot keyboard-focusable and activates on Enter and Spa
   expect(fireEvent.keyDown(slot, { key: " " })).toBe(false);
   expect(onSlotClick).toHaveBeenCalledTimes(2);
   expect(onAdvance).not.toHaveBeenCalled();
+});
+
+it("makes BasicLandSlot keyboard-focusable and opens the land picker", () => {
+  const onPick = vi.fn();
+  render(
+    <BasicLandSlot
+      selected={null}
+      dimensions={{ width: 80, height: 112 }}
+      onPick={onPick}
+    />,
+  );
+
+  const trigger = screen.getByRole("button", { name: "Pick basic land" });
+  expect(trigger.tabIndex).toBe(0);
+  fireEvent.click(trigger);
+
+  const islandButton = screen.getByRole("button", { name: "Island" });
+  fireEvent.click(islandButton);
+  expect(onPick).toHaveBeenCalledWith("Island");
 });
