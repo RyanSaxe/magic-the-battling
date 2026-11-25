@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { CubeLook } from "../../hooks/useCubeLook";
+import { useResizeObserver } from "../../hooks/useDomEffects";
 import type { ResumableSeat } from "../../hooks/useResumableGames";
 import type { useVoiceChat } from "../../hooks/useVoiceChat";
 import type { LobbyPlayer, LobbyState, PlayMode } from "../../types";
@@ -344,16 +345,7 @@ export function BoardPlayGames({
   const boxRef = useRef<HTMLDivElement>(null);
   const [boxHeight, setBoxHeight] = useState(0);
 
-  useLayoutEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const measure = () => setBoxHeight(el.clientHeight);
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  useResizeObserver(boxRef, (el) => setBoxHeight(el.clientHeight));
 
   const rowStep =
     typeof window !== "undefined" && window.innerHeight < SHORT_WINDOW_HEIGHT

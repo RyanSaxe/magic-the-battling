@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/authState";
+import { useState, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../contexts";
+import { useRedirectWhen, useRequireAuth } from "../hooks/pages/useAuthSession";
 import { PageFrame } from "../components/common/PageFrame";
 import { DashboardFrame } from "../components/dashboard/DashboardFrame";
 import { DefaultOpponentsField } from "../components/dashboard/DefaultOpponentsField";
@@ -39,8 +39,7 @@ import { Dialog } from "../components/common/Dialog";
 export function BattlerView() {
   const { listId } = useParams<{ listId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const { addToast } = useToast();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -60,17 +59,7 @@ export function BattlerView() {
     presetLoad.state.status === "loaded" ? presetLoad.state.value : null;
   const missing = presetLoad.state.status === "loaded" && battler === null;
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate(`/login?returnTo=${encodeURIComponent(location.pathname)}`, {
-        replace: true,
-      });
-    }
-  }, [authLoading, user, navigate, location.pathname]);
-
-  useEffect(() => {
-    if (missing) navigate("/dashboard", { replace: true });
-  }, [missing, navigate]);
+  useRedirectWhen(missing, "/dashboard");
 
   const battlerId = battler?.id;
   const loadGames = useCallback<LoadGames>(

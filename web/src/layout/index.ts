@@ -1,0 +1,81 @@
+/**
+ * Public entry point for the modular web layout engine: card fitting, unified
+ * phase layout, constrained frames, slack redistribution, and shell primitives.
+ */
+export {
+  cardHeight,
+  fitCards,
+  horizontalGaps,
+  makeZoneDims,
+  verticalGaps,
+  widthCapForHeight,
+  widthCapForRows,
+  zoneGridHeight,
+  zoneGridWidth,
+  type CardFitOptions,
+  type CardFitResult,
+} from "./cardFit";
+export {
+  MIN_ZONE_CARD,
+  clampSavedConstraints,
+  computeConstrainedFrames,
+  computeConstrainedLayout,
+  computeConstrainedLayoutState,
+  deriveConstraintsFromLayout,
+  resolveConstraints,
+} from "./constrainedLayout";
+export { computePhaseLayout } from "./phaseLayout";
+export {
+  boardSizeBand,
+  clampDividerFraction,
+  layoutForContainer,
+  measureContentBox,
+  measureFromPlacement,
+  omitConstraintKey,
+  parsePersistedConstraintBands,
+  quantizeBoardSize,
+  resetConstraintHistoryFrom,
+  resolveConstraintHistory,
+  resolveVisibleDividers,
+  seedDragConstraints,
+  sortConstraintEntries,
+  upsertConstraintHistoryEntry,
+  type BoardSize,
+  type MeasuredFromPlacement,
+  type PersistedConstraintEntry,
+  type PersistedConstraintResolution,
+  type VisibleDividers,
+  type ZoneMeasurement,
+} from "./shellPrimitives";
+export {
+  redistributeSlack,
+  resolveGrowPriority,
+  type RedistributeSlackResult,
+} from "./slackRedistribution";
+export {
+  CARD_ASPECT_RATIO,
+  DEFAULT_CARD_GAP,
+  DEFAULT_PASS_2_MAX_CARD_WIDTH,
+  DEFAULT_ZONE_DIMS,
+  DEFAULT_ZONE_FRAME,
+  MIN_CARD_WIDTH,
+  ZONE_LAYOUT_PADDING,
+  dimsEqual,
+  framesEqual,
+  getActiveZoneIds,
+  makeDefaultDims,
+  makeDefaultFrames,
+  resolveZone,
+  type ActiveZoneIds,
+  type CardLayoutConfig,
+  type CardLayoutResult,
+  type ConstrainedLayoutState,
+  type ContainerLayout,
+  type ContainerSize,
+  type ResolvedZone,
+  type ZoneConstraints,
+  type ZoneDims,
+  type ZoneFrame,
+  type ZoneFrameResult,
+  type ZoneSpec,
+} from "./types";

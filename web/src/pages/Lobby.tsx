@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+/** Lobby route for seat setup, deck submission, readiness, and starting a multiplayer game. */
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useGame } from "../hooks/useGame";
+import { useLobbySync } from "../hooks/useLobbySync";
 import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
@@ -24,7 +26,6 @@ import { InfoTip } from "../components/common/InfoTip";
 import { Switch } from "../components/common/Switch";
 import { LoadingScreen } from "../components/common/LoadingScreen";
 import {
-  type LoadingRouteState,
   START_STEPS,
   useHandedOnSteps,
 } from "../components/common/loadingSteps";
@@ -236,10 +237,28 @@ export function Lobby() {
   const [copied, setCopied] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
   const [guideMinimized, setGuideMinimized] = useState(false);
+  const guidedScopeKey = gameId
+    ? `${gameId}::${session?.playerId ?? ""}`
+    : null;
+  const [guidedScope, setGuidedScope] = useState<string | null>(guidedScopeKey);
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
-    getDefaultNewPlayerPreference(),
+    gameId
+      ? (getNewPlayerPreferenceForGame(gameId, session?.playerId) ??
+        getDefaultNewPlayerPreference())
+      : getDefaultNewPlayerPreference(),
   );
+  if (guidedScope !== guidedScopeKey) {
+    setGuidedScope(guidedScopeKey);
+    if (gameId) {
+      setIsGuidedMode(
+        getNewPlayerPreferenceForGame(gameId, session?.playerId) ??
+          getDefaultNewPlayerPreference(),
+      );
+    }
+  }
+
   const [battlerIdInput, setBattlerIdInput] = useState("");
+  const [syncedBattlerId, setSyncedBattlerId] = useState("");
   const [editingDeck, setEditingDeck] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [leavingSeat, setLeavingSeat] = useState<ResumableSeat | null>(null);
@@ -248,25 +267,6 @@ export function Lobby() {
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
     RulesPanelTarget | undefined
   >(undefined);
-  const lastCubeLoadingErrorRef = useRef<string | null>(null);
-  const lastBattlerErrorRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!gameId) return;
-    const existing = getNewPlayerPreferenceForGame(gameId, session?.playerId);
-    const initial = existing ?? getDefaultNewPlayerPreference();
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setIsGuidedMode(initial);
-    });
-    if (existing === null) {
-      setNewPlayerPreferenceForGame(gameId, initial, session?.playerId);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId, session?.playerId]);
 
   const handleGuidedModeToggle = (nextValue: boolean) => {
     setIsGuidedMode(nextValue);
@@ -279,6 +279,11 @@ export function Lobby() {
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
   );
+  const serverBattlerId = currentPlayer?.battler_id ?? "";
+  if (syncedBattlerId !== serverBattlerId) {
+    setSyncedBattlerId(serverBattlerId);
+    setBattlerIdInput(serverBattlerId);
+  }
   const isConstructed = lobbyState?.play_mode === "constructed";
   const battlerStatus = currentPlayer?.battler_status ?? null;
   const hasLoadedBattler = battlerStatus === "ready";
@@ -312,48 +317,6 @@ export function Lobby() {
     if (!currentPlayer || readyActionDisabled) return;
     actions.setReady(!currentPlayer.is_ready);
   };
-
-  useEffect(() => {
-    const nextBattlerId = currentPlayer?.battler_id ?? "";
-    queueMicrotask(() => {
-      setBattlerIdInput((previous) =>
-        previous === nextBattlerId ? previous : nextBattlerId,
-      );
-    });
-  }, [currentPlayer?.battler_id]);
-
-  useEffect(() => {
-    const nextError =
-      lobbyState?.play_mode === "limited" &&
-      lobbyState.cube_loading_status === "error"
-        ? lobbyState.cube_loading_error
-        : null;
-    if (!nextError || nextError === lastCubeLoadingErrorRef.current) {
-      if (!nextError) {
-        lastCubeLoadingErrorRef.current = null;
-      }
-      return;
-    }
-    lastCubeLoadingErrorRef.current = nextError;
-    addToast(nextError, "error");
-  }, [
-    addToast,
-    lobbyState?.cube_loading_error,
-    lobbyState?.cube_loading_status,
-    lobbyState?.play_mode,
-  ]);
-
-  useEffect(() => {
-    const nextError = currentPlayer?.battler_error ?? null;
-    if (!nextError || nextError === lastBattlerErrorRef.current) {
-      if (!nextError) {
-        lastBattlerErrorRef.current = null;
-      }
-      return;
-    }
-    lastBattlerErrorRef.current = nextError;
-    addToast(nextError, "error");
-  }, [addToast, currentPlayer?.battler_error]);
 
   const submitBattler = () => {
     const battlerId = battlerIdInput.trim();
@@ -420,20 +383,6 @@ export function Lobby() {
   useHotkeys(lobbyHotkeyMap, !!session && !removing && !leavingSeat);
   usePanelHoldsEnter(guideTakesKeys);
 
-  useEffect(() => {
-    if (gameState) {
-      const state: LoadingRouteState = { loadingSteps: START_STEPS };
-      navigate(`/game/${gameId}/play`, { state });
-    }
-  }, [gameState, gameId, navigate]);
-
-  useEffect(() => {
-    if (!session) return;
-    if (status.kind === "open") connectionOpened(session.sessionId);
-    if (status.kind === "ended")
-      connectionEnded(session.sessionId, status.error);
-  }, [status, session, connectionOpened, connectionEnded]);
-
   const host = lobbyState?.players.find((p) => p.is_host) ?? null;
   const hostName = host?.name ?? null;
   const awayHost = host && !host.is_connected ? host : null;
@@ -444,6 +393,22 @@ export function Lobby() {
   const lostHost =
     !!previousHost && previousHost.player_id === session?.playerId;
   const gainedHost = !!previousHost && currentPlayer?.is_host === true;
+
+  useLobbySync({
+    gameId,
+    session,
+    status,
+    lobbyState,
+    gameState,
+    battlerError: currentPlayer?.battler_error ?? null,
+    hostName,
+    selfName,
+    lostHost,
+    gainedHost,
+    connectionOpened,
+    connectionEnded,
+    addToast,
+  });
 
   const hostPass =
     previousHost && host ? `${previousHost.player_id}:${host.player_id}` : null;
@@ -464,21 +429,6 @@ export function Lobby() {
       };
     }
   }
-
-  const previousHostRef = useRef<string | null>(null);
-  useEffect(() => {
-    const previousName = previousHostRef.current;
-    previousHostRef.current = hostName;
-    if (!previousName || !hostName || previousName === hostName) return;
-    // The notice tells those two, unless the previous host's seat is gone.
-    if (lostHost || gainedHost) return;
-    addToast(
-      hostName === selfName
-        ? `You're the host now. ${previousName} left the lobby.`
-        : `${hostName} is now the host.`,
-      "info",
-    );
-  }, [hostName, selfName, lostHost, gainedHost, addToast]);
 
   const copyJoinLink = async () => {
     if (!(await copyText(`${window.location.origin}/game/${gameId}/lobby`)))

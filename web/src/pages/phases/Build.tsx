@@ -1,11 +1,4 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-  type ComponentProps,
-} from "react";
+import { useState, useCallback, useMemo, type ComponentProps } from "react";
 import type {
   GameState,
   Card as CardType,
@@ -23,6 +16,7 @@ import { UpgradeGrid } from "../../components/common/UpgradeGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
 import { useSavedLayout, type BoardSize } from "../../hooks/useSavedLayout";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
+import { useBuildPhaseSync } from "../../hooks/usePhaseHelpers";
 import { buildLayoutConfig } from "./phaseLayouts";
 
 type Selection =
@@ -87,12 +81,11 @@ export function BuildPhase({
   const poolSize = self_player.hand.length + self_player.sideboard.length;
   const selectedBasicsCount = selectedBasics.filter(Boolean).length;
 
-  const hasUserInteracted = useRef(false);
-  const pendingHandAddsRef = useRef(0);
-  const pendingHandAddsTimeoutRef = useRef<number | null>(null);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
-    if (!(e.target as HTMLElement).closest(".card, .card-slot")) {
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (!target?.closest(".card, .card-slot")) {
       setSelection(null);
     }
   }, []);
@@ -103,65 +96,26 @@ export function BuildPhase({
       return id ? (handById.get(id) ?? null) : null;
     });
   }, [self_player.hand, self_player.hand_slots, maxHandSize]);
-
-  useEffect(() => {
-    onHandSlotsChange?.(handSlots.map((c) => c?.id ?? null));
-  }, [handSlots, onHandSlotsChange]);
-
-  const clearPendingHandAdds = useCallback(() => {
-    pendingHandAddsRef.current = 0;
-    if (pendingHandAddsTimeoutRef.current !== null) {
-      window.clearTimeout(pendingHandAddsTimeoutRef.current);
-      pendingHandAddsTimeoutRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    // Clear optimistic move guards once authoritative state updates arrive.
-    clearPendingHandAdds();
-  }, [
-    self_player.hand.length,
-    self_player.sideboard.length,
-    clearPendingHandAdds,
-  ]);
-
-  useEffect(
-    () => () => {
-      clearPendingHandAdds();
-    },
-    [clearPendingHandAdds],
+  const handSlotIds = useMemo(
+    () => handSlots.map((card) => card?.id ?? null),
+    [handSlots],
   );
 
-  const tryQueueSideboardToHandMove = useCallback(() => {
-    const availableSlots =
-      maxHandSize - self_player.hand.length - pendingHandAddsRef.current;
-    if (availableSlots <= 0) return false;
-
-    pendingHandAddsRef.current += 1;
-    if (pendingHandAddsTimeoutRef.current !== null) {
-      window.clearTimeout(pendingHandAddsTimeoutRef.current);
-    }
-    // Fallback so a dropped/failed response doesn't leave the guard stuck.
-    pendingHandAddsTimeoutRef.current = window.setTimeout(() => {
-      pendingHandAddsRef.current = 0;
-      pendingHandAddsTimeoutRef.current = null;
-    }, 2000);
-    return true;
-  }, [maxHandSize, self_player.hand.length]);
-
-  useEffect(() => {
-    if (
-      !hasUserInteracted.current &&
-      self_player.chosen_basics?.length &&
-      selectedBasicsCount === 0
-    ) {
-      onBasicsChange([...self_player.chosen_basics]);
-    }
-  }, [self_player.chosen_basics, selectedBasicsCount, onBasicsChange]);
+  const { tryQueueSideboardToHandMove } = useBuildPhaseSync({
+    handSlotIds,
+    handLength: self_player.hand.length,
+    sideboardLength: self_player.sideboard.length,
+    maxHandSize,
+    chosenBasics: self_player.chosen_basics,
+    selectedBasicsCount,
+    hasUserInteracted,
+    onHandSlotsChange,
+    onHydrateBasics: onBasicsChange,
+  });
 
   const handleBasicPick = (index: number, name: string) => {
     if (locked) return;
-    hasUserInteracted.current = true;
+    setHasUserInteracted(true);
     const next = [...selectedBasics];
     next[index] = name;
     onBasicsChange(next);

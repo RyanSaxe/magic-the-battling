@@ -1,10 +1,4 @@
-import {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useLayoutEffect,
-} from "react";
+import { useState, useCallback } from "react";
 import type {
   GameState,
   Card as CardType,
@@ -17,6 +11,8 @@ import { CompactZoneDisplay } from "../../components/zones/CompactZoneDisplay";
 import { Card, CardBack, CardActionMenu } from "../../components/card";
 import { ZoneDivider } from "../../components/common/ZoneDivider";
 import { usePanelHoldsEnter } from "../../utils/enterKey";
+import { useEscapeKey } from "../../hooks/useDomEffects";
+import { useBattleLayoutMetricsSync } from "../../hooks/usePhaseHelpers";
 import { useBattleCardSizes } from "../../hooks/useBattleCardSizes";
 import { battleBoardMetrics } from "./phaseLayouts";
 import {
@@ -139,16 +135,14 @@ function ZoneActionMenu({
   );
 
   usePanelHoldsEnter();
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+  // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
+  useEscapeKey(
+    (event) => {
       event.preventDefault();
       onClose();
-    };
-    // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
-    window.addEventListener("keydown", handleKey, true);
-    return () => window.removeEventListener("keydown", handleKey, true);
-  }, [onClose]);
+    },
+    { capture: true },
+  );
 
   return (
     <>
@@ -201,42 +195,30 @@ export function BattlePhase({
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange;
 
-  const selectedCardRef = useRef(selectedCard);
-  const actionsRef = useRef(actions);
-  useEffect(() => {
-    selectedCardRef.current = selectedCard;
-    actionsRef.current = actions;
-  });
+  const handleBackgroundClick = (e: React.MouseEvent) => {
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target?.closest(".card")) return;
 
-  const handleBackgroundClick = useCallback(
-    (e: React.MouseEvent) => {
-      if ((e.target as HTMLElement).closest(".card")) return;
-
-      const sel = selectedCardRef.current;
-      if (sel) {
-        const zoneEl = (e.target as HTMLElement).closest(
-          "[data-zone]",
-        ) as HTMLElement | null;
-        if (zoneEl) {
-          const toZone = zoneEl.dataset.zone as ZoneName;
-          const toOwner = (zoneEl.dataset.zoneOwner ?? "player") as ZoneOwner;
-          if (toZone !== sel.zone || toOwner !== sel.owner) {
-            actionsRef.current.battleMove(
-              sel.card.id,
-              sel.zone,
-              toZone,
-              sel.owner,
-              toOwner,
-            );
-            setSelectedCard(null);
-            return;
-          }
+    if (selectedCard) {
+      const zoneEl = target?.closest<HTMLElement>("[data-zone]") ?? null;
+      if (zoneEl) {
+        const toZone = zoneEl.dataset.zone as ZoneName;
+        const toOwner = (zoneEl.dataset.zoneOwner ?? "player") as ZoneOwner;
+        if (toZone !== selectedCard.zone || toOwner !== selectedCard.owner) {
+          actions.battleMove(
+            selectedCard.card.id,
+            selectedCard.zone,
+            toZone,
+            selectedCard.owner,
+            toOwner,
+          );
+          setSelectedCard(null);
+          return;
         }
-        setSelectedCard(null);
       }
-    },
-    [setSelectedCard],
-  );
+      setSelectedCard(null);
+    }
+  };
   const [zoneContextMenu, setZoneContextMenu] =
     useState<ZoneContextMenuState | null>(null);
 
@@ -298,20 +280,11 @@ export function BattlePhase({
   const playerTopZoneHeight = Math.floor(bfHeight / 2);
   const playerMidZoneHeight = bfHeight - playerTopZoneHeight;
 
-  useLayoutEffect(() => {
-    onLayoutMetricsChange?.({
-      topSectionHeight: handHeight + opponentMidZoneHeight,
-      middleLaneHeight:
-        opponentBottomZoneHeight + midDividerHeight + playerTopZoneHeight,
-    });
-  }, [
-    handHeight,
+  useBattleLayoutMetricsSync(
+    handHeight + opponentMidZoneHeight,
+    opponentBottomZoneHeight + midDividerHeight + playerTopZoneHeight,
     onLayoutMetricsChange,
-    midDividerHeight,
-    opponentBottomZoneHeight,
-    opponentMidZoneHeight,
-    playerTopZoneHeight,
-  ]);
+  );
 
   if (!battle) {
     return (

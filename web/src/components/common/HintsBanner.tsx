@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
 import { hintsFor, type HintPlace } from "../../constants/hints";
+import { useHintCycler } from "../../hooks/ui/useOverlayAnimations";
 import { textForInput } from "../../utils/inputMode";
 
-const CYCLE_INTERVAL = 8000;
-const FADE_OUT_DURATION = 280;
-const SWAP_PAUSE = 80;
+const HINT_CYCLE_TIMINGS = {
+  cycleMs: 8000,
+  fadeOutMs: 280,
+  swapPauseMs: 80,
+};
 
 type HintsBannerVariant = "default" | "dark" | "rail";
 
@@ -16,71 +18,10 @@ export function HintsBanner({
   variant?: HintsBannerVariant;
 }) {
   const hints = hintsFor(place);
-  const [index, setIndex] = useState(() =>
-    Math.floor(Math.random() * hints.length),
+  const { index, visible, prev, next } = useHintCycler(
+    hints.length,
+    HINT_CYCLE_TIMINGS,
   );
-  const [visible, setVisible] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fadeOutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fadeInRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearTransitionTimers = useCallback(() => {
-    if (fadeOutRef.current) {
-      clearTimeout(fadeOutRef.current);
-      fadeOutRef.current = null;
-    }
-    if (fadeInRef.current) {
-      clearTimeout(fadeInRef.current);
-      fadeInRef.current = null;
-    }
-  }, []);
-
-  const goTo = useCallback(
-    (next: number) => {
-      clearTransitionTimers();
-      setVisible(false);
-      fadeOutRef.current = setTimeout(() => {
-        setIndex(next);
-        fadeInRef.current = setTimeout(() => {
-          setVisible(true);
-          fadeInRef.current = null;
-        }, SWAP_PAUSE);
-        fadeOutRef.current = null;
-      }, FADE_OUT_DURATION);
-    },
-    [clearTransitionTimers],
-  );
-
-  const resetTimer = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      goTo((index + 1) % hints.length);
-    }, CYCLE_INTERVAL);
-  }, [index, goTo, hints.length]);
-
-  useEffect(() => {
-    resetTimer();
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [resetTimer]);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      clearTransitionTimers();
-    };
-  }, [clearTransitionTimers]);
-
-  const prev = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    goTo((index - 1 + hints.length) % hints.length);
-  };
-
-  const next = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    goTo((index + 1) % hints.length);
-  };
 
   const wrapperClass =
     variant === "dark"

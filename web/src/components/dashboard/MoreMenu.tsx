@@ -1,4 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import {
+  useDocumentEvent,
+  useEscapeKey,
+  useLayoutMeasure,
+} from "../../hooks/useDomEffects";
 import { BoardBackdrop } from "../common/BoardBackdrop";
 import { POPOVER_CHROME } from "../common/styles";
 
@@ -33,42 +38,41 @@ export function MoreMenu({
   const backdropRef = useRef<HTMLDivElement>(null);
 
   // A card near the bottom of the felt would open its menu past the felt's edge, behind the bottom bar.
-  useLayoutEffect(() => {
-    const menu = menuRef.current;
-    const button = ref.current;
-    if (!open || !menu || !button) return;
-    const visible = visibleArea(button);
-    const below = menu.getBoundingClientRect();
-    const roomAbove = button.getBoundingClientRect().top - visible.top;
-    if (below.bottom > visible.bottom && below.height <= roomAbove) {
-      menu.style.top = "auto";
-      menu.style.bottom = "100%";
-      menu.style.marginTop = "0";
-      menu.style.marginBottom = "0.25rem";
-    }
-  }, [open]);
+  useLayoutMeasure(
+    menuRef,
+    (menu) => {
+      const button = ref.current;
+      if (!button) return;
+      const visible = visibleArea(button);
+      const below = menu.getBoundingClientRect();
+      const roomAbove = button.getBoundingClientRect().top - visible.top;
+      if (below.bottom > visible.bottom && below.height <= roomAbove) {
+        menu.style.top = "auto";
+        menu.style.bottom = "100%";
+        menu.style.marginTop = "0";
+        menu.style.marginBottom = "0.25rem";
+      }
+    },
+    [],
+    open,
+  );
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      const target = e.target as Node;
+  useDocumentEvent(
+    "mousedown",
+    (e) => {
       if (
-        ref.current?.contains(target) ||
-        backdropRef.current?.contains(target)
-      )
+        e.target instanceof Node &&
+        (ref.current?.contains(e.target) ||
+          backdropRef.current?.contains(e.target))
+      ) {
         return;
+      }
       setOpen(false);
-    };
-    const closeOnEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
+    },
+    { enabled: open },
+  );
+
+  useEscapeKey(() => setOpen(false), { enabled: open, target: "document" });
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>

@@ -2,7 +2,7 @@
  * React hook owner for the Guided Mode scheduler.
  *
  * Bridges the pure `reduceGuideScheduler` state machine with localStorage progress
- * persistence and gameplay overlay dismissal without any `queueMicrotask` calls.
+ * persistence and gameplay overlay dismissal through explicit reducer transitions.
  */
 import {
   useCallback,

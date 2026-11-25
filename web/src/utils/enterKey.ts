@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { usePanelHoldsEnter } from "../hooks/usePanelHoldsEnter";
+
+export { usePanelHoldsEnter };
 
 const PRESSED_BY_ENTER = "button:not([disabled]), a[href], summary";
 const ENDS_PHASE = "[data-ends-phase]";
@@ -76,15 +78,11 @@ export function enterMayAdvance(e: KeyboardEvent): boolean {
   return !e.repeat && openPanels === 0 && !skipsThisEnter;
 }
 
-/** While open, a panel over the page keeps Enter from advancing it. */
-export function usePanelHoldsEnter(open = true) {
-  useEffect(() => {
-    if (!open) return;
-    openPanels += 1;
-    return () => {
-      openPanels -= 1;
-    };
-  }, [open]);
+export function acquireEnterPanelHold(): () => void {
+  openPanels += 1;
+  return () => {
+    openPanels -= 1;
+  };
 }
 
 /** The next Enter doesn't advance. Returns what calls that off. */

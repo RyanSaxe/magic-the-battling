@@ -1,5 +1,7 @@
-import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useAnimatedPresence } from "../../hooks/ui/useOverlayAnimations";
+import { useEscapeKey } from "../../hooks/useDomEffects";
 import { usePanelHoldsEnter } from "../../utils/enterKey";
 import { BoardBackdrop } from "./BoardBackdrop";
 import { CloseButton } from "./CloseButton";
@@ -59,26 +61,18 @@ export function SidePanel({
 }: SidePanelProps) {
   const host = useContext(SidePanelHostContext);
   const panelRef = useRef<HTMLElement>(null);
-  const [present, setPresent] = useState(open);
-  if (open && !present) setPresent(true);
+  const { present, finishExit } = useAnimatedPresence(open, panelRef);
   usePanelHoldsEnter(open);
 
-  // A panel closed before it was ever drawn has no slide to end, so it drops its content at once.
-  useEffect(() => {
-    if (open || !present) return;
-    const frame = requestAnimationFrame(() => {
-      if (!panelRef.current?.getAnimations().length) setPresent(false);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open, present]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      const target = event.target as HTMLElement | null;
+  useEscapeKey(
+    (event) => {
+      if (event.defaultPrevented) return;
+      const target = event.target;
       // Escape first cancels typing in a field, and closes a dialog or card preview open over the panel.
-      if (target?.closest('input, textarea, select, [contenteditable="true"]'))
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      )
         return;
       if (
         document.querySelector(
@@ -87,10 +81,9 @@ export function SidePanel({
       )
         return;
       onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
+    },
+    { enabled: open },
+  );
 
   if (!present || !host) return null;
   const label = prefix ? `${prefix} ${title}` : title;
@@ -102,7 +95,7 @@ export function SidePanel({
       inert={!open}
       data-guide-target={guideTarget}
       onTransitionEnd={(event) => {
-        if (event.target === event.currentTarget && !open) setPresent(false);
+        if (event.target === event.currentTarget && !open) finishExit();
       }}
     >
       <div

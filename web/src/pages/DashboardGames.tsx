@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/authState";
 import { useToast } from "../contexts";
 import { DashboardFrame } from "../components/dashboard/DashboardFrame";
 import { GameTile } from "../components/dashboard/GameTile";
@@ -15,87 +14,31 @@ import {
   SectionCounts,
   WinsCount,
 } from "../components/dashboard/Section";
-import { getMyGames } from "../api/client";
-import { useDebouncedValue } from "../hooks/useDebouncedValue";
-import type { GameSummary } from "../types";
-
-const SEARCH_DELAY_MS = 300;
-
-/** A list of games, stamped with the search it was loaded for. */
-interface LoadedGames {
-  search: string;
-  games: GameSummary[];
-  hasMore: boolean;
-  totalGames: number;
-  totalWins: number;
-}
+import { useRequireAuth } from "../hooks/pages/useAuthSession";
+import { useDashboardGames } from "../hooks/pages/useDashboardData";
 
 /** Every finished game the player has played, newest first, searchable by cube, preset, opponent or card. */
 export function DashboardGames() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useRequireAuth("/dashboard/games");
   const { addToast } = useToast();
-  const [searchText, setSearchText] = useState("");
-  const search = useDebouncedValue(searchText.trim(), SEARCH_DELAY_MS);
-  const [loaded, setLoaded] = useState<LoadedGames | null>(null);
-  const [failedSearch, setFailedSearch] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && !user)
-      navigate("/login?returnTo=/dashboard/games", { replace: true });
-  }, [authLoading, user, navigate]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    getMyGames(0, search)
-      .then((data) => {
-        if (cancelled) return;
-        setLoaded({
-          search,
-          games: data.games,
-          hasMore: data.has_more,
-          totalGames: data.total_games,
-          totalWins: data.total_wins,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setFailedSearch(search);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user, search, attempt]);
-
-  const loadMore = async () => {
-    if (!loaded) return;
-    setLoadingMore(true);
-    try {
-      const data = await getMyGames(loaded.games.length, loaded.search);
-      setLoaded((prev) =>
-        prev && prev.search === loaded.search
-          ? {
-              ...prev,
-              games: [...prev.games, ...data.games],
-              hasMore: data.has_more,
-            }
-          : prev,
-      );
-    } catch {
-      addToast("Failed to load games", "error");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  const handleLoadMoreError = useCallback(
+    () => addToast("Failed to load games", "error"),
+    [addToast],
+  );
+  const {
+    searchText,
+    setSearchText,
+    search,
+    current,
+    shown,
+    failed,
+    retry,
+    loadingMore,
+    loadMore,
+  } = useDashboardGames(user, handleLoadMoreError);
 
   if (authLoading || !user) return null;
-
-  const current = loaded?.search === search ? loaded : null;
-  const failed = failedSearch === search && !current;
-  // While a new search loads, the last list stays on screen, dimmed, instead of flashing away.
-  const shown = current ?? loaded;
 
   return (
     <DashboardFrame>
@@ -124,10 +67,7 @@ export function DashboardGames() {
         <NoticeTile
           action={{
             label: "Retry",
-            onClick: () => {
-              setFailedSearch(null);
-              setAttempt((n) => n + 1);
-            },
+            onClick: retry,
           }}
         >
           Your games didn&apos;t load.

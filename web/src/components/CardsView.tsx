@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
-import { getGameCards, type GameCardsResponse } from "../api/client";
+import { getGameCards } from "../api/client";
+import { useAsyncResource } from "../hooks/useAsyncResource";
 import { CardPreviewModal } from "./card/CardPreviewModal";
 import type { Card } from "../types";
 import { unknownToAppError } from "../utils/appError";
@@ -35,46 +36,22 @@ export function CardsView({
   which: "cards" | "upgrades";
   playerName?: string;
 }) {
-  const [data, setData] = useState<GameCardsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data,
+    loading,
+    error: loadError,
+  } = useAsyncResource(
+    () => getGameCards(gameId, playerName),
+    [gameId, playerName],
+  );
+  const error = loadError
+    ? unknownToAppError(loadError, "default", "Failed to load cards").message
+    : null;
   const [searchName, setSearchName] = useState("");
   const [searchType, setSearchType] = useState("");
   const [searchText, setSearchText] = useState("");
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
-  const cacheRef = useRef<GameCardsResponse | null>(null);
-  const cacheKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const cacheKey = `${gameId}:${playerName ?? ""}`;
-    if (cacheRef.current && cacheKeyRef.current === cacheKey) {
-      setData(cacheRef.current);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    getGameCards(gameId, playerName)
-      .then((result) => {
-        if (cancelled) return;
-        cacheKeyRef.current = cacheKey;
-        cacheRef.current = result;
-        setData(result);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(
-          unknownToAppError(err, "default", "Failed to load cards").message,
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId, playerName]);
 
   if (loading) {
     return (
