@@ -2,7 +2,8 @@ import { usePanelHoldsEnter } from "../hooks/usePanelHoldsEnter";
 
 export { usePanelHoldsEnter };
 
-const PRESSED_BY_ENTER = "button:not([disabled]), a[href], summary";
+const PRESSED_BY_ENTER =
+  'button:not([disabled]), a[href], summary, [role="button"]:not([aria-disabled="true"])';
 const ENDS_PHASE = "[data-ends-phase]";
 
 // :focus-visible matches a clicked button as soon as any key is down, so the outline a player saw is the one from
