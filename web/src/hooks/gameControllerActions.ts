@@ -236,14 +236,17 @@ export function useGameBoardCallbacks(options: {
     [actions, isSpectator],
   );
   const handleCreateTreasure = useCallback(() => {
-    actions.battleUpdateCardState("create_treasure", "", {});
-  }, [actions]);
+    if (!isSpectator) actions.battleUpdateCardState("create_treasure", "", {});
+  }, [actions, isSpectator]);
   const handleCreateOpponentTreasure = useCallback(() => {
-    actions.battleUpdateCardState("create_treasure", "", {
-      for_opponent: true,
-    });
-  }, [actions]);
+    if (!isSpectator) {
+      actions.battleUpdateCardState("create_treasure", "", {
+        for_opponent: true,
+      });
+    }
+  }, [actions, isSpectator]);
   const untapAll = (opponent = false): void => {
+    if (isSpectator) return;
     const battle = gameState?.current_battle;
     if (!battle) return;
     const zones = opponent ? battle.opponent_zones : battle.your_zones;

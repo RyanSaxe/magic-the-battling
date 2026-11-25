@@ -62,6 +62,49 @@ export interface GameVoiceControls {
   targetNames: ReadonlySet<string>;
 }
 
+function MobileLifeChip({
+  life,
+  onChange,
+  readOnly,
+}: {
+  life: number;
+  onChange: (life: number) => void;
+  readOnly: boolean;
+}): ReactNode {
+  const stepLife = (delta: number): void => {
+    if (!readOnly) onChange(life + delta);
+  };
+
+  return (
+    <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={() => stepLife(-1)}
+        className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none disabled:opacity-40 disabled:cursor-not-allowed`}
+      >
+        -
+      </button>
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={ignoreLifeNumberTap}
+        className="text-white font-bold cursor-default"
+      >
+        {life}
+      </button>
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={() => stepLife(1)}
+        className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none disabled:opacity-40 disabled:cursor-not-allowed`}
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 export function BattleMobileLifeRail({
   battle,
   selfName,
@@ -69,6 +112,7 @@ export function BattleMobileLifeRail({
   lifeRailRef,
   onYourLifeChange,
   onOpponentLifeChange,
+  readOnly = false,
 }: {
   battle: BattleView;
   selfName: string;
@@ -76,6 +120,7 @@ export function BattleMobileLifeRail({
   lifeRailRef: (node: HTMLDivElement | null) => void;
   onYourLifeChange: (life: number) => void;
   onOpponentLifeChange: (life: number) => void;
+  readOnly?: boolean;
 }): ReactNode {
   const canManipulateOpponent = battle.can_manipulate_opponent;
   const oppPeer =
@@ -104,28 +149,11 @@ export function BattleMobileLifeRail({
               onClick={() => voice.togglePeerMute(battle.opponent_name)}
             />
           )}
-          <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-            <button
-              onClick={() => onOpponentLifeChange(battle.opponent_life - 1)}
-              className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}
-            >
-              -
-            </button>
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={ignoreLifeNumberTap}
-              className="text-white font-bold cursor-default"
-            >
-              {battle.opponent_life}
-            </button>
-            <button
-              onClick={() => onOpponentLifeChange(battle.opponent_life + 1)}
-              className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}
-            >
-              +
-            </button>
-          </div>
+          <MobileLifeChip
+            life={battle.opponent_life}
+            onChange={onOpponentLifeChange}
+            readOnly={readOnly}
+          />
         </div>
         <div className="flex items-center gap-1.5 leading-tight">
           <div className="text-center">
@@ -139,28 +167,11 @@ export function BattleMobileLifeRail({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-            <button
-              onClick={() => onYourLifeChange(battle.your_life - 1)}
-              className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}
-            >
-              -
-            </button>
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={ignoreLifeNumberTap}
-              className="text-white font-bold cursor-default"
-            >
-              {battle.your_life}
-            </button>
-            <button
-              onClick={() => onYourLifeChange(battle.your_life + 1)}
-              className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}
-            >
-              +
-            </button>
-          </div>
+          <MobileLifeChip
+            life={battle.your_life}
+            onChange={onYourLifeChange}
+            readOnly={readOnly}
+          />
           {!canManipulateOpponent &&
             voice.targetsAvailable &&
             voice.state.peers.length > 0 && (
@@ -335,6 +346,7 @@ function renderBattleSidebarContent(
       topSectionHeight={battleSidebarLayout?.topSectionHeight ?? null}
       middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
       overlayTopInset={props.overlaySidebarTopInset}
+      readOnly={props.isSpectator}
     />
   );
 }

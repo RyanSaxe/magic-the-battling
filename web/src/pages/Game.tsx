@@ -94,6 +94,7 @@ function GameBattleStage({
                 lifeRailRef={battleLifeRailRef}
                 onYourLifeChange={c.handleYourLifeChange}
                 onOpponentLifeChange={c.handleOpponentLifeChange}
+                readOnly={c.isSpectator}
               />
             )}
             <BattlePhase
@@ -342,7 +343,7 @@ function GameTableLayout({
       onOpponentLifeChange={c.handleOpponentLifeChange}
       onCreateTreasure={c.handleCreateTreasure}
       onUntapAll={() => c.untapAll(false)}
-      onPassTurn={actions.battlePassTurn}
+      onPassTurn={c.isSpectator ? ignoreBasicsPick : actions.battlePassTurn}
       onCreateOpponentTreasure={c.handleCreateOpponentTreasure}
       onUntapOpponentAll={() => c.untapAll(true)}
     />

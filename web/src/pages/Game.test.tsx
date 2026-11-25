@@ -929,4 +929,59 @@ describe("Game: what is open over the board", () => {
       screen.getByRole("radio", { name: "FAQ" }).getAttribute("aria-checked"),
     ).toBe("true");
   });
+
+  it("disables Fight sidebar and mobile life controls while spectating and emits no WS actions", async () => {
+    auth.user = { username: "Bob" };
+    const { catalog, state } = gameBootstrap({ phase: "battle", counts: {} });
+    const activeBattle = state.current_battle
+      ? { ...state.current_battle, current_turn_name: state.self_player.name }
+      : null;
+
+    const assertDisabledForViewport = async (
+      width: number,
+      labels: string[],
+    ): Promise<void> => {
+      vi.stubGlobal("innerWidth", width);
+      saveTabSpectate("game-1", {
+        target: "Alice",
+        requestId: "request-1",
+        sessionId: "spectator-session",
+      });
+      renderGame();
+      await settle();
+      act(() => FakeWebSocket.latest().serverOpen());
+      await act(async () => {
+        FakeWebSocket.latest().serverMessage({
+          type: "game_bootstrap",
+          payload: {
+            catalog,
+            state: { ...state, current_battle: activeBattle },
+          },
+        });
+      });
+
+      const sentBefore = FakeWebSocket.latest().sent.length;
+      for (const label of labels) {
+        const buttons = screen.getAllByRole<HTMLButtonElement>("button", {
+          name: label,
+        });
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const button of buttons) {
+          expect(button.disabled).toBe(true);
+          fireEvent.click(button);
+        }
+      }
+      expect(FakeWebSocket.latest().sent.length).toBe(sentBefore);
+      cleanup();
+    };
+
+    await assertDisabledForViewport(1280, [
+      "Treasure",
+      "Untap",
+      "Pass",
+      "-",
+      "+",
+    ]);
+    await assertDisabledForViewport(600, ["-", "+"]);
+  });
 });
