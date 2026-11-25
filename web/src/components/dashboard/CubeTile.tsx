@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { SurfaceCard } from "../common/SurfaceCard";
 import { CubeBadge, type CubeBadgeTone } from "./CubeBadge";
@@ -33,13 +33,15 @@ export function CubeTile({
   menuItems,
   className,
   style,
-}: CubeTileProps) {
+}: CubeTileProps): ReactElement {
   const navigate = useNavigate();
   return (
     <SurfaceCard
       as="article"
       layout="tile"
-      onClick={() => navigate(href)}
+      onClick={() => {
+        void navigate(href);
+      }}
       style={style}
       className={`flex flex-col cursor-pointer transition-shadow hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)] ${className ?? ""}`}
     >

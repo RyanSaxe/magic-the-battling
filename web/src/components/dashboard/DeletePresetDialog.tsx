@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { Dialog } from "../common/Dialog";
 
 export function DeletePresetDialog({
@@ -12,7 +13,7 @@ export function DeletePresetDialog({
   deleting?: boolean;
   onKeep: () => void;
   onDelete: () => void;
-}) {
+}): ReactElement {
   return (
     <Dialog title="Delete this preset?" onClose={onKeep}>
       <div className="delete-preset-row">

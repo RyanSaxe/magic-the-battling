@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
 import { useObservedElement } from "../../hooks/pages/useObservedElement";
 import type { Card as CardType } from "../../types";
@@ -38,7 +38,7 @@ export function ZoneModal({
   upgradedCardIds?: Set<string>;
   appliedUpgradesByCardId?: Map<string, CardType[]>;
   onClose: () => void;
-}) {
+}): ReactNode {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_MODAL_DIMS);
 
   const bodyRef = useObservedElement<HTMLDivElement>(
@@ -53,14 +53,14 @@ export function ZoneModal({
         parseFloat(cs.paddingTop) -
         parseFloat(cs.paddingBottom);
 
-      const next = bestFit(
-        cards.length,
-        Math.max(width, 0),
-        Math.max(height, 0),
-        8,
-        220,
-        64,
-      );
+      const next = bestFit({
+        count: cards.length,
+        availWidth: Math.max(width, 0),
+        availHeight: Math.max(height, 0),
+        gap: 8,
+        maxWidth: 220,
+        minWidth: 64,
+      });
 
       setDims((prev) =>
         prev.width === next.width &&
@@ -75,14 +75,14 @@ export function ZoneModal({
   );
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="modal-chrome border gold-border rounded-lg w-full max-w-6xl h-[85vh] max-h-[860px] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+      <button
+        type="button"
+        aria-label={`Close ${title}`}
+        className="absolute inset-0 bg-black/60 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative z-10 modal-chrome border gold-border rounded-lg w-full max-w-6xl h-[85vh] max-h-[860px] flex flex-col overflow-hidden">
         <div className="px-4 py-2 border-b gold-divider flex justify-between items-center shrink-0">
           <h3 className="text-white font-medium">
             {title} ({cards.length})
@@ -143,7 +143,7 @@ export function ZoneDisplay({
   companionIds,
   upgradedCardIds,
   appliedUpgradesByCardId,
-}: ZoneDisplayProps) {
+}: ZoneDisplayProps): ReactNode {
   const [showModal, setShowModal] = useState(false);
 
   const displayedCards = cards.slice(0, maxThumbnails);

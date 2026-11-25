@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactElement } from "react";
 import { useWindowEvent } from "../../hooks/useDomEffects";
 import type { Card as CardType } from "../../types";
 import { UpgradeStack } from "../sidebar/UpgradeStack";
@@ -21,7 +21,7 @@ export function RevealBeforeSubmitModal({
   onRevealAndSubmit,
   onSkip,
   onClose,
-}: RevealBeforeSubmitModalProps) {
+}: RevealBeforeSubmitModalProps): ReactElement {
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     upgrades.map((u) => u.id),
   );
@@ -55,10 +55,12 @@ export function RevealBeforeSubmitModal({
 
   return (
     <div
+      role="presentation"
       className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50 p-4 sm:p-8`}
       onClick={onClose}
     >
       <div
+        role="presentation"
         ref={dialogRef}
         className="modal-chrome border gold-border rounded-lg flex flex-col w-full max-w-xl overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}

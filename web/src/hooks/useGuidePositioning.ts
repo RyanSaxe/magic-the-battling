@@ -121,26 +121,26 @@ function hasVisibleArea(element: HTMLElement): boolean {
   return rect.width > 1 && rect.height > 1;
 }
 
+function positionKey(state: PositionState): string {
+  return [
+    rectSignature(state.spotlight),
+    state.cardLeft,
+    state.cardTop,
+    state.resolvedPlacement,
+    state.isMobile,
+    state.containerWidth,
+    state.containerHeight,
+    state.clipPath,
+  ].join("|");
+}
+
 function samePositionState(
   a: PositionState | null,
   b: PositionState | null,
 ): boolean {
-  if (a === b) {
-    return true;
-  }
-  if (!a || !b) {
-    return false;
-  }
-  return (
-    rectSignature(a.spotlight) === rectSignature(b.spotlight) &&
-    a.cardLeft === b.cardLeft &&
-    a.cardTop === b.cardTop &&
-    a.resolvedPlacement === b.resolvedPlacement &&
-    a.isMobile === b.isMobile &&
-    a.containerWidth === b.containerWidth &&
-    a.containerHeight === b.containerHeight &&
-    a.clipPath === b.clipPath
-  );
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return positionKey(a) === positionKey(b);
 }
 
 interface RectLike {
@@ -173,17 +173,20 @@ export function computeScrollDeltaForVisibility(
   return top !== 0 || left !== 0 ? { top, left } : null;
 }
 
+function axisScrollLimit(overflow: string, hiddenSize: number): number {
+  const scrollable =
+    overflow === "auto" || overflow === "scroll" || overflow === "overlay";
+  return scrollable && hiddenSize > 1 ? hiddenSize : 0;
+}
+
 function getScrollLimits(element: HTMLElement): { top: number; left: number } {
   const { overflowX, overflowY } = window.getComputedStyle(element);
-  const limit = (overflow: string, hiddenSize: number) =>
-    (overflow === "auto" || overflow === "scroll" || overflow === "overlay") &&
-    hiddenSize > 1
-      ? hiddenSize
-      : 0;
-
   return {
-    top: limit(overflowY, element.scrollHeight - element.clientHeight),
-    left: limit(overflowX, element.scrollWidth - element.clientWidth),
+    top: axisScrollLimit(
+      overflowY,
+      element.scrollHeight - element.clientHeight,
+    ),
+    left: axisScrollLimit(overflowX, element.scrollWidth - element.clientWidth),
   };
 }
 
@@ -302,15 +305,25 @@ function rectDistanceSquared(a: SpotlightRect, b: SpotlightRect): number {
   return dx * dx + dy * dy;
 }
 
-function preferredAnchorOffsetSquared(
-  candidate: RectCandidate,
-  preferred: GuidePlacement,
-  spotlight: SpotlightRect,
-  centeredLeft: number,
-  centeredTop: number,
-  cardW: number,
-  cardH: number,
-): number {
+interface AnchorOffsetInput {
+  candidate: RectCandidate;
+  preferred: GuidePlacement;
+  spotlight: SpotlightRect;
+  centeredLeft: number;
+  centeredTop: number;
+  cardW: number;
+  cardH: number;
+}
+
+function preferredAnchorOffsetSquared({
+  candidate,
+  preferred,
+  spotlight,
+  centeredLeft,
+  centeredTop,
+  cardW,
+  cardH,
+}: AnchorOffsetInput): number {
   switch (preferred) {
     case "top":
       return (
@@ -386,54 +399,49 @@ function resolveCandidatePlacement(
   vertical: VerticalRegion,
   preferred: GuidePlacement,
 ): GuidePlacement {
-  if (vertical === "top" && horizontal === "overlap") return "top";
-  if (vertical === "bottom" && horizontal === "overlap") return "bottom";
-  if (horizontal === "left" && vertical === "overlap") return "left";
-  if (horizontal === "right" && vertical === "overlap") return "right";
+  if (horizontal === "overlap" && vertical !== "overlap") return vertical;
+  if (vertical === "overlap" && horizontal !== "overlap") return horizontal;
   if (preferred !== "center") return preferred;
-  if (vertical === "top") return "top";
-  if (vertical === "bottom") return "bottom";
-  if (horizontal === "left") return "left";
-  if (horizontal === "right") return "right";
+  if (vertical !== "overlap") return vertical;
+  if (horizontal !== "overlap") return horizontal;
   return "center";
 }
 
-function computePosition(
-  placement: GuidePlacement,
-  cw: number,
-  ch: number,
-  spotlight: SpotlightRect | null,
-  cardW: number,
-  cardH: number,
-  isMobile: boolean,
-  centerAnchor?: SpotlightRect | null,
-): { left: number; top: number; resolved: GuidePlacement } {
-  const xMin = CARD_MARGIN;
-  const yMin = CARD_MARGIN;
-  const xMax = Math.max(CARD_MARGIN, cw - cardW - CARD_MARGIN);
-  const yMax = Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN);
+interface ComputePositionInput {
+  placement: GuidePlacement;
+  cw: number;
+  ch: number;
+  spotlight: SpotlightRect | null;
+  cardW: number;
+  cardH: number;
+  isMobile: boolean;
+  centerAnchor?: SpotlightRect | null;
+}
 
-  if (!spotlight || placement === "center") {
-    const cx = centerAnchor ? centerAnchor.x + centerAnchor.width / 2 : cw / 2;
-    const cy = centerAnchor ? centerAnchor.y + centerAnchor.height / 2 : ch / 2;
-    return {
-      left: clamp(cx - cardW / 2, xMin, xMax),
-      top: clamp(cy - cardH / 2, yMin, yMax),
-      resolved: "center",
-    };
-  }
-
-  const centeredLeft = clamp(
-    spotlight.x + spotlight.width / 2 - cardW / 2,
+function buildLegalCandidates(options: {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+  spotlight: SpotlightRect;
+  cardW: number;
+  cardH: number;
+  centeredLeft: number;
+  centeredTop: number;
+  placement: GuidePlacement;
+}): RectCandidate[] {
+  const {
     xMin,
     xMax,
-  );
-  const centeredTop = clamp(
-    spotlight.y + spotlight.height / 2 - cardH / 2,
     yMin,
     yMax,
-  );
-
+    spotlight,
+    cardW,
+    cardH,
+    centeredLeft,
+    centeredTop,
+    placement,
+  } = options;
   const horizontalIntervals = [
     buildInterval(xMin, Math.min(xMax, spotlight.x - cardW), "left"),
     buildInterval(
@@ -462,14 +470,13 @@ function computePosition(
     (interval): interval is AxisInterval<VerticalRegion> => interval !== null,
   );
 
-  const legalCandidates: RectCandidate[] = [];
+  const candidates: RectCandidate[] = [];
   for (const horizontal of horizontalIntervals) {
     for (const vertical of verticalIntervals) {
       if (horizontal.region === "overlap" && vertical.region === "overlap") {
         continue;
       }
-
-      legalCandidates.push({
+      candidates.push({
         left: chooseAxisCoordinate(horizontal, centeredLeft),
         top: chooseAxisCoordinate(vertical, centeredTop),
         resolved: resolveCandidatePlacement(
@@ -480,6 +487,61 @@ function computePosition(
       });
     }
   }
+  return candidates;
+}
+
+function computePosition({
+  placement,
+  cw,
+  ch,
+  spotlight,
+  cardW,
+  cardH,
+  isMobile,
+  centerAnchor,
+}: ComputePositionInput): {
+  left: number;
+  top: number;
+  resolved: GuidePlacement;
+} {
+  const xMin = CARD_MARGIN;
+  const yMin = CARD_MARGIN;
+  const xMax = Math.max(CARD_MARGIN, cw - cardW - CARD_MARGIN);
+  const yMax = Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN);
+
+  if (!spotlight || placement === "center") {
+    const cx = centerAnchor ? centerAnchor.x + centerAnchor.width / 2 : cw / 2;
+    const cy = centerAnchor ? centerAnchor.y + centerAnchor.height / 2 : ch / 2;
+    return {
+      left: clamp(cx - cardW / 2, xMin, xMax),
+      top: clamp(cy - cardH / 2, yMin, yMax),
+      resolved: "center",
+    };
+  }
+
+  const centeredLeft = clamp(
+    spotlight.x + spotlight.width / 2 - cardW / 2,
+    xMin,
+    xMax,
+  );
+  const centeredTop = clamp(
+    spotlight.y + spotlight.height / 2 - cardH / 2,
+    yMin,
+    yMax,
+  );
+
+  const legalCandidates = buildLegalCandidates({
+    xMin,
+    xMax,
+    yMin,
+    yMax,
+    spotlight,
+    cardW,
+    cardH,
+    centeredLeft,
+    centeredTop,
+    placement,
+  });
 
   const fallbackCandidates: RectCandidate[] = [
     { left: centeredLeft, top: yMin, resolved: "top" },
@@ -497,9 +559,9 @@ function computePosition(
     { left: xMax, top: yMax, resolved: "bottom" },
   ];
 
-  const scored = (
-    legalCandidates.length > 0 ? legalCandidates : fallbackCandidates
-  ).map((candidate) => {
+  const pool =
+    legalCandidates.length > 0 ? legalCandidates : fallbackCandidates;
+  const scored = pool.map((candidate) => {
     const cardRect: SpotlightRect = {
       x: candidate.left,
       y: candidate.top,
@@ -507,18 +569,20 @@ function computePosition(
       height: cardH,
     };
     return {
-      ...candidate,
+      left: candidate.left,
+      top: candidate.top,
+      resolved: candidate.resolved,
       overlap: overlapArea(cardRect, spotlight),
       penalty: placementPenalty(candidate.resolved, placement),
-      anchorOffset: preferredAnchorOffsetSquared(
+      anchorOffset: preferredAnchorOffsetSquared({
         candidate,
-        placement,
+        preferred: placement,
         spotlight,
         centeredLeft,
         centeredTop,
         cardW,
         cardH,
-      ),
+      }),
       distance: rectDistanceSquared(cardRect, spotlight),
     };
   });
@@ -543,19 +607,100 @@ function computePosition(
   return { left: best.left, top: best.top, resolved: best.resolved };
 }
 
-export function useGuidePositioning(
-  rootRef: RefObject<HTMLElement | null>,
-  cardRef: RefObject<HTMLElement | null>,
-  targetId: GuideTargetId | undefined,
-  targetSelector: string | undefined,
-  positionTargetId: GuideTargetId | undefined,
-  positionTargetSelector: string | undefined,
-  waitForLayoutTargetId: GuideTargetId | undefined,
-  waitForLayoutTargetSelector: string | undefined,
-  placement: GuidePlacement,
-  spotlightPadding: number | undefined,
-  stepKey: string,
-): PositionState | null {
+function buildResolvedMeasurement(options: {
+  root: HTMLElement;
+  card: HTMLElement;
+  target: HTMLElement | null;
+  posTarget: HTMLElement | null;
+  observedElements: HTMLElement[];
+  placement: GuidePlacement;
+  spotlightPadding: number | undefined;
+  stepKey: string;
+}): LayoutMeasurement {
+  const {
+    root,
+    card,
+    target,
+    posTarget,
+    observedElements,
+    placement,
+    spotlightPadding,
+    stepKey,
+  } = options;
+  const cw = root.clientWidth;
+  const ch = root.clientHeight;
+  const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
+  const rawSpotlight = target ? toRelativeRect(root, target, padding) : null;
+  const spotlight = rawSpotlight ? clampSpotlight(rawSpotlight, cw, ch) : null;
+  const cardRect = card.getBoundingClientRect();
+  const isMobile = cw <= MOBILE_BREAKPOINT;
+  const centerAnchor = posTarget ? toRelativeRect(root, posTarget, 0) : null;
+  const pos = computePosition({
+    placement,
+    cw,
+    ch,
+    spotlight,
+    cardW: cardRect.width,
+    cardH: cardRect.height,
+    isMobile,
+    centerAnchor,
+  });
+
+  return {
+    state: {
+      spotlight,
+      cardLeft: pos.left,
+      cardTop: pos.top,
+      resolvedPlacement: pos.resolved,
+      isMobile,
+      containerWidth: cw,
+      containerHeight: ch,
+      clipPath: buildClipPath(spotlight, cw, ch),
+    },
+    signature: [
+      stepKey,
+      cw,
+      ch,
+      roundRectValue(cardRect.width),
+      roundRectValue(cardRect.height),
+      rectSignature(spotlight),
+      rectSignature(centerAnchor),
+      roundRectValue(pos.left),
+      roundRectValue(pos.top),
+      pos.resolved,
+    ].join("|"),
+    target,
+    observedElements,
+  };
+}
+
+export interface UseGuidePositioningOptions {
+  rootRef: RefObject<HTMLElement | null>;
+  cardRef: RefObject<HTMLElement | null>;
+  targetId: GuideTargetId | undefined;
+  targetSelector: string | undefined;
+  positionTargetId: GuideTargetId | undefined;
+  positionTargetSelector: string | undefined;
+  waitForLayoutTargetId: GuideTargetId | undefined;
+  waitForLayoutTargetSelector: string | undefined;
+  placement: GuidePlacement;
+  spotlightPadding: number | undefined;
+  stepKey: string;
+}
+
+export function useGuidePositioning({
+  rootRef,
+  cardRef,
+  targetId,
+  targetSelector,
+  positionTargetId,
+  positionTargetSelector,
+  waitForLayoutTargetId,
+  waitForLayoutTargetSelector,
+  placement,
+  spotlightPadding,
+  stepKey,
+}: UseGuidePositioningOptions): PositionState | null {
   const [state, setState] = useState<PositionState | null>(null);
 
   // Use useEffect so ancestor refs (such as Game's guideRootRef) are attached
@@ -564,7 +709,7 @@ export function useGuidePositioning(
     const root = rootRef.current;
     const card = cardRef.current;
     if (!root || !card) {
-      return;
+      return undefined;
     }
 
     let animationFrameId: number | null = null;
@@ -602,8 +747,8 @@ export function useGuidePositioning(
         (element): element is HTMLElement => element !== null,
       );
 
-      const requiresWaitTarget = !!(
-        waitForLayoutTargetId || waitForLayoutTargetSelector
+      const requiresWaitTarget = Boolean(
+        waitForLayoutTargetId || waitForLayoutTargetSelector,
       );
       if (requiresWaitTarget && (!waitTarget || !hasVisibleArea(waitTarget))) {
         return {
@@ -616,58 +761,19 @@ export function useGuidePositioning(
         };
       }
 
-      const cw = r.clientWidth;
-      const ch = r.clientHeight;
-      const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
-      const rawSpotlight = target ? toRelativeRect(r, target, padding) : null;
-      const spotlight = rawSpotlight
-        ? clampSpotlight(rawSpotlight, cw, ch)
-        : null;
-      const cardRect = c.getBoundingClientRect();
-      const isMobile = cw <= MOBILE_BREAKPOINT;
-      const centerAnchor = posTarget ? toRelativeRect(r, posTarget, 0) : null;
-      const pos = computePosition(
-        placement,
-        cw,
-        ch,
-        spotlight,
-        cardRect.width,
-        cardRect.height,
-        isMobile,
-        centerAnchor,
-      );
-
-      const nextState = {
-        spotlight,
-        cardLeft: pos.left,
-        cardTop: pos.top,
-        resolvedPlacement: pos.resolved,
-        isMobile,
-        containerWidth: cw,
-        containerHeight: ch,
-        clipPath: buildClipPath(spotlight, cw, ch),
-      };
-
-      return {
-        state: nextState,
-        signature: [
-          stepKey,
-          cw,
-          ch,
-          roundRectValue(cardRect.width),
-          roundRectValue(cardRect.height),
-          rectSignature(spotlight),
-          rectSignature(centerAnchor),
-          roundRectValue(pos.left),
-          roundRectValue(pos.top),
-          pos.resolved,
-        ].join("|"),
+      return buildResolvedMeasurement({
+        root: r,
+        card: c,
         target,
+        posTarget,
         observedElements: nextObserved,
-      };
+        placement,
+        spotlightPadding,
+        stepKey,
+      });
     };
 
-    const syncObservedElements = (elements: HTMLElement[]) => {
+    const syncObservedElements = (elements: HTMLElement[]): void => {
       for (const element of observedElements) {
         if (!elements.includes(element)) {
           resizeObserver.unobserve(element);
@@ -683,7 +789,7 @@ export function useGuidePositioning(
       }
     };
 
-    const runStabilityCheck = () => {
+    const runStabilityCheck = (): void => {
       animationFrameId = null;
       if (!active) {
         return;
@@ -735,7 +841,7 @@ export function useGuidePositioning(
       if (mutated) scheduleUpdate();
     };
 
-    const scheduleUpdate = () => {
+    const scheduleUpdate = (): void => {
       if (!active || animationFrameId !== null) {
         return;
       }
@@ -764,7 +870,7 @@ export function useGuidePositioning(
 
     scheduleUpdate();
 
-    return () => {
+    return (): void => {
       active = false;
       if (animationFrameId !== null) {
         window.cancelAnimationFrame(animationFrameId);

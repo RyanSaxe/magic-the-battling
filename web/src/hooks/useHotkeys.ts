@@ -11,33 +11,28 @@ export function hotkeyFor(key: string): string {
   return key === "Enter" ? "Enter" : key.toLowerCase();
 }
 
+const EDITABLE_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return EDITABLE_TAGS.has(target.tagName) || target.isContentEditable;
+}
+
 export function useHotkeys(hotkeys: HotkeyMap, enabled = true): void {
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
-    const target = e.target;
-    const element = target instanceof HTMLElement ? target : null;
-    const tag = element?.tagName;
     if (e.altKey || e.ctrlKey || e.metaKey) return;
-    if (
-      tag === "INPUT" ||
-      tag === "TEXTAREA" ||
-      tag === "SELECT" ||
-      element?.isContentEditable
-    ) {
-      return;
-    }
-    if (enterPressesControl(e)) return;
+    if (isEditableTarget(e.target) || enterPressesControl(e)) return;
 
     const action = hotkeys[hotkeyFor(e.key)];
-    if (action) {
-      e.preventDefault();
-      if (e.key === "Enter" && !enterMayAdvance(e)) return;
-      action();
-    }
+    if (!action) return;
+    e.preventDefault();
+    if (e.key === "Enter" && !enterMayAdvance(e)) return;
+    action();
   });
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return (): void => window.removeEventListener("keydown", handleKeyDown);
   }, [enabled]);
 }

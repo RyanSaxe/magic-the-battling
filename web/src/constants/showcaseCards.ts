@@ -19,12 +19,7 @@ const SHOWCASE_IMAGES = {
     "https://cards.scryfall.io/large/front/1/6/167c6740-0625-4987-8fac-516aab564ca1.jpg?1720517036",
 };
 
-function makeCard(
-  id: string,
-  name: string,
-  imageUrl: string,
-  upgradeTarget?: Card,
-): Card {
+function makeCard(id: string, name: string, imageUrl: string): Card {
   return {
     id,
     name,
@@ -35,7 +30,7 @@ function makeCard(
     type_line: "",
     tokens: [],
     elo: null,
-    upgrade_target: upgradeTarget ?? null,
+    upgrade_target: null,
     oracle_text: null,
     colors: [],
     cmc: 0,
@@ -85,12 +80,11 @@ const CARDS = {
   ),
 };
 
-const myrWithUpgrade = makeCard(
-  "showcase-myr-upgraded",
-  "Myr Battlesphere",
-  SHOWCASE_IMAGES.myrBattlesphere,
-  CARDS.immediateAction,
-);
+const myrWithUpgrade: Card = {
+  ...CARDS.myrBattlesphere,
+  id: "showcase-myr-upgraded",
+  upgrade_target: CARDS.immediateAction,
+};
 
 export interface UpgradeAnimation {
   targetCardId: string;

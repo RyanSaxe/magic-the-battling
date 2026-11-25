@@ -15,12 +15,17 @@ export interface ShowcaseSizes {
  * stage dots, phone login line, and Resume shelf), sized for the widest 5-card stage so card size
  * stays steady across all three stages and the 1.5x upgrade animation stays inside the stage bounds.
  */
-export function computeShowcaseSizes(
-  containerWidth: number,
-  containerHeight: number,
-  viewportWidth: number,
-  chromeHeight: number,
-): ShowcaseSizes {
+export function computeShowcaseSizes({
+  containerWidth,
+  containerHeight,
+  viewportWidth,
+  chromeHeight,
+}: {
+  containerWidth: number;
+  containerHeight: number;
+  viewportWidth: number;
+  chromeHeight: number;
+}): ShowcaseSizes {
   const isMobile = viewportWidth < 640;
   const availableWidth = Math.max(1, containerWidth - (isMobile ? 0 : 32));
   const effectiveSlots = isMobile

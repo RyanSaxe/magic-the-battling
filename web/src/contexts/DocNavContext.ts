@@ -6,6 +6,6 @@ interface DocNav {
 
 export const DocNavContext = createContext<DocNav>({ navigate: () => {} });
 
-export function useDocNav() {
+export function useDocNav(): DocNav {
   return useContext(DocNavContext);
 }

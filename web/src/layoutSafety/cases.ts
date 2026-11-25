@@ -61,12 +61,12 @@ const MEASURED: [number, number, Box, Box][] = [
 ];
 
 export const VIEWPORTS: Viewport[] = MEASURED.map(
-  ([width, height, zoneBoard, battleBoard]) => ({
+  ([width, height, zoneBoard, battleBox]) => ({
     name: `${width}x${height}`,
     width,
     height,
     zoneBoard,
-    battleBoard,
+    battleBoard: battleBox,
   }),
 );
 
@@ -121,10 +121,7 @@ const REWARD_COUNTS = [1, 2, 3];
 // Config.max_available_upgrades.
 const OFFERED_UPGRADE_COUNTS = [1, 2, 3, 4];
 
-export function zoneCases(viewport: Viewport): ZoneCase[] {
-  const rails = hasUpgradeRail(viewport) ? RAIL_COUNTS : [0];
-  const horizontal = !isMobileViewport(viewport);
-  const isDesktop = computeGameShellMode(viewport.width) === "big";
+function draftAndBuildCases(rails: number[], horizontal: boolean): ZoneCase[] {
   const cases: ZoneCase[] = [];
   for (const pack of PACK_COUNTS) {
     for (const pool of DRAFT_POOL_COUNTS) {
@@ -164,6 +161,11 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
       }
     }
   }
+  return cases;
+}
+
+function rewardAndDeckCases(isDesktop: boolean): ZoneCase[] {
+  const cases: ZoneCase[] = [];
   for (const rewards of REWARD_COUNTS) {
     cases.push({
       phase: "reward",
@@ -221,6 +223,16 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
     }
   }
   return cases;
+}
+
+export function zoneCases(viewport: Viewport): ZoneCase[] {
+  const rails = hasUpgradeRail(viewport) ? RAIL_COUNTS : [0];
+  const horizontal = !isMobileViewport(viewport);
+  const isDesktop = computeGameShellMode(viewport.width) === "big";
+  return [
+    ...draftAndBuildCases(rails, horizontal),
+    ...rewardAndDeckCases(isDesktop),
+  ];
 }
 
 // DeckDisplay's battlefield holds the three chosen basics beside treasure and poison.
@@ -379,7 +391,19 @@ export function battleBoard(viewport: Viewport, isSuddenDeath: boolean): Box {
     : viewport.battleBoard;
 }
 
-export function battleConfig(viewport: Viewport, battleCase: BattleCase) {
+export interface BattleLayoutCheckConfig extends BattleCase {
+  handGap: number;
+  battlefieldGap: number;
+  handMaxWidth: number;
+  battlefieldMaxWidth: number;
+  fixedHeight: number;
+  zoneColumnWidth: number;
+}
+
+export function battleConfig(
+  viewport: Viewport,
+  battleCase: BattleCase,
+): BattleLayoutCheckConfig {
   const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({
     isMobile: isMobileViewport(viewport),
   });

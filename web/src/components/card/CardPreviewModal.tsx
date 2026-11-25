@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useEscapeKey } from "../../hooks/useDomEffects";
 import type { Card as CardType } from "../../types";
 import { formatCounter } from "../../utils/counters";
@@ -10,12 +10,21 @@ interface CardPreviewModalProps {
   onClose: () => void;
 }
 
+const EMPTY_COUNTERS: Record<string, number> = {};
+
+function getImageUrl(c: CardType, flipped: boolean): string {
+  if (flipped && c.flip_image_url) {
+    return c.flip_image_url;
+  }
+  return c.png_url ?? c.image_url;
+}
+
 export function CardPreviewModal({
   card,
   appliedUpgrades,
-  counters = {},
+  counters = EMPTY_COUNTERS,
   onClose,
-}: CardPreviewModalProps) {
+}: CardPreviewModalProps): ReactElement {
   const [isFlipped, setIsFlipped] = useState(false);
   const counterEntries = Object.entries(counters);
   const imageHeight =
@@ -23,20 +32,15 @@ export function CardPreviewModal({
 
   useEscapeKey(onClose);
 
-  const getImageUrl = (c: CardType, flipped: boolean) => {
-    if (flipped && c.flip_image_url) {
-      return c.flip_image_url;
-    }
-    return c.png_url ?? c.image_url;
-  };
-
   return (
     <div
+      role="presentation"
       data-card-preview-modal="true"
       className="fixed inset-0 bg-black/60 flex flex-col items-center justify-center z-[101]"
       onClick={onClose}
     >
       <div
+        role="presentation"
         className="relative flex gap-4 items-center max-w-[95vw] max-h-[85vh] px-4"
         onClick={(e) => e.stopPropagation()}
       >
@@ -83,7 +87,11 @@ export function CardPreviewModal({
         )}
       </div>
       {counterEntries.length > 0 && (
-        <div className="preview-counters" onClick={(e) => e.stopPropagation()}>
+        <div
+          role="presentation"
+          className="preview-counters"
+          onClick={(e) => e.stopPropagation()}
+        >
           {counterEntries.map(([type, count]) => (
             <span key={type} className="counter-chip">
               {formatCounter(type, count)}

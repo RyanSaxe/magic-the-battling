@@ -19,7 +19,7 @@ export function useLobbyJoin(gameId: string): LobbyState | "missing" | null {
       .catch(() => {
         if (!cancelled) setLobby("missing");
       });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [gameId]);
@@ -27,7 +27,7 @@ export function useLobbyJoin(gameId: string): LobbyState | "missing" | null {
   useEffect(() => {
     // A link to a lobby whose game has started belongs on the game page, which offers to watch or reconnect.
     if (lobby === "missing") {
-      navigate(`/game/${gameId}/play`, { replace: true });
+      void navigate(`/game/${gameId}/play`, { replace: true });
     }
   }, [lobby, gameId, navigate]);
 

@@ -62,7 +62,9 @@ function isRetryableStatus(status: number): boolean {
   );
 }
 
-function withDeviceHeaders(baseHeaders: HeadersInit = {}): HeadersInit {
+function withDeviceHeaders(
+  baseHeaders: Record<string, string> = {},
+): Record<string, string> {
   const deviceId = getOrCreateDeviceId();
   if (!deviceId) return baseHeaders;
   return { ...baseHeaders, [DEVICE_ID_HEADER]: deviceId };
@@ -87,13 +89,14 @@ export interface GameOptions {
   playMode?: PlayMode;
 }
 
-export async function createGame(
-  playerName: string,
-  options: GameOptions = {},
-): Promise<CreateGameResponse> {
-  const idempotencyKey = createIdempotencyKey();
-  const startedAt = Date.now();
-  const body = JSON.stringify({
+interface CreateGameRequestContext {
+  body: string;
+  idempotencyKey: string;
+  startedAt: number;
+}
+
+function buildCreateGameBody(playerName: string, options: GameOptions): string {
+  const payload = {
     player_name: playerName,
     cube_id: options.cubeId ?? "auto",
     use_upgrades: options.useUpgrades ?? true,
@@ -103,59 +106,80 @@ export async function createGame(
     auto_approve_spectators: options.autoApproveSpectators ?? false,
     guided_mode_default: options.guidedModeDefault ?? false,
     play_mode: options.playMode ?? "limited",
-  });
+  };
+  return JSON.stringify(payload);
+}
 
-  for (let attempt = 0; attempt < CREATE_RETRY_MAX_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(`${API_BASE}/games`, {
-        method: "POST",
-        headers: withDeviceHeaders({
-          "Content-Type": "application/json",
-          [IDEMPOTENCY_KEY_HEADER]: idempotencyKey,
-        }),
-        credentials: "include",
-        body,
-      });
+function hasRetryBudget(startedAt: number, attempt: number): boolean {
+  return (
+    attempt < CREATE_RETRY_MAX_ATTEMPTS - 1 &&
+    Date.now() - startedAt < CREATE_RETRY_MAX_TOTAL_MS
+  );
+}
 
-      if (response.ok) {
-        return response.json();
-      }
+function rethrowCreateGameError(err: unknown): never {
+  if (err instanceof Error) {
+    throw err;
+  }
+  throw new Error("Failed to create game", { cause: err });
+}
 
-      const elapsed = Date.now() - startedAt;
-      const canRetry =
-        isRetryableStatus(response.status) &&
-        attempt < CREATE_RETRY_MAX_ATTEMPTS - 1 &&
-        elapsed < CREATE_RETRY_MAX_TOTAL_MS;
-      if (!canRetry) {
-        await throwResponseError(
-          response,
-          "create-game",
-          "Failed to create game",
-        );
-      }
-    } catch (err) {
-      if (err instanceof AppError) {
-        throw err;
-      }
-      const elapsed = Date.now() - startedAt;
-      const isAbortError =
-        err instanceof DOMException && err.name === "AbortError";
-      const canRetry =
-        !isAbortError &&
-        attempt < CREATE_RETRY_MAX_ATTEMPTS - 1 &&
-        elapsed < CREATE_RETRY_MAX_TOTAL_MS;
-      if (!canRetry) {
-        if (err instanceof Error) {
-          throw err;
-        }
-        throw new Error("Failed to create game");
-      }
+async function attemptCreateGame(
+  ctx: CreateGameRequestContext,
+  attempt: number,
+): Promise<CreateGameResponse> {
+  try {
+    const response = await fetch(`${API_BASE}/games`, {
+      method: "POST",
+      headers: withDeviceHeaders({
+        "Content-Type": "application/json",
+        [IDEMPOTENCY_KEY_HEADER]: ctx.idempotencyKey,
+      }),
+      credentials: "include",
+      body: ctx.body,
+    });
+
+    if (response.ok) {
+      return response.json();
     }
 
-    await sleep(createRetryDelay(attempt));
+    if (
+      !isRetryableStatus(response.status) ||
+      !hasRetryBudget(ctx.startedAt, attempt)
+    ) {
+      await throwResponseError(
+        response,
+        "create-game",
+        "Failed to create game",
+      );
+    }
+  } catch (err) {
+    if (err instanceof AppError) {
+      throw err;
+    }
+    const isAbortError =
+      err instanceof DOMException && err.name === "AbortError";
+    if (isAbortError || !hasRetryBudget(ctx.startedAt, attempt)) {
+      rethrowCreateGameError(err);
+    }
   }
 
-  throw new Error("Failed to create game");
+  await sleep(createRetryDelay(attempt));
+  return attemptCreateGame(ctx, attempt + 1);
+}
+
+export async function createGame(
+  playerName: string,
+  options: GameOptions = {},
+): Promise<CreateGameResponse> {
+  return attemptCreateGame(
+    {
+      body: buildCreateGameBody(playerName, options),
+      idempotencyKey: createIdempotencyKey(),
+      startedAt: Date.now(),
+    },
+    0,
+  );
 }
 
 export async function joinGame(
@@ -346,10 +370,10 @@ export async function getGameCards(
   if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load card pool");
   }
-  const payload = (await response.json()) as {
+  const payload: {
     cards: CardCatalogEntry[];
     upgrades: CardCatalogEntry[];
-  };
+  } = await response.json();
   const mergedCatalog = Object.fromEntries(
     [...payload.cards, ...payload.upgrades].map((card) => [
       card.scryfall_id,
@@ -391,12 +415,12 @@ export async function getServerStatus(): Promise<ServerStatus> {
   return response.json();
 }
 
-const _lastWarmTimes = new Map<string, number>();
+const lastWarmTimes = new Map<string, number>();
 
 export function warmCubeCache(cubeId: string): void {
   const now = Date.now();
-  if (now - (_lastWarmTimes.get(cubeId) ?? 0) < 30_000) return;
-  _lastWarmTimes.set(cubeId, now);
+  if (now - (lastWarmTimes.get(cubeId) ?? 0) < 30_000) return;
+  lastWarmTimes.set(cubeId, now);
   fetch(`${API_BASE}/games/cubes/warm`, {
     method: "POST",
     headers: withDeviceHeaders({ "Content-Type": "application/json" }),
@@ -454,8 +478,9 @@ export async function authLogout(): Promise<void> {
     method: "POST",
     credentials: "include",
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Something went wrong.");
+  }
   rememberSignedIn(false);
 }
 
@@ -482,8 +507,9 @@ export async function getBattlers(
   const response = await fetch(`${API_BASE}/battlers?offset=${offset}`, {
     credentials: "include",
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load presets");
+  }
   return response.json();
 }
 
@@ -491,8 +517,9 @@ export async function getBattler(id: number): Promise<UserBattler> {
   const response = await fetch(`${API_BASE}/battlers/${id}`, {
     credentials: "include",
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load preset");
+  }
   return response.json();
 }
 
@@ -517,12 +544,13 @@ export async function createBattler(
     credentials: "include",
     body: JSON.stringify(data),
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(
       response,
       "create-battler",
       "Failed to create preset",
     );
+  }
   return response.json();
 }
 
@@ -536,12 +564,13 @@ export async function updateBattler(
     credentials: "include",
     body: JSON.stringify(data),
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(
       response,
       "update-battler",
       "Failed to update preset",
     );
+  }
   return response.json();
 }
 
@@ -551,12 +580,13 @@ export async function deleteBattler(id: number): Promise<void> {
     credentials: "include",
   });
   // A preset already deleted, such as from another tab, is gone, which is what the caller asked for.
-  if (!response.ok && response.status !== 404)
+  if (!response.ok && response.status !== 404) {
     await throwResponseError(
       response,
       "delete-battler",
       "Failed to delete preset",
     );
+  }
 }
 
 export interface CubeGamesPage {
@@ -578,17 +608,19 @@ export async function getBattlerGames(
 ): Promise<CubeGamesPage> {
   const params = new URLSearchParams();
   if (opts.offset) params.set("offset", String(opts.offset));
-  if (opts.playMode != null) params.set("play_mode", opts.playMode);
-  if (opts.useUpgrades != null)
+  if (opts.playMode !== undefined) params.set("play_mode", opts.playMode);
+  if (opts.useUpgrades !== undefined) {
     params.set("use_upgrades", String(opts.useUpgrades));
+  }
   if (opts.mineOnly) params.set("mine_only", "true");
   const qs = params.toString();
   const response = await fetch(
     `${API_BASE}/battlers/${battlerId}/games${qs ? `?${qs}` : ""}`,
     { credentials: "include" },
   );
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load games");
+  }
   return response.json();
 }
 
@@ -597,8 +629,9 @@ export async function getCubeSummary(cubeId: string): Promise<CubeSummary> {
     `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}`,
     { credentials: "include" },
   );
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load the cube");
+  }
   return response.json();
 }
 
@@ -608,15 +641,17 @@ export async function getCubeGames(
 ): Promise<CubeGamesPage> {
   const params = new URLSearchParams();
   if (opts.offset) params.set("offset", String(opts.offset));
-  if (opts.playMode != null) params.set("play_mode", opts.playMode);
-  if (opts.useUpgrades != null)
+  if (opts.playMode !== undefined) params.set("play_mode", opts.playMode);
+  if (opts.useUpgrades !== undefined) {
     params.set("use_upgrades", String(opts.useUpgrades));
+  }
   const qs = params.toString();
   const response = await fetch(
     `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}/games${qs ? `?${qs}` : ""}`,
   );
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load games");
+  }
   return response.json();
 }
 
@@ -634,8 +669,9 @@ export async function getMyGames(
   const response = await fetch(`${API_BASE}/battlers/my-games?${params}`, {
     credentials: "include",
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load games");
+  }
   return response.json();
 }
 
@@ -648,8 +684,9 @@ export async function getFollowing(
     `${API_BASE}/battlers/following?offset=${offset}`,
     { credentials: "include" },
   );
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load following");
+  }
   return response.json();
 }
 
@@ -666,8 +703,9 @@ export async function followCube(
       display_name: displayName || null,
     }),
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "follow-cube", "Failed to follow cube");
+  }
   return response.json();
 }
 
@@ -677,8 +715,9 @@ export async function unfollowCube(followId: number): Promise<void> {
     credentials: "include",
   });
   // A follow already removed, such as from another tab, is gone, which is what the caller asked for.
-  if (!response.ok && response.status !== 404)
+  if (!response.ok && response.status !== 404) {
     await throwResponseError(response, "unfollow-cube", "Failed to unfollow");
+  }
 }
 
 // ── Discover ────────────────────────────────────────────────────────
@@ -702,7 +741,8 @@ export async function discoverCubes(
   const response = await fetch(`${API_BASE}/discover?${params}`, {
     credentials: "include",
   });
-  if (!response.ok)
+  if (!response.ok) {
     await throwResponseError(response, "default", "Failed to load cubes");
+  }
   return response.json();
 }

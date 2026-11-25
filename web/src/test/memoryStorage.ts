@@ -15,7 +15,7 @@ export function installMemoryLocalStorage(): Storage {
       store.delete(key);
     },
     setItem: (key, value) => {
-      store.set(key, String(value));
+      store.set(key, value);
     },
   };
   vi.stubGlobal("localStorage", storage);

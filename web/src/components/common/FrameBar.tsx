@@ -1,7 +1,11 @@
-import type { ReactNode, Ref } from "react";
+import type { ReactElement, ReactNode, Ref } from "react";
 
 /** The crossed-cards mark. Decorative: the wordmark or the page beside it names the app. */
-export function BrandMark({ className = "" }: { className?: string }) {
+export function BrandMark({
+  className = "",
+}: {
+  className?: string;
+}): ReactElement {
   return (
     <img
       src="/favicon.svg"
@@ -12,7 +16,7 @@ export function BrandMark({ className = "" }: { className?: string }) {
 }
 
 /** The mark, PITFIGHT and "— an MtG format" over the tagline. Below 360px wide the tagline drops. */
-export function BrandLockup() {
+export function BrandLockup(): ReactElement {
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
       <BrandMark />
@@ -44,7 +48,7 @@ export function BarLabel({
 }: {
   desktop: string;
   phone: string;
-}) {
+}): ReactElement {
   return (
     <>
       <span className="hidden sm:inline">{desktop}</span>
@@ -77,7 +81,7 @@ export function TopBar({
   primary,
   account,
   ref,
-}: TopBarProps) {
+}: TopBarProps): ReactElement {
   return (
     <header ref={ref} className="frame-bar shrink-0 frame-chrome frame-bar-pad">
       <div className="h-[var(--frame-bar-height)] flex items-center justify-between gap-3">
@@ -121,7 +125,7 @@ export function BottomBar({
   guideTarget,
   inert = false,
   ref,
-}: BottomBarProps) {
+}: BottomBarProps): ReactElement {
   return (
     <footer
       ref={ref}

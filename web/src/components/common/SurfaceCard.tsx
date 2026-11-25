@@ -1,4 +1,8 @@
-import { createElement, type ComponentPropsWithoutRef } from "react";
+import {
+  createElement,
+  type ComponentPropsWithoutRef,
+  type ReactElement,
+} from "react";
 
 type SurfaceCardElement = "div" | "form" | "section" | "article";
 
@@ -26,7 +30,7 @@ export function SurfaceCard<E extends SurfaceCardElement = "div">({
   layout = "page",
   className,
   ...props
-}: SurfaceCardProps<E>) {
+}: SurfaceCardProps<E>): ReactElement {
   const classes = [
     "surface-card modal-chrome border gold-border rounded-lg",
     LAYOUT_CLASSES[layout],

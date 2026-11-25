@@ -30,12 +30,21 @@ function makeCard(id: string): Card {
   };
 }
 
-function makeSnapshot(
-  stage: number,
-  round: number,
-  poison: number,
-  treasures: number,
-): SharePlayerSnapshot {
+interface SnapshotSpec {
+  stage: number;
+  round: number;
+  poison: number;
+  treasures: number;
+  suddenDeathBuild?: number | null;
+}
+
+function makeSnapshot({
+  stage,
+  round,
+  poison,
+  treasures,
+  suddenDeathBuild = null,
+}: SnapshotSpec): SharePlayerSnapshot {
   return {
     stage,
     round,
@@ -49,7 +58,7 @@ function makeSnapshot(
     poison,
     vanguard: null,
     visibility: "full",
-    sudden_death_build: null,
+    sudden_death_build: suddenDeathBuild,
   };
 }
 
@@ -67,7 +76,10 @@ function makeShareData(): ShareGameResponse {
         final_poison: 6,
         final_treasures: null,
         is_puppet: false,
-        snapshots: [makeSnapshot(4, 2, 4, 2), makeSnapshot(4, 3, 6, 3)],
+        snapshots: [
+          makeSnapshot({ stage: 4, round: 2, poison: 4, treasures: 2 }),
+          makeSnapshot({ stage: 4, round: 3, poison: 6, treasures: 3 }),
+        ],
       },
       {
         name: "Bob",
@@ -75,7 +87,10 @@ function makeShareData(): ShareGameResponse {
         final_poison: 10,
         final_treasures: null,
         is_puppet: false,
-        snapshots: [makeSnapshot(4, 1, 7, 1), makeSnapshot(4, 2, 10, 0)],
+        snapshots: [
+          makeSnapshot({ stage: 4, round: 1, poison: 7, treasures: 1 }),
+          makeSnapshot({ stage: 4, round: 2, poison: 10, treasures: 0 }),
+        ],
       },
     ],
   };
@@ -133,7 +148,10 @@ function makeFinishedShareData(): ShareGameResponse {
   const [alice, bob] = data.players;
   alice.final_poison = 7;
   alice.final_treasures = 3;
-  bob.snapshots = [makeSnapshot(4, 1, 7, 1), makeSnapshot(4, 2, 9, 6)];
+  bob.snapshots = [
+    makeSnapshot({ stage: 4, round: 1, poison: 7, treasures: 1 }),
+    makeSnapshot({ stage: 4, round: 2, poison: 9, treasures: 6 }),
+  ];
   bob.final_poison = 12;
   bob.final_treasures = 5;
   return data;
@@ -182,7 +200,7 @@ describe("share rows after the final battle", () => {
 
   it("ranks a past round as it stood, and the latest by where each player finished", () => {
     const data = makeFinishedShareData();
-    const places = (round: string) =>
+    const places = (round: string): [string, number][] =>
       buildSharePlayerViews(data, round).map((p) => [p.name, p.placement]);
 
     expect(places("4_2")).toEqual([
@@ -231,9 +249,9 @@ describe("share rows after the final battle", () => {
 describe("share rounds hidden while the game goes on", () => {
   it("hides every zone of another player and bands the round by whether they are still in", () => {
     const data = makeShareData();
-    const hidden = {
-      ...makeSnapshot(4, 2, 4, 2),
-      visibility: "hidden" as const,
+    const hidden: SharePlayerSnapshot = {
+      ...makeSnapshot({ stage: 4, round: 2, poison: 4, treasures: 2 }),
+      visibility: "hidden",
     };
     const stillIn = { ...data.players[0], final_placement: null };
 
@@ -248,9 +266,9 @@ describe("share rounds hidden while the game goes on", () => {
 
   it("hides only the hand and upgrades of the sharer's last build, without a band", () => {
     const data = makeShareData();
-    const lastBuild = {
-      ...makeSnapshot(4, 3, 6, 3),
-      visibility: "hand_hidden" as const,
+    const lastBuild: SharePlayerSnapshot = {
+      ...makeSnapshot({ stage: 4, round: 3, poison: 6, treasures: 3 }),
+      visibility: "hand_hidden",
     };
 
     expect(getShareHiddenZones(lastBuild)).toEqual(["hand", "upgrades"]);
@@ -266,25 +284,25 @@ describe("share rounds hidden while the game goes on", () => {
   });
 });
 
-function makeSuddenDeathSnapshot(
-  stage: number,
-  round: number,
-  suddenDeathBuild: number,
-  treasures: number,
-): SharePlayerSnapshot {
-  return {
-    ...makeSnapshot(stage, round, 9, treasures),
-    sudden_death_build: suddenDeathBuild,
-  };
-}
-
 // In 4-2 Bob and Carol reach lethal while Alice survives. Their first Sudden Death is a draw, Bob wins the second,
 // and Alice beats Bob in 4-3.
 function makeSuddenDeathShareData(): ShareGameResponse {
   const fightersRounds = [
-    makeSnapshot(4, 2, 8, 2),
-    makeSuddenDeathSnapshot(4, 2, 1, 3),
-    makeSuddenDeathSnapshot(4, 2, 2, 4),
+    makeSnapshot({ stage: 4, round: 2, poison: 8, treasures: 2 }),
+    makeSnapshot({
+      stage: 4,
+      round: 2,
+      poison: 9,
+      treasures: 3,
+      suddenDeathBuild: 1,
+    }),
+    makeSnapshot({
+      stage: 4,
+      round: 2,
+      poison: 9,
+      treasures: 4,
+      suddenDeathBuild: 2,
+    }),
   ];
   return {
     ...makeShareData(),
@@ -296,7 +314,10 @@ function makeSuddenDeathShareData(): ShareGameResponse {
         final_poison: 4,
         final_treasures: 3,
         is_puppet: false,
-        snapshots: [makeSnapshot(4, 2, 4, 2), makeSnapshot(4, 3, 4, 3)],
+        snapshots: [
+          makeSnapshot({ stage: 4, round: 2, poison: 4, treasures: 2 }),
+          makeSnapshot({ stage: 4, round: 3, poison: 4, treasures: 3 }),
+        ],
       },
       {
         name: "Bob",
@@ -304,7 +325,10 @@ function makeSuddenDeathShareData(): ShareGameResponse {
         final_poison: 10,
         final_treasures: 5,
         is_puppet: false,
-        snapshots: [...fightersRounds, makeSnapshot(4, 3, 9, 5)],
+        snapshots: [
+          ...fightersRounds,
+          makeSnapshot({ stage: 4, round: 3, poison: 9, treasures: 5 }),
+        ],
       },
       {
         name: "Carol",

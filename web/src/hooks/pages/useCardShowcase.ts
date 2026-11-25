@@ -9,9 +9,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 import { SHOWCASE_STAGES } from "../../constants/showcaseCards";
-import { computeShowcaseSizes } from "../../components/home/showcaseSizes";
+import {
+  computeShowcaseSizes,
+  type ShowcaseSizes,
+} from "../../components/home/showcaseSizes";
 
 const CYCLE_INTERVAL = 4000;
 const FADE_DURATION = 400;
@@ -43,7 +47,7 @@ const UPGRADE_TIMINGS = {
   shrinkDuration: 500,
 };
 
-function totalUpgradeDuration() {
+function totalUpgradeDuration(): number {
   const t = UPGRADE_TIMINGS;
   return (
     t.startDelay +
@@ -55,18 +59,23 @@ function totalUpgradeDuration() {
   );
 }
 
-function useShowcaseSizes() {
+function useShowcaseSizes(): {
+  sizes: ShowcaseSizes;
+  containerRef: RefObject<HTMLDivElement | null>;
+  taglineRef: RefObject<HTMLParagraphElement | null>;
+  dotsRef: RefObject<HTMLDivElement | null>;
+} {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const taglineRef = useRef<HTMLParagraphElement | null>(null);
   const dotsRef = useRef<HTMLDivElement | null>(null);
 
   const [sizes, setSizes] = useState(() =>
-    computeShowcaseSizes(
-      window.innerWidth,
-      window.innerHeight,
-      window.innerWidth,
-      FALLBACK_CHROME_HEIGHT,
-    ),
+    computeShowcaseSizes({
+      containerWidth: window.innerWidth,
+      containerHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+      chromeHeight: FALLBACK_CHROME_HEIGHT,
+    }),
   );
 
   const updateSizes = useEffectEvent(() => {
@@ -80,12 +89,12 @@ function useShowcaseSizes() {
       ? taglineHeight + dotsHeight + STACK_GAPS_HEIGHT
       : FALLBACK_CHROME_HEIGHT;
     setSizes(
-      computeShowcaseSizes(
+      computeShowcaseSizes({
         containerWidth,
         containerHeight,
         viewportWidth,
         chromeHeight,
-      ),
+      }),
     );
   });
 
@@ -94,13 +103,13 @@ function useShowcaseSizes() {
 
     const container = containerRef.current;
     const observer =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => updateSizes())
-        : null;
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => updateSizes());
     if (container && observer) observer.observe(container);
 
     window.addEventListener("resize", updateSizes);
-    return () => {
+    return (): void => {
       window.removeEventListener("resize", updateSizes);
       observer?.disconnect();
     };
@@ -109,7 +118,23 @@ function useShowcaseSizes() {
   return { sizes, containerRef, taglineRef, dotsRef };
 }
 
-export function useCardShowcase() {
+export interface UseCardShowcaseResult {
+  sizes: ShowcaseSizes;
+  containerRef: RefObject<HTMLDivElement | null>;
+  taglineRef: RefObject<HTMLParagraphElement | null>;
+  dotsRef: RefObject<HTMLDivElement | null>;
+  targetCardRef: RefObject<HTMLDivElement | null>;
+  currentStage: number;
+  fading: boolean;
+  upgradePhase: UpgradePhase;
+  myrUpgraded: boolean;
+  targetPosition: { centerY: number; right: number } | null;
+  bounds: ShowcaseBounds | null;
+  showSourceCard: boolean;
+  handleDotClick: (index: number) => void;
+}
+
+export function useCardShowcase(): UseCardShowcaseResult {
   const [currentStage, setCurrentStage] = useState(0);
   const [fading, setFading] = useState(false);
   const [upgradePhase, setUpgradePhase] = useState<UpgradePhase>("hidden");
@@ -211,7 +236,7 @@ export function useCardShowcase() {
 
   // Auto-advance: schedule the next stage transition after fading completes
   useEffect(() => {
-    if (fading) return;
+    if (fading) return undefined;
     const delay =
       currentStage === 2
         ? totalUpgradeDuration() + CYCLE_INTERVAL
@@ -219,13 +244,13 @@ export function useCardShowcase() {
     timerRef.current = setTimeout(() => {
       onAutoAdvance();
     }, delay);
-    return () => {
+    return (): void => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [currentStage, fading]);
 
   useEffect(() => {
-    return () => clearSequenceTimers();
+    return (): void => clearSequenceTimers();
   }, [clearSequenceTimers]);
 
   const showSourceCard =
@@ -239,9 +264,9 @@ export function useCardShowcase() {
   });
 
   useEffect(() => {
-    if (!showSourceCard) return;
+    if (!showSourceCard) return undefined;
     window.addEventListener("resize", onWindowResize);
-    return () => window.removeEventListener("resize", onWindowResize);
+    return (): void => window.removeEventListener("resize", onWindowResize);
   }, [showSourceCard]);
 
   const handleDotClick = useCallback(

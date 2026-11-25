@@ -1,10 +1,11 @@
+import type { ReactElement } from "react";
 import { useParams } from "react-router-dom";
 import { GameSummary } from "../components/GameSummary";
 import { FrameBoard } from "../components/common/PageFrame";
 import { useSummaryEmbed } from "../hooks/pages/useShareGame";
 import { buildGameSummaryData } from "../utils/share";
 
-export function SummaryEmbed() {
+export function SummaryEmbed(): ReactElement {
   const { gameId, playerName } = useParams<{
     gameId: string;
     playerName: string;

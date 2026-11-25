@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import type { Card as CardType, ZoneName } from "../types";
@@ -39,34 +40,62 @@ interface DraggableCardProps {
   dragInstanceKey?: string;
 }
 
-export function DraggableCard({
-  card,
-  zone,
-  zoneOwner = "player",
-  onClick,
-  onDoubleClick,
-  onContextMenu,
-  onCardHover,
-  onCardHoverEnd,
-  selected,
-  size = "md",
-  dimensions,
-  tapped,
-  faceDown,
-  flipped,
-  counters,
-  glow,
-  disabled = false,
-  isOpponent = false,
-  isCompanion = false,
-  upgraded = false,
-  appliedUpgrades,
-  hiddenUpgradeCount = 0,
-  onRevealHiddenUpgrades,
-  canPeekFaceDown,
-  style: externalStyle,
-  dragInstanceKey,
-}: DraggableCardProps) {
+function isInsideButton(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("button") !== null;
+}
+
+function resolveDraggableDefaults(props: DraggableCardProps): {
+  zoneOwner: ZoneOwner;
+  size: "xs" | "sm" | "md" | "lg";
+  disabled: boolean;
+  isOpponent: boolean;
+  isCompanion: boolean;
+  upgraded: boolean;
+  hiddenUpgradeCount: number;
+} {
+  return {
+    zoneOwner: props.zoneOwner ?? "player",
+    size: props.size ?? "md",
+    disabled: props.disabled ?? false,
+    isOpponent: props.isOpponent ?? false,
+    isCompanion: props.isCompanion ?? false,
+    upgraded: props.upgraded ?? false,
+    hiddenUpgradeCount: props.hiddenUpgradeCount ?? 0,
+  };
+}
+
+export function DraggableCard(props: DraggableCardProps): ReactElement {
+  const {
+    card,
+    zone,
+    onClick,
+    onDoubleClick,
+    onContextMenu,
+    onCardHover,
+    onCardHoverEnd,
+    selected,
+    dimensions,
+    tapped,
+    faceDown,
+    flipped,
+    counters,
+    glow,
+    appliedUpgrades,
+    onRevealHiddenUpgrades,
+    canPeekFaceDown,
+    style: externalStyle,
+    dragInstanceKey,
+  } = props;
+  const {
+    zoneOwner,
+    size,
+    disabled,
+    isOpponent,
+    isCompanion,
+    upgraded,
+    hiddenUpgradeCount,
+  } = resolveDraggableDefaults(props);
+
   const contextFaceDown = useFaceDown(card.id);
   const effectiveFaceDown = faceDown || contextFaceDown;
 
@@ -78,12 +107,12 @@ export function DraggableCard({
     isOpponent,
     faceDown: effectiveFaceDown,
   };
-  const draggableId = makeDraggableId(
+  const draggableId = makeDraggableId({
     zone,
-    zoneOwner,
-    card.id,
-    dragInstanceKey,
-  );
+    owner: zoneOwner,
+    cardId: card.id,
+    instanceKey: dragInstanceKey,
+  });
 
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -105,7 +134,7 @@ export function DraggableCard({
           ...listeners,
           ...attributes,
           onClick: (e) => {
-            if (!(e.target as HTMLElement).closest("button")) {
+            if (!isInsideButton(e.target)) {
               onClick?.();
             }
           },
@@ -136,7 +165,7 @@ export function DraggableCard({
           onContextMenu?.(e);
         }}
         onHoverStart={
-          onCardHover ? () => onCardHover(card.id, zone) : undefined
+          onCardHover ? (): void => onCardHover(card.id, zone) : undefined
         }
         onHoverEnd={onCardHoverEnd}
       />

@@ -70,35 +70,35 @@ export function layoutForContainer(
   //      via fraction adjustments. Iterates until convergence.
   // User-supplied constraints (divider drag) skip both pass 1 and pass 3 so
   // the user's explicit fractions are honored without bouncing.
-  const automatic = computeConstrainedLayoutState(
-    w,
-    h,
+  const automatic = computeConstrainedLayoutState({
+    containerW: w,
+    containerH: h,
     config,
-    redistributeSlack(
-      deriveConstraintsFromLayout(
-        computePhaseLayout(w, h, config),
+    constraints: redistributeSlack({
+      initial: deriveConstraintsFromLayout({
+        unconstrained: computePhaseLayout(w, h, config),
         config,
-        h,
-        w,
-      ),
+        containerH: h,
+        containerW: w,
+      }),
       config,
-      w,
-      h,
-    ).constraints,
-  );
+      containerW: w,
+      containerH: h,
+    }).constraints,
+  });
   const state = config.constraints
-    ? computeConstrainedLayoutState(
-        w,
-        h,
+    ? computeConstrainedLayoutState({
+        containerW: w,
+        containerH: h,
         config,
-        clampSavedConstraints(
-          w,
-          h,
+        constraints: clampSavedConstraints({
+          containerW: w,
+          containerH: h,
           config,
-          config.constraints,
-          automatic.frames,
-        ),
-      )
+          savedFractions: config.constraints,
+          automaticFrames: automatic.frames,
+        }),
+      })
     : automatic;
   return { containerSize: { width: w, height: h }, ...state };
 }
@@ -127,12 +127,13 @@ function readMeasurement(
   return zoneMeasurements[id] ?? ZERO_MEASUREMENT;
 }
 
-function computeMeasuredBottomLeftSplit(
-  hasFill: boolean,
-  blPrimary: ZoneMeasurement,
-  blFill: ZoneMeasurement,
-  sectionPadV: number,
-): number {
+function computeMeasuredBottomLeftSplit(args: {
+  hasFill: boolean;
+  blPrimary: ZoneMeasurement;
+  blFill: ZoneMeasurement;
+  sectionPadV: number;
+}): number {
+  const { hasFill, blPrimary, blFill, sectionPadV } = args;
   if (!hasFill) return 0.5;
   const primaryInner = Math.max(0, blPrimary.outerHeight - sectionPadV);
   const fillInner = Math.max(0, blFill.outerHeight - sectionPadV);
@@ -140,13 +141,14 @@ function computeMeasuredBottomLeftSplit(
   return totalInner > 0 ? primaryInner / totalInner : 0.5;
 }
 
-function computeMeasuredHorizontal(
-  blPrimary: ZoneMeasurement,
-  br: ZoneMeasurement,
-  hasBR: boolean,
-  sectionGap: number,
-  containerWidth: number,
-): { leftFraction: number; usableWidth: number } {
+function computeMeasuredHorizontal(args: {
+  blPrimary: ZoneMeasurement;
+  br: ZoneMeasurement;
+  hasBR: boolean;
+  sectionGap: number;
+  containerWidth: number;
+}): { leftFraction: number; usableWidth: number } {
+  const { blPrimary, br, hasBR, sectionGap, containerWidth } = args;
   const totalBottomWidth =
     blPrimary.outerWidth + (hasBR ? br.outerWidth + sectionGap : 0);
   const leftFraction =
@@ -190,25 +192,25 @@ export function measureFromPlacement(args: {
   if (bottomOuter <= 0) return null;
 
   const usableHeight = top.outerHeight + bottomOuter;
-  const horizontal = computeMeasuredHorizontal(
+  const horizontal = computeMeasuredHorizontal({
     blPrimary,
     br,
     hasBR,
     sectionGap,
-    args.containerWidth,
-  );
+    containerWidth: args.containerWidth,
+  });
   const blOverhead =
     (hasFill ? sectionGap : 0) + (hasFill ? 2 : 1) * sectionPadV;
 
   return {
     topFraction: usableHeight > 0 ? top.outerHeight / usableHeight : 0,
     leftFraction: horizontal.leftFraction,
-    bottomLeftSplit: computeMeasuredBottomLeftSplit(
+    bottomLeftSplit: computeMeasuredBottomLeftSplit({
       hasFill,
       blPrimary,
       blFill,
       sectionPadV,
-    ),
+    }),
     usableHeight,
     bottomInnerHeight: Math.max(0, blOuter - blOverhead),
     usableWidth: horizontal.usableWidth,

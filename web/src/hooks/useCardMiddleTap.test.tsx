@@ -1,31 +1,54 @@
 // @vitest-environment jsdom
+import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi, type Mock } from "vitest";
 import { useCardMiddleTap } from "./useCardMiddleTap";
 
 afterEach(cleanup);
 
-const box = (x: number, y: number, width: number, height: number) => () =>
-  ({
-    x,
-    y,
-    width,
-    height,
-    left: x,
-    top: y,
-    right: x + width,
-    bottom: y + height,
-  }) as DOMRect;
+const box =
+  (rect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): (() => DOMRect) =>
+  (): DOMRect => ({
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
+    left: rect.x,
+    top: rect.y,
+    right: rect.x + rect.width,
+    bottom: rect.y + rect.height,
+    toJSON: (): Record<string, number> => ({
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    }),
+  });
 
-function renderSmallCard() {
+function renderSmallCard(): {
+  tap: (x: number, y: number) => void;
+  select: Mock;
+  preview: Mock;
+} {
   const select = vi.fn();
   const preview = vi.fn();
-  function Board() {
+  function Board(): ReactNode {
     useCardMiddleTap();
     return (
-      <div className="card" data-testid="card" onClick={select}>
+      <div
+        role="presentation"
+        className="card"
+        data-testid="card"
+        onClick={select}
+      >
         <img alt="" />
         <button
+          type="button"
           onClick={(event) => {
             event.stopPropagation();
             preview();
@@ -39,11 +62,11 @@ function renderSmallCard() {
   render(<Board />);
   const card = screen.getByTestId("card");
   const button = screen.getByRole("button");
-  card.getBoundingClientRect = box(0, 0, 45, 63);
-  button.getBoundingClientRect = box(4, 4, 24, 24);
-  document.elementFromPoint = (x, y) =>
+  card.getBoundingClientRect = box({ x: 0, y: 0, width: 45, height: 63 });
+  button.getBoundingClientRect = box({ x: 4, y: 4, width: 24, height: 24 });
+  document.elementFromPoint = (x, y): HTMLElement | null =>
     x >= 4 && x <= 28 && y >= 4 && y <= 28 ? button : card.querySelector("img");
-  const tap = (x: number, y: number) => {
+  const tap = (x: number, y: number): void => {
     fireEvent.touchEnd(card, { changedTouches: [{ clientX: x, clientY: y }] });
     // The browser clicks the nearest button, wherever the finger was.
     fireEvent.click(button);

@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactElement } from "react";
 
 interface Dimensions {
   width: number;
@@ -9,6 +9,12 @@ interface TokenCounterBadgeProps {
   count: number;
   dimensions: Dimensions;
   textClassName: string;
+}
+
+function getDigitScale(digitCount: number): number {
+  if (digitCount >= 3) return 0.72;
+  if (digitCount === 2) return 0.85;
+  return 1;
 }
 
 function buildBadgeStyle(dimensions: Dimensions, count: number): CSSProperties {
@@ -23,7 +29,7 @@ function buildBadgeStyle(dimensions: Dimensions, count: number): CSSProperties {
     Math.max(8, Math.min(16, smallestEdge * 0.22)),
   );
   const digitCount = String(Math.abs(count)).length;
-  const digitScale = digitCount >= 3 ? 0.72 : digitCount === 2 ? 0.85 : 1;
+  const digitScale = getDigitScale(digitCount);
   const fontSize = Math.max(7, Math.round(baseFontSize * digitScale));
   const horizontalPadding = Math.max(2, Math.round(badgeDiameter * 0.16));
 
@@ -39,7 +45,7 @@ export function TokenCounterBadge({
   count,
   dimensions,
   textClassName,
-}: TokenCounterBadgeProps) {
+}: TokenCounterBadgeProps): ReactElement {
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <span

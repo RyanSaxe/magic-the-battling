@@ -1,4 +1,6 @@
-export function CrossIcon() {
+import type { ReactElement } from "react";
+
+export function CrossIcon(): ReactElement {
   return (
     <svg
       aria-hidden="true"

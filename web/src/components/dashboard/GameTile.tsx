@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { GameSummary } from "../../types";
 import {
@@ -19,6 +19,17 @@ type CardImageSize = "small" | "normal";
 
 function scryfallImage(id: string, size: CardImageSize): string {
   return `https://cards.scryfall.io/${size}/front/${id[0]}/${id[1]}/${id}.jpg`;
+}
+
+function keyedScryfallIds(
+  ids: string[],
+): { key: string; id: string; isFirst: boolean }[] {
+  const counts = new Map<string, number>();
+  return ids.map((id, pos) => {
+    const count = (counts.get(id) ?? 0) + 1;
+    counts.set(id, count);
+    return { key: `${id}#${count}`, id, isFirst: pos === 0 };
+  });
 }
 
 interface HandSizing {
@@ -50,22 +61,22 @@ function HandFan({
   scryfallIds: string[];
   sizing: HandSizing;
   imageSize?: CardImageSize;
-}) {
-  const cards = scryfallIds.slice(0, MAX_HAND_CARDS);
+}): ReactElement | null {
+  const cards = keyedScryfallIds(scryfallIds.slice(0, MAX_HAND_CARDS));
   if (cards.length === 0) return null;
   const fitsWidth = `calc((100cqw + ${HAND_OVERLAP_PX * (cards.length - 1)}px) / ${cards.length} * 1.4)`;
   const height = `min(var(--hand-room, ${HAND_MAX_HEIGHT_PX}px), ${fitsWidth})`;
   return (
     <div className={sizing.box}>
       <div className={`flex h-full items-center ${sizing.row}`}>
-        {cards.map((id, index) => (
+        {cards.map((card) => (
           <img
-            key={`${id}-${index}`}
-            src={scryfallImage(id, imageSize)}
+            key={card.key}
+            src={scryfallImage(card.id, imageSize)}
             alt=""
             loading="lazy"
             className="aspect-[5/7] rounded-[4px] border border-black/60 bg-black/60 object-cover"
-            style={{ height, marginLeft: index === 0 ? 0 : -HAND_OVERLAP_PX }}
+            style={{ height, marginLeft: card.isFirst ? 0 : -HAND_OVERLAP_PX }}
           />
         ))}
       </div>
@@ -78,7 +89,7 @@ function recapPath(game: GameSummary): string {
 }
 
 /** The rank down a game card's left edge, red for last place, where the card shows a placement. */
-function GameRank({ game }: { game: GameSummary }) {
+function GameRank({ game }: { game: GameSummary }): ReactElement | null {
   if (game.best_human_placement === null) return null;
   return (
     <StandingsRank
@@ -101,7 +112,7 @@ function GameHeader({
   title: string;
   href: string;
   game: GameSummary;
-}) {
+}): ReactElement {
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -145,14 +156,20 @@ interface GameTileProps {
 }
 
 /** A finished game: the player's placement, the cube, the table, the date, the settings and final hand. Opens its recap. */
-export function GameTile({ game, className, style }: GameTileProps) {
+export function GameTile({
+  game,
+  className,
+  style,
+}: GameTileProps): ReactElement {
   const navigate = useNavigate();
   const href = recapPath(game);
   return (
     <SurfaceCard
       as="article"
       layout="tile"
-      onClick={() => navigate(href)}
+      onClick={() => {
+        void navigate(href);
+      }}
       style={style}
       className={`${GAME_CARD_CLASS} ${className ?? ""}`}
     >
@@ -166,14 +183,16 @@ export function GameTile({ game, className, style }: GameTileProps) {
 }
 
 /** A game in a cube's history, shown by one seat: its placement, name, table, date, settings and final hand. */
-export function RecapCard({ game }: { game: GameSummary }) {
+export function RecapCard({ game }: { game: GameSummary }): ReactElement {
   const navigate = useNavigate();
   const href = recapPath(game);
   return (
     <SurfaceCard
       as="article"
       layout="tile"
-      onClick={() => navigate(href)}
+      onClick={() => {
+        void navigate(href);
+      }}
       className={GAME_CARD_CLASS}
     >
       <GameRank game={game} />

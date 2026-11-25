@@ -89,13 +89,13 @@ export function useContainerCardSizes({
         const entry = entries[0];
         if (!entry) return;
         const containerWidth = entry.contentRect.width;
-        const next = compute(containerWidth);
+        const resized = compute(containerWidth);
         setDims((prev) =>
-          prev.width === next.width &&
-          prev.height === next.height &&
-          prev.columns === next.columns
+          prev.width === resized.width &&
+          prev.height === resized.height &&
+          prev.columns === resized.columns
             ? prev
-            : next,
+            : resized,
         );
       });
 

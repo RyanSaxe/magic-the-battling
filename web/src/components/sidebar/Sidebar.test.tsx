@@ -1,27 +1,34 @@
 // @vitest-environment jsdom
+import type { ReactNode } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { gameBootstrap } from "../../../e2e/gameStates";
-import type { PlayerView } from "../../types";
+import { hydrateGameState } from "../../utils/catalogHydration";
 import { Sidebar, type Scouting } from "./Sidebar";
 
 // Cards read matchMedia when they're imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  });
 });
 
 beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
     },
   );
 });
@@ -34,9 +41,12 @@ afterEach(() => {
 function showPlayers(
   phase: "build" | "battle",
   scouting: Scouting | null = null,
-) {
-  const [alice, bob] = gameBootstrap({ phase, counts: {} }).state
-    .players as unknown as PlayerView[];
+): void {
+  const bootstrap = gameBootstrap({ phase, counts: {} });
+  const [alice, bob] = hydrateGameState(
+    bootstrap.state,
+    bootstrap.catalog,
+  ).players;
   // The server sends 0 for everyone's odds during a Fight.
   const opponent = {
     ...bob,
@@ -48,7 +58,9 @@ function showPlayers(
       players={[alice, opponent]}
       currentPlayer={alice}
       renderFight={
-        phase === "battle" ? (viewSwitch) => <>{viewSwitch}</> : undefined
+        phase === "battle"
+          ? (viewSwitch): ReactNode => <>{viewSwitch}</>
+          : undefined
       }
       fightView="players"
       onFightViewChange={() => {}}

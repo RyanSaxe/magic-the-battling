@@ -44,7 +44,7 @@ function StatusLabel({
   standing: Standing;
   variant: "game" | "share";
   isSelected: boolean;
-}) {
+}): ReactNode {
   if (standing === "out") {
     // A shared game shows the round each player went out in, since the viewer moves between rounds.
     const round =
@@ -55,20 +55,24 @@ function StatusLabel({
       </span>
     );
   }
-  if (standing === "ghost")
+  if (standing === "ghost") {
     return <span className="player-card-label">Ghost</span>;
-  if (player.is_puppet)
+  }
+  if (player.is_puppet) {
     return <span className="player-card-label">Puppet</span>;
+  }
 
   const activity = getPlayerActivity(player);
-  if (variant === "game" && activity)
+  if (variant === "game" && activity) {
     return <span className="player-card-label">{activity}</span>;
-  if (isSelected)
+  }
+  if (isSelected) {
     return (
       <span className="player-card-label player-card-label-viewing">
         Viewing
       </span>
     );
+  }
   return null;
 }
 
@@ -83,7 +87,7 @@ function Outlook({
   standing: Standing;
   variant: "game" | "share";
   isSelf: boolean;
-}) {
+}): ReactNode {
   if (variant === "share") return null;
   if (player.in_sudden_death) {
     return (
@@ -95,12 +99,64 @@ function Outlook({
       </span>
     );
   }
-  if (isSelf || standing === "out" || player.pairing_probability === null)
+  if (isSelf || standing === "out" || player.pairing_probability === null) {
     return null;
+  }
   return (
     <span title="Chance you face them next">
       {Math.round(player.pairing_probability * 100)}%
     </span>
+  );
+}
+
+function LastFightResult({
+  result,
+}: {
+  result: PlayerView["last_result"];
+}): ReactNode {
+  if (!result) return null;
+  return (
+    <span
+      className={`player-card-result player-card-result-${result}`}
+      title="Last fight"
+    >
+      {getLastResultWord(result)}
+    </span>
+  );
+}
+
+function PlayerRowStats({
+  player,
+  hiddenInFight,
+}: {
+  player: PlayerView;
+  hiddenInFight: boolean;
+}): ReactNode {
+  if (hiddenInFight) return null;
+  return (
+    <>
+      <span className="player-card-stat" title="Poison">
+        <PoisonIcon size="sm" />
+        {player.poison}
+      </span>
+      <span className="player-card-stat" title="Treasures">
+        <MoneyBagIcon size="sm" />
+        {player.treasures}
+      </span>
+    </>
+  );
+}
+
+function isHiddenInFight(options: {
+  variant: "game" | "share";
+  isSelf: boolean;
+  players: PlayerView[];
+  currentPlayerName: string;
+}): boolean {
+  if (options.variant !== "game" || options.isSelf) return false;
+  return (
+    options.players.find(({ name }) => name === options.currentPlayerName)
+      ?.phase === "battle"
   );
 }
 
@@ -124,17 +180,20 @@ export function PlayerRow({
   shareStatus?: ShareResultStatus;
   micToggle?: ReactNode;
   showPlacement?: boolean;
-}) {
+}): ReactNode {
   const isSelf = variant === "game" && player.name === currentPlayerName;
-  const viewerFighting =
-    variant === "game" &&
-    players.find(({ name }) => name === currentPlayerName)?.phase === "battle";
-  const hiddenInFight = viewerFighting && !isSelf;
+  const hiddenInFight = isHiddenInFight({
+    variant,
+    isSelf,
+    players,
+    currentPlayerName,
+  });
   const standing = getShownStanding(
     player,
     variant === "share" ? shareStatus : undefined,
   );
   const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
+  const showOutlook = !hiddenInFight || player.in_sudden_death;
 
   return (
     <PlayerCard
@@ -148,34 +207,14 @@ export function PlayerRow({
         )
       }
       name={player.name}
-      nameEnd={
-        player.last_result && (
-          <span
-            className={`player-card-result player-card-result-${player.last_result}`}
-            title="Last fight"
-          >
-            {getLastResultWord(player.last_result)}
-          </span>
-        )
-      }
+      nameEnd={<LastFightResult result={player.last_result} />}
       control={micToggle}
       isSelf={isSelf}
       isOut={standing !== "alive"}
       selected={isSelected}
       onSelect={onClick}
     >
-      {!hiddenInFight && (
-        <>
-          <span className="player-card-stat" title="Poison">
-            <PoisonIcon size="sm" />
-            {player.poison}
-          </span>
-          <span className="player-card-stat" title="Treasures">
-            <MoneyBagIcon size="sm" />
-            {player.treasures}
-          </span>
-        </>
-      )}
+      <PlayerRowStats player={player} hiddenInFight={hiddenInFight} />
       <StatusLabel
         player={player}
         standing={standing}
@@ -184,7 +223,7 @@ export function PlayerRow({
       />
       <span className="player-card-outlook">
         {/* The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death. */}
-        {(!hiddenInFight || player.in_sudden_death) && (
+        {showOutlook && (
           <Outlook
             player={player}
             standing={standing}
@@ -203,7 +242,7 @@ export function PlayerList({
   scoutedPlayerName,
   onPlayerClick,
   renderMicToggle,
-}: PlayerListProps) {
+}: PlayerListProps): ReactNode {
   const sortedPlayers = getSidebarPlayerOrder(players);
 
   return (

@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { AppHeader, HomeButton } from "./AppHeader";
 import { BottomBar, BrandMark } from "./FrameBar";
 import { PageFrame } from "./PageFrame";
@@ -11,13 +12,19 @@ interface LoadingScreenProps {
   onCancel?: () => void;
 }
 
+function stepStatusClass(index: number, currentIndex: number): string {
+  if (index < currentIndex) return "loading-step-done";
+  if (index === currentIndex) return "loading-step-current";
+  return "";
+}
+
 /** The wait for a lobby or a board: an opening hand on the felt over the steps the wait is really at. */
 export function LoadingScreen({
   title = "Setting the table",
   steps,
   current,
   onCancel,
-}: LoadingScreenProps) {
+}: LoadingScreenProps): ReactElement {
   const at = steps.indexOf(current);
   return (
     <PageFrame
@@ -37,7 +44,7 @@ export function LoadingScreen({
         />
       }
     >
-      <div role="status" className="loading-table">
+      <output className="loading-table">
         <div className="loading-hand" aria-hidden="true">
           {[0, 1, 2].map((card) => (
             <div key={card} className="loading-slot">
@@ -53,7 +60,7 @@ export function LoadingScreen({
             <li
               key={step}
               aria-current={i === at ? "step" : undefined}
-              className={`loading-step ${i < at ? "loading-step-done" : i === at ? "loading-step-current" : ""}`}
+              className={`loading-step ${stepStatusClass(i, at)}`}
             >
               <span className="loading-dot" aria-hidden="true">
                 {i < at && "✓"}
@@ -62,7 +69,7 @@ export function LoadingScreen({
             </li>
           ))}
         </ol>
-      </div>
+      </output>
     </PageFrame>
   );
 }

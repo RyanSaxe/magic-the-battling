@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useLocation } from "react-router-dom";
 
 import { ServerStatusWindow } from "./ServerStatusWindow";
 import { useServerStatus } from "../../hooks/useServerStatus";
 
-export function ServerStatusBanner() {
+export function ServerStatusBanner(): ReactElement | null {
   const location = useLocation();
   const status = useServerStatus();
   const [dismissedAt, setDismissedAt] = useState<string | null>(null);

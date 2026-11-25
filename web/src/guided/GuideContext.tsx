@@ -1,5 +1,5 @@
 /** Context provider exposing the Guided Mode scheduler owned by `useGuideScheduler`. */
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type ReactElement, type ReactNode } from "react";
 import { useGuideScheduler } from "../hooks/useGuideScheduler";
 import type {
   GuideCompletionTrigger,
@@ -32,7 +32,7 @@ export function GuideProvider({
   closeGameplayOverlays,
   completionTrigger,
   children,
-}: GuideProviderProps) {
+}: GuideProviderProps): ReactElement {
   const {
     isGuidedMode,
     guideRequest,

@@ -17,6 +17,25 @@ repos:
       - id: rumdl-check
         args: [--fix]
 
+  - repo: local
+    hooks:
+      - id: max-file-lines
+        name: max-file-lines
+        # Hard 1,000-line cap on source files; skips lockfiles, generated,
+        # minified, SVG, JSON, data and Markdown files.
+        entry: >-
+          python3 -c 'import pathlib, re, sys;
+          skip_ext = {".lock", ".svg", ".json", ".jsonc", ".csv", ".tsv", ".jsonl", ".ndjson", ".sql", ".xml", ".md", ".mdx", ".markdown", ".map", ".snap", ".po", ".pot"};
+          skip_re = re.compile(r"(^|/)([^/]+-lock\.[^/]+|[^/]+\.(min|generated|gen)\.[^/]+|[^/]+_pb2\.py|[^/]+\.pb\.go)$");
+          bad = [];
+          [bad.append((p, n)) for p in sys.argv[1:]
+           if pathlib.Path(p).suffix.lower() not in skip_ext and not skip_re.search(p)
+           and (n := sum(1 for _ in pathlib.Path(p).open("rb"))) > 1000];
+          [print(f"{p}: {n} lines (limit 1000) - split this file along a domain boundary.", file=sys.stderr) for p, n in bad];
+          sys.exit(1 if bad else 0)'
+        language: python
+        types: [text]
+
   # Python: ruff and ty stay pinned in pyproject.toml / uv.lock.
   - repo: local
     hooks:
@@ -46,18 +65,8 @@ repos:
         files: ^(pyproject\.toml|uv\.lock)$
         pass_filenames: false
 
-      - id: max-file-lines
-        name: max-file-lines
-        # Hard 1,000-line cap on Python source files (Wave 3 expands to all text files).
-        entry: >-
-          uv run python -c 'import pathlib, sys;
-          bad = [(p, n) for p in sys.argv[1:] if (n := sum(1 for _ in pathlib.Path(p).open("rb"))) > 1000];
-          [sys.stderr.write(f"{p}: {n} lines (limit 1000) - split this file along a domain boundary.\n") for p, n in bad];
-          sys.exit(1 if bad else 0)'
-        language: system
-        types: [python]
-
-  # Web: oxfmt formats web files; ESLint and tsc stay until Wave 3 locks oxlint.
+  # Web: oxfmt and oxlint run from node_modules, at the versions in
+  # package-lock.json.
   - repo: local
     hooks:
       - id: oxfmt
@@ -68,18 +77,12 @@ repos:
         files: ^web/.*\.([cm]?[jt]sx?|css|html|json|ya?ml|toml)$
         exclude: ^web/(dist|node_modules|package-lock\.json)
 
-      - id: eslint
-        name: eslint
-        entry: bash -c 'cd web && npm run lint'
+      - id: oxlint
+        name: oxlint
+        entry: bash -c 'cd web && npx --no-install oxlint --type-aware --type-check --deny-warnings'
         language: system
-        files: ^web/src/.*\.(ts|tsx)$
-        pass_filenames: false
-
-      - id: typecheck-web
-        name: typecheck-web
-        entry: bash -c 'cd web && npm run typecheck'
-        language: system
-        files: ^web/src/.*\.(ts|tsx)$
+        files: ^web/(.*\.([cm]?[jt]sx?)|\.oxlintrc\.json|tsconfig.*\.json)$
+        exclude: ^web/(dist|node_modules)/
         pass_filenames: false
 
   # Shell

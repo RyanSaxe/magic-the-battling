@@ -39,23 +39,23 @@ export type PeerConnectionPhase =
   | { kind: "failed" }
   | { kind: "closed" };
 
+const PHASE_UI_STATE: Record<
+  Exclude<PeerConnectionPhase["kind"], "reconnecting">,
+  PeerUiConnectionState
+> = {
+  awaiting_offer: "connecting",
+  offering: "connecting",
+  connecting: "connecting",
+  connected: "connected",
+  failed: "failed",
+  closed: "disconnected",
+};
+
 export function peerPhaseToUiState(
   phase: PeerConnectionPhase,
 ): PeerUiConnectionState {
-  switch (phase.kind) {
-    case "awaiting_offer":
-    case "offering":
-    case "connecting":
-      return "connecting";
-    case "connected":
-      return "connected";
-    case "reconnecting":
-      return phase.reason;
-    case "failed":
-      return "failed";
-    case "closed":
-      return "disconnected";
-  }
+  if (phase.kind === "reconnecting") return phase.reason;
+  return PHASE_UI_STATE[phase.kind];
 }
 
 export function retryDelayForAttempt(
@@ -238,14 +238,21 @@ export class PeerConnectionController {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private signalQueue: Promise<void> = Promise.resolve();
 
-  constructor(
-    peerName: string,
-    selfPlayerName: string,
-    localStream: MediaStream,
-    peerMuted: boolean,
-    callbacks: PeerCallbacks,
-    iceServers: readonly RTCIceServer[] = DEFAULT_ICE_SERVERS,
-  ) {
+  constructor({
+    peerName,
+    selfPlayerName,
+    localStream,
+    peerMuted,
+    callbacks,
+    iceServers = DEFAULT_ICE_SERVERS,
+  }: {
+    peerName: string;
+    selfPlayerName: string;
+    localStream: MediaStream;
+    peerMuted: boolean;
+    callbacks: PeerCallbacks;
+    iceServers?: readonly RTCIceServer[];
+  }) {
     this.peerName = peerName;
     this.polite = selfPlayerName > peerName;
     this.localStream = localStream;
@@ -264,7 +271,7 @@ export class PeerConnectionController {
       }
     }
 
-    this.pc.onicecandidate = (event) => {
+    this.pc.onicecandidate = (event): void => {
       if (event.candidate && !this.isClosed()) {
         this.callbacks.sendSignal(
           this.peerName,
@@ -273,13 +280,14 @@ export class PeerConnectionController {
         );
       }
     };
-    this.pc.ontrack = (event) => this.handleRemoteTrack(event);
-    this.pc.onconnectionstatechange = () => this.handleConnectionStateChange();
-    this.pc.oniceconnectionstatechange = () =>
+    this.pc.ontrack = (event): void => this.handleRemoteTrack(event);
+    this.pc.onconnectionstatechange = (): void =>
+      this.handleConnectionStateChange();
+    this.pc.oniceconnectionstatechange = (): void =>
       this.handleIceConnectionStateChange();
   }
 
-  start(bufferedSignals: readonly VoiceSignalPayload[]) {
+  start(bufferedSignals: readonly VoiceSignalPayload[]): void {
     for (const signal of bufferedSignals) {
       this.enqueueSignal(signal);
     }
@@ -296,12 +304,12 @@ export class PeerConnectionController {
     return peerPhaseToUiState(this.phase);
   }
 
-  setPeerMuted(muted: boolean) {
+  setPeerMuted(muted: boolean): void {
     this.peerMuted = muted;
     this.audioEl.muted = !this.active || muted;
   }
 
-  setActive(nextActive: boolean) {
+  setActive(nextActive: boolean): void {
     if (this.isClosed() || this.active === nextActive) return;
     this.active = nextActive;
     if (!nextActive) {
@@ -311,7 +319,7 @@ export class PeerConnectionController {
     this.unpark();
   }
 
-  enqueueSignal(payload: VoiceSignalPayload) {
+  enqueueSignal(payload: VoiceSignalPayload): void {
     if (this.isClosed()) return;
     if (payload.signal_type === "mute_state") {
       const muted = parseMuteState(payload.data);
@@ -327,7 +335,7 @@ export class PeerConnectionController {
       });
   }
 
-  close() {
+  close(): void {
     if (this.isClosed()) return;
     this.phase = { kind: "closed" };
     this.active = false;
@@ -346,7 +354,7 @@ export class PeerConnectionController {
     return this.phase.kind === "closed";
   }
 
-  private park() {
+  private park(): void {
     this.clearOfferTimer();
     this.clearReconnectTimer();
     this.audioEl.muted = true;
@@ -355,7 +363,7 @@ export class PeerConnectionController {
     this.callbacks.onPeerStateChange();
   }
 
-  private unpark() {
+  private unpark(): void {
     this.audioEl.muted = this.peerMuted;
     const audioTrack = this.localStream.getAudioTracks()[0] ?? null;
     this.replaceOutgoingTrack(audioTrack);
@@ -391,13 +399,13 @@ export class PeerConnectionController {
     this.callbacks.onPeerStateChange();
   }
 
-  private replaceOutgoingTrack(track: MediaStreamTrack | null) {
+  private replaceOutgoingTrack(track: MediaStreamTrack | null): void {
     for (const sender of this.senders) {
       void sender.replaceTrack(track).catch(() => {});
     }
   }
 
-  private handleRemoteTrack(event: RTCTrackEvent) {
+  private handleRemoteTrack(event: RTCTrackEvent): void {
     if (this.isClosed()) return;
     const remoteStream = event.streams[0] ?? new MediaStream([event.track]);
     this.audioEl.srcObject = remoteStream;
@@ -414,7 +422,7 @@ export class PeerConnectionController {
     );
   }
 
-  private startOffer(iceRestart: boolean, retryAttempt: number) {
+  private startOffer(iceRestart: boolean, retryAttempt: number): void {
     if (this.isClosed()) return;
     this.clearOfferTimer();
     this.clearReconnectTimer();
@@ -431,7 +439,7 @@ export class PeerConnectionController {
     void this.runOffer(epoch, iceRestart);
   }
 
-  private async runOffer(epoch: number, iceRestart: boolean) {
+  private async runOffer(epoch: number, iceRestart: boolean): Promise<void> {
     try {
       const offer = iceRestart
         ? await this.pc.createOffer({ iceRestart: true })
@@ -455,7 +463,7 @@ export class PeerConnectionController {
     return this.phase.kind !== "offering" || this.negotiationEpoch !== epoch;
   }
 
-  private sendCurrentOfferAndScheduleResend(epoch: number) {
+  private sendCurrentOfferAndScheduleResend(epoch: number): void {
     if (this.isOfferSuperseded(epoch)) return;
     if (this.pc.signalingState !== "have-local-offer") return;
     const description = this.pc.localDescription;
@@ -477,7 +485,7 @@ export class PeerConnectionController {
     }, delay);
   }
 
-  private async processSignal(payload: VoiceSignalPayload) {
+  private async processSignal(payload: VoiceSignalPayload): Promise<void> {
     if (this.isClosed()) return;
     if (payload.signal_type === "offer") {
       await this.handleIncomingOffer(payload.data);
@@ -488,7 +496,7 @@ export class PeerConnectionController {
     }
   }
 
-  private async handleIncomingOffer(data: unknown) {
+  private async handleIncomingOffer(data: unknown): Promise<void> {
     const description = parseSessionDescription(data);
     if (!description || description.type !== "offer") return;
 
@@ -513,7 +521,7 @@ export class PeerConnectionController {
   private async applyRemoteOfferAndAnswer(
     description: RTCSessionDescriptionInit,
     preservedRetryAttempt: number,
-  ) {
+  ): Promise<void> {
     await this.pc.setRemoteDescription(description);
     if (this.isClosed()) return;
     this.hasRemoteDesc = true;
@@ -537,7 +545,7 @@ export class PeerConnectionController {
     this.callbacks.onPeerStateChange();
   }
 
-  private async handleIncomingAnswer(data: unknown) {
+  private async handleIncomingAnswer(data: unknown): Promise<void> {
     const description = parseSessionDescription(data);
     if (!description || description.type !== "answer") return;
     if (this.pc.signalingState !== "have-local-offer") return;
@@ -560,7 +568,7 @@ export class PeerConnectionController {
     this.callbacks.onPeerStateChange();
   }
 
-  private async handleIncomingIce(data: unknown) {
+  private async handleIncomingIce(data: unknown): Promise<void> {
     const candidate = parseIceCandidate(data);
     if (!candidate) return;
     if (this.hasRemoteDesc) {
@@ -572,16 +580,22 @@ export class PeerConnectionController {
     }
   }
 
-  private async drainIceBuffer() {
+  private async drainIceBuffer(): Promise<void> {
     const queued = this.iceBuffer;
     this.iceBuffer = [];
-    for (const candidate of queued) {
-      if (this.isClosed()) return;
-      await this.pc.addIceCandidate(candidate);
-    }
+    await this.addQueuedIceCandidates(queued, 0);
   }
 
-  private handleConnectionStateChange() {
+  private async addQueuedIceCandidates(
+    queued: readonly RTCIceCandidateInit[],
+    index: number,
+  ): Promise<void> {
+    if (index >= queued.length || this.isClosed()) return;
+    await this.pc.addIceCandidate(queued[index]);
+    await this.addQueuedIceCandidates(queued, index + 1);
+  }
+
+  private handleConnectionStateChange(): void {
     if (this.isClosed()) return;
     const state = this.pc.connectionState;
     if (state === "connected") {
@@ -604,7 +618,7 @@ export class PeerConnectionController {
     this.callbacks.onPeerStateChange();
   }
 
-  private handleIceConnectionStateChange() {
+  private handleIceConnectionStateChange(): void {
     if (this.isClosed()) return;
     if (
       this.pc.connectionState === "connected" ||
@@ -618,7 +632,7 @@ export class PeerConnectionController {
     }
   }
 
-  private handleTransportDegraded(reason: ReconnectReason) {
+  private handleTransportDegraded(reason: ReconnectReason): void {
     if (this.phase.kind === "closed" || this.phase.kind === "failed") return;
     if (!this.active) {
       this.clearOfferTimer();
@@ -652,7 +666,7 @@ export class PeerConnectionController {
   private scheduleReconnectTimer(
     reason: ReconnectReason,
     retryAttempt: number,
-  ) {
+  ): void {
     this.clearReconnectTimer();
     this.phase = { kind: "reconnecting", reason, retryAttempt };
     this.callbacks.onPeerStateChange();
@@ -670,14 +684,14 @@ export class PeerConnectionController {
     }, delay);
   }
 
-  private clearOfferTimer() {
+  private clearOfferTimer(): void {
     if (this.offerTimer) {
       clearTimeout(this.offerTimer);
       this.offerTimer = null;
     }
   }
 
-  private clearReconnectTimer() {
+  private clearReconnectTimer(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

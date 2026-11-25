@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { ResumableSeat } from "../../hooks/useResumableGames";
 import { useResumeSeat } from "../../hooks/useResumeSeat";
 import { resumeDetail, resumeHeadline } from "../../utils/accountFormat";
@@ -11,7 +12,7 @@ export function ResumeBanner({
 }: {
   seat: ResumableSeat;
   onClose?: (seat: ResumableSeat) => void;
-}) {
+}): ReactElement {
   const resume = useResumeSeat();
   const inGame = seat.kind === "game";
   const title = seat.cubeName ?? seat.cubeId;

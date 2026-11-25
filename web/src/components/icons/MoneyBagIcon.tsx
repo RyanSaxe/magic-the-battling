@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 interface MoneyBagIconProps {
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -12,7 +14,7 @@ const sizes = {
 export function MoneyBagIcon({
   size = "md",
   className = "",
-}: MoneyBagIconProps) {
+}: MoneyBagIconProps): ReactElement {
   const px = sizes[size];
   return (
     <svg

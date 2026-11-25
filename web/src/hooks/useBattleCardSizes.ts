@@ -32,14 +32,23 @@ interface BattleZoneDims {
   opponentNonlands: CardDimensions;
 }
 
-function computeZoneCards(
-  count: number,
-  rowH: number,
-  containerW: number,
-  gap: number,
-  maxWidth: number,
-  padding: number,
-): CardDimensions {
+interface ZoneCardsInput {
+  count: number;
+  rowH: number;
+  containerW: number;
+  gap: number;
+  maxWidth: number;
+  padding: number;
+}
+
+function computeZoneCards({
+  count,
+  rowH,
+  containerW,
+  gap,
+  maxWidth,
+  padding,
+}: ZoneCardsInput): CardDimensions {
   const baseCardW = Math.floor(rowH / CARD_ASPECT_RATIO);
 
   if (count === 0) {
@@ -54,14 +63,14 @@ function computeZoneCards(
   return { width: cardW, height: Math.round(cardW * CARD_ASPECT_RATIO) };
 }
 
-function computeHandCards(
-  count: number,
-  rowH: number,
-  containerW: number,
-  defaultGap: number,
-  maxWidth: number,
-  padding: number,
-): CardDimensions & { gap: number } {
+function computeHandCards({
+  count,
+  rowH,
+  containerW,
+  gap: defaultGap,
+  maxWidth,
+  padding,
+}: ZoneCardsInput): CardDimensions & { gap: number } {
   const baseCardW = Math.floor(rowH / CARD_ASPECT_RATIO);
   const idealW = Math.min(baseCardW, maxWidth);
 
@@ -165,22 +174,30 @@ export function computeBattleZones(
   const bfWidth = containerWidth - zoneColumnWidth;
   const handWidth = containerWidth - zoneColumnWidth;
 
-  const playerHandResult = computeHandCards(
-    playerHandCount,
+  const playerHandResult = computeHandCards({
+    count: playerHandCount,
     rowH,
-    handWidth,
-    handGap,
-    handMaxWidth,
-    handPadding,
-  );
-  const opponentHandResult = computeHandCards(
-    opponentHandCount,
+    containerW: handWidth,
+    gap: handGap,
+    maxWidth: handMaxWidth,
+    padding: handPadding,
+  });
+  const opponentHandResult = computeHandCards({
+    count: opponentHandCount,
     rowH,
-    handWidth,
-    handGap,
-    handMaxWidth,
-    handPadding,
-  );
+    containerW: handWidth,
+    gap: handGap,
+    maxWidth: handMaxWidth,
+    padding: handPadding,
+  });
+
+  const bfBase = {
+    rowH,
+    containerW: bfWidth,
+    gap: battlefieldGap,
+    maxWidth: battlefieldMaxWidth,
+    padding: BATTLEFIELD_INSET,
+  };
 
   return {
     rowHeight: rowH,
@@ -194,39 +211,18 @@ export function computeBattleZones(
       width: opponentHandResult.width,
       height: opponentHandResult.height,
     },
-    playerLands: computeZoneCards(
-      playerLandCount,
-      rowH,
-      bfWidth,
-      battlefieldGap,
-      battlefieldMaxWidth,
-      BATTLEFIELD_INSET,
-    ),
-    playerNonlands: computeZoneCards(
-      playerNonlandCount,
-      rowH,
-      bfWidth,
-      battlefieldGap,
-      battlefieldMaxWidth,
-      BATTLEFIELD_INSET,
-    ),
-    opponentLands: computeZoneCards(
-      opponentLandCount,
-      rowH,
-      bfWidth,
-      battlefieldGap,
-      battlefieldMaxWidth,
-      BATTLEFIELD_INSET,
-    ),
-    opponentNonlands: computeZoneCards(
-      opponentNonlandCount,
-      rowH,
-      bfWidth,
-      battlefieldGap,
-      battlefieldMaxWidth,
-      BATTLEFIELD_INSET,
-    ),
+    playerLands: computeZoneCards({ ...bfBase, count: playerLandCount }),
+    playerNonlands: computeZoneCards({ ...bfBase, count: playerNonlandCount }),
+    opponentLands: computeZoneCards({ ...bfBase, count: opponentLandCount }),
+    opponentNonlands: computeZoneCards({
+      ...bfBase,
+      count: opponentNonlandCount,
+    }),
   };
+}
+
+function cardDimsEqual(a: CardDimensions, b: CardDimensions): boolean {
+  return a.width === b.width && a.height === b.height;
 }
 
 function dimsEqual(a: BattleZoneDims, b: BattleZoneDims): boolean {
@@ -234,18 +230,12 @@ function dimsEqual(a: BattleZoneDims, b: BattleZoneDims): boolean {
     a.rowHeight === b.rowHeight &&
     a.playerHandGap === b.playerHandGap &&
     a.opponentHandGap === b.opponentHandGap &&
-    a.playerHand.width === b.playerHand.width &&
-    a.playerHand.height === b.playerHand.height &&
-    a.opponentHand.width === b.opponentHand.width &&
-    a.opponentHand.height === b.opponentHand.height &&
-    a.playerLands.width === b.playerLands.width &&
-    a.playerLands.height === b.playerLands.height &&
-    a.playerNonlands.width === b.playerNonlands.width &&
-    a.playerNonlands.height === b.playerNonlands.height &&
-    a.opponentLands.width === b.opponentLands.width &&
-    a.opponentLands.height === b.opponentLands.height &&
-    a.opponentNonlands.width === b.opponentNonlands.width &&
-    a.opponentNonlands.height === b.opponentNonlands.height
+    cardDimsEqual(a.playerHand, b.playerHand) &&
+    cardDimsEqual(a.opponentHand, b.opponentHand) &&
+    cardDimsEqual(a.playerLands, b.playerLands) &&
+    cardDimsEqual(a.playerNonlands, b.playerNonlands) &&
+    cardDimsEqual(a.opponentLands, b.opponentLands) &&
+    cardDimsEqual(a.opponentNonlands, b.opponentNonlands)
   );
 }
 
@@ -266,21 +256,6 @@ export function useBattleCardSizes(
     battlefieldMaxWidth = 300,
     zoneColumnWidth = 0,
   } = config;
-
-  const resolved = {
-    playerHandCount,
-    opponentHandCount,
-    playerLandCount,
-    playerNonlandCount,
-    opponentLandCount,
-    opponentNonlandCount,
-    handGap,
-    battlefieldGap,
-    fixedHeight,
-    handMaxWidth,
-    battlefieldMaxWidth,
-    zoneColumnWidth,
-  };
 
   const [dims, setDims] = useState<BattleZoneDims>(() => ({
     rowHeight: 0,
@@ -316,10 +291,21 @@ export function useBattleCardSizes(
   const elementRef = useRef<HTMLElement | null>(null);
 
   const compute = useCallback(
-    (containerWidth: number, containerHeight: number) => {
-      return computeBattleZones(containerWidth, containerHeight, resolved);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (containerWidth: number, containerHeight: number) =>
+      computeBattleZones(containerWidth, containerHeight, {
+        playerHandCount,
+        opponentHandCount,
+        playerLandCount,
+        playerNonlandCount,
+        opponentLandCount,
+        opponentNonlandCount,
+        handGap,
+        battlefieldGap,
+        fixedHeight,
+        handMaxWidth,
+        battlefieldMaxWidth,
+        zoneColumnWidth,
+      }),
     [
       playerHandCount,
       opponentHandCount,
@@ -363,8 +349,8 @@ export function useBattleCardSizes(
         const entry = entries[0];
         if (!entry) return;
         const { width, height } = entry.contentRect;
-        const next = compute(width, height);
-        setDims((prev) => (dimsEqual(prev, next) ? prev : next));
+        const resized = compute(width, height);
+        setDims((prev) => (dimsEqual(prev, resized) ? prev : resized));
       });
 
       observer.observe(node);

@@ -1,6 +1,9 @@
+import type { ReactElement } from "react";
 import type { Card as CardType, ZoneName } from "../../types";
 import { DraggableCard, DroppableZone } from "../../dnd";
 import { Card } from "../card";
+
+const DEFAULT_VALID_FROM_ZONES: ZoneName[] = ["hand"];
 
 interface SideboardZoneProps {
   cards: CardType[];
@@ -14,9 +17,9 @@ export function SideboardZone({
   cards,
   selectedCardId,
   onCardClick,
-  validFromZones = ["hand"],
+  validFromZones = DEFAULT_VALID_FROM_ZONES,
   draggable = true,
-}: SideboardZoneProps) {
+}: SideboardZoneProps): ReactElement {
   return (
     <DroppableZone
       zone="sideboard"

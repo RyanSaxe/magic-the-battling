@@ -96,6 +96,17 @@ export function followFor(
   return follows.records.find((f) => f.cube_id === cubeId);
 }
 
+async function findFollowFromOffset(
+  cubeId: string,
+  offset: number,
+  loadPage: (offset: number) => Promise<FollowingPage>,
+): Promise<FollowedBattler | undefined> {
+  const page = await loadPage(offset);
+  const record = page.following.find((f) => f.cube_id === cubeId);
+  if (record || !page.has_more) return record;
+  return findFollowFromOffset(cubeId, offset + page.following.length, loadPage);
+}
+
 /**
  * Finds a cube's follow record, loading Following from its first page when the record isn't loaded.
  * Returns undefined only when no Following page has the cube.
@@ -105,17 +116,10 @@ export async function findFollow(
   cubeId: string,
   loadPage: (offset: number) => Promise<FollowingPage>,
 ): Promise<FollowedBattler | undefined> {
-  let record = followFor(follows, cubeId);
+  const record = followFor(follows, cubeId);
+  if (record) return record;
   // Start from the first page: a follow made on another device since this page loaded sorts ahead of the loaded records.
-  let offset = 0;
-  let hasMore = true;
-  while (!record && hasMore) {
-    const page = await loadPage(offset);
-    record = page.following.find((f) => f.cube_id === cubeId);
-    offset += page.following.length;
-    hasMore = page.has_more;
-  }
-  return record;
+  return findFollowFromOffset(cubeId, 0, loadPage);
 }
 
 export function isFollowing(follows: Follows, cubeId: string): boolean {
@@ -175,10 +179,12 @@ export function libraryHasMore(library: Library): boolean {
  */
 export function nextLibraryPage(library: Library): LibraryPageRequest | null {
   if (library.loadingMore || library.removing.size > 0) return null;
-  if (library.presetsHaveMore)
+  if (library.presetsHaveMore) {
     return { list: "saved", offset: library.presets.length };
-  if (library.followsHaveMore)
+  }
+  if (library.followsHaveMore) {
     return { list: "following", offset: library.follows.length };
+  }
   return null;
 }
 

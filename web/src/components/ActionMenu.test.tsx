@@ -8,32 +8,76 @@ import { ActionMenu } from "./ActionMenu";
 
 afterEach(cleanup);
 
-const card = {
+const noop = (): void => {};
+
+const card: Card = {
   id: "card-1",
   name: "Mantis Rider",
-  tokens: [],
+  image_url: "",
   flip_image_url: null,
-} as unknown as Card;
+  png_url: null,
+  flip_png_url: null,
+  type_line: "Creature",
+  tokens: [],
+  elo: null,
+  upgrade_target: null,
+  oracle_text: null,
+  colors: [],
+  cmc: 3,
+};
 
-function zones(faceDown: string[] = []) {
+function zones(faceDown: string[] = []): Zones {
   return {
     battlefield: faceDown.length ? [card] : [],
+    graveyard: [],
+    exile: [],
+    hand: [],
+    sideboard: [],
+    upgrades: [],
+    command_zone: [],
     library: [],
+    treasures: 0,
+    submitted_cards: [],
     tapped_card_ids: [],
+    flipped_card_ids: [],
     face_down_card_ids: faceDown,
     counters: {},
     attachments: {},
-  } as unknown as Zones;
+    spawned_tokens: [],
+  };
 }
 
-function renderMenu(props: Record<string, unknown>) {
+type ActionMenuProps = ComponentProps<typeof ActionMenu>;
+
+function renderMenu(
+  overrides: Partial<ActionMenuProps> &
+    Pick<ActionMenuProps, "selectedCard" | "battle" | "playerName">,
+): void {
   render(
-    <ActionMenu {...(props as unknown as ComponentProps<typeof ActionMenu>)} />,
+    <ActionMenu
+      sideboardCount={0}
+      opponentSideboardCount={0}
+      onAction={noop}
+      onMove={noop}
+      onUntapAll={noop}
+      onUntapOpponentAll={noop}
+      onShowSideboard={noop}
+      onShowOpponentSideboard={noop}
+      onCreateTreasure={noop}
+      onDrawLibrary={noop}
+      onShuffleLibrary={noop}
+      onDrawOpponentLibrary={noop}
+      onShuffleOpponentLibrary={noop}
+      onPassTurn={noop}
+      onRollDie={noop}
+      onClose={noop}
+      {...overrides}
+    />,
   );
 }
 
 describe("ActionMenu", () => {
-  it.each(["player", "opponent"] as const)(
+  it.each<ZoneOwner>(["player", "opponent"])(
     "offers to turn the %s's face-down card face up",
     (owner: ZoneOwner) => {
       renderMenu({
@@ -71,7 +115,7 @@ describe("ActionMenu", () => {
       });
 
       expect(
-        (screen.getByRole("button", { name: "Pass Turn" }) as HTMLButtonElement)
+        screen.getByRole<HTMLButtonElement>("button", { name: "Pass Turn" })
           .disabled,
       ).toBe(expectedDisabled);
     },

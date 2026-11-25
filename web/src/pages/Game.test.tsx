@@ -6,6 +6,7 @@ import {
   render,
   screen,
 } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GAME_ID, gameBootstrap } from "../../e2e/gameStates";
@@ -23,12 +24,16 @@ import { Game } from "./Game";
 
 // The game shell reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
 vi.mock("../api/client", async (importOriginal) => ({
@@ -52,33 +57,71 @@ const fetchGameStatus = vi.mocked(getGameStatus);
 
 vi.mock("../contexts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../contexts")>()),
-  useToast: () => ({ addToast: () => {} }),
+  useToast: (): { addToast: () => void } => ({ addToast: (): void => {} }),
 }));
 
-const auth = vi.hoisted(() => ({
-  user: null as { username: string } | null,
+interface MockAuthState {
+  user: { username: string } | null;
+  loading: boolean;
+}
+
+const auth = vi.hoisted((): MockAuthState => ({
+  user: null,
   loading: false,
 }));
 vi.mock("../contexts/authState", () => ({
-  useAuth: () => ({
+  useAuth: (): MockAuthState => ({
     user: auth.loading ? null : auth.user,
     loading: auth.loading,
   }),
 }));
 
-const find = (selector: string) =>
-  document.querySelector<HTMLElement>(selector)!;
+function find(selector: string): HTMLElement {
+  const el = document.querySelector<HTMLElement>(selector);
+  if (!el) throw new Error(`Element not found: ${selector}`);
+  return el;
+}
 
-function HomePage() {
+function makeDomRect(box: {
+  x?: number;
+  y?: number;
+  width: number;
+  height: number;
+}): DOMRect {
+  const x = box.x ?? 0;
+  const y = box.y ?? 0;
+  return {
+    x,
+    y,
+    left: x,
+    top: y,
+    right: x + box.width,
+    bottom: y + box.height,
+    width: box.width,
+    height: box.height,
+    toJSON: (): Record<string, number> => ({
+      x,
+      y,
+      width: box.width,
+      height: box.height,
+    }),
+  };
+}
+
+function HomePage(): ReactElement {
   const navigate = useNavigate();
   return (
-    <button onClick={() => navigate("/game/game-1/play")}>
+    <button
+      onClick={() => {
+        void navigate("/game/game-1/play");
+      }}
+    >
       Open the game link
     </button>
   );
 }
 
-function renderGame(gameId = "game-1") {
+function renderGame(gameId = "game-1"): void {
   render(
     <MemoryRouter initialEntries={[`/game/${gameId}/play`]}>
       <Routes>
@@ -89,13 +132,15 @@ function renderGame(gameId = "game-1") {
   );
 }
 
-async function settle() {
+async function settle(): Promise<void> {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
   });
 }
 
-async function openGame(bootstrap: ReturnType<typeof gameBootstrap>) {
+async function openGame(
+  bootstrap: ReturnType<typeof gameBootstrap>,
+): Promise<void> {
   renderGame(GAME_ID);
   await vi.waitFor(() => FakeWebSocket.latest());
   await act(async () => {
@@ -177,14 +222,14 @@ beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
     },
   );
   FakeWebSocket.instances = [];
   // jsdom has no animations, so a closing panel has none to wait for.
-  Element.prototype.getAnimations = () => [];
+  Element.prototype.getAnimations = (): Animation[] => [];
   cancelRequest.mockClear();
   auth.user = null;
   auth.loading = false;
@@ -198,29 +243,102 @@ afterEach(() => {
   auth.loading = false;
 });
 
-describe("Game: advancing with Enter", () => {
-  const draftWith = (treasures: number) => {
-    const bootstrap = gameBootstrap({
-      phase: "draft",
-      counts: { pack: 2, sideboard: 2 },
-    });
-    bootstrap.state.self_player.treasures = treasures;
-    return bootstrap;
-  };
-  const receive = (treasures: number) =>
-    act(async () => {
-      FakeWebSocket.latest().serverMessage({
-        type: "game_bootstrap",
-        payload: draftWith(treasures),
-      });
-    });
-  const draftsEnded = () =>
-    FakeWebSocket.latest().sent.filter((message) =>
-      message.includes('"draft_done"'),
-    ).length;
-  const pressEnter = (target: HTMLElement = document.body, repeat = false) =>
-    fireEvent.keyDown(target, { key: "Enter", repeat });
+function draftWith(treasures: number): ReturnType<typeof gameBootstrap> {
+  const bootstrap = gameBootstrap({
+    phase: "draft",
+    counts: { pack: 2, sideboard: 2 },
+  });
+  bootstrap.state.self_player.treasures = treasures;
+  return bootstrap;
+}
 
+function draftsEnded(): number {
+  return FakeWebSocket.latest().sent.filter((message) =>
+    message.includes('"draft_done"'),
+  ).length;
+}
+
+function pressEnter(
+  target: HTMLElement = document.body,
+  repeat = false,
+): boolean {
+  return fireEvent.keyDown(target, { key: "Enter", repeat });
+}
+
+function isBasicLandName(alt: string): boolean {
+  return BASIC_LANDS.some(({ name }) => name === alt);
+}
+
+function shownLands(): string[] {
+  return Array.from(
+    find(
+      '[data-guide-target="build-battlefield"]',
+    ).querySelectorAll<HTMLImageElement>("img"),
+  )
+    .filter((image) => isBasicLandName(image.alt))
+    .map((image) => image.alt);
+}
+
+function clickPlayerExile(): void {
+  const container = find(
+    '.battle-side-dropzone[data-zone="exile"][data-zone-owner="player"] > div',
+  );
+  fireEvent.click(container.querySelector("button") ?? container);
+}
+
+function battleMovesCount(): number {
+  return FakeWebSocket.latest().sent.filter((message) =>
+    message.includes('"battle_move"'),
+  ).length;
+}
+
+function pressEscape(): boolean {
+  return fireEvent.keyDown(document.body, { key: "Escape" });
+}
+
+function openActions(): boolean {
+  return fireEvent.click(screen.getByRole("button", { name: "Actions" }));
+}
+
+function minimizeGuide(): boolean {
+  return fireEvent.click(
+    screen.getByRole("button", { name: "Minimize guide" }),
+  );
+}
+
+function followControlsLink(): void {
+  fireEvent.click(find('[data-guide-target="timeline-phase-draft"]'));
+  fireEvent.click(screen.getByRole("button", { name: "Controls" }));
+}
+
+function guideOnScreen(): boolean {
+  return screen.queryByRole("button", { name: "Minimize guide" }) !== null;
+}
+
+function minimizedOnScreen(): boolean {
+  return screen.queryByRole("button", { name: "Open guide" }) !== null;
+}
+
+function pressGuideKey(): boolean {
+  return fireEvent.keyDown(document.body, { key: "?" });
+}
+
+async function dragMoveTo(at: number): Promise<void> {
+  await act(async () => {
+    fireEvent.mouseMove(document, { clientX: at, clientY: at, buttons: 1 });
+  });
+}
+
+async function receiveDraft(treasures: number): Promise<void> {
+  await act(async () => {
+    FakeWebSocket.latest().serverMessage({
+      type: "game_bootstrap",
+      payload: draftWith(treasures),
+    });
+  });
+}
+
+describe("Game: advancing with Enter", () => {
   beforeEach(() => {
     saveTabSession(GAME_ID, { sessionId: "session-1", playerId: "player-1" });
     vi.stubGlobal("innerWidth", 1280);
@@ -247,7 +365,7 @@ describe("Game: advancing with Enter", () => {
 
   it("doesn't end Draft from the Enter after the last Roll, or from holding it", async () => {
     await openGame(draftWith(1));
-    await receive(0);
+    await receiveDraft(0);
 
     pressEnter();
     pressEnter(document.body, true);
@@ -349,19 +467,10 @@ describe("Game: watching a player build", () => {
 
   it("shows the player's lands as they change, whatever the spectator picks", async () => {
     const { catalog, state } = gameBootstrap({ phase: "build", counts: {} });
-    const withLands = (chosen_basics: string[]) => ({
+    const withLands = (chosen_basics: string[]): CompactGameState => ({
       ...state,
       self_player: { ...state.self_player, chosen_basics },
     });
-    const shownLands = () =>
-      screen
-        .getAllByRole<HTMLImageElement>("img")
-        .filter(
-          (image) =>
-            !image.closest("button") &&
-            BASIC_LANDS.some(({ name }) => name === image.alt),
-        )
-        .map((image) => image.alt);
 
     saveTabSpectate("game-1", {
       target: "Alice",
@@ -393,10 +502,9 @@ describe("Game: watching a player build", () => {
 
   it("opens Apply Upgrade only to look", async () => {
     // The window shows its cards once it has a height, and jsdom has none.
-    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
-      width: 300,
-      height: 20,
-    } as DOMRect);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
+      makeDomRect({ width: 300, height: 20 }),
+    );
     const { catalog, state } = gameBootstrap({
       phase: "build",
       counts: { hand: 1, upgrades: 1 },
@@ -416,21 +524,17 @@ describe("Game: watching a player build", () => {
       });
     });
 
-    fireEvent.click(document.querySelector('button[aria-label^="Upgrade "]')!);
-    const cards = screen
-      .getByText("Permanently")
-      .closest(".modal-chrome")!
-      .querySelectorAll<HTMLElement>(".card");
+    fireEvent.click(find('button[aria-label^="Upgrade "]'));
+    const modal = screen.getByText("Permanently").closest(".modal-chrome");
+    if (!modal) throw new Error("expected .modal-chrome");
+    const cards = modal.querySelectorAll<HTMLElement>(".card");
     expect(cards).toHaveLength(2);
     for (const card of cards) {
       expect(card.classList.contains("selected")).toBe(false);
       fireEvent.click(card);
       expect(card.classList.contains("selected")).toBe(false);
-      const zoom = document.querySelector<HTMLElement>(
-        "[data-card-preview-modal]",
-      );
-      expect(zoom).not.toBeNull();
-      fireEvent.click(zoom!);
+      const zoom = find("[data-card-preview-modal]");
+      fireEvent.click(zoom);
     }
     expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
   });
@@ -470,9 +574,7 @@ describe("Game: watching a player's Round Wrap-Up", () => {
       });
     });
 
-    const upgrade = document.querySelector<HTMLElement>(
-      '[data-guide-target="reward-upgrades"] .card',
-    )!;
+    const upgrade = find('[data-guide-target="reward-upgrades"] .card');
     fireEvent.click(upgrade);
     expect(upgrade.classList.contains("selected")).toBe(false);
     expect(document.querySelector("[data-card-preview-modal]")).not.toBeNull();
@@ -547,72 +649,73 @@ describe("Game: what is open over the board", () => {
       phase: "battle",
       counts: { hand: 2, lands: 1 },
     });
-    const zones = bootstrap.state.current_battle!.your_zones;
+    const battle = bootstrap.state.current_battle;
+    if (!battle) throw new Error("expected current_battle");
+    const zones = battle.your_zones;
     zones.sideboard = [{ ...zones.hand[0], id: "sideboard-card" }];
     await openGame(bootstrap);
 
-    const selectInSideboard = () => {
+    const selectInSideboard = (): void => {
       fireEvent.keyDown(document.body, { key: "s" });
       fireEvent.click(find('[data-guide-card-id="sideboard-card"]'));
     };
-    const tapFelt = () =>
+    const tapFelt = (): boolean =>
       fireEvent.click(
         find('[data-zone="battlefield"][data-zone-owner="player"]'),
       );
-    const moves = () =>
-      FakeWebSocket.latest().sent.filter((message) =>
-        message.includes('"battle_move"'),
-      ).length;
 
-    const pressEscape = () =>
-      fireEvent.keyDown(document.body, { key: "Escape" });
-    const openActions = () =>
-      fireEvent.click(screen.getByRole("button", { name: "Actions" }));
-    const ways = {
-      "×": () =>
+    const ways: Record<string, () => void> = {
+      "×": (): void => {
         fireEvent.click(
           screen.getByRole("button", { name: "Close Your Sideboard" }),
-        ),
-      Escape: pressEscape,
-      "its key": () => fireEvent.keyDown(document.body, { key: "s" }),
-      "the Guide": () => {
+        );
+      },
+      Escape: (): void => {
+        pressEscape();
+      },
+      "its key": (): void => {
+        fireEvent.keyDown(document.body, { key: "s" });
+      },
+      "the Guide": (): void => {
         fireEvent.click(find('[data-guide-target="guide-button"]'));
         pressEscape();
       },
-      "Submit Result": () => {
+      "Submit Result": (): void => {
         fireEvent.click(screen.getByRole("button", { name: "Submit Result" }));
         pressEscape();
       },
-      "another pile's key": () => {
+      "another pile's key": (): void => {
         fireEvent.keyDown(document.body, { key: "e" });
         pressEscape();
       },
-      "Actions, dismissed": () => {
+      "Actions, dismissed": (): void => {
         openActions();
         pressEscape();
       },
-      "☰": () => fireEvent.click(find('[data-guide-target="sidebar-toggle"]')),
+      "☰": (): void => {
+        fireEvent.click(find('[data-guide-target="sidebar-toggle"]'));
+      },
     };
     const movedAfter: string[] = [];
     for (const [how, leavePanel] of Object.entries(ways)) {
       selectInSideboard();
       leavePanel();
-      const before = moves();
+      const before = battleMovesCount();
       tapFelt();
-      if (moves() > before) movedAfter.push(how);
+      if (battleMovesCount() > before) movedAfter.push(how);
     }
     expect(movedAfter).toEqual([]);
 
     selectInSideboard();
     tapFelt();
-    expect(moves()).toBe(1);
+    expect(battleMovesCount()).toBe(1);
 
     // The card is out of sight in Actions, and still the one Move To moves.
     fireEvent.click(find('[data-guide-card-id="sideboard-card"]'));
     openActions();
     fireEvent.click(screen.getByRole("button", { name: /^Move To/ }));
     fireEvent.click(find(".menu-submenu button"));
-    expect(moves()).toBe(2);
+    expect(battleMovesCount()).toBe(2);
   });
 
   it("forgets a selected card once it is dragged to another zone", async () => {
@@ -624,16 +727,7 @@ describe("Game: what is open over the board", () => {
         )
           ? 200
           : 0;
-        return {
-          x: at,
-          y: at,
-          left: at,
-          top: at,
-          right: at + 50,
-          bottom: at + 50,
-          width: 50,
-          height: 50,
-        } as DOMRect;
+        return makeDomRect({ x: at, y: at, width: 50, height: 50 });
       },
     );
     await openGame(gameBootstrap({ phase: "battle", counts: { lands: 1 } }));
@@ -641,21 +735,15 @@ describe("Game: what is open over the board", () => {
     fireEvent.click(land);
 
     fireEvent.mouseDown(land, { clientX: 10, clientY: 10, button: 0 });
-    for (const at of [30, 220, 225]) {
-      await act(async () => {
-        fireEvent.mouseMove(document, { clientX: at, clientY: at, buttons: 1 });
-      });
-    }
+    await dragMoveTo(30);
+    await dragMoveTo(220);
+    await dragMoveTo(225);
     await act(async () => {
       fireEvent.mouseUp(document, { clientX: 225, clientY: 225 });
       // A drag swallows clicks for 50ms after it ends.
       await new Promise((resolve) => setTimeout(resolve, 60));
     });
-    fireEvent.click(
-      find(
-        '.battle-side-dropzone[data-zone="exile"][data-zone-owner="player"] > div',
-      ),
-    );
+    clickPlayerExile();
 
     const moves = FakeWebSocket.latest().sent.filter((message) =>
       message.includes('"battle_move"'),
@@ -709,11 +797,7 @@ describe("Game: what is open over the board", () => {
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("button", { name: "Pass Turn" })).toBeNull();
 
-    fireEvent.click(
-      find(
-        '.battle-side-dropzone[data-zone="exile"][data-zone-owner="player"] > div',
-      ),
-    );
+    clickPlayerExile();
     expect(screen.getByRole("button", { name: "Open guide" })).toBeTruthy();
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(document.querySelector(".side-panel--open")).toBeNull();
@@ -730,18 +814,16 @@ describe("Game: what is open over the board", () => {
       gameBootstrap({ phase: "draft", counts: { pack: 2, sideboard: 2 } }),
     );
     const guideButton = find('[data-guide-target="guide-button"]');
-    const minimize = () =>
-      fireEvent.click(screen.getByRole("button", { name: "Minimize guide" }));
     fireEvent.click(guideButton);
     fireEvent.click(screen.getByRole("radio", { name: "FAQ" }));
 
-    minimize();
+    minimizeGuide();
     fireEvent.click(guideButton);
     expect(
       screen.getByRole("radio", { name: "FAQ" }).getAttribute("aria-checked"),
     ).toBe("true");
 
-    minimize();
+    minimizeGuide();
     fireEvent.click(find('[data-guide-target="timeline-phase-draft"]'));
     fireEvent.click(screen.getByRole("button", { name: "Controls" }));
     expect(
@@ -750,7 +832,7 @@ describe("Game: what is open over the board", () => {
         .getAttribute("aria-checked"),
     ).toBe("true");
 
-    minimize();
+    minimizeGuide();
     fireEvent.click(screen.getByRole("button", { name: "Close guide" }));
     await vi.waitFor(() =>
       expect(document.querySelector(".floating-window")).toBeNull(),
@@ -764,10 +846,6 @@ describe("Game: what is open over the board", () => {
     await openGame(
       gameBootstrap({ phase: "draft", counts: { pack: 2, sideboard: 2 } }),
     );
-    const followControlsLink = () => {
-      fireEvent.click(find('[data-guide-target="timeline-phase-draft"]'));
-      fireEvent.click(screen.getByRole("button", { name: "Controls" }));
-    };
     followControlsLink();
     fireEvent.click(screen.getByRole("radio", { name: "FAQ" }));
     fireEvent.click(screen.getByRole("button", { name: "Minimize guide" }));
@@ -784,8 +862,6 @@ describe("Game: what is open over the board", () => {
     await openGame(
       gameBootstrap({ phase: "build", counts: { hand: 2, sideboard: 2 } }),
     );
-    const guideOnScreen = () =>
-      screen.queryByRole("button", { name: "Minimize guide" }) !== null;
     fireEvent.click(find('[data-guide-target="guide-button"]'));
     fireEvent.click(screen.getByRole("radio", { name: "FAQ" }));
 
@@ -804,8 +880,6 @@ describe("Game: what is open over the board", () => {
   it("brings a minimized Guide back after backing out of Submit Result, and not after submitting", async () => {
     vi.stubGlobal("innerWidth", 768);
     await openGame(gameBootstrap({ phase: "battle", counts: { lands: 1 } }));
-    const minimizedOnScreen = () =>
-      screen.queryByRole("button", { name: "Open guide" }) !== null;
     fireEvent.click(find('[data-guide-target="guide-button"]'));
     fireEvent.click(screen.getByRole("button", { name: "Minimize guide" }));
 
@@ -823,7 +897,6 @@ describe("Game: what is open over the board", () => {
     await openGame(
       gameBootstrap({ phase: "build", counts: { hand: 2, sideboard: 2 } }),
     );
-    const pressGuideKey = () => fireEvent.keyDown(document.body, { key: "?" });
     pressGuideKey();
     fireEvent.click(screen.getByRole("radio", { name: "FAQ" }));
     fireEvent.click(screen.getByRole("button", { name: "Minimize guide" }));

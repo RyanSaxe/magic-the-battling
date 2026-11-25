@@ -1,4 +1,6 @@
-export function VerticalDivider({ label }: { label: string }) {
+import type { ReactElement } from "react";
+
+export function VerticalDivider({ label }: { label: string }): ReactElement {
   return (
     <div
       className="flex flex-col items-center justify-center self-stretch"

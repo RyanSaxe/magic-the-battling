@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { Dialog } from "../common/Dialog";
 
 export function RemovePlayerDialog({
@@ -8,7 +9,7 @@ export function RemovePlayerDialog({
   name: string;
   onKeep: () => void;
   onRemove: () => void;
-}) {
+}): ReactElement {
   return (
     <Dialog title={`Remove ${name}?`} onClose={onKeep}>
       <p className="text-sm leading-relaxed text-[var(--ivory-muted)]">

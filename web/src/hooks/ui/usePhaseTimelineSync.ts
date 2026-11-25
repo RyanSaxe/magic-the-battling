@@ -21,6 +21,17 @@ interface AutoCloseConfig {
   id: number;
 }
 
+export interface UsePhaseTimelineSyncResult {
+  popoverPhase: Phase | null;
+  popoverAnchorRect: DOMRect | null;
+  isPopoverClosing: boolean;
+  openPopoverForPhase: (phase: Phase, autoCloseAfterMs?: number) => boolean;
+  beginClosingPopover: () => void;
+  closePopoverImmediately: () => void;
+  bindPhaseButtonRef: (phase: Phase) => (el: HTMLButtonElement | null) => void;
+  bindPhaseStepRef: (phase: Phase) => (el: HTMLDivElement | null) => void;
+}
+
 export function usePhaseTimelineSync({
   activeGamePhase,
   stepsOverflow,
@@ -35,7 +46,7 @@ export function usePhaseTimelineSync({
   autoOpenPhase: Phase | null;
   autoOpenDurationMs: number;
   onAutoOpenHandled?: (phase: Phase) => void;
-}) {
+}): UsePhaseTimelineSyncResult {
   const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(
     null,
@@ -118,21 +129,21 @@ export function usePhaseTimelineSync({
   });
 
   useEffect(() => {
-    if (!autoCloseConfig) return;
+    if (!autoCloseConfig) return undefined;
     const timerId = window.setTimeout(() => {
       handleAutoCloseTick(autoCloseConfig.phase);
     }, autoCloseConfig.delayMs);
-    return () => window.clearTimeout(timerId);
+    return (): void => window.clearTimeout(timerId);
   }, [autoCloseConfig]);
 
   useEffect(() => {
-    if (!isPopoverClosing) return;
+    if (!isPopoverClosing) return undefined;
     const timerId = window.setTimeout(() => {
       setIsPopoverClosing(false);
       setPopoverPhase(null);
       setPopoverAnchorRect(null);
     }, PHASE_POPOVER_FADE_OUT_MS);
-    return () => window.clearTimeout(timerId);
+    return (): void => window.clearTimeout(timerId);
   }, [isPopoverClosing]);
 
   const attemptAutoOpen = useEffectEvent(
@@ -149,7 +160,7 @@ export function usePhaseTimelineSync({
       !activeGamePhase ||
       autoOpenPhase !== activeGamePhase
     ) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -165,7 +176,7 @@ export function usePhaseTimelineSync({
       }, 0);
     }, 0);
 
-    return () => {
+    return (): void => {
       cancelled = true;
       window.clearTimeout(openId);
       if (retryId !== null) {
@@ -175,16 +186,18 @@ export function usePhaseTimelineSync({
   }, [activeGamePhase, autoOpenDurationMs, autoOpenPhase]);
 
   const bindPhaseButtonRef = useCallback(
-    (phase: Phase) => (el: HTMLButtonElement | null) => {
-      phaseButtonRefs.current[phase] = el;
-    },
+    (phase: Phase) =>
+      (el: HTMLButtonElement | null): void => {
+        phaseButtonRefs.current[phase] = el;
+      },
     [],
   );
 
   const bindPhaseStepRef = useCallback(
-    (phase: Phase) => (el: HTMLDivElement | null) => {
-      phaseStepRefs.current[phase] = el;
-    },
+    (phase: Phase) =>
+      (el: HTMLDivElement | null): void => {
+        phaseStepRefs.current[phase] = el;
+      },
     [],
   );
 

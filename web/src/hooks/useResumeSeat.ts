@@ -7,7 +7,7 @@ export function useResumeSeat(): (seat: ResumableSeat) => void {
   const navigate = useNavigate();
   return (seat) => {
     rememberPlayerForGame(seat.gameId, seat.playerName);
-    navigate(
+    void navigate(
       `/game/${seat.gameId}/${seat.kind === "lobby" ? "lobby" : "play"}`,
     );
   };

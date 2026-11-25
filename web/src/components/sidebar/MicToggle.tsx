@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useAudioMeter } from "../../hooks/pages/useAudioMeter";
 import { type VoicePeer } from "../../hooks/useVoiceChat";
 
@@ -10,9 +11,16 @@ interface MicToggleProps {
   remoteMuted?: boolean;
 }
 
+interface MicVisual {
+  icon: "mic" | "warning" | "off";
+  color: string;
+  animation: string;
+  title: string;
+}
+
 function getMicVisual(
   props: Pick<MicToggleProps, "muted" | "connectionState" | "remoteMuted">,
-) {
+): MicVisual {
   const { muted, connectionState, remoteMuted } = props;
 
   if (connectionState === "connecting") {
@@ -63,12 +71,35 @@ function getMicVisual(
   };
 }
 
-function sizeClasses(variant: MicToggleProps["variant"], showsLevel: boolean) {
-  if (variant === "seat")
+function sizeClasses(
+  variant: MicToggleProps["variant"],
+  showsLevel: boolean,
+): string {
+  if (variant === "seat") {
     return "h-11 w-11 -ml-2 shrink-0 justify-center gap-0.5 py-2.5 focus-visible:-outline-offset-4";
-  if (variant === "player-row")
+  }
+  if (variant === "player-row") {
     return `h-6 shrink-0 justify-start ${showsLevel ? "w-5 gap-0.5" : "w-4"}`;
+  }
   return `h-6 justify-center ${showsLevel ? "w-7 gap-0.5" : "w-6"}`;
+}
+
+function renderMicIcon(
+  icon: MicVisual["icon"],
+  connectionState: MicToggleProps["connectionState"],
+  variant: MicToggleProps["variant"],
+): ReactNode {
+  if (icon === "warning") {
+    return connectionState === "failed" && variant !== "seat" ? (
+      <WarningTriangleIcon className="w-3.5 h-3.5" />
+    ) : (
+      <MicWarningIcon className="w-3.5 h-3.5" />
+    );
+  }
+  if (icon === "off") {
+    return <MicOffIcon className="w-3.5 h-3.5" />;
+  }
+  return <MicIcon className="w-3.5 h-3.5" />;
 }
 
 export function MicToggle({
@@ -78,22 +109,10 @@ export function MicToggle({
   audioLevelKey,
   connectionState,
   remoteMuted,
-}: MicToggleProps) {
+}: MicToggleProps): ReactNode {
   const visual = getMicVisual({ muted, connectionState, remoteMuted });
   const barRef = useAudioMeter(audioLevelKey);
-
-  const iconEl =
-    visual.icon === "warning" ? (
-      connectionState === "failed" && variant !== "seat" ? (
-        <WarningTriangleIcon className="w-3.5 h-3.5" />
-      ) : (
-        <MicWarningIcon className="w-3.5 h-3.5" />
-      )
-    ) : visual.icon === "off" ? (
-      <MicOffIcon className="w-3.5 h-3.5" />
-    ) : (
-      <MicIcon className="w-3.5 h-3.5" />
-    );
+  const iconEl = renderMicIcon(visual.icon, connectionState, variant);
 
   return (
     <button
@@ -111,7 +130,7 @@ export function MicToggle({
   );
 }
 
-export function MicIcon({ className }: { className?: string }) {
+export function MicIcon({ className }: { className?: string }): ReactNode {
   return (
     <svg
       className={className}
@@ -129,7 +148,7 @@ export function MicIcon({ className }: { className?: string }) {
   );
 }
 
-export function MicOffIcon({ className }: { className?: string }) {
+export function MicOffIcon({ className }: { className?: string }): ReactNode {
   return (
     <svg
       className={className}
@@ -150,7 +169,11 @@ export function MicOffIcon({ className }: { className?: string }) {
   );
 }
 
-export function MicWarningIcon({ className }: { className?: string }) {
+export function MicWarningIcon({
+  className,
+}: {
+  className?: string;
+}): ReactNode {
   return (
     <svg
       className={className}
@@ -170,7 +193,7 @@ export function MicWarningIcon({ className }: { className?: string }) {
   );
 }
 
-function WarningTriangleIcon({ className }: { className?: string }) {
+function WarningTriangleIcon({ className }: { className?: string }): ReactNode {
   return (
     <svg
       className={className}
@@ -187,7 +210,7 @@ function WarningTriangleIcon({ className }: { className?: string }) {
   );
 }
 
-export function MicBlockedIndicator() {
+export function MicBlockedIndicator(): ReactNode {
   return (
     <div className="flex items-center justify-center gap-1.5 text-[10px] text-red-400/80">
       <MicOffIcon className="w-3 h-3" />

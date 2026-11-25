@@ -1,8 +1,9 @@
+import type { ReactElement } from "react";
 import { MdScreenRotation } from "react-icons/md";
 import { canHover } from "../../utils/inputMode";
 import { POPOVER_CHROME } from "./styles";
 
-export function RotatePrompt() {
+export function RotatePrompt(): ReactElement | null {
   if (canHover) return null;
 
   return (

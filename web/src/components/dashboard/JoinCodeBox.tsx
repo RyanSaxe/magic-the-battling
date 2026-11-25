@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts";
 import { unknownToAppError } from "../../utils/appError";
@@ -12,19 +12,19 @@ export function JoinCodeBox({
 }: {
   playerName: string;
   className?: string;
-}) {
+}): ReactElement {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
 
-  const submit = async (e: FormEvent) => {
+  const submit = async (e: FormEvent): Promise<void> => {
     e.preventDefault();
     const code = joinCode.trim();
     if (!code) return;
     setJoining(true);
     try {
-      navigate(await joinLobbyByCode(code, playerName));
+      void navigate(await joinLobbyByCode(code, playerName));
     } catch (err) {
       addToast(
         unknownToAppError(err, "join-game", "Failed to join game").message,
@@ -36,7 +36,9 @@ export function JoinCodeBox({
 
   return (
     <form
-      onSubmit={submit}
+      onSubmit={(e) => {
+        void submit(e);
+      }}
       className={`flex h-9 items-center rounded-md ${FIELD_SURFACE} pl-2.5 pr-0.5 focus-within:ring-2 focus-within:ring-[var(--color-gold-bright)] ${className ?? ""}`}
     >
       <input

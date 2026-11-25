@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import type { Card, ZoneName, Phase, BuildSource } from "../types";
+import type { ZoneName, Phase, BuildSource } from "../types";
+import type { CardMoveCallback } from "./DndContext";
 import type { ZoneOwner } from "./types";
 
 const SANDBOX_ZONES: Set<ZoneName> = new Set([
@@ -16,18 +17,18 @@ function isSandboxZone(zone: ZoneName): boolean {
   return SANDBOX_ZONES.has(zone);
 }
 
-type BattleMoveAction = (
-  cardId: string,
-  fromZone: ZoneName,
-  toZone: ZoneName,
-  fromOwner: ZoneOwner,
-  toOwner: ZoneOwner,
-) => void;
-type BuildMoveAction = (
-  cardId: string,
-  source: BuildSource,
-  destination: BuildSource,
-) => void;
+type BattleMoveAction = (move: {
+  cardId: string;
+  fromZone: ZoneName;
+  toZone: ZoneName;
+  fromOwner: ZoneOwner;
+  toOwner: ZoneOwner;
+}) => void;
+type BuildMoveAction = (move: {
+  cardId: string;
+  source: BuildSource;
+  destination: BuildSource;
+}) => void;
 
 interface UseDndActionsOptions {
   phase: Phase;
@@ -64,26 +65,31 @@ const BUILD_VALID_ZONES: Record<ZoneName, ZoneName[]> = {
   library: [],
 };
 
+export interface UseDndActionsResult {
+  handleCardMove: CardMoveCallback;
+  getValidDropZones: (fromZone: ZoneName) => ZoneName[];
+}
+
 export function useDndActions({
   phase,
   battleMove,
   buildMove,
-}: UseDndActionsOptions) {
-  const handleCardMove = useCallback(
-    (
-      card: Card,
-      fromZone: ZoneName,
-      toZone: ZoneName,
-      fromOwner: ZoneOwner,
-      toOwner: ZoneOwner,
-    ) => {
+}: UseDndActionsOptions): UseDndActionsResult {
+  const handleCardMove = useCallback<CardMoveCallback>(
+    ({ card, fromZone, toZone, fromOwner, toOwner }) => {
       if (phase === "battle" && battleMove) {
-        battleMove(card.id, fromZone, toZone, fromOwner, toOwner);
+        battleMove({
+          cardId: card.id,
+          fromZone,
+          toZone,
+          fromOwner,
+          toOwner,
+        });
       } else if (phase === "build" && buildMove) {
         const source: BuildSource = fromZone === "hand" ? "hand" : "sideboard";
         const destination: BuildSource =
           toZone === "hand" ? "hand" : "sideboard";
-        buildMove(card.id, source, destination);
+        buildMove({ cardId: card.id, source, destination });
       }
     },
     [phase, battleMove, buildMove],

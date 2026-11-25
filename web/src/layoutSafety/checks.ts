@@ -52,16 +52,22 @@ export interface Failure {
 
 const DEFAULT_GAP = 6;
 
-function gridSize(dims: ZoneDims, gap: number) {
+function gridSize(dims: ZoneDims, gap: number): Box {
   return {
     width: dims.columns * dims.width + gap * Math.max(0, dims.columns - 1),
     height: dims.rows * dims.height + gap * Math.max(0, dims.rows - 1),
   };
 }
 
-function activeZones(zoneCase: ZoneCase) {
+interface ActiveZones {
+  top: string[];
+  bottomLeft: string[];
+  bottomRight: string[];
+}
+
+function activeZones(zoneCase: ZoneCase): ActiveZones {
   const { layout, zones } = zoneCase.config;
-  const active = (ids: string[] | undefined) =>
+  const active = (ids: string[] | undefined): string[] =>
     (ids ?? []).filter((id) => zones[id]?.count > 0);
   return {
     top: active(layout.top),
@@ -83,96 +89,97 @@ function renderedDims(
 }
 
 // Testing Library keeps every rendered hook until cleanup, and the sweep renders tens of thousands.
-function releaseRenderedHooks() {
+function releaseRenderedHooks(): void {
   cleanup();
 }
 
-function frameText(frame: ZoneFrame) {
+function frameText(frame: ZoneFrame): string {
   return `${frame.outerWidth}x${frame.outerHeight}`;
 }
 
-export function checkZoneLayout(
-  viewport: Viewport,
-  zoneCase: ZoneCase,
-  saved: ZoneConstraints | null,
-  board: Box = viewport.zoneBoard,
-): Failure[] {
-  const failures: Failure[] = [];
-  const label = saved
-    ? `${zoneCase.label}, saved ${JSON.stringify(saved)}`
-    : zoneCase.label;
-  const fail = (check: CheckId, detail: string) =>
-    failures.push({
-      check,
-      surface: zoneCase.phase,
-      viewport: viewport.name,
-      label,
-      detail,
-    });
+type RecordFailure = (check: CheckId, detail: string) => void;
+
+function checkSingleZoneFit(args: {
+  id: string;
+  zoneCase: ZoneCase;
+  layout: ContainerLayout;
+  fail: RecordFailure;
+}): void {
+  const { id, zoneCase, layout, fail } = args;
   const { config } = zoneCase;
-  const layout = layoutForContainer(board.width, board.height, {
-    ...config,
-    constraints: saved,
-  });
-  const { top, bottomLeft, bottomRight } = activeZones(zoneCase);
-  const allActive = [...top, ...bottomLeft, ...bottomRight];
-
-  for (const id of allActive) {
-    const frame = layout.frames[id];
-    const dims = renderedDims(zoneCase, layout, id);
-    const count = config.zones[id].count;
-    const grid = gridSize(dims, config.zones[id].gap ?? DEFAULT_GAP);
-    if (frame.innerWidth <= 0 || frame.innerHeight <= 0) {
-      fail(
-        "zones-off-board",
-        `${id} has no room inside its padding (${frameText(frame)})`,
-      );
-    }
-    if (dims.rows * dims.columns < count) {
-      fail(
-        "card-outside-zone",
-        `${id} grid holds ${dims.rows * dims.columns} of ${count} cards`,
-      );
-    } else if (
-      grid.width > frame.innerWidth ||
-      grid.height > frame.innerHeight
-    ) {
-      const over = [
-        grid.width > frame.innerWidth
-          ? `${grid.width - frame.innerWidth}px too wide`
-          : null,
-        grid.height > frame.innerHeight
-          ? `${grid.height - frame.innerHeight}px too tall`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(", ");
-      fail(
-        "card-outside-zone",
-        `${id} ${dims.columns}x${dims.rows} grid of ${dims.width}px cards is ${over}`,
-      );
-    }
-    if (dims.width < MIN_CARD_WIDTH) {
-      fail("card-below-minimum", `${id} cards ${dims.width}px wide`);
-    }
+  const frame = layout.frames[id];
+  const dims = renderedDims(zoneCase, layout, id);
+  const count = config.zones[id].count;
+  const grid = gridSize(dims, config.zones[id].gap ?? DEFAULT_GAP);
+  if (frame.innerWidth <= 0 || frame.innerHeight <= 0) {
+    fail(
+      "zones-off-board",
+      `${id} has no room inside its padding (${frameText(frame)})`,
+    );
   }
+  if (dims.rows * dims.columns < count) {
+    fail(
+      "card-outside-zone",
+      `${id} grid holds ${dims.rows * dims.columns} of ${count} cards`,
+    );
+  } else if (grid.width > frame.innerWidth || grid.height > frame.innerHeight) {
+    const over = [
+      grid.width > frame.innerWidth
+        ? `${grid.width - frame.innerWidth}px too wide`
+        : null,
+      grid.height > frame.innerHeight
+        ? `${grid.height - frame.innerHeight}px too tall`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    fail(
+      "card-outside-zone",
+      `${id} ${dims.columns}x${dims.rows} grid of ${dims.width}px cards is ${over}`,
+    );
+  }
+  if (dims.width < MIN_CARD_WIDTH) {
+    fail("card-below-minimum", `${id} cards ${dims.width}px wide`);
+  }
+}
 
+function computeUsedBoardHeight(
+  layout: ContainerLayout,
+  active: ActiveZones,
+  gap: number,
+): number {
+  const { top, bottomLeft, bottomRight } = active;
+  const blStack =
+    bottomLeft.reduce((sum, id) => sum + layout.frames[id].outerHeight, 0) +
+    gap * Math.max(0, bottomLeft.length - 1);
+  const brHeight =
+    bottomRight.length > 0 ? layout.frames[bottomRight[0]].outerHeight : 0;
+  const hasTop = top.length > 0;
+  const hasBottom = bottomLeft.length + bottomRight.length > 0;
+  const topHeight = hasTop ? layout.frames[top[0]].outerHeight : 0;
+  const middleGap = hasTop && hasBottom ? gap : 0;
+  const bottomHeight = hasBottom ? Math.max(blStack, brHeight) : 0;
+  return topHeight + middleGap + bottomHeight;
+}
+
+function checkBoardCoverage(args: {
+  zoneCase: ZoneCase;
+  layout: ContainerLayout;
+  active: ActiveZones;
+  fail: RecordFailure;
+}): { boardW: number; boardH: number; gap: number } {
+  const { zoneCase, layout, active, fail } = args;
+  const { config } = zoneCase;
+  const { top, bottomLeft, bottomRight } = active;
   const gap = config.sectionGap ?? 0;
   const boardW = layout.containerSize.width;
   // The zones fill the board apart from the height the config reserves for other content.
   const boardH = layout.containerSize.height - (config.fixedHeight ?? 0);
-  const stack = (ids: string[]) =>
-    ids.reduce((sum, id) => sum + layout.frames[id].outerHeight, 0) +
-    gap * Math.max(0, ids.length - 1);
-  const bottomH = Math.max(
-    stack(bottomLeft),
-    bottomRight.length > 0 ? layout.frames[bottomRight[0]].outerHeight : 0,
-  );
-  const usedH =
-    (top.length > 0 ? layout.frames[top[0]].outerHeight : 0) +
-    (top.length > 0 && bottomLeft.length + bottomRight.length > 0 ? gap : 0) +
-    (bottomLeft.length + bottomRight.length > 0 ? bottomH : 0);
-  if (allActive.length > 0 && usedH !== boardH) {
+  const usedH = computeUsedBoardHeight(layout, active, gap);
+  if (
+    top.length + bottomLeft.length + bottomRight.length > 0 &&
+    usedH !== boardH
+  ) {
     fail("zones-off-board", `zones stack ${usedH}px on a ${boardH}px board`);
   }
   if (bottomLeft.length > 0 && bottomRight.length > 0) {
@@ -180,83 +187,193 @@ export function checkZoneLayout(
       layout.frames[bottomLeft[0]].outerWidth +
       gap +
       layout.frames[bottomRight[0]].outerWidth;
-    if (rowW !== boardW)
+    if (rowW !== boardW) {
       fail(
         "zones-off-board",
         `bottom zones span ${rowW}px of a ${boardW}px board`,
       );
+    }
+  }
+  return { boardW, boardH, gap };
+}
+
+function checkSavedDividerPositions(args: {
+  zoneCase: ZoneCase;
+  layout: ContainerLayout;
+  drawable: Required<ZoneConstraints>;
+  active: ActiveZones;
+  coverage: { boardW: number; gap: number };
+  fail: RecordFailure;
+}): void {
+  const { zoneCase, layout, drawable, active, coverage, fail } = args;
+  const { config } = zoneCase;
+  const { top, bottomLeft, bottomRight } = active;
+  const measured = measureFromPlacement({
+    layout: config.layout,
+    zones: config.zones,
+    zoneMeasurements: layout.frames,
+    containerWidth: coverage.boardW,
+    sectionPadTop: config.sectionPadTop,
+    sectionPadBottom: config.sectionPadBottom,
+    sectionGap: config.sectionGap,
+  });
+  if (!measured) return;
+  const visible = {
+    topFraction: top.length > 0 && bottomLeft.length + bottomRight.length > 0,
+    bottomLeftSplit: bottomLeft.length >= 2,
+    leftFraction: bottomLeft.length > 0 && bottomRight.length > 0,
+  };
+  const space = {
+    topFraction: measured.usableHeight,
+    bottomLeftSplit: measured.bottomInnerHeight,
+    leftFraction: measured.usableWidth - coverage.gap,
+  };
+  for (const key of [
+    "topFraction",
+    "bottomLeftSplit",
+    "leftFraction",
+  ] as const) {
+    if (!visible[key]) continue;
+    const want = drawable[key];
+    const offPx = Math.abs(measured[key] - want) * space[key];
+    if (offPx > 1) {
+      fail(
+        "divider-off-saved-layout",
+        `${key} ${want.toFixed(3)} sits at ${measured[key].toFixed(3)} (${Math.round(offPx)}px off)`,
+      );
+    }
+  }
+}
+
+function checkSavedZoneMinimums(args: {
+  allActive: string[];
+  layout: ContainerLayout;
+  automatic: ContainerLayout;
+  fail: RecordFailure;
+}): void {
+  const { allActive, layout, automatic, fail } = args;
+  // A saved layout leaves each zone room for one row of cards, or the room the automatic layout gives it if less.
+  for (const id of allActive) {
+    const frame = layout.frames[id];
+    const minWidth = Math.min(
+      MIN_ZONE_CARD.width,
+      automatic.frames[id].innerWidth,
+    );
+    const minHeight = Math.min(
+      MIN_ZONE_CARD.height,
+      automatic.frames[id].innerHeight,
+    );
+    if (frame.innerWidth < minWidth || frame.innerHeight < minHeight) {
+      fail(
+        "saved-layout-squeezes-zone",
+        `${id} has ${frame.innerWidth}x${frame.innerHeight}px inside its padding`,
+      );
+    }
+  }
+}
+
+function checkSavedLayoutFit(args: {
+  zoneCase: ZoneCase;
+  layout: ContainerLayout;
+  saved: ZoneConstraints;
+  board: Box;
+  active: ActiveZones;
+  coverage: { boardW: number; boardH: number; gap: number };
+  fail: RecordFailure;
+}): void {
+  const { zoneCase, layout, saved, board, active, coverage, fail } = args;
+  const { config } = zoneCase;
+  // A divider sits where the layout was saved, unless that leaves a zone without room for one row of cards.
+  const automatic = layoutForContainer(board.width, board.height, {
+    ...config,
+    constraints: null,
+  });
+  const drawable = clampSavedConstraints({
+    containerW: coverage.boardW,
+    containerH: coverage.boardH,
+    config,
+    savedFractions: saved,
+    automaticFrames: automatic.frames,
+  });
+  checkSavedDividerPositions({
+    zoneCase,
+    layout,
+    drawable,
+    active,
+    coverage,
+    fail,
+  });
+  checkSavedZoneMinimums({
+    allActive: [...active.top, ...active.bottomLeft, ...active.bottomRight],
+    layout,
+    automatic,
+    fail,
+  });
+}
+
+export interface CheckZoneLayoutOptions {
+  viewport: Viewport;
+  zoneCase: ZoneCase;
+  saved: ZoneConstraints | null;
+  board?: Box;
+}
+
+export function checkZoneLayout({
+  viewport,
+  zoneCase,
+  saved,
+  board = viewport.zoneBoard,
+}: CheckZoneLayoutOptions): Failure[] {
+  const failures: Failure[] = [];
+  const label = saved
+    ? `${zoneCase.label}, saved ${JSON.stringify(saved)}`
+    : zoneCase.label;
+  const fail: RecordFailure = (check, detail) => {
+    failures.push({
+      check,
+      surface: zoneCase.phase,
+      viewport: viewport.name,
+      label,
+      detail,
+    });
+  };
+  const layout = layoutForContainer(board.width, board.height, {
+    ...zoneCase.config,
+    constraints: saved,
+  });
+  const active = activeZones(zoneCase);
+  const allActive = [
+    ...active.top,
+    ...active.bottomLeft,
+    ...active.bottomRight,
+  ];
+
+  for (const id of allActive) {
+    checkSingleZoneFit({ id, zoneCase, layout, fail });
   }
 
+  const coverage = checkBoardCoverage({ zoneCase, layout, active, fail });
   if (saved) {
-    const measured = measureFromPlacement({
-      layout: config.layout,
-      zones: config.zones,
-      zoneMeasurements: layout.frames,
-      containerWidth: boardW,
-      sectionPadTop: config.sectionPadTop,
-      sectionPadBottom: config.sectionPadBottom,
-      sectionGap: config.sectionGap,
-    });
-    const visible = {
-      topFraction: top.length > 0 && bottomLeft.length + bottomRight.length > 0,
-      bottomLeftSplit: bottomLeft.length >= 2,
-      leftFraction: bottomLeft.length > 0 && bottomRight.length > 0,
-    };
-    const space = {
-      topFraction: measured?.usableHeight ?? 0,
-      bottomLeftSplit: measured?.bottomInnerHeight ?? 0,
-      leftFraction: (measured?.usableWidth ?? 0) - gap,
-    };
-    // A divider sits where the layout was saved, unless that leaves a zone without room for one row of cards.
-    const automatic = layoutForContainer(board.width, board.height, {
-      ...config,
-      constraints: null,
-    });
-    const drawable = clampSavedConstraints(
-      boardW,
-      boardH,
-      config,
+    checkSavedLayoutFit({
+      zoneCase,
+      layout,
       saved,
-      automatic.frames,
-    );
-    for (const key of [
-      "topFraction",
-      "bottomLeftSplit",
-      "leftFraction",
-    ] as const) {
-      const want = drawable[key];
-      if (want === undefined || !visible[key] || !measured) continue;
-      const offPx = Math.abs(measured[key] - want) * space[key];
-      if (offPx > 1) {
-        fail(
-          "divider-off-saved-layout",
-          `${key} ${want.toFixed(3)} sits at ${measured[key].toFixed(3)} (${Math.round(offPx)}px off)`,
-        );
-      }
-    }
-    // A saved layout leaves each zone room for one row of cards, or the room the automatic layout gives it if less.
-    for (const id of allActive) {
-      const frame = layout.frames[id];
-      const minWidth = Math.min(
-        MIN_ZONE_CARD.width,
-        automatic.frames[id].innerWidth,
-      );
-      const minHeight = Math.min(
-        MIN_ZONE_CARD.height,
-        automatic.frames[id].innerHeight,
-      );
-      if (frame.innerWidth < minWidth || frame.innerHeight < minHeight) {
-        fail(
-          "saved-layout-squeezes-zone",
-          `${id} has ${frame.innerWidth}x${frame.innerHeight}px inside its padding`,
-        );
-      }
-    }
+      board,
+      active,
+      coverage,
+      fail,
+    });
   }
 
   if (zoneCase.hasDividers && !isMobileViewport(viewport)) {
-    for (const failure of grabEachDivider(zoneCase, layout, saved, board))
+    for (const failure of grabEachDivider({
+      zoneCase,
+      rendered: layout,
+      saved,
+      board,
+    })) {
       fail("grab-moves-layout", failure);
+    }
   }
   return failures;
 }
@@ -274,12 +391,15 @@ function dividerPositions(
 ): Partial<Record<(typeof DIVIDERS)[number], number>> {
   const { top, bottomLeft, bottomRight } = activeZones(zoneCase);
   const positions: Partial<Record<(typeof DIVIDERS)[number], number>> = {};
-  if (top.length > 0 && bottomLeft.length + bottomRight.length > 0)
+  if (top.length > 0 && bottomLeft.length + bottomRight.length > 0) {
     positions.topDivider = layout.frames[top[0]].outerHeight;
-  if (bottomLeft.length >= 2)
+  }
+  if (bottomLeft.length >= 2) {
     positions.bottomLeftSplitDivider = layout.frames[bottomLeft[0]].outerHeight;
-  if (bottomLeft.length > 0 && bottomRight.length > 0)
+  }
+  if (bottomLeft.length > 0 && bottomRight.length > 0) {
     positions.leftDivider = layout.frames[bottomLeft[0]].outerWidth;
+  }
   return positions;
 }
 
@@ -287,15 +407,16 @@ function dividerPositions(
  * Presses and releases each divider, once without moving it and once after
  * moving it 1px and back, the way useResizableLayout wires useZoneDividers.
  */
-function grabEachDivider(
-  zoneCase: ZoneCase,
-  rendered: ContainerLayout,
-  saved: ZoneConstraints | null,
-  board: Box,
-): string[] {
+function grabEachDivider(args: {
+  zoneCase: ZoneCase;
+  rendered: ContainerLayout;
+  saved: ZoneConstraints | null;
+  board: Box;
+}): string[] {
+  const { zoneCase, rendered, saved, board } = args;
   const { config } = zoneCase;
   const writes: ZoneConstraints[] = [];
-  const save = (constraints: ZoneConstraints) => {
+  const save = (constraints: ZoneConstraints): void => {
     writes.push(constraints);
   };
   // Composed the way useResizableLayout composes them.
@@ -346,12 +467,20 @@ function grabEachDivider(
     });
     const positionsBefore = dividerPositions(zoneCase, rendered);
     const positionsAfter = dividerPositions(zoneCase, after);
-    const dividerMoves = DIVIDERS.filter(
-      (each) => positionsBefore[each] !== positionsAfter[each],
-    ).map(
-      (each) =>
-        `${each === divider ? "it" : each} moved ${positionsAfter[each]! - positionsBefore[each]!}px`,
-    );
+    const dividerMoves = DIVIDERS.flatMap((each) => {
+      const beforePos = positionsBefore[each];
+      const afterPos = positionsAfter[each];
+      if (
+        beforePos === undefined ||
+        afterPos === undefined ||
+        beforePos === afterPos
+      ) {
+        return [];
+      }
+      return [
+        `${each === divider ? "it" : each} moved ${afterPos - beforePos}px`,
+      ];
+    });
     const cardChanges = Object.keys(config.zones)
       .filter(
         (id) =>
@@ -377,29 +506,37 @@ function grabEachDivider(
 // Rows are fractional and card heights whole, so a card may round up past its row by under half a pixel.
 const ROW_ROUNDING_PX = 0.5;
 
-function battleRowFits(
-  count: number,
-  card: { width: number; height: number },
-  gap: number,
-  width: number,
-  rowHeight: number,
-) {
+function battleRowFits(args: {
+  count: number;
+  card: { width: number; height: number };
+  gap: number;
+  width: number;
+  rowHeight: number;
+}): boolean {
+  const { count, card, gap, width, rowHeight } = args;
   return (
     count * card.width + Math.max(0, count - 1) * gap <= width &&
     card.height <= rowHeight + ROW_ROUNDING_PX
   );
 }
 
+export interface CheckBattleLayoutOptions {
+  viewport: Viewport;
+  battleCase: BattleCase;
+  isSuddenDeath: boolean;
+  board?: Box;
+}
+
 /** Battle sizing as useBattleCardSizes computes it, checked against the room computeBattleZones itself budgets. */
-export function checkBattleLayout(
-  viewport: Viewport,
-  battleCase: BattleCase,
-  isSuddenDeath: boolean,
-  board: Box = battleBoard(viewport, isSuddenDeath),
-): Failure[] {
+export function checkBattleLayout({
+  viewport,
+  battleCase,
+  isSuddenDeath,
+  board = battleBoard(viewport, isSuddenDeath),
+}: CheckBattleLayoutOptions): Failure[] {
   const failures: Failure[] = [];
   const surface = isSuddenDeath ? "battle-sudden-death" : "battle";
-  const fail = (check: CheckId, detail: string) =>
+  const fail = (check: CheckId, detail: string): number =>
     failures.push({
       check,
       surface,
@@ -461,7 +598,13 @@ export function checkBattleLayout(
   for (const row of rows) {
     if (row.count === 0) continue;
     if (
-      !battleRowFits(row.count, row.card, row.gap, row.width, zones.rowHeight)
+      !battleRowFits({
+        count: row.count,
+        card: row.card,
+        gap: row.gap,
+        width: row.width,
+        rowHeight: zones.rowHeight,
+      })
     ) {
       fail(
         "card-outside-zone",
@@ -493,16 +636,20 @@ function sizesPerMeasurement<T>(
   padding: number,
   useSizing: () => [React.RefCallback<HTMLElement>, T],
 ): T[] {
-  let resize: ResizeCallback = () => {};
+  let resize: ResizeCallback | null = null;
   const original = globalThis.ResizeObserver;
-  globalThis.ResizeObserver = class {
-    constructor(callback: ResizeCallback) {
-      resize = callback;
-    }
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
+  Reflect.set(
+    globalThis,
+    "ResizeObserver",
+    class {
+      constructor(callback: ResizeCallback) {
+        resize = callback;
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    },
+  );
   const element = document.createElement("div");
   element.style.padding = `${padding}px`;
   Object.defineProperty(element, "clientWidth", {
@@ -514,9 +661,13 @@ function sizesPerMeasurement<T>(
   document.body.appendChild(element);
   try {
     const { result, rerender } = renderHook(useSizing);
-    act(() => result.current[0](element));
+    act(() => {
+      result.current[0](element);
+    });
     const sizes = [result.current[1]];
-    act(() => resize([{ contentRect: box }]));
+    act(() => {
+      resize?.([{ contentRect: box }]);
+    });
     sizes.push(result.current[1]);
     rerender();
     sizes.push(result.current[1]);
@@ -524,7 +675,7 @@ function sizesPerMeasurement<T>(
     return sizes;
   } finally {
     element.remove();
-    globalThis.ResizeObserver = original;
+    Reflect.set(globalThis, "ResizeObserver", original);
   }
 }
 

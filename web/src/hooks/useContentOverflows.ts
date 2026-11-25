@@ -9,7 +9,7 @@ export function useContentOverflows(
   useLayoutEffect(() => {
     const container = containerRef.current;
     const content = contentRef.current;
-    if (!container || !content) return;
+    if (!container || !content) return undefined;
 
     const observer = new ResizeObserver(() => {
       setOverflows(
@@ -19,7 +19,7 @@ export function useContentOverflows(
     });
     observer.observe(container);
     observer.observe(content);
-    return () => observer.disconnect();
+    return (): void => observer.disconnect();
   }, [containerRef, contentRef]);
 
   return overflows;

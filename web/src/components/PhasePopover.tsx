@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { type ReactNode, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   getPhaseReferenceLabel,
@@ -11,7 +11,7 @@ import {
   useLayoutMeasure,
   useWindowEvent,
 } from "../hooks/useDomEffects";
-import { usePanelHoldsEnter } from "../utils/enterKey";
+import { usePanelHoldsEnter } from "../hooks/usePanelHoldsEnter";
 import { BoardBackdrop } from "./common/BoardBackdrop";
 import { POPOVER_CHROME } from "./common/styles";
 
@@ -40,7 +40,7 @@ export function PhasePopover({
   onClose,
   onOpenDetails,
   onOpenControls,
-}: PhasePopoverProps) {
+}: PhasePopoverProps): ReactNode {
   const popoverRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
@@ -89,7 +89,7 @@ export function PhasePopover({
         arrowRef.current.style.left = `${Math.max(minArrowLeft, Math.min(arrowLeft - 6, maxArrowLeft))}px`;
       }
     },
-    [anchorRect],
+    { deps: [anchorRect] },
   );
 
   return (
@@ -138,7 +138,7 @@ export function PhasePopover({
             <div className="px-3 py-2">
               {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
                 <p
-                  key={`${phase}-${index}`}
+                  key={`${phase}-${row}`}
                   className="text-xs text-[var(--ivory-muted)] mb-1.5 last:mb-0 leading-5"
                 >
                   <span className="text-amber-400/90 mr-1.5">{index + 1}.</span>

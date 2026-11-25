@@ -1,0 +1,65 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    // oxlint counts `&&`, `||`, `??` and `?:`, so 10 matches Python C901 <= 8.
+    "complexity": ["error", 10],
+    "max-depth": ["error", 4],
+    "max-nested-callbacks": ["error", 3],
+    // Pass an options object when a function needs more than three inputs.
+    "max-params": ["error", 3],
+    "curly": ["error", "multi-line"],
+    "import/no-cycle": "error",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    "eqeqeq": ["error", "always"],
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-param-reassign": "error",
+    "no-nested-ternary": "error",
+    "no-else-return": "error",
+    "no-lonely-if": "error",
+    "unicorn/no-negated-condition": "error",
+    // Keep React hooks safety after dropping eslint-plugin-react-hooks.
+    "react/rules-of-hooks": "error",
+    // React 19 uses the automatic JSX runtime (`jsx: react-jsx`).
+    "react/react-in-jsx-scope": "off",
+    // Narrow with type guards or runtime checks instead of casting with `as`.
+    "typescript/consistent-type-assertions": [
+      "error",
+      { "assertionStyle": "never" }
+    ],
+    // Use `unknown` and narrow instead of turning off checks with `any`.
+    "typescript/no-explicit-any": "error",
+    // Handle null and undefined explicitly instead of using `!`.
+    "typescript/no-non-null-assertion": "error",
+    // Cover every member of a discriminated union in switch statements.
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/explicit-function-return-type": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react",
+            "importNames": ["useEffect", "useLayoutEffect"],
+            "message": "Derive state during render, handle side effects in event handlers, or encapsulate external-system sync in a custom hook under hooks/."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/hooks/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

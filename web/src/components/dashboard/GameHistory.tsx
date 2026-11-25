@@ -1,11 +1,11 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, type ReactElement, type ReactNode } from "react";
 import { useToast } from "../../contexts";
 import {
   useGameHistory,
   type GameFilters,
   type LoadGames,
 } from "../../hooks/pages/useDashboardData";
-import type { PlayMode } from "../../types";
+import type { GameSummary, PlayMode } from "../../types";
 import {
   countLabel,
   modeLabel,
@@ -41,6 +41,140 @@ function shownGames({ playMode, useUpgrades }: GameFilters): string {
   return narrowed.join(" · ") || "All games";
 }
 
+function GameHistoryFilters({
+  filters,
+  onChange,
+}: {
+  filters: GameFilters;
+  onChange: (patch: Partial<GameFilters>) => void;
+}): ReactElement {
+  return (
+    <FilterMenu shown={shownGames(filters)}>
+      <FilterGroup title="Mode">
+        <SegmentedFilter<ModeChoice>
+          label="Mode"
+          className="w-full"
+          value={filters.playMode ?? "all"}
+          onChange={(value) =>
+            onChange({ playMode: value === "all" ? null : value })
+          }
+          options={[
+            { value: "all", label: "All" },
+            { value: "limited", label: "Cube" },
+            { value: "constructed", label: "Deck" },
+          ]}
+        />
+      </FilterGroup>
+      <FilterGroup title="Upgrades">
+        <SegmentedFilter<UpgradesChoice>
+          label="Upgrades"
+          className="w-full"
+          value={upgradesChoice(filters.useUpgrades)}
+          onChange={(value) =>
+            onChange({ useUpgrades: UPGRADES_CHOICE[value] })
+          }
+          options={[
+            { value: "all", label: "All" },
+            { value: "on", label: "On" },
+            { value: "off", label: "Off" },
+          ]}
+        />
+      </FilterGroup>
+    </FilterMenu>
+  );
+}
+
+function GameHistoryBody({
+  failed,
+  games,
+  filters,
+  onRetry,
+  onClearFilters,
+}: {
+  failed: boolean;
+  games: GameSummary[] | null;
+  filters: GameFilters;
+  onRetry: () => void;
+  onClearFilters: () => void;
+}): ReactElement {
+  if (failed) {
+    return (
+      <NoticeTile action={{ label: "Retry", onClick: onRetry }}>
+        The games didn&apos;t load.
+      </NoticeTile>
+    );
+  }
+  if (!games) {
+    return <NoticeTile>Loading...</NoticeTile>;
+  }
+  if (games.length === 0) {
+    const isFiltered =
+      filters.playMode !== null || filters.useUpgrades !== null;
+    return (
+      <NoticeTile
+        action={
+          isFiltered
+            ? {
+                label: "Show all modes and upgrades",
+                onClick: onClearFilters,
+              }
+            : undefined
+        }
+      >
+        {filters.mineOnly
+          ? "You have no finished games here yet."
+          : "No finished games here yet."}
+      </NoticeTile>
+    );
+  }
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 min-[1600px]:grid-cols-3">
+      {games.map((game) => (
+        <RecapCard key={game.game_id} game={game} />
+      ))}
+    </div>
+  );
+}
+
+function GameHistoryToolbar({
+  scoped,
+  title,
+  totalGames,
+  filters,
+  onChange,
+}: {
+  scoped: boolean;
+  title?: (totalGames: number | null) => ReactNode;
+  totalGames: number | null;
+  filters: GameFilters;
+  onChange: (patch: Partial<GameFilters>) => void;
+}): ReactElement {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {scoped && (
+        <SegmentedFilter
+          label="Whose games"
+          variant="heading"
+          className="w-full sm:w-auto"
+          value={filters.mineOnly ? "mine" : "everyone"}
+          onChange={(value) => onChange({ mineOnly: value === "mine" })}
+          options={[
+            { value: "mine", label: "My Games" },
+            { value: "everyone", label: "All Players" },
+          ]}
+        />
+      )}
+      {title?.(totalGames)}
+      {scoped && totalGames !== null && (
+        <span className="text-xs tabular-nums text-[var(--ivory-muted)]">
+          {countLabel(totalGames, "game")}
+        </span>
+      )}
+      <GameHistoryFilters filters={filters} onChange={onChange} />
+    </div>
+  );
+}
+
 interface GameHistoryProps {
   loadGames: LoadGames;
   initialFilters: GameFilters;
@@ -56,7 +190,7 @@ export function GameHistory({
   initialFilters,
   scoped = false,
   title,
-}: GameHistoryProps) {
+}: GameHistoryProps): ReactElement {
   const { addToast } = useToast();
   const handleLoadMoreError = useCallback(
     () => addToast("Failed to load games", "error"),
@@ -67,96 +201,29 @@ export function GameHistory({
 
   return (
     <section aria-label="Game history" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        {scoped && (
-          <SegmentedFilter
-            label="Whose games"
-            variant="heading"
-            className="w-full sm:w-auto"
-            value={filters.mineOnly ? "mine" : "everyone"}
-            onChange={(value) => change({ mineOnly: value === "mine" })}
-            options={[
-              { value: "mine", label: "My Games" },
-              { value: "everyone", label: "All Players" },
-            ]}
-          />
-        )}
-        {title?.(current?.totalGames ?? null)}
-        {scoped && current && (
-          <span className="text-xs tabular-nums text-[var(--ivory-muted)]">
-            {countLabel(current.totalGames, "game")}
-          </span>
-        )}
-        <FilterMenu shown={shownGames(filters)}>
-          <FilterGroup title="Mode">
-            <SegmentedFilter<ModeChoice>
-              label="Mode"
-              className="w-full"
-              value={filters.playMode ?? "all"}
-              onChange={(value) =>
-                change({ playMode: value === "all" ? null : value })
-              }
-              options={[
-                { value: "all", label: "All" },
-                { value: "limited", label: "Cube" },
-                { value: "constructed", label: "Deck" },
-              ]}
-            />
-          </FilterGroup>
-          <FilterGroup title="Upgrades">
-            <SegmentedFilter<UpgradesChoice>
-              label="Upgrades"
-              className="w-full"
-              value={upgradesChoice(filters.useUpgrades)}
-              onChange={(value) =>
-                change({ useUpgrades: UPGRADES_CHOICE[value] })
-              }
-              options={[
-                { value: "all", label: "All" },
-                { value: "on", label: "On" },
-                { value: "off", label: "Off" },
-              ]}
-            />
-          </FilterGroup>
-        </FilterMenu>
-      </div>
+      <GameHistoryToolbar
+        scoped={scoped}
+        title={title}
+        totalGames={current?.totalGames ?? null}
+        filters={filters}
+        onChange={change}
+      />
 
-      {failed ? (
-        <NoticeTile
-          action={{
-            label: "Retry",
-            onClick: retry,
-          }}
-        >
-          The games didn&apos;t load.
-        </NoticeTile>
-      ) : !current ? (
-        <NoticeTile>Loading...</NoticeTile>
-      ) : current.games.length === 0 ? (
-        <NoticeTile
-          action={
-            filters.playMode !== null || filters.useUpgrades !== null
-              ? {
-                  label: "Show all modes and upgrades",
-                  onClick: () => change({ playMode: null, useUpgrades: null }),
-                }
-              : undefined
-          }
-        >
-          {filters.mineOnly
-            ? "You have no finished games here yet."
-            : "No finished games here yet."}
-        </NoticeTile>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 min-[1600px]:grid-cols-3">
-          {current.games.map((game) => (
-            <RecapCard key={game.game_id} game={game} />
-          ))}
-        </div>
-      )}
+      <GameHistoryBody
+        failed={failed}
+        games={current ? current.games : null}
+        filters={filters}
+        onRetry={retry}
+        onClearFilters={() => change({ playMode: null, useUpgrades: null })}
+      />
 
       {current?.hasMore && (
-        <LoadMoreButton loading={loadingMore} onClick={loadMore} />
+        <LoadMoreButton
+          loading={loadingMore}
+          onClick={() => {
+            void loadMore();
+          }}
+        />
       )}
     </section>
   );

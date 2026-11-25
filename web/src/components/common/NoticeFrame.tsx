@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { AppHeader, HomeButton } from "./AppHeader";
 import { PageFrame } from "./PageFrame";
 
@@ -9,14 +9,15 @@ import { PageFrame } from "./PageFrame";
  */
 export function NoticeFrame({
   children,
-  home = <HomeButton />,
+  home,
 }: {
   children: ReactNode;
   home?: ReactNode;
-}) {
+}): ReactElement {
+  const resolvedHome = home === undefined ? <HomeButton /> : home;
   return (
     <PageFrame
-      header={<AppHeader home={home} />}
+      header={<AppHeader home={resolvedHome} />}
       center
       contentClassName="items-center"
     >

@@ -1,4 +1,10 @@
-import { useCallback, useState, type ComponentPropsWithoutRef } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type ComponentPropsWithRef,
+  type ReactElement,
+} from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/authState";
 import { useAsyncAction } from "../hooks/useAsyncResource";
@@ -19,27 +25,44 @@ const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,30}$/;
 const USERNAME_HINT = "3-30 characters: letters, numbers, underscores";
 const PASSWORD_HINT = "At least 8 characters";
 
-/** Why each field keeps Create Account disabled, or null when the field is ready. */
-function reasonsNotReady(
-  username: string,
-  email: string,
+interface RegisterValues {
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+interface RegisterReasons {
+  username: string | null;
+  email: string | null;
+  password: string | null;
+  confirmPassword: string | null;
+}
+
+function usernameReason(username: string): string | null {
+  if (!username) return "Enter a username";
+  return USERNAME_PATTERN.test(username) ? null : USERNAME_HINT;
+}
+
+function confirmPasswordReason(
   password: string,
   confirmPassword: string,
-) {
+): string | null {
+  if (confirmPassword === password) return null;
+  return confirmPassword
+    ? "Passwords don't match"
+    : "Enter your password again";
+}
+
+function reasonsNotReady(values: RegisterValues): RegisterReasons {
   return {
-    username: !username
-      ? "Enter a username"
-      : USERNAME_PATTERN.test(username)
-        ? null
-        : USERNAME_HINT,
-    email: email ? null : "Enter your email",
-    password: password.length >= 8 ? null : PASSWORD_HINT,
-    confirmPassword:
-      confirmPassword === password
-        ? null
-        : confirmPassword
-          ? "Passwords don't match"
-          : "Enter your password again",
+    username: usernameReason(values.username),
+    email: values.email ? null : "Enter your email",
+    password: values.password.length >= 8 ? null : PASSWORD_HINT,
+    confirmPassword: confirmPasswordReason(
+      values.password,
+      values.confirmPassword,
+    ),
   };
 }
 
@@ -47,13 +70,14 @@ type RegisterField = "username" | "email" | "password" | "confirmPassword";
 
 function fieldForRegisterError(code: string, message: string): RegisterField {
   if (code === "EMAIL_IN_USE" || /\bemail\b/i.test(message)) return "email";
-  if (code === "USERNAME_TAKEN" || /\busername\b/i.test(message))
+  if (code === "USERNAME_TAKEN" || /\busername\b/i.test(message)) {
     return "username";
+  }
   if (/\bpassword\b/i.test(message)) return "password";
   return "confirmPassword";
 }
 
-type FieldProps = ComponentPropsWithoutRef<"input"> & {
+type FieldProps = ComponentPropsWithRef<"input"> & {
   id: string;
   label: string;
   hint?: string;
@@ -71,7 +95,7 @@ function Field({
   alert,
   wrapperClassName,
   ...inputProps
-}: FieldProps) {
+}: FieldProps): ReactElement {
   const message = reason ?? hint;
   return (
     <div className={wrapperClassName}>
@@ -98,7 +122,14 @@ function Field({
   );
 }
 
-export function Register() {
+interface RegisterFieldMeta {
+  reason: string | null;
+  alert: boolean;
+  onFocus: () => void;
+  onBlur: () => void;
+}
+
+export function Register(): ReactElement {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/";
@@ -114,24 +145,39 @@ export function Register() {
   // How many fields, from the top, the player has left or skipped past. An empty field explains itself only after
   // that, so a new form isn't covered in reasons.
   const [fieldsPassed, setFieldsPassed] = useState(0);
+  const focusedRef = useRef(false);
 
-  const reasons = reasonsNotReady(username, email, password, confirmPassword);
-  const ready = Object.values(reasons).every((reason) => reason === null);
-  const tracksPassing = (index: number) => ({
-    onFocus: () => setFieldsPassed((passed) => Math.max(passed, index)),
-    onBlur: () => setFieldsPassed((passed) => Math.max(passed, index + 1)),
+  const reasons = reasonsNotReady({
+    username,
+    email,
+    password,
+    confirmPassword,
   });
-  const shownReason = (index: number, value: string, reason: string | null) =>
-    value || index < fieldsPassed ? reason : null;
-  const serverReason = (field: RegisterField) =>
-    serverError?.field === field ? serverError.message : null;
+  const ready = Object.values(reasons).every((reason) => reason === null);
+
+  const fieldMeta = (
+    field: RegisterField,
+    index: number,
+    value: string,
+  ): RegisterFieldMeta => {
+    const localReason = value || index < fieldsPassed ? reasons[field] : null;
+    const serverReason =
+      serverError?.field === field ? serverError.message : null;
+    return {
+      reason: localReason ?? serverReason,
+      alert: serverError?.field === field,
+      onFocus: (): void => setFieldsPassed((passed) => Math.max(passed, index)),
+      onBlur: (): void =>
+        setFieldsPassed((passed) => Math.max(passed, index + 1)),
+    };
+  };
 
   const { run: submitRegister, pending: loading } = useAsyncAction(
     useCallback(async () => {
       setServerError(null);
       try {
         await register(username, password, email);
-        navigate(returnTo);
+        void navigate(returnTo);
       } catch (err) {
         const appError = unknownToAppError(
           err,
@@ -146,7 +192,7 @@ export function Register() {
     }, [register, username, password, email, navigate, returnTo]),
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     void submitRegister();
   };
@@ -165,20 +211,20 @@ export function Register() {
         <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>
 
         <Field
+          ref={(el): void => {
+            if (el && !focusedRef.current) {
+              focusedRef.current = true;
+              el.focus();
+            }
+          }}
           id="username"
           label="Username"
           hint={USERNAME_HINT}
-          reason={
-            shownReason(0, username, reasons.username) ??
-            serverReason("username")
-          }
-          alert={serverError?.field === "username"}
+          {...fieldMeta("username", 0, username)}
           wrapperClassName="mb-4"
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          {...tracksPassing(0)}
-          autoFocus
           required
           maxLength={30}
         />
@@ -186,13 +232,11 @@ export function Register() {
         <Field
           id="email"
           label="Email"
-          reason={shownReason(1, email, reasons.email) ?? serverReason("email")}
-          alert={serverError?.field === "email"}
+          {...fieldMeta("email", 1, email)}
           wrapperClassName="mb-4"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          {...tracksPassing(1)}
           required
         />
 
@@ -200,32 +244,22 @@ export function Register() {
           id="password"
           label="Password"
           hint={PASSWORD_HINT}
-          reason={
-            shownReason(2, password, reasons.password) ??
-            serverReason("password")
-          }
-          alert={serverError?.field === "password"}
+          {...fieldMeta("password", 2, password)}
           wrapperClassName="mb-4"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          {...tracksPassing(2)}
           required
         />
 
         <Field
           id="confirm-password"
           label="Confirm Password"
-          reason={
-            shownReason(3, confirmPassword, reasons.confirmPassword) ??
-            serverReason("confirmPassword")
-          }
-          alert={serverError?.field === "confirmPassword"}
+          {...fieldMeta("confirmPassword", 3, confirmPassword)}
           wrapperClassName="mb-6"
           type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          {...tracksPassing(3)}
           required
         />
 
@@ -240,7 +274,7 @@ export function Register() {
         <p className="text-center text-[var(--ivory-muted)] text-sm mt-4">
           Already have an account?{" "}
           <Link
-            to={`/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
+            to={`/login${returnTo === "/" ? "" : `?returnTo=${encodeURIComponent(returnTo)}`}`}
             className={LINK}
           >
             Log in

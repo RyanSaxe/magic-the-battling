@@ -64,13 +64,14 @@ describe("SubmitPopover", () => {
 
     const tapTarget = boardCover.firstElementChild;
     expect(tapTarget).not.toBeNull();
-    fireEvent.pointerDown(tapTarget!);
+    if (!tapTarget) return;
+    fireEvent.pointerDown(tapTarget);
     expect(onClose).not.toHaveBeenCalled();
     // Dragged off the board, the press clicks what the two places share.
     fireEvent.click(document.body);
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(tapTarget!);
+    fireEvent.click(tapTarget);
     expect(onClose).toHaveBeenCalledOnce();
   });
 
@@ -79,7 +80,7 @@ describe("SubmitPopover", () => {
     const onClose = vi.fn();
     const { getByText } = render(
       <SubmitPopover
-        options={[{ label: "Draw", onClick: () => {} }]}
+        options={[{ label: "Draw", onClick: (): void => {} }]}
         onClose={onClose}
       />,
     );

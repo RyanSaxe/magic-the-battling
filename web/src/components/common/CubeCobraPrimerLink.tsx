@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 const CUBECOBRA_PRIMER_URL =
   "https://cubecobra.com/cube/about/auto?view=primer";
 
@@ -5,7 +7,11 @@ interface CubeCobraPrimerLinkProps {
   className?: string;
 }
 
-function CubeCobraPrimerIcon({ className = "" }: { className?: string }) {
+function CubeCobraPrimerIcon({
+  className = "",
+}: {
+  className?: string;
+}): ReactElement {
   return (
     <svg
       className={className}
@@ -27,7 +33,7 @@ function CubeCobraPrimerIcon({ className = "" }: { className?: string }) {
 
 export function CubeCobraPrimerLink({
   className = "",
-}: CubeCobraPrimerLinkProps) {
+}: CubeCobraPrimerLinkProps): ReactElement {
   const combinedClass =
     `inline-flex items-center gap-1.5 text-sm text-[#498007] hover:text-[#5ba50a] transition-colors ${className}`.trim();
   return (

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { HotkeyEntry } from "../constants/hotkeys";
 
 export function HotkeyRow({
@@ -6,7 +7,7 @@ export function HotkeyRow({
 }: {
   entry: HotkeyEntry;
   indent?: boolean;
-}) {
+}): ReactNode {
   return (
     <>
       <div className={`flex items-center gap-3 ${indent ? "pl-6" : ""}`}>

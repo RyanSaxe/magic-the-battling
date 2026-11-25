@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, type ReactElement, type ReactNode } from "react";
 
 /** An on/off setting with its label, green when on. The whole label is the 44px target. */
 export function Switch({
@@ -17,23 +17,25 @@ export function Switch({
   /** Optional InfoTip beside the label; rendered outside the label so tapping it never toggles the switch. */
   tip?: ReactNode;
   children: ReactNode;
-}) {
+}): ReactElement {
   const id = useId();
+  const labelId = `${id}-label`;
 
   if (tip) {
     return (
       <div className={`switch-with-tip ${spread ? "switch-spread" : ""}`}>
         <div className="switch-label-group">
           <label htmlFor={id} className="switch">
-            <span>{children}</span>
+            <span id={labelId}>{children}</span>
           </label>
           {tip}
         </div>
-        <label htmlFor={id} className="switch">
+        <label htmlFor={id} aria-labelledby={labelId} className="switch">
           <input
             id={id}
             type="checkbox"
             role="switch"
+            aria-checked={checked}
             checked={checked}
             disabled={disabled}
             onChange={(event) => onChange(event.target.checked)}
@@ -51,6 +53,7 @@ export function Switch({
       <input
         type="checkbox"
         role="switch"
+        aria-checked={checked}
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}

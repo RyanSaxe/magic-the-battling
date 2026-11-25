@@ -66,31 +66,33 @@ function clampDesktopWindowSize(
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function isLegacyStoredWindowState(
   value: unknown,
 ): value is LegacyStoredWindowState {
-  if (!value || typeof value !== "object") {
+  if (!isRecord(value)) {
     return false;
   }
-  const candidate = value as Partial<LegacyStoredWindowState>;
   return (
-    typeof candidate.width === "number" &&
-    typeof candidate.height === "number" &&
-    typeof candidate.x === "number" &&
-    typeof candidate.y === "number"
+    typeof value.width === "number" &&
+    typeof value.height === "number" &&
+    typeof value.x === "number" &&
+    typeof value.y === "number"
   );
 }
 
 function isStoredRulesPanelWindowState(
   value: unknown,
 ): value is StoredRulesPanelWindowState {
-  if (!value || typeof value !== "object") {
+  if (!isRecord(value)) {
     return false;
   }
-  const candidate = value as Partial<StoredRulesPanelWindowState>;
   return (
-    typeof candidate.isCollapsed === "boolean" &&
-    isLegacyStoredWindowState(candidate.windowState)
+    typeof value.isCollapsed === "boolean" &&
+    isLegacyStoredWindowState(value.windowState)
   );
 }
 
@@ -152,14 +154,13 @@ export function collapsedPanelSize(
 }
 
 export function clampDesktopPanelOrigin(
-  x: number,
-  y: number,
+  origin: Pick<DesktopWindowState, "x" | "y">,
   panel: PanelSize,
   viewport: ViewportBox,
 ): Pick<DesktopWindowState, "x" | "y"> {
   return {
     x: clamp(
-      x,
+      origin.x,
       viewport.left + WINDOW_MARGIN_PX,
       Math.max(
         viewport.left + WINDOW_MARGIN_PX,
@@ -167,7 +168,7 @@ export function clampDesktopPanelOrigin(
       ),
     ),
     y: clamp(
-      y,
+      origin.y,
       viewport.top + WINDOW_MARGIN_PX,
       Math.max(
         viewport.top + WINDOW_MARGIN_PX,
@@ -177,12 +178,18 @@ export function clampDesktopPanelOrigin(
   };
 }
 
+export interface DesktopPanelModeOptions {
+  isCollapsed: boolean;
+  collapsedHeight?: number;
+}
+
 export function clampDesktopWindowForMode(
   state: DesktopWindowState,
   viewport: ViewportBox,
-  isCollapsed: boolean,
-  collapsedHeight = DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
+  options: DesktopPanelModeOptions,
 ): DesktopWindowState {
+  const { isCollapsed, collapsedHeight = DEFAULT_COLLAPSED_PANEL_HEIGHT_PX } =
+    options;
   const sized = clampDesktopWindowSize(state, viewport);
   if (!isCollapsed) {
     return clampDesktopWindowState(sized, viewport);
@@ -190,8 +197,7 @@ export function clampDesktopWindowForMode(
   return {
     ...sized,
     ...clampDesktopPanelOrigin(
-      sized.x,
-      sized.y,
+      { x: sized.x, y: sized.y },
       collapsedPanelSize(viewport, collapsedHeight),
       viewport,
     ),
@@ -201,9 +207,10 @@ export function clampDesktopWindowForMode(
 export function getDesktopPanelRect(
   state: DesktopWindowState,
   viewport: ViewportBox,
-  isCollapsed: boolean,
-  collapsedHeight = DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
+  options: DesktopPanelModeOptions,
 ): DesktopWindowState {
+  const { isCollapsed, collapsedHeight = DEFAULT_COLLAPSED_PANEL_HEIGHT_PX } =
+    options;
   if (!isCollapsed) {
     return clampDesktopWindowState(state, viewport);
   }
@@ -212,7 +219,7 @@ export function getDesktopPanelRect(
   return {
     width: panel.width,
     height: panel.height,
-    ...clampDesktopPanelOrigin(sized.x, sized.y, panel, viewport),
+    ...clampDesktopPanelOrigin({ x: sized.x, y: sized.y }, panel, viewport),
   };
 }
 

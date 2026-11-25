@@ -4,7 +4,8 @@ export function markClassicScrollbars(): void {
   probe.style.cssText =
     "position: fixed; visibility: hidden; width: 100px; height: 100px; overflow: scroll";
   document.body.append(probe);
-  if (probe.offsetWidth > probe.clientWidth)
+  if (probe.offsetWidth > probe.clientWidth) {
     document.documentElement.dataset.scrollbars = "classic";
+  }
   probe.remove();
 }

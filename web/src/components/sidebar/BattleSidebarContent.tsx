@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { BattleView, Card as CardType } from "../../types";
 import type { VoiceChatState } from "../../hooks/useVoiceChat";
 import { useObservedElement } from "../../hooks/pages/useObservedElement";
@@ -40,21 +40,22 @@ function LifeCounter({
 }: {
   life: number;
   onChange: (life: number) => void;
-}) {
+}): ReactNode {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(life.toString());
+  const focusedRef = useRef(false);
 
-  const handleBlur = () => {
+  const handleBlur = (): void => {
     setIsEditing(false);
     const newLife = parseInt(inputValue, 10);
-    if (!isNaN(newLife)) {
-      onChange(newLife);
-    } else {
+    if (isNaN(newLife)) {
       setInputValue(life.toString());
+    } else {
+      onChange(newLife);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === "Enter") {
       handleBlur();
     }
@@ -75,6 +76,14 @@ function LifeCounter({
       </button>
       {isEditing ? (
         <input
+          ref={(el): void => {
+            if (!el) {
+              focusedRef.current = false;
+            } else if (!focusedRef.current) {
+              focusedRef.current = true;
+              el.focus();
+            }
+          }}
           type="number"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
@@ -83,7 +92,6 @@ function LifeCounter({
           onKeyDown={handleKeyDown}
           className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold-bright)]"
           style={{ background: "var(--chrome)" }}
-          autoFocus
         />
       ) : (
         <button
@@ -119,7 +127,14 @@ function resolveUpgradeDims(
   if (!container || count === 0) return { ...MIN_DIMS, rows: 1, columns: 1 };
   const availWidth = Math.max(1, container.width);
   const availHeight = Math.max(1, container.height);
-  return bestFit(count, availWidth, availHeight, GAP, availWidth, 1);
+  return bestFit({
+    count,
+    availWidth,
+    availHeight,
+    gap: GAP,
+    maxWidth: availWidth,
+    minWidth: 1,
+  });
 }
 
 function PlayerSection({
@@ -128,7 +143,7 @@ function PlayerSection({
 }: {
   upgrades: CardType[];
   isReversed?: boolean;
-}) {
+}): ReactNode {
   const [containerDims, setContainerDims] = useState<{
     width: number;
     height: number;
@@ -175,7 +190,7 @@ function ActionButtonsRow({
   onUntapAll?: () => void;
   onPassTurn?: () => void;
   passDisabled: boolean;
-}) {
+}): ReactNode {
   if (!onCreateTreasure && !onUntapAll && !onPassTurn) {
     return null;
   }
@@ -233,7 +248,7 @@ function ControlsPanel({
   currentTurnName: string | null;
   voiceChat?: BattleSidebarContentProps["voiceChat"];
   showTopDivider: boolean;
-}) {
+}): ReactNode {
   return (
     <div
       className="relative grid h-full min-h-0 w-full grid-rows-[1fr_auto_1fr] overflow-hidden"
@@ -313,6 +328,195 @@ function ControlsPanel({
   );
 }
 
+function OpponentUpgradeLane({
+  header,
+  upgrades,
+  canManipulateOpponent,
+  onCreateTreasure,
+  onUntapAll,
+  onPassTurn,
+  isYourTurn,
+}: {
+  header?: ReactNode;
+  upgrades: CardType[];
+  canManipulateOpponent?: boolean;
+  onCreateTreasure?: () => void;
+  onUntapAll?: () => void;
+  onPassTurn?: () => void;
+  isYourTurn: boolean;
+}): ReactNode {
+  const hasActions =
+    Boolean(canManipulateOpponent) &&
+    Boolean(onCreateTreasure || onUntapAll || onPassTurn);
+  const rows = [
+    header ? "auto" : null,
+    "minmax(0,1fr)",
+    hasActions ? "auto" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div
+      className="grid h-full min-h-0 px-3 pt-3 pb-3"
+      style={{ gap: SECTION_GUTTER, gridTemplateRows: rows }}
+    >
+      {header}
+      <div className="min-h-0">
+        <PlayerSection upgrades={upgrades} isReversed />
+      </div>
+      {hasActions && (
+        <ActionButtonsRow
+          onCreateTreasure={onCreateTreasure}
+          onUntapAll={onUntapAll}
+          onPassTurn={onPassTurn}
+          passDisabled={isYourTurn}
+        />
+      )}
+    </div>
+  );
+}
+
+function SelfUpgradeLane({
+  upgrades,
+  onCreateTreasure,
+  onUntapAll,
+  onPassTurn,
+  isYourTurn,
+}: {
+  upgrades: CardType[];
+  onCreateTreasure?: () => void;
+  onUntapAll?: () => void;
+  onPassTurn?: () => void;
+  isYourTurn: boolean;
+}): ReactNode {
+  const hasActions = Boolean(onCreateTreasure || onUntapAll || onPassTurn);
+  return (
+    <div
+      className="grid h-full min-h-0 px-3 pt-3 pb-3"
+      style={{
+        gap: SECTION_GUTTER,
+        gridTemplateRows: hasActions ? "auto minmax(0,1fr)" : "minmax(0,1fr)",
+      }}
+    >
+      {hasActions && (
+        <ActionButtonsRow
+          onCreateTreasure={onCreateTreasure}
+          onUntapAll={onUntapAll}
+          onPassTurn={onPassTurn}
+          passDisabled={!isYourTurn}
+        />
+      )}
+      <div className="min-h-0">
+        <PlayerSection upgrades={upgrades} />
+      </div>
+    </div>
+  );
+}
+
+function MeasuredBattleSidebar({
+  topSectionHeight,
+  middleLaneHeight,
+  overlayTopInset,
+  opponentLane,
+  controls,
+  selfLane,
+}: {
+  topSectionHeight: number;
+  middleLaneHeight: number;
+  overlayTopInset: number;
+  opponentLane: ReactNode;
+  controls: ReactNode;
+  selfLane: ReactNode;
+}): ReactNode {
+  const totalTopSectionHeight = topSectionHeight + overlayTopInset;
+  const controlsBottom = totalTopSectionHeight + middleLaneHeight;
+
+  return (
+    <div className="relative h-full">
+      <div
+        className="absolute inset-x-0 top-0 overflow-hidden"
+        style={{ height: totalTopSectionHeight }}
+      >
+        {opponentLane}
+      </div>
+      <div
+        className="absolute inset-x-0 min-h-0"
+        style={{ top: totalTopSectionHeight, height: middleLaneHeight }}
+      >
+        {controls}
+      </div>
+      <div
+        className="absolute inset-x-0 bottom-0 min-h-0 overflow-hidden"
+        style={{ top: controlsBottom }}
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+        />
+        {selfLane}
+      </div>
+    </div>
+  );
+}
+
+function FlexBattleSidebar({
+  topSectionHeight,
+  middleLaneHeight,
+  opponentLane,
+  controls,
+  selfLane,
+}: {
+  topSectionHeight: number | null;
+  middleLaneHeight: number | null;
+  opponentLane: ReactNode;
+  controls: ReactNode;
+  selfLane: ReactNode;
+}): ReactNode {
+  const hasMeasuredMiddleLane = middleLaneHeight !== null;
+  const topClass = topSectionHeight === null ? "flex-1" : "box-border shrink-0";
+  const middleClass =
+    middleLaneHeight === null ? "flex-1" : "box-border shrink-0";
+  const topBorder = hasMeasuredMiddleLane
+    ? ""
+    : "border-b border-[var(--gold-border-opaque)]";
+  const bottomBorder = hasMeasuredMiddleLane
+    ? ""
+    : "border-t border-[var(--gold-border-opaque)]";
+
+  return (
+    <div className="flex flex-col h-full">
+      <div
+        className={`${topClass} overflow-hidden ${topBorder}`}
+        style={
+          topSectionHeight === null ? undefined : { height: topSectionHeight }
+        }
+      >
+        {opponentLane}
+      </div>
+      <div
+        className={`${middleClass} min-h-0`}
+        style={
+          middleLaneHeight === null ? undefined : { height: middleLaneHeight }
+        }
+      >
+        {controls}
+      </div>
+      <div
+        className={`relative min-h-0 flex-1 overflow-hidden ${bottomBorder}`}
+      >
+        {hasMeasuredMiddleLane && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+          />
+        )}
+        {selfLane}
+      </div>
+    </div>
+  );
+}
+
 export function BattleSidebarContent({
   header,
   currentBattle,
@@ -333,202 +537,67 @@ export function BattleSidebarContent({
   middleLaneHeight = null,
   overlayTopInset = 0,
   voiceChat,
-}: BattleSidebarContentProps) {
+}: BattleSidebarContentProps): ReactNode {
   const { opponent_name, current_turn_name, opponent_zones } = currentBattle;
-
   const isYourTurn = current_turn_name === playerName;
-  const hasMeasuredMiddleLane = middleLaneHeight != null;
-  const hasMeasuredLayout =
-    topSectionHeight != null && middleLaneHeight != null;
-  const hasOpponentActions =
-    !!canManipulateOpponent &&
-    !!(onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn);
-  const hasPlayerActions = !!(onCreateTreasure || onUntapAll || onPassTurn);
-  const opponentLaneRows = [
-    header ? "auto" : null,
-    "minmax(0,1fr)",
-    hasOpponentActions ? "auto" : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
 
-  if (hasMeasuredLayout) {
-    const totalTopSectionHeight = topSectionHeight + overlayTopInset;
-    const controlsTop = totalTopSectionHeight;
-    const controlsBottom = controlsTop + middleLaneHeight;
+  const opponentLane = (
+    <OpponentUpgradeLane
+      header={header}
+      upgrades={opponent_zones.upgrades}
+      canManipulateOpponent={canManipulateOpponent}
+      onCreateTreasure={onCreateOpponentTreasure}
+      onUntapAll={onUntapOpponentAll}
+      onPassTurn={onPassOpponentTurn}
+      isYourTurn={isYourTurn}
+    />
+  );
 
+  const controls = (
+    <ControlsPanel
+      opponentName={opponent_name}
+      playerName={playerName}
+      opponentLife={opponentLife}
+      yourLife={yourLife}
+      onOpponentLifeChange={onOpponentLifeChange}
+      onYourLifeChange={onYourLifeChange}
+      isYourTurn={isYourTurn}
+      currentTurnName={current_turn_name}
+      voiceChat={voiceChat}
+      showTopDivider={middleLaneHeight !== null}
+    />
+  );
+
+  const selfLane = (
+    <SelfUpgradeLane
+      upgrades={selfUpgrades}
+      onCreateTreasure={onCreateTreasure}
+      onUntapAll={onUntapAll}
+      onPassTurn={onPassTurn}
+      isYourTurn={isYourTurn}
+    />
+  );
+
+  if (topSectionHeight !== null && middleLaneHeight !== null) {
     return (
-      <div className="relative h-full">
-        <div
-          className="absolute inset-x-0 top-0 overflow-hidden"
-          style={{ height: totalTopSectionHeight }}
-        >
-          <div
-            className="grid h-full min-h-0 px-3 pt-3 pb-3"
-            style={{
-              gap: SECTION_GUTTER,
-              gridTemplateRows: opponentLaneRows,
-            }}
-          >
-            {header}
-            <div className="min-h-0">
-              <PlayerSection upgrades={opponent_zones.upgrades} isReversed />
-            </div>
-            {hasOpponentActions && (
-              <ActionButtonsRow
-                onCreateTreasure={onCreateOpponentTreasure}
-                onUntapAll={onUntapOpponentAll}
-                onPassTurn={onPassOpponentTurn}
-                passDisabled={isYourTurn}
-              />
-            )}
-          </div>
-        </div>
-
-        <div
-          className="absolute inset-x-0 min-h-0"
-          style={{ top: controlsTop, height: middleLaneHeight }}
-        >
-          <ControlsPanel
-            opponentName={opponent_name}
-            playerName={playerName}
-            opponentLife={opponentLife}
-            yourLife={yourLife}
-            onOpponentLifeChange={onOpponentLifeChange}
-            onYourLifeChange={onYourLifeChange}
-            isYourTurn={isYourTurn}
-            currentTurnName={current_turn_name}
-            voiceChat={voiceChat}
-            showTopDivider
-          />
-        </div>
-
-        <div
-          className="absolute inset-x-0 bottom-0 min-h-0 overflow-hidden"
-          style={{ top: controlsBottom }}
-        >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
-          />
-          <div
-            className="grid h-full min-h-0 px-3 pt-3 pb-3"
-            style={{
-              gap: SECTION_GUTTER,
-              gridTemplateRows: hasPlayerActions
-                ? "auto minmax(0,1fr)"
-                : "minmax(0,1fr)",
-            }}
-          >
-            {hasPlayerActions && (
-              <ActionButtonsRow
-                onCreateTreasure={onCreateTreasure}
-                onUntapAll={onUntapAll}
-                onPassTurn={onPassTurn}
-                passDisabled={!isYourTurn}
-              />
-            )}
-            <div className="min-h-0">
-              <PlayerSection upgrades={selfUpgrades} />
-            </div>
-          </div>
-        </div>
-      </div>
+      <MeasuredBattleSidebar
+        topSectionHeight={topSectionHeight}
+        middleLaneHeight={middleLaneHeight}
+        overlayTopInset={overlayTopInset}
+        opponentLane={opponentLane}
+        controls={controls}
+        selfLane={selfLane}
+      />
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Opponent section - top */}
-      <div
-        className={`${topSectionHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden ${
-          hasMeasuredMiddleLane
-            ? ""
-            : "border-b border-[var(--gold-border-opaque)]"
-        }`}
-        style={
-          topSectionHeight != null ? { height: topSectionHeight } : undefined
-        }
-      >
-        <div
-          className="grid h-full min-h-0 px-3 pt-3 pb-3"
-          style={{
-            gap: SECTION_GUTTER,
-            gridTemplateRows: opponentLaneRows,
-          }}
-        >
-          {header}
-          <div className="min-h-0">
-            <PlayerSection upgrades={opponent_zones.upgrades} isReversed />
-          </div>
-          {hasOpponentActions && (
-            <ActionButtonsRow
-              onCreateTreasure={onCreateOpponentTreasure}
-              onUntapAll={onUntapOpponentAll}
-              onPassTurn={onPassOpponentTurn}
-              passDisabled={isYourTurn}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Controls panel */}
-      <div
-        className={`${middleLaneHeight != null ? "box-border shrink-0" : "flex-1"} min-h-0`}
-        style={
-          middleLaneHeight != null ? { height: middleLaneHeight } : undefined
-        }
-      >
-        <ControlsPanel
-          opponentName={opponent_name}
-          playerName={playerName}
-          opponentLife={opponentLife}
-          yourLife={yourLife}
-          onOpponentLifeChange={onOpponentLifeChange}
-          onYourLifeChange={onYourLifeChange}
-          isYourTurn={isYourTurn}
-          currentTurnName={current_turn_name}
-          voiceChat={voiceChat}
-          showTopDivider={middleLaneHeight != null}
-        />
-      </div>
-
-      {/* Your section - bottom */}
-      <div
-        className={`relative min-h-0 flex-1 overflow-hidden ${
-          hasMeasuredMiddleLane
-            ? ""
-            : "border-t border-[var(--gold-border-opaque)]"
-        }`}
-      >
-        {hasMeasuredMiddleLane && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
-          />
-        )}
-        <div
-          className="grid h-full min-h-0 px-3 pt-3 pb-3"
-          style={{
-            gap: SECTION_GUTTER,
-            gridTemplateRows: hasPlayerActions
-              ? "auto minmax(0,1fr)"
-              : "minmax(0,1fr)",
-          }}
-        >
-          {hasPlayerActions && (
-            <ActionButtonsRow
-              onCreateTreasure={onCreateTreasure}
-              onUntapAll={onUntapAll}
-              onPassTurn={onPassTurn}
-              passDisabled={!isYourTurn}
-            />
-          )}
-          <div className="min-h-0">
-            <PlayerSection upgrades={selfUpgrades} />
-          </div>
-        </div>
-      </div>
-    </div>
+    <FlexBattleSidebar
+      topSectionHeight={topSectionHeight}
+      middleLaneHeight={middleLaneHeight}
+      opponentLane={opponentLane}
+      controls={controls}
+      selfLane={selfLane}
+    />
   );
 }

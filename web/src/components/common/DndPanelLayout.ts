@@ -8,6 +8,49 @@ const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 };
 export const PANEL_GAP = 6;
 export const PANEL_MAX_WIDTH = 200;
 
+function evaluateBattlePanelCandidate(options: {
+  count: number;
+  columns: number;
+  width: number;
+  height: number;
+}): { candidate: ZoneDims; score: number } | null {
+  const rows = Math.ceil(options.count / options.columns);
+  const widthByColumns = Math.floor(
+    (options.width - PANEL_GAP * Math.max(0, options.columns - 1)) /
+      options.columns,
+  );
+  const widthByRows = Math.floor(
+    (options.height - PANEL_GAP * Math.max(0, rows - 1)) / rows / (7 / 5),
+  );
+  const cardWidth = Math.floor(
+    Math.min(PANEL_MAX_WIDTH, widthByColumns, widthByRows),
+  );
+  if (cardWidth < 1) return null;
+
+  const candidate: ZoneDims = {
+    width: cardWidth,
+    height: Math.round(cardWidth * (7 / 5)),
+    rows,
+    columns: options.columns,
+  };
+  const totalWidth =
+    candidate.columns * candidate.width +
+    PANEL_GAP * Math.max(0, candidate.columns - 1);
+  const totalHeight =
+    candidate.rows * candidate.height +
+    PANEL_GAP * Math.max(0, candidate.rows - 1);
+  if (totalWidth > options.width || totalHeight > options.height) return null;
+
+  const fill =
+    (totalWidth * totalHeight) / Math.max(1, options.width * options.height);
+  const multiColumnBonus = candidate.columns > 1 ? 14 : 0;
+  const balancePenalty = Math.abs(candidate.rows - candidate.columns) * 2;
+  return {
+    candidate,
+    score: candidate.width + fill * 18 + multiColumnBonus - balancePenalty,
+  };
+}
+
 export function resolveBattlePanelLayout(
   count: number,
   width: number,
@@ -17,14 +60,14 @@ export function resolveBattlePanelLayout(
     return DEFAULT_DIMS;
   }
 
-  const baseFit = bestFit(
+  const baseFit = bestFit({
     count,
-    width,
-    height,
-    PANEL_GAP,
-    PANEL_MAX_WIDTH,
-    MIN_CARD_WIDTH,
-  );
+    availWidth: width,
+    availHeight: height,
+    gap: PANEL_GAP,
+    maxWidth: PANEL_MAX_WIDTH,
+    minWidth: MIN_CARD_WIDTH,
+  });
   let best = baseFit;
   let bestScore =
     baseFit.width +
@@ -32,47 +75,15 @@ export function resolveBattlePanelLayout(
     Math.abs(baseFit.rows - baseFit.columns) * 2;
 
   for (let columns = 1; columns <= count; columns += 1) {
-    const rows = Math.ceil(count / columns);
-    const widthByColumns = Math.floor(
-      (width - PANEL_GAP * Math.max(0, columns - 1)) / columns,
-    );
-    const widthByRows = Math.floor(
-      (height - PANEL_GAP * Math.max(0, rows - 1)) / rows / (7 / 5),
-    );
-    const cardWidth = Math.floor(
-      Math.min(PANEL_MAX_WIDTH, widthByColumns, widthByRows),
-    );
-
-    if (cardWidth < 1) {
-      continue;
-    }
-
-    const candidate = {
-      width: cardWidth,
-      height: Math.round(cardWidth * (7 / 5)),
-      rows,
+    const result = evaluateBattlePanelCandidate({
+      count,
       columns,
-    };
-
-    const totalWidth =
-      candidate.columns * candidate.width +
-      PANEL_GAP * Math.max(0, candidate.columns - 1);
-    const totalHeight =
-      candidate.rows * candidate.height +
-      PANEL_GAP * Math.max(0, candidate.rows - 1);
-    if (totalWidth > width || totalHeight > height) {
-      continue;
-    }
-
-    const fill = (totalWidth * totalHeight) / Math.max(1, width * height);
-    const multiColumnBonus = candidate.columns > 1 ? 14 : 0;
-    const balancePenalty = Math.abs(candidate.rows - candidate.columns) * 2;
-    const score =
-      candidate.width + fill * 18 + multiColumnBonus - balancePenalty;
-
-    if (score > bestScore) {
-      best = candidate;
-      bestScore = score;
+      width,
+      height,
+    });
+    if (result && result.score > bestScore) {
+      best = result.candidate;
+      bestScore = result.score;
     }
   }
 

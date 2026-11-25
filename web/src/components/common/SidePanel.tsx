@@ -1,8 +1,8 @@
-import { useContext, useRef, type ReactNode } from "react";
+import { useContext, useRef, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useAnimatedPresence } from "../../hooks/ui/useOverlayAnimations";
 import { useEscapeKey } from "../../hooks/useDomEffects";
-import { usePanelHoldsEnter } from "../../utils/enterKey";
+import { usePanelHoldsEnter } from "../../hooks/usePanelHoldsEnter";
 import { BoardBackdrop } from "./BoardBackdrop";
 import { CloseButton } from "./CloseButton";
 import { SidePanelHostContext } from "./sidePanelHost";
@@ -12,7 +12,7 @@ export function SidePanelFrame({
   ref,
 }: {
   ref: (element: HTMLDivElement | null) => void;
-}) {
+}): ReactElement {
   return <div ref={ref} className="side-panel-frame" />;
 }
 
@@ -39,6 +39,70 @@ interface SidePanelProps {
   children: ReactNode;
 }
 
+function shouldIgnorePanelEscape(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented) return true;
+  const target = event.target;
+  // Escape first cancels typing in a field, and closes a dialog or card preview open over the panel.
+  if (
+    target instanceof HTMLElement &&
+    target.closest('input, textarea, select, [contenteditable="true"]')
+  ) {
+    return true;
+  }
+  return Boolean(
+    document.querySelector(
+      "[aria-modal='true'], [data-card-preview-modal='true']",
+    ),
+  );
+}
+
+interface SidePanelHeaderProps {
+  title: string;
+  prefix?: string;
+  count?: number;
+  label: string;
+  headerActions?: ReactNode;
+  onClose: () => void;
+}
+
+function SidePanelHeader({
+  title,
+  prefix,
+  count,
+  label,
+  headerActions,
+  onClose,
+}: SidePanelHeaderProps): ReactElement {
+  return (
+    <div
+      className="side-panel-header"
+      style={{ height: SIDE_PANEL_HEADER_HEIGHT }}
+    >
+      <h2 className="side-panel-title">
+        {prefix && <span className="side-panel-prefix">{prefix}</span>}
+        <span className={prefix ? "side-panel-name" : undefined}>{title}</span>
+        {count !== undefined && (
+          <span className="side-panel-count">{count}</span>
+        )}
+      </h2>
+      <div className="flex items-center gap-2">
+        {headerActions}
+        <CloseButton onClick={onClose} label={`Close ${label}`} />
+      </div>
+    </div>
+  );
+}
+
+function buildSidePanelClass(open: boolean, steppedAside?: boolean): string {
+  return [
+    "side-panel frame-chrome",
+    open ? "side-panel--open" : "",
+    steppedAside ? "side-panel--aside" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /**
  * The one panel that opens over the board: inside its gold edge, under any banner and between the bars, so the
  * bars and their buttons always show. From 1120px wide it covers the docked sidebar's column, from 640px the same
@@ -46,19 +110,9 @@ interface SidePanelProps {
  *
  * It stays mounted while it slides out, and drops its content once it has gone.
  */
-export function SidePanel({
-  open,
-  title,
-  prefix,
-  count,
-  onClose,
-  headerActions,
-  steppedAside = false,
-  closeOnBoardTap = false,
-  placement = "column",
-  guideTarget,
-  children,
-}: SidePanelProps) {
+export function SidePanel(props: SidePanelProps): ReactElement | null {
+  const { open, title, prefix, count, onClose, headerActions, children } =
+    props;
   const host = useContext(SidePanelHostContext);
   const panelRef = useRef<HTMLElement>(null);
   const { present, finishExit } = useAnimatedPresence(open, panelRef);
@@ -66,21 +120,7 @@ export function SidePanel({
 
   useEscapeKey(
     (event) => {
-      if (event.defaultPrevented) return;
-      const target = event.target;
-      // Escape first cancels typing in a field, and closes a dialog or card preview open over the panel.
-      if (
-        target instanceof HTMLElement &&
-        target.closest('input, textarea, select, [contenteditable="true"]')
-      )
-        return;
-      if (
-        document.querySelector(
-          "[aria-modal='true'], [data-card-preview-modal='true']",
-        )
-      )
-        return;
-      onClose();
+      if (!shouldIgnorePanelEscape(event)) onClose();
     },
     { enabled: open },
   );
@@ -90,40 +130,31 @@ export function SidePanel({
   const panel = (
     <section
       ref={panelRef}
-      className={`side-panel frame-chrome${open ? " side-panel--open" : ""}${steppedAside ? " side-panel--aside" : ""}`}
+      className={buildSidePanelClass(open, props.steppedAside)}
       aria-label={label}
       inert={!open}
-      data-guide-target={guideTarget}
+      data-guide-target={props.guideTarget}
       onTransitionEnd={(event) => {
         if (event.target === event.currentTarget && !open) finishExit();
       }}
     >
-      <div
-        className="side-panel-header"
-        style={{ height: SIDE_PANEL_HEADER_HEIGHT }}
-      >
-        <h2 className="side-panel-title">
-          {prefix && <span className="side-panel-prefix">{prefix}</span>}
-          <span className={prefix ? "side-panel-name" : undefined}>
-            {title}
-          </span>
-          {count !== undefined && (
-            <span className="side-panel-count">{count}</span>
-          )}
-        </h2>
-        <div className="flex items-center gap-2">
-          {headerActions}
-          <CloseButton onClick={onClose} label={`Close ${label}`} />
-        </div>
-      </div>
+      <SidePanelHeader
+        title={title}
+        prefix={prefix}
+        count={count}
+        label={label}
+        headerActions={headerActions}
+        onClose={onClose}
+      />
       <div className="side-panel-body">{children}</div>
     </section>
   );
+
   return (
     <>
-      {open && closeOnBoardTap && <BoardBackdrop onTap={onClose} />}
+      {open && props.closeOnBoardTap && <BoardBackdrop onTap={onClose} />}
       {createPortal(
-        placement === "beside" ? (
+        props.placement === "beside" ? (
           <div className="side-panel-beside">{panel}</div>
         ) : (
           panel

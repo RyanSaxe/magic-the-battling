@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { TREASURE_TOKEN_IMAGE } from "../../constants/assets";
 import { TokenCounterBadge } from "./TokenCounterBadge";
 
@@ -7,7 +8,7 @@ export function TreasureCard({
 }: {
   count: number;
   dimensions: { width: number; height: number };
-}) {
+}): ReactElement {
   return (
     <div
       className="relative overflow-hidden"

@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { hintsFor, type HintPlace } from "../../constants/hints";
 import { useHintCycler } from "../../hooks/ui/useOverlayAnimations";
 import { textForInput } from "../../utils/inputMode";
@@ -10,25 +11,26 @@ const HINT_CYCLE_TIMINGS = {
 
 type HintsBannerVariant = "default" | "dark" | "rail";
 
+const WRAPPER_CLASSES: Record<HintsBannerVariant, string> = {
+  dark: "rounded-md border-l-[3px] border-l-amber-500 bg-black/40 flex items-center gap-2 !mb-0 py-1.5 px-3",
+  rail: "hint-rail flex items-center gap-2 !mb-0 py-1.5 px-3 sm:px-4",
+  default: "callout callout-tip flex items-center gap-2 !mb-0 !py-1.5",
+};
+
 export function HintsBanner({
   place,
   variant = "default",
 }: {
   place: HintPlace;
   variant?: HintsBannerVariant;
-}) {
+}): ReactElement {
   const hints = hintsFor(place);
   const { index, visible, prev, next } = useHintCycler(
     hints.length,
     HINT_CYCLE_TIMINGS,
   );
 
-  const wrapperClass =
-    variant === "dark"
-      ? "rounded-md border-l-[3px] border-l-amber-500 bg-black/40 flex items-center gap-2 !mb-0 py-1.5 px-3"
-      : variant === "rail"
-        ? "hint-rail flex items-center gap-2 !mb-0 py-1.5 px-3 sm:px-4"
-        : "callout callout-tip flex items-center gap-2 !mb-0 !py-1.5";
+  const wrapperClass = WRAPPER_CLASSES[variant];
   const labelClass =
     variant === "rail"
       ? "text-amber-200/95 font-semibold text-xs uppercase tracking-[0.04em] shrink-0"
@@ -44,7 +46,7 @@ export function HintsBanner({
 
   return (
     <div className={wrapperClass}>
-      {variant !== "rail" ? <span className={labelClass}>Tip</span> : null}
+      {variant === "rail" ? null : <span className={labelClass}>Tip</span>}
       <button
         onClick={prev}
         className={navButtonClass}

@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { BASIC_LAND_IMAGES } from "../../constants/assets";
 
 export function BasicLandCard({
@@ -6,7 +7,7 @@ export function BasicLandCard({
 }: {
   name: string;
   dimensions: { width: number; height: number };
-}) {
+}): ReactElement | null {
   const src = BASIC_LAND_IMAGES[name];
   if (!src) return null;
 

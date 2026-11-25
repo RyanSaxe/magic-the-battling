@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { GameState, PlayerView, SelfPlayerView } from "../types";
+import type { GameState, PlayerView, SelfPlayerView, Zones } from "../types";
 import {
   BASE_RETRY_DELAY_MS,
   DISCONNECTED_GRACE_MS,
@@ -63,7 +63,7 @@ function makeSelfPlayer(overrides: Partial<SelfPlayerView>): SelfPlayerView {
   };
 }
 
-function makeEmptyZones() {
+function makeEmptyZones(): Zones {
   return {
     battlefield: [],
     graveyard: [],
@@ -226,10 +226,10 @@ describe("isVoiceMicBlocked", () => {
 describe("voice signaling parsers and state helpers", () => {
   it("parses plain and prototype-backed session descriptions and rejects invalid payloads", () => {
     class ProtoSessionDescription {
-      get type() {
+      get type(): string {
         return "offer";
       }
-      get sdp() {
+      get sdp(): string {
         return "v=0";
       }
     }

@@ -103,193 +103,234 @@ export interface StartFlowTransition {
 
 export const IDLE_START_FLOW: StartFlowState = { kind: "idle" };
 
+function gameIdForStartFlow(state: StartFlowState): string | null {
+  if (state.kind === "waiting_for_start" || state.kind === "failed") {
+    return state.gameId;
+  }
+  return null;
+}
+
+function handleBeginCreate(
+  state: StartFlowState,
+  event: Extract<StartFlowEvent, { type: "begin_create" }>,
+): StartFlowTransition {
+  const existingGameId = gameIdForStartFlow(state);
+  const effects: StartFlowEffect[] = existingGameId
+    ? [{ type: "abandon", gameId: existingGameId }]
+    : [];
+  return {
+    state: {
+      kind: "creating",
+      mode: event.mode,
+      playMode: event.playMode,
+      attempt: event.attempt,
+      opponents: event.opponents,
+    },
+    effects,
+  };
+}
+
+function handleSoloLobbyUpdated(
+  state: Extract<StartFlowState, { kind: "waiting_for_start" }>,
+  lobby: LobbyState,
+): StartFlowTransition {
+  if (state.step === "loading_cube" && lobby.cube_loading_status === "ready") {
+    const available = lobby.available_puppet_count ?? 0;
+    if (available >= lobby.puppet_count) {
+      return {
+        state: { ...state, step: "readying" },
+        effects: [{ type: "set_ready", ready: true }],
+      };
+    }
+    return {
+      state: {
+        kind: "failed",
+        reason: "not_enough_puppets",
+        mode: "solo",
+        message: "Not enough puppet data",
+        gameId: state.gameId,
+        availablePuppets: available,
+      },
+      effects: [],
+    };
+  }
+
+  if (state.step === "readying" && lobby.can_start) {
+    return {
+      state: { ...state, step: "starting" },
+      effects: [{ type: "start_game" }],
+    };
+  }
+
+  return { state, effects: [] };
+}
+
+function handleLobbyUpdated(
+  state: StartFlowState,
+  lobby: LobbyState,
+): StartFlowTransition {
+  if (state.kind !== "waiting_for_start" || lobby.game_id !== state.gameId) {
+    return { state, effects: [] };
+  }
+
+  if (lobby.cube_loading_status === "error") {
+    const message = lobby.cube_loading_error ?? "Failed to load the cube.";
+    return {
+      state: IDLE_START_FLOW,
+      effects: [
+        { type: "toast", message },
+        { type: "abandon", gameId: state.gameId },
+      ],
+    };
+  }
+
+  if (state.mode === "friends" && lobby.cube_loading_status === "ready") {
+    return {
+      state: IDLE_START_FLOW,
+      effects: [
+        {
+          type: "navigate",
+          path: `/game/${state.gameId}/lobby`,
+          routeState: { loadingSteps: newLobbySteps(state.playMode) },
+        },
+      ],
+    };
+  }
+
+  if (state.mode === "solo") {
+    return handleSoloLobbyUpdated(state, lobby);
+  }
+
+  return { state, effects: [] };
+}
+
+function handleConnectionFailed(
+  state: StartFlowState,
+  error: AppError,
+): StartFlowTransition {
+  if (state.kind !== "waiting_for_start") return { state, effects: [] };
+  const message = getAppErrorMessage(
+    error,
+    "play-connection",
+    "That game is no longer available. Please start a new one.",
+  );
+  const effects: StartFlowEffect[] = [{ type: "toast", message }];
+  // A seat that moved is still the player's, in the tab or on the device that took it.
+  if (error.code !== "SEAT_MOVED") {
+    effects.push({ type: "abandon", gameId: state.gameId });
+  }
+  return { state: IDLE_START_FLOW, effects };
+}
+
+function handleServerErrorEvent(
+  state: StartFlowState,
+  error: AppError,
+): StartFlowTransition {
+  const message = getAppErrorMessage(
+    error,
+    "play-connection",
+    "Something went wrong.",
+  );
+  if (state.kind === "waiting_for_start" && state.step === "starting") {
+    return {
+      state: IDLE_START_FLOW,
+      effects: [
+        { type: "toast", message },
+        { type: "abandon", gameId: state.gameId },
+      ],
+    };
+  }
+  return { state, effects: [{ type: "toast", message }] };
+}
+
+function handleCreatedEvent(
+  state: StartFlowState,
+  event: Extract<StartFlowEvent, { type: "created" }>,
+): StartFlowTransition {
+  if (state.kind !== "creating" || state.attempt !== event.attempt) {
+    return { state, effects: [] };
+  }
+  return {
+    state: {
+      kind: "waiting_for_start",
+      mode: state.mode,
+      playMode: state.playMode,
+      gameId: event.gameId,
+      sessionId: event.sessionId,
+      opponents: state.opponents,
+      step: "loading_cube",
+    },
+    effects: [],
+  };
+}
+
+function handleStartLifecycleEvent(
+  state: StartFlowState,
+  event: Extract<
+    StartFlowEvent,
+    { type: "begin_create" | "created" | "create_failed" | "cancel" }
+  >,
+): StartFlowTransition {
+  if (event.type === "begin_create") return handleBeginCreate(state, event);
+  if (event.type === "created") return handleCreatedEvent(state, event);
+  if (event.type === "create_failed") {
+    if (state.kind !== "creating" || state.attempt !== event.attempt) {
+      return { state, effects: [] };
+    }
+    return {
+      state: IDLE_START_FLOW,
+      effects: [{ type: "toast", message: event.message }],
+    };
+  }
+  if (state.kind === "idle") return { state, effects: [] };
+  const gameId = gameIdForStartFlow(state);
+  return {
+    state: IDLE_START_FLOW,
+    effects: gameId ? [{ type: "abandon", gameId }] : [],
+  };
+}
+
+function handleGameStartedEvent(
+  state: StartFlowState,
+  gameId: string,
+): StartFlowTransition {
+  if (state.kind !== "waiting_for_start" || state.gameId !== gameId) {
+    return { state, effects: [] };
+  }
+  return {
+    state: IDLE_START_FLOW,
+    effects: [
+      {
+        type: "navigate",
+        path: `/game/${state.gameId}/play`,
+        routeState: { loadingSteps: goldfishSteps(state.playMode) },
+      },
+    ],
+  };
+}
+
 export function transitionStartFlow(
   state: StartFlowState,
   event: StartFlowEvent,
 ): StartFlowTransition {
-  switch (event.type) {
-    case "begin_create": {
-      const effects: StartFlowEffect[] = [];
-      if (state.kind === "failed" && state.gameId) {
-        effects.push({ type: "abandon", gameId: state.gameId });
-      } else if (state.kind === "waiting_for_start") {
-        effects.push({ type: "abandon", gameId: state.gameId });
-      }
-      return {
-        state: {
-          kind: "creating",
-          mode: event.mode,
-          playMode: event.playMode,
-          attempt: event.attempt,
-          opponents: event.opponents,
-        },
-        effects,
-      };
-    }
-
-    case "created": {
-      if (state.kind !== "creating" || state.attempt !== event.attempt) {
-        return { state, effects: [] };
-      }
-      return {
-        state: {
-          kind: "waiting_for_start",
-          mode: state.mode,
-          playMode: state.playMode,
-          gameId: event.gameId,
-          sessionId: event.sessionId,
-          opponents: state.opponents,
-          step: "loading_cube",
-        },
-        effects: [],
-      };
-    }
-
-    case "create_failed": {
-      if (state.kind !== "creating" || state.attempt !== event.attempt) {
-        return { state, effects: [] };
-      }
-      return {
-        state: IDLE_START_FLOW,
-        effects: [{ type: "toast", message: event.message }],
-      };
-    }
-
-    case "lobby_updated": {
-      if (
-        state.kind !== "waiting_for_start" ||
-        event.lobby.game_id !== state.gameId
-      ) {
-        return { state, effects: [] };
-      }
-
-      if (event.lobby.cube_loading_status === "error") {
-        const message =
-          event.lobby.cube_loading_error ?? "Failed to load the cube.";
-        return {
-          state: IDLE_START_FLOW,
-          effects: [
-            { type: "toast", message },
-            { type: "abandon", gameId: state.gameId },
-          ],
-        };
-      }
-
-      if (
-        state.mode === "friends" &&
-        event.lobby.cube_loading_status === "ready"
-      ) {
-        return {
-          state: IDLE_START_FLOW,
-          effects: [
-            {
-              type: "navigate",
-              path: `/game/${state.gameId}/lobby`,
-              routeState: { loadingSteps: newLobbySteps(state.playMode) },
-            },
-          ],
-        };
-      }
-
-      if (state.mode === "solo") {
-        if (
-          state.step === "loading_cube" &&
-          event.lobby.cube_loading_status === "ready"
-        ) {
-          const available = event.lobby.available_puppet_count ?? 0;
-          if (available >= event.lobby.puppet_count) {
-            return {
-              state: { ...state, step: "readying" },
-              effects: [{ type: "set_ready", ready: true }],
-            };
-          }
-          return {
-            state: {
-              kind: "failed",
-              reason: "not_enough_puppets",
-              mode: "solo",
-              message: "Not enough puppet data",
-              gameId: state.gameId,
-              availablePuppets: available,
-            },
-            effects: [],
-          };
-        }
-
-        if (state.step === "readying" && event.lobby.can_start) {
-          return {
-            state: { ...state, step: "starting" },
-            effects: [{ type: "start_game" }],
-          };
-        }
-      }
-
-      return { state, effects: [] };
-    }
-
-    case "game_started": {
-      if (state.kind !== "waiting_for_start" || state.gameId !== event.gameId) {
-        return { state, effects: [] };
-      }
-      return {
-        state: IDLE_START_FLOW,
-        effects: [
-          {
-            type: "navigate",
-            path: `/game/${state.gameId}/play`,
-            routeState: { loadingSteps: goldfishSteps(state.playMode) },
-          },
-        ],
-      };
-    }
-
-    case "connection_failed": {
-      if (state.kind !== "waiting_for_start") return { state, effects: [] };
-      const message = getAppErrorMessage(
-        event.error,
-        "play-connection",
-        "That game is no longer available. Please start a new one.",
-      );
-      const effects: StartFlowEffect[] = [{ type: "toast", message }];
-      // A seat that moved is still the player's, in the tab or on the device that took it.
-      if (event.error.code !== "SEAT_MOVED") {
-        effects.push({ type: "abandon", gameId: state.gameId });
-      }
-      return { state: IDLE_START_FLOW, effects };
-    }
-
-    case "server_error": {
-      const message = getAppErrorMessage(
-        event.error,
-        "play-connection",
-        "Something went wrong.",
-      );
-      if (state.kind === "waiting_for_start" && state.step === "starting") {
-        return {
-          state: IDLE_START_FLOW,
-          effects: [
-            { type: "toast", message },
-            { type: "abandon", gameId: state.gameId },
-          ],
-        };
-      }
-      return { state, effects: [{ type: "toast", message }] };
-    }
-
-    case "cancel": {
-      if (state.kind === "idle") return { state, effects: [] };
-      const gameId =
-        state.kind === "waiting_for_start"
-          ? state.gameId
-          : state.kind === "failed"
-            ? state.gameId
-            : null;
-      return {
-        state: IDLE_START_FLOW,
-        effects: gameId ? [{ type: "abandon", gameId }] : [],
-      };
-    }
+  if (
+    event.type === "begin_create" ||
+    event.type === "created" ||
+    event.type === "create_failed" ||
+    event.type === "cancel"
+  ) {
+    return handleStartLifecycleEvent(state, event);
   }
+  if (event.type === "lobby_updated") {
+    return handleLobbyUpdated(state, event.lobby);
+  }
+  if (event.type === "game_started") {
+    return handleGameStartedEvent(state, event.gameId);
+  }
+  if (event.type === "connection_failed") {
+    return handleConnectionFailed(state, event.error);
+  }
+  return handleServerErrorEvent(state, event.error);
 }
 
 function abandonStart(gameId: string): void {
@@ -309,11 +350,64 @@ interface StartGameParams {
   isAuthenticated: boolean;
 }
 
+export interface UseStartFlowResult {
+  state: StartFlowState;
+  start: (params: StartGameParams) => Promise<void>;
+  cancel: () => void;
+}
+
+interface ObservedStartSignals {
+  lobbyState: LobbyState | null;
+  startedGameId: string | undefined;
+  connectionError: AppError | null;
+  serverErrorNonce: number;
+}
+
+function collectServerEvents(
+  observed: ObservedStartSignals,
+  current: {
+    lobbyState: LobbyState | null;
+    startedGameId: string | undefined;
+    connectionError: AppError | null;
+    incomingServerError: { error: AppError; nonce: number } | null;
+  },
+): StartFlowEvent[] {
+  const events: StartFlowEvent[] = [];
+  if (current.lobbyState && current.lobbyState !== observed.lobbyState) {
+    events.push({ type: "lobby_updated", lobby: current.lobbyState });
+  }
+  if (
+    current.startedGameId &&
+    current.startedGameId !== observed.startedGameId
+  ) {
+    events.push({ type: "game_started", gameId: current.startedGameId });
+  }
+  if (
+    current.connectionError &&
+    current.connectionError !== observed.connectionError
+  ) {
+    events.push({ type: "connection_failed", error: current.connectionError });
+  }
+  if (
+    current.incomingServerError &&
+    current.incomingServerError.nonce !== observed.serverErrorNonce
+  ) {
+    events.push({
+      type: "server_error",
+      error: current.incomingServerError.error,
+    });
+  }
+  return events;
+}
+
 export function useStartFlow(
   addToast: (message: string, type?: "error" | "info" | "warning") => void,
-) {
+): UseStartFlowResult {
   const navigate = useNavigate();
   const [state, setState] = useState<StartFlowState>(IDLE_START_FLOW);
+  const [pendingEffects, setPendingEffects] = useState<
+    readonly StartFlowEffect[]
+  >([]);
   const attemptRef = useRef(0);
   const unfinishedGameIdRef = useRef<string | null>(null);
 
@@ -333,12 +427,12 @@ export function useStartFlow(
     setIncomingServerError({ error, nonce: errorNonceRef.current });
   }, []);
 
-  const { lobbyState, gameState, actions, connectionError } = useGame(
-    pendingGameId,
-    pendingSessionId,
-    null,
-    handleServerError,
-  );
+  const { lobbyState, gameState, actions, connectionError } = useGame({
+    gameId: pendingGameId,
+    sessionId: pendingSessionId,
+    spectatorConfig: null,
+    onServerError: handleServerError,
+  });
 
   const executeEffects = useCallback(
     (effects: readonly StartFlowEffect[]) => {
@@ -359,7 +453,7 @@ export function useStartFlow(
             break;
           case "navigate":
             unfinishedGameIdRef.current = null;
-            navigate(effect.path, { state: effect.routeState });
+            void navigate(effect.path, { state: effect.routeState });
             break;
         }
       }
@@ -367,18 +461,61 @@ export function useStartFlow(
     [actions, addToast, navigate],
   );
 
+  const [observed, setObserved] = useState<ObservedStartSignals>({
+    lobbyState: null,
+    startedGameId: undefined,
+    connectionError: null,
+    serverErrorNonce: 0,
+  });
+
+  const startedGameId = gameState?.game_id;
+  const serverEvents = collectServerEvents(observed, {
+    lobbyState,
+    startedGameId,
+    connectionError,
+    incomingServerError,
+  });
+
+  if (serverEvents.length > 0) {
+    setObserved({
+      lobbyState,
+      startedGameId,
+      connectionError,
+      serverErrorNonce: incomingServerError?.nonce ?? observed.serverErrorNonce,
+    });
+    let nextState = state;
+    const collectedEffects: StartFlowEffect[] = [];
+    for (const event of serverEvents) {
+      const transition = transitionStartFlow(nextState, event);
+      nextState = transition.state;
+      collectedEffects.push(...transition.effects);
+    }
+    if (nextState !== state) setState(nextState);
+    if (collectedEffects.length > 0) {
+      setPendingEffects((prev) => [...prev, ...collectedEffects]);
+    }
+  }
+
+  const flushEffects = useEffectEvent((effects: readonly StartFlowEffect[]) => {
+    executeEffects(effects);
+  });
+
   useEffect(() => {
-    unfinishedGameIdRef.current =
-      state.kind === "waiting_for_start"
-        ? state.gameId
-        : state.kind === "failed"
-          ? state.gameId
-          : null;
+    if (pendingEffects.length === 0) return undefined;
+    flushEffects(pendingEffects);
+    const frameId = requestAnimationFrame(() => {
+      setPendingEffects([]);
+    });
+    return (): void => cancelAnimationFrame(frameId);
+  }, [pendingEffects]);
+
+  useEffect(() => {
+    unfinishedGameIdRef.current = gameIdForStartFlow(state);
   }, [state]);
 
   // Leaving Play gives up an unfinished start as Cancel does. A reload or closed tab never unmounts it.
   useEffect(
-    () => () => {
+    () => (): void => {
       attemptRef.current += 1;
       if (unfinishedGameIdRef.current) {
         abandonStart(unfinishedGameIdRef.current);
@@ -386,40 +523,6 @@ export function useStartFlow(
     },
     [],
   );
-
-  const applyServerTransition = useEffectEvent((event: StartFlowEvent) => {
-    const result = transitionStartFlow(state, event);
-    if (result.state !== state) {
-      setState(result.state);
-    }
-    executeEffects(result.effects);
-  });
-
-  useEffect(() => {
-    if (!lobbyState) return;
-    applyServerTransition({ type: "lobby_updated", lobby: lobbyState });
-  }, [lobbyState]);
-
-  useEffect(() => {
-    if (!gameState?.game_id) return;
-    applyServerTransition({ type: "game_started", gameId: gameState.game_id });
-  }, [gameState?.game_id]);
-
-  useEffect(() => {
-    if (!connectionError) return;
-    applyServerTransition({
-      type: "connection_failed",
-      error: connectionError,
-    });
-  }, [connectionError]);
-
-  useEffect(() => {
-    if (!incomingServerError) return;
-    applyServerTransition({
-      type: "server_error",
-      error: incomingServerError.error,
-    });
-  }, [incomingServerError]);
 
   const start = useCallback(
     async (params: StartGameParams) => {
@@ -531,15 +634,15 @@ export function useGuestName(): [string, (v: string) => void, boolean] {
   const [loading, setLoading] = useState(rememberedName === null);
 
   useEffect(() => {
-    if (rememberedName !== null) return;
+    if (rememberedName !== null) return undefined;
     let cancelled = false;
-    getLegendaryName().then((generated) => {
+    void getLegendaryName().then((generated) => {
       if (!cancelled) {
         setName(generated);
         setLoading(false);
       }
     });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [rememberedName]);
@@ -549,20 +652,28 @@ export function useGuestName(): [string, (v: string) => void, boolean] {
 
 export function usePlayCubeWarmup(cubeId: string): void {
   useEffect(() => {
-    if (!cubeId) return;
+    if (!cubeId) return undefined;
     const timer = window.setTimeout(() => warmCubeCache(cubeId), 2000);
-    return () => window.clearTimeout(timer);
+    return (): void => window.clearTimeout(timer);
   }, [cubeId]);
 }
 
-export function useRestoreButtonFocus(
-  buttonRef: RefObject<HTMLButtonElement | null>,
-  shouldRestoreRef: RefObject<boolean>,
-  view: string,
-  bannerCubeId: string,
-): void {
+export function useRestoreButtonFocus({
+  buttonRef,
+  shouldRestoreRef,
+  view,
+  bannerCubeId,
+}: {
+  buttonRef: RefObject<HTMLButtonElement | null>;
+  shouldRestoreRef: RefObject<boolean>;
+  view: string;
+  bannerCubeId: string;
+}): void {
   useEffect(() => {
     if (!shouldRestoreRef.current) return;
+    if (view === "" && bannerCubeId === "") {
+      // No-op guard keeping view and bannerCubeId as explicit restore triggers.
+    }
     shouldRestoreRef.current = false;
     buttonRef.current?.focus({ preventScroll: true });
   }, [bannerCubeId, buttonRef, shouldRestoreRef, view]);

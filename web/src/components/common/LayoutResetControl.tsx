@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import {
   useGameShellMode,
   type GameShellMode,
@@ -20,7 +20,7 @@ interface LayoutResetControlProps {
 function positionClasses(
   position: "top-right" | "bottom-right",
   shellMode: GameShellMode,
-) {
+): { wrapper: string; popover: string } {
   if (position === "bottom-right") {
     return {
       wrapper: "absolute right-2 bottom-2 z-40 pointer-events-auto",
@@ -49,13 +49,17 @@ export function LayoutResetControl({
   onConfirm,
   position = "top-right",
   message,
-}: LayoutResetControlProps) {
+}: LayoutResetControlProps): ReactElement {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const shellMode = useGameShellMode();
   const { wrapper, popover } = positionClasses(position, shellMode);
 
   return (
-    <div className={wrapper} onClick={(e) => e.stopPropagation()}>
+    <div
+      role="presentation"
+      className={wrapper}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="relative">
         <button
           type="button"
@@ -71,7 +75,7 @@ export function LayoutResetControl({
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-200">
               Reset {phaseLabel}
             </div>
-            {isInherited && originStage != null && originRound != null && (
+            {isInherited && originStage !== null && originRound !== null && (
               <div className="mt-2 text-xs text-[var(--ivory-muted)]">
                 Current layout is inherited from Stage {originStage}, Round{" "}
                 {originRound}.

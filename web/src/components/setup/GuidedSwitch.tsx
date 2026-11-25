@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { InfoTip } from "../common/InfoTip";
 import { Switch } from "../common/Switch";
 
@@ -10,7 +11,7 @@ export function GuidedSwitch({
 }: {
   enabled: boolean;
   setEnabled: (enabled: boolean) => void;
-}) {
+}): ReactElement {
   return (
     <div className="setup-setting">
       <Switch checked={enabled} onChange={setEnabled}>

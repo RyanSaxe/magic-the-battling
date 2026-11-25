@@ -11,26 +11,41 @@ export function makeZoneId(
   return prefix ? `${prefix}:${base}` : base;
 }
 
-export function makeDraggableId(
-  zone: ZoneName,
-  owner: ZoneOwner,
-  cardId: string,
-  instanceKey?: string,
-): string {
+export function makeDraggableId({
+  zone,
+  owner,
+  cardId,
+  instanceKey,
+}: {
+  zone: ZoneName;
+  owner: ZoneOwner;
+  cardId: string;
+  instanceKey?: string;
+}): string {
   const base = `${makeZoneId(zone, owner)}-${cardId}`;
   return instanceKey ? `${instanceKey}:${base}` : base;
 }
+
+const ZONE_NAMES = new Map<string, ZoneName>([
+  ["battlefield", "battlefield"],
+  ["graveyard", "graveyard"],
+  ["exile", "exile"],
+  ["hand", "hand"],
+  ["sideboard", "sideboard"],
+  ["upgrades", "upgrades"],
+  ["command_zone", "command_zone"],
+  ["library", "library"],
+]);
 
 export function parseZoneId(zoneId: string): {
   zone: ZoneName;
   owner: ZoneOwner;
 } {
   const raw = zoneId.includes(":") ? zoneId.split(":")[1] : zoneId;
-  const [owner, ...zoneParts] = raw.split("-");
-  return {
-    owner: owner as ZoneOwner,
-    zone: zoneParts.join("-") as ZoneName,
-  };
+  const [ownerPart, ...zoneParts] = raw.split("-");
+  const owner: ZoneOwner = ownerPart === "opponent" ? "opponent" : "player";
+  const zone: ZoneName = ZONE_NAMES.get(zoneParts.join("-")) ?? "hand";
+  return { owner, zone };
 }
 
 export interface DragData {

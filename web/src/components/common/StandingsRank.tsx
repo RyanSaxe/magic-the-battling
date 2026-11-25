@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { getOrdinal } from "../../utils/format";
 
 /** A place as a standings table shows it: the number over its suffix, in a column down a card's left edge. */
@@ -9,7 +10,7 @@ export function StandingsRank({
   rank: number;
   isLast: boolean;
   className?: string;
-}) {
+}): ReactElement {
   const ordinal = getOrdinal(rank);
   return (
     <span

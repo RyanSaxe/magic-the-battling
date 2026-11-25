@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import type { Card as CardType, ZoneName } from "../../types";
 import type { ZoneOwner } from "../../dnd/types";
 import { DraggableCard, DroppableZone, useGameDnd } from "../../dnd";
@@ -47,146 +47,277 @@ interface CompactZoneDisplayProps {
   onRevealHiddenUpgrades?: (cardId: string) => void;
 }
 
-export function CompactZoneDisplay({
-  title,
-  panelTitle = title,
-  zone,
-  cards,
-  height,
-  width,
-  isOpponent = false,
-  canManipulateOpponent = false,
-  validFromZones,
-  onCardHover,
-  onCardHoverEnd,
-  canPeekFaceDown,
-  selectedCardId,
-  onZoneClick,
-  onCardClick,
-  onCardContextMenu,
-  containerClassName,
-  forceFaceDown = false,
-  isModalOpen,
-  onModalOpenChange,
-  onContextMenu,
-  modalHeaderActions,
+function getCompactCardDimensions(
+  width: number,
+  height: number,
+): { width: number; height: number } {
+  const availW = width - 4;
+  const availH = height - LABEL_HEIGHT;
+  const cardW = Math.floor(Math.min(availW, availH * CARD_ASPECT));
+  return { width: cardW, height: Math.floor(cardW / CARD_ASPECT) };
+}
+
+function resolvePileCards(options: {
+  cards: CardType[];
+  zone: ZoneName;
+  zoneOwner: ZoneOwner;
+  activeDraggableId: string | null;
+}): { topCard?: CardType; nextCard?: CardType } {
+  const topCard = options.cards[options.cards.length - 1];
+  if (!topCard) return {};
+  const topId = makeDraggableId({
+    zone: options.zone,
+    owner: options.zoneOwner,
+    cardId: topCard.id,
+    instanceKey: "compact",
+  });
+  const isDraggingTop = options.activeDraggableId === topId;
+  return {
+    topCard,
+    nextCard: isDraggingTop
+      ? options.cards[options.cards.length - 2]
+      : undefined,
+  };
+}
+
+function CompactNextCard({
+  card,
+  dimensions,
+  forceFaceDown,
   upgradedCardIds,
   upgradesByCardId,
   hiddenUpgradesByCardId,
   onRevealHiddenUpgrades,
-}: CompactZoneDisplayProps) {
+}: {
+  card: CardType;
+  dimensions: { width: number; height: number };
+  forceFaceDown: boolean;
+  upgradedCardIds?: Set<string>;
+  upgradesByCardId?: Map<string, CardType[]>;
+  hiddenUpgradesByCardId?: Map<string, CardType[]>;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
+}): ReactElement {
+  return (
+    <div className="absolute">
+      <Card
+        card={card}
+        dimensions={dimensions}
+        faceDown={forceFaceDown}
+        upgraded={upgradedCardIds?.has(card.id)}
+        appliedUpgrades={upgradesByCardId?.get(card.id)}
+        hiddenUpgradeCount={hiddenUpgradesByCardId?.get(card.id)?.length ?? 0}
+        onRevealHiddenUpgrades={
+          onRevealHiddenUpgrades
+            ? (): void => onRevealHiddenUpgrades(card.id)
+            : undefined
+        }
+      />
+    </div>
+  );
+}
+
+function buildTopCardCallbacks(options: {
+  card: CardType;
+  zone: ZoneName;
+  allowCardInteraction: boolean;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  onCardContextMenu?: (
+    e: React.MouseEvent,
+    card: CardType,
+    zone: ZoneName,
+  ) => void;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
+}): {
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  onRevealHiddenUpgrades?: () => void;
+} {
+  return {
+    onCardHover: options.allowCardInteraction ? options.onCardHover : undefined,
+    onCardHoverEnd: options.allowCardInteraction
+      ? options.onCardHoverEnd
+      : undefined,
+    onContextMenu:
+      options.allowCardInteraction && options.onCardContextMenu
+        ? (e: React.MouseEvent): void =>
+            options.onCardContextMenu?.(e, options.card, options.zone)
+        : undefined,
+    onRevealHiddenUpgrades: options.onRevealHiddenUpgrades
+      ? (): void => options.onRevealHiddenUpgrades?.(options.card.id)
+      : undefined,
+  };
+}
+
+function CompactTopCard({
+  card,
+  zone,
+  zoneOwner,
+  dimensions,
+  allowCardInteraction,
+  isOpponent,
+  forceFaceDown,
+  canPeekFaceDown,
+  onCardHover,
+  onCardHoverEnd,
+  onCardContextMenu,
+  upgradedCardIds,
+  upgradesByCardId,
+  hiddenUpgradesByCardId,
+  onRevealHiddenUpgrades,
+}: {
+  card: CardType;
+  zone: ZoneName;
+  zoneOwner: ZoneOwner;
+  dimensions: { width: number; height: number };
+  allowCardInteraction: boolean;
+  isOpponent: boolean;
+  forceFaceDown: boolean;
+  canPeekFaceDown?: boolean;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  onCardContextMenu?: (
+    e: React.MouseEvent,
+    card: CardType,
+    zone: ZoneName,
+  ) => void;
+  upgradedCardIds?: Set<string>;
+  upgradesByCardId?: Map<string, CardType[]>;
+  hiddenUpgradesByCardId?: Map<string, CardType[]>;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
+}): ReactElement {
+  const callbacks = buildTopCardCallbacks({
+    card,
+    zone,
+    allowCardInteraction,
+    onCardHover,
+    onCardHoverEnd,
+    onCardContextMenu,
+    onRevealHiddenUpgrades,
+  });
+
+  return (
+    <DraggableCard
+      card={card}
+      zone={zone}
+      zoneOwner={zoneOwner}
+      dragInstanceKey="compact"
+      dimensions={dimensions}
+      disabled={!allowCardInteraction}
+      isOpponent={isOpponent}
+      onCardHover={callbacks.onCardHover}
+      onCardHoverEnd={callbacks.onCardHoverEnd}
+      onContextMenu={callbacks.onContextMenu}
+      faceDown={forceFaceDown}
+      canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
+      upgraded={upgradedCardIds?.has(card.id)}
+      appliedUpgrades={upgradesByCardId?.get(card.id)}
+      hiddenUpgradeCount={hiddenUpgradesByCardId?.get(card.id)?.length ?? 0}
+      onRevealHiddenUpgrades={callbacks.onRevealHiddenUpgrades}
+    />
+  );
+}
+
+export function CompactZoneDisplay(
+  props: CompactZoneDisplayProps,
+): ReactElement {
   const [uncontrolledModalOpen, setUncontrolledModalOpen] = useState(false);
-  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
+  const isOpponent = Boolean(props.isOpponent);
+  const canManipulateOpponent = Boolean(props.canManipulateOpponent);
+  const forceFaceDown = Boolean(props.forceFaceDown);
+  const zoneOwner: ZoneOwner = isOpponent ? "opponent" : "player";
   const allowZoneInteraction = canInteractWithBattleZone({
     owner: zoneOwner,
-    zone,
+    zone: props.zone,
     canManipulateOpponent,
   });
-  const showModal = isModalOpen ?? uncontrolledModalOpen;
-  const setShowModal = onModalOpenChange ?? setUncontrolledModalOpen;
-
-  const { activeDraggableId } = useGameDnd();
-  const topCard = cards[cards.length - 1];
-  const topCardDraggableId = topCard
-    ? makeDraggableId(zone, zoneOwner, topCard.id, "compact")
-    : null;
-  const isDraggingTopCard =
-    activeDraggableId !== null && activeDraggableId === topCardDraggableId;
-  const nextCard = isDraggingTopCard ? cards[cards.length - 2] : null;
   const allowCardInteraction = canInteractWithBattleCard({
     owner: zoneOwner,
-    zone,
+    zone: props.zone,
     canManipulateOpponent,
     isFaceDown: forceFaceDown,
   });
+  const showModal = props.isModalOpen ?? uncontrolledModalOpen;
+  const setShowModal = props.onModalOpenChange ?? setUncontrolledModalOpen;
 
-  const availW = width - 4;
-  const availH = height - LABEL_HEIGHT;
-  const cardW = Math.floor(Math.min(availW, availH * CARD_ASPECT));
-  const cardH = Math.floor(cardW / CARD_ASPECT);
+  const { activeDraggableId } = useGameDnd();
+  const { topCard, nextCard } = resolvePileCards({
+    cards: props.cards,
+    zone: props.zone,
+    zoneOwner,
+    activeDraggableId,
+  });
+  const dimensions = getCompactCardDimensions(props.width, props.height);
 
-  const label = (
-    <div
-      className="flex items-center justify-center gap-0 px-0.5 shrink-0"
-      style={{ height: LABEL_HEIGHT }}
-    >
-      <span className="battle-side-label truncate">{title}</span>
-    </div>
-  );
+  const handleZoneClick = (e: React.MouseEvent): void => {
+    if (props.selectedCardId && props.onZoneClick) {
+      e.stopPropagation();
+      props.onZoneClick();
+      return;
+    }
+    setShowModal(true);
+  };
 
   return (
     <>
       <DroppableZone
-        zone={zone}
+        zone={props.zone}
         zoneOwner={zoneOwner}
-        validFromZones={validFromZones}
+        validFromZones={props.validFromZones}
         disabled={!allowZoneInteraction}
         className="box-border shrink-0 battle-side-dropzone"
-        style={{ width, height }}
+        style={{ width: props.width, height: props.height }}
       >
         <div
-          onContextMenu={onContextMenu}
-          onClick={(e) => {
-            if (selectedCardId && onZoneClick) {
-              e.stopPropagation();
-              onZoneClick();
-              return;
-            }
-            setShowModal(true);
-          }}
-          className={`flex flex-col items-center overflow-hidden cursor-pointer ${containerClassName ?? ""} w-full h-full`}
+          onContextMenu={props.onContextMenu}
+          className={`relative flex flex-col items-center overflow-hidden ${props.containerClassName ?? ""} w-full h-full`}
         >
-          {label}
-          <div className="flex-1 flex items-center justify-center min-h-0 relative">
+          <button
+            type="button"
+            aria-label={props.title}
+            onClick={handleZoneClick}
+            className="absolute inset-0 border-0 bg-transparent p-0 cursor-pointer"
+          />
+          <div
+            className="relative pointer-events-none flex items-center justify-center gap-0 px-0.5 shrink-0"
+            style={{ height: LABEL_HEIGHT }}
+          >
+            <span className="battle-side-label truncate">{props.title}</span>
+          </div>
+          <div
+            role="presentation"
+            onClick={handleZoneClick}
+            className="relative flex-1 flex items-center justify-center min-h-0 cursor-pointer"
+          >
             {nextCard && (
-              <div className="absolute">
-                <Card
-                  card={nextCard}
-                  dimensions={{ width: cardW, height: cardH }}
-                  faceDown={forceFaceDown}
-                  upgraded={upgradedCardIds?.has(nextCard.id)}
-                  appliedUpgrades={upgradesByCardId?.get(nextCard.id)}
-                  hiddenUpgradeCount={
-                    (hiddenUpgradesByCardId?.get(nextCard.id) ?? []).length
-                  }
-                  onRevealHiddenUpgrades={
-                    onRevealHiddenUpgrades
-                      ? () => onRevealHiddenUpgrades(nextCard.id)
-                      : undefined
-                  }
-                />
-              </div>
+              <CompactNextCard
+                card={nextCard}
+                dimensions={dimensions}
+                forceFaceDown={forceFaceDown}
+                upgradedCardIds={props.upgradedCardIds}
+                upgradesByCardId={props.upgradesByCardId}
+                hiddenUpgradesByCardId={props.hiddenUpgradesByCardId}
+                onRevealHiddenUpgrades={props.onRevealHiddenUpgrades}
+              />
             )}
             {topCard && (
-              <DraggableCard
+              <CompactTopCard
                 card={topCard}
-                zone={zone}
+                zone={props.zone}
                 zoneOwner={zoneOwner}
-                dragInstanceKey="compact"
-                dimensions={{ width: cardW, height: cardH }}
-                disabled={!allowCardInteraction}
+                dimensions={dimensions}
+                allowCardInteraction={allowCardInteraction}
                 isOpponent={isOpponent}
-                onCardHover={allowCardInteraction ? onCardHover : undefined}
-                onCardHoverEnd={
-                  allowCardInteraction ? onCardHoverEnd : undefined
-                }
-                onContextMenu={
-                  allowCardInteraction && onCardContextMenu
-                    ? (e) => onCardContextMenu(e, topCard, zone)
-                    : undefined
-                }
-                faceDown={forceFaceDown}
-                canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
-                upgraded={upgradedCardIds?.has(topCard.id)}
-                appliedUpgrades={upgradesByCardId?.get(topCard.id)}
-                hiddenUpgradeCount={
-                  (hiddenUpgradesByCardId?.get(topCard.id) ?? []).length
-                }
-                onRevealHiddenUpgrades={
-                  onRevealHiddenUpgrades
-                    ? () => onRevealHiddenUpgrades(topCard.id)
-                    : undefined
-                }
+                forceFaceDown={forceFaceDown}
+                canPeekFaceDown={props.canPeekFaceDown}
+                onCardHover={props.onCardHover}
+                onCardHoverEnd={props.onCardHoverEnd}
+                onCardContextMenu={props.onCardContextMenu}
+                upgradedCardIds={props.upgradedCardIds}
+                upgradesByCardId={props.upgradesByCardId}
+                hiddenUpgradesByCardId={props.hiddenUpgradesByCardId}
+                onRevealHiddenUpgrades={props.onRevealHiddenUpgrades}
               />
             )}
           </div>
@@ -195,25 +326,25 @@ export function CompactZoneDisplay({
 
       <ZoneModal
         open={showModal}
-        title={panelTitle}
-        zone={zone}
-        cards={cards}
+        title={props.panelTitle ?? props.title}
+        zone={props.zone}
+        cards={props.cards}
         allowZoneInteraction={allowZoneInteraction}
         allowCardInteraction={allowCardInteraction}
         isOpponent={isOpponent}
         tone="battle"
-        headerActions={modalHeaderActions}
+        headerActions={props.modalHeaderActions}
         onClose={() => setShowModal(false)}
-        onCardHover={onCardHover}
-        onCardHoverEnd={onCardHoverEnd}
-        onCardClick={onCardClick}
-        onCardContextMenu={onCardContextMenu}
-        selectedCardId={selectedCardId}
+        onCardHover={props.onCardHover}
+        onCardHoverEnd={props.onCardHoverEnd}
+        onCardClick={props.onCardClick}
+        onCardContextMenu={props.onCardContextMenu}
+        selectedCardId={props.selectedCardId}
         forceFaceDown={forceFaceDown}
-        upgradedCardIds={upgradedCardIds}
-        appliedUpgradesByCardId={upgradesByCardId}
-        hiddenUpgradesByCardId={hiddenUpgradesByCardId}
-        onRevealHiddenUpgrades={onRevealHiddenUpgrades}
+        upgradedCardIds={props.upgradedCardIds}
+        appliedUpgradesByCardId={props.upgradesByCardId}
+        hiddenUpgradesByCardId={props.hiddenUpgradesByCardId}
+        onRevealHiddenUpgrades={props.onRevealHiddenUpgrades}
       />
     </>
   );

@@ -82,8 +82,9 @@ describe("useLayoutDrag", () => {
     });
 
     act(() => result.current.drag.start(SEED));
-    for (const fraction of [0.41, 0.42, 0.43, 0.44])
+    for (const fraction of [0.41, 0.42, 0.43, 0.44]) {
       act(() => result.current.drag.move("topFraction", fraction));
+    }
     expect(setItem).not.toHaveBeenCalled();
 
     act(() => result.current.drag.end());

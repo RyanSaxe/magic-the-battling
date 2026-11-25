@@ -5,7 +5,7 @@ import type { ServerStatus } from "../types";
 
 const STATUS_POLL_INTERVAL_MS = 15_000;
 
-export function useServerStatus() {
+export function useServerStatus(): ServerStatus | null {
   const [status, setStatus] = useState<ServerStatus | null>(null);
 
   const refresh = useCallback(async () => {
@@ -25,14 +25,14 @@ export function useServerStatus() {
       void refresh();
     }, STATUS_POLL_INTERVAL_MS);
 
-    const onVisibilityChange = () => {
+    const onVisibilityChange = (): void => {
       if (document.visibilityState === "visible") {
         void refresh();
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
-    return () => {
+    return (): void => {
       window.clearTimeout(immediate);
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibilityChange);

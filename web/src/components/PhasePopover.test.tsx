@@ -6,12 +6,18 @@ import { PhasePopover } from "./PhasePopover";
 
 // The popover's wording reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  });
 });
 
 afterEach(() => {
@@ -27,7 +33,7 @@ it("takes the whole tap that closes it over the board, and lets a bar button act
     <SidePanelHostContext.Provider value={board}>
       <PhasePopover
         phase="draft"
-        anchorRect={{ top: 0, bottom: 20, left: 0, width: 40 } as DOMRect}
+        anchorRect={new DOMRect(0, 0, 40, 20)}
         useUpgrades
         onClose={onClose}
         onOpenDetails={() => {}}

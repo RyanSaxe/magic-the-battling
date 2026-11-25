@@ -21,8 +21,10 @@ import {
   withRemovalStarted,
   withRemoved,
   withoutFollow,
+  type FollowingPage,
   type Library,
   type LibraryEntry,
+  type SavedPage,
 } from "./dashboardState";
 
 function followed(id: number, cubeId: string): FollowedBattler {
@@ -36,7 +38,7 @@ function followed(id: number, cubeId: string): FollowedBattler {
   };
 }
 
-const cubeIds = (follows: typeof NO_FOLLOWS) =>
+const cubeIds = (follows: typeof NO_FOLLOWS): string[] =>
   follows.records.map((f) => f.cube_id);
 
 describe("follows as Discover shows them", () => {
@@ -137,9 +139,11 @@ describe("follows as Discover shows them", () => {
   });
 });
 
-function serverFollowing(cubeIds: string[]) {
-  const all = cubeIds.map((cubeId, i) => followed(100 + i, cubeId));
-  return async (offset: number) => ({
+function serverFollowing(
+  ids: string[],
+): (offset: number) => Promise<FollowingPage> {
+  const all = ids.map((cubeId, i) => followed(100 + i, cubeId));
+  return async (offset: number): Promise<FollowingPage> => ({
     following: all.slice(offset, offset + 20),
     has_more: offset + 20 < all.length,
   });
@@ -179,22 +183,47 @@ describe("findFollow", () => {
   });
 });
 
-const preset = (id: number) => ({ id, cube_id: `cube-${id}` }) as UserBattler;
+const preset = (id: number): UserBattler => ({
+  id,
+  cube_id: `cube-${id}`,
+  display_name: null,
+  use_upgrades: false,
+  use_vanguards: false,
+  play_mode: "limited",
+  puppet_count: 3,
+  target_player_count: 4,
+  auto_approve_spectators: false,
+  guided_mode_default: false,
+  position: id,
+  created_at: "2026-11-21T00:00:00",
+  game_count: 0,
+  human_player_count: 0,
+  my_game_count: 0,
+  my_win_count: 0,
+  my_average_placement: null,
+  my_last_played: null,
+});
+
+interface PresetServer {
+  page: (offset: number) => SavedPage;
+  save: () => UserBattler;
+  remove: (id: number) => number[];
+}
 
 /** Saved presets as GET /battlers pages them: newest first, so a new one goes to the front. */
-function serverPresets(count: number) {
+function serverPresets(count: number): PresetServer {
   const ids = Array.from({ length: count }, (_, i) => i + 1);
   return {
-    page: (offset: number) => ({
+    page: (offset: number): SavedPage => ({
       battlers: ids.slice(offset, offset + 20).map(preset),
       has_more: offset + 20 < ids.length,
     }),
-    save: () => {
+    save: (): UserBattler => {
       const id = Math.max(0, ...ids) + 1;
       ids.unshift(id);
       return preset(id);
     },
-    remove: (id: number) => ids.splice(ids.indexOf(id), 1),
+    remove: (id: number): number[] => ids.splice(ids.indexOf(id), 1),
   };
 }
 
@@ -205,15 +234,16 @@ function nextSavedPage(
   server: ReturnType<typeof serverPresets>,
 ): Library {
   const next = nextLibraryPage(library);
-  if (next?.list !== "saved")
+  if (next?.list !== "saved") {
     throw new Error(`expected a saved page, not ${JSON.stringify(next)}`);
+  }
   return withLibraryPage(withLibraryPageRequested(library), {
     list: "saved",
     page: server.page(next.offset),
   });
 }
 
-const savedIds = (library: Library) =>
+const savedIds = (library: Library): number[] =>
   libraryEntries(library).flatMap((entry) =>
     entry.kind === "saved" ? [entry.preset.id] : [],
   );

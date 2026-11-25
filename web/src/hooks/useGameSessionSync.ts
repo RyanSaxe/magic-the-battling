@@ -1,7 +1,14 @@
 /**
  * Connection, identity, phase-action, and pointer-hover synchronization hooks for `Game.tsx`.
  */
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { findBattleCard, type HoveredBattleCard } from "../pages/gameHotkeys";
 import type { PhaseActionEvent } from "../pages/pendingPhaseAction";
 import type { BattleView } from "../types";
@@ -83,7 +90,10 @@ export function useGameSessionSync({
 export function useGamePointerHover(
   currentBattle: BattleView | null | undefined,
   selfPhase: string | undefined,
-) {
+): {
+  hoveredCard: HoveredBattleCard | null;
+  setHoveredCard: Dispatch<SetStateAction<HoveredBattleCard | null>>;
+} {
   const [hoveredCard, setHoveredCard] = useState<HoveredBattleCard | null>(
     null,
   );
@@ -95,15 +105,15 @@ export function useGamePointerHover(
 
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
-    const trackPointer = (event: MouseEvent) => {
+    const trackPointer = (event: MouseEvent): void => {
       pointerRef.current = { x: event.clientX, y: event.clientY };
     };
-    const forgetPointer = () => {
+    const forgetPointer = (): void => {
       pointerRef.current = null;
     };
     window.addEventListener("mousemove", trackPointer);
     document.documentElement.addEventListener("mouseleave", forgetPointer);
-    return () => {
+    return (): void => {
       window.removeEventListener("mousemove", trackPointer);
       document.documentElement.removeEventListener("mouseleave", forgetPointer);
     };
@@ -111,7 +121,7 @@ export function useGamePointerHover(
 
   useEffect(() => {
     const pointer = pointerRef.current;
-    if (!currentBattle || !pointer) return;
+    if (!currentBattle || !pointer) return undefined;
     // A card that slides under a resting pointer gets no mouseenter; re-read on the next frame.
     const frameId = requestAnimationFrame(() => {
       const cardId = document
@@ -121,7 +131,7 @@ export function useGamePointerHover(
       const card = cardId ? findBattleCard(currentBattle, cardId) : null;
       setHoveredCard(card);
     });
-    return () => cancelAnimationFrame(frameId);
+    return (): void => cancelAnimationFrame(frameId);
   }, [currentBattle]);
 
   return { hoveredCard, setHoveredCard };
@@ -136,6 +146,6 @@ export function useRollExhaustedEnterGuard(
     const rolledOut = couldRollRef.current && !canRoll && selfPhase === "draft";
     couldRollRef.current = canRoll;
     // Players press Enter on Roll until it turns off, so the Enter after that is likely meant for Roll.
-    if (rolledOut) return skipNextEnter();
+    return rolledOut ? skipNextEnter() : undefined;
   }, [canRoll, selfPhase]);
 }
