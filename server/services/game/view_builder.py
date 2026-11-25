@@ -10,12 +10,15 @@ import hmac
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from pitfight.models.card_registry import get_card_data
 from pitfight.models.cards import Card
 from pitfight.models.game import Battle, Game, LastBattleResult, Player, Puppet, StaticOpponent, Zones
 from pitfight.phases import reward
-from pitfight.phases.battle import get_furthest_round, get_pairing_probabilities
+from pitfight.phases.battle import BASIC_LAND_IMAGES, get_furthest_round, get_pairing_probabilities
 from server.schemas.api import (
     BattleView,
+    CardCatalogEntry,
+    CardRef,
     GameBootstrapResponse,
     GameStateResponse,
     GameStatusPlayer,
@@ -24,12 +27,13 @@ from server.schemas.api import (
     PlayerView,
     RevealAnimationView,
     SelfPlayerView,
+    ZonesView,
 )
 from server.services.game_serialization import (
     build_catalog_from_game,
-    build_catalog_from_state_refs,
     card_to_ref,
     cards_to_refs,
+    catalog_entry_for_scryfall_id,
     last_battle_result_to_view,
     zones_to_view,
 )
@@ -46,6 +50,9 @@ _PHASE_PRIORITY: tuple[str, ...] = (
     "draft",
 )
 _FINISHED_VIEWER_PHASES: frozenset[str] = frozenset({"eliminated", "winner", "game_over"})
+_SYNTHETIC_CATALOG_IDS: frozenset[str] = frozenset(
+    {*(f"basic-{name.lower()}" for name in BASIC_LAND_IMAGES), "treasure"}
+)
 
 
 def _opaque_card_id(key: bytes, card_id: str) -> str:
@@ -102,13 +109,17 @@ def puppet_snapshot_for_round(puppet: Puppet, *, stage: int, round_num: int) -> 
     if exact_key in puppet.snapshots:
         return puppet.snapshots[exact_key]
 
-    available_keys = sorted(puppet.snapshots, key=_parse_round_key)
-    if not available_keys:
+    parsed_keys = sorted(((_parse_round_key(key), key) for key in puppet.snapshots), key=lambda item: item[0])
+    if not parsed_keys:
         return None
 
     target = (target_stage, target_round)
-    prior_keys = [key for key in available_keys if _parse_round_key(key) <= target]
-    selected_key = prior_keys[-1] if prior_keys else available_keys[0]
+    selected_key = parsed_keys[0][1]
+    for round_key, key in parsed_keys:
+        if round_key <= target:
+            selected_key = key
+        else:
+            break
     return puppet.snapshots[selected_key]
 
 
@@ -337,12 +348,15 @@ def build_puppet_view(
     *,
     probabilities: dict[str, float] | None,
     most_recent_ghost_puppet_name: str | None = None,
+    furthest_round: tuple[int, int] | None = None,
 ) -> PlayerView:
     snapshot = puppet_snapshot_for_round(puppet, stage=viewer.stage, round_num=viewer.round)
     # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
     # round, or a player who is behind would see a hand early. Both stop at the round a puppet went out.
-    furthest_stage, furthest_round = get_furthest_round(viewer.game)
-    table_snapshot = puppet_snapshot_for_round(puppet, stage=furthest_stage, round_num=furthest_round)
+    furthest_stage, furthest_round_num = (
+        furthest_round if furthest_round is not None else get_furthest_round(viewer.game)
+    )
+    table_snapshot = puppet_snapshot_for_round(puppet, stage=furthest_stage, round_num=furthest_round_num)
     revealed_cards, prior_upgrades = _puppet_revealed_cards_and_upgrades(puppet, viewer, snapshot=snapshot)
     has_data = snapshot is not None and table_snapshot is not None
 
@@ -409,6 +423,93 @@ def _build_self_player_view(game: Game, player: Player) -> SelfPlayerView:
     )
 
 
+def _add_ref_ids(refs: list[CardRef], out: set[str]) -> None:
+    for ref in refs:
+        if ref.scryfall_id:
+            out.add(ref.scryfall_id)
+
+
+def _collect_player_view_ids(view: PlayerView, out: set[str]) -> None:
+    _add_ref_ids(view.upgrades, out)
+    if view.vanguard is not None and view.vanguard.scryfall_id:
+        out.add(view.vanguard.scryfall_id)
+    _add_ref_ids(view.most_recently_revealed_cards, out)
+    _add_ref_ids(view.full_sideboard, out)
+    _add_ref_ids(view.command_zone, out)
+
+
+def _collect_zones_view_ids(zones: ZonesView, out: set[str]) -> None:
+    for ref_list in (
+        zones.battlefield,
+        zones.graveyard,
+        zones.exile,
+        zones.hand,
+        zones.sideboard,
+        zones.upgrades,
+        zones.command_zone,
+        zones.library,
+        zones.submitted_cards,
+        zones.spawned_tokens,
+    ):
+        _add_ref_ids(ref_list, out)
+
+
+def _collect_battle_view_ids(battle_view: BattleView, out: set[str]) -> None:
+    _collect_zones_view_ids(battle_view.your_zones, out)
+    _collect_zones_view_ids(battle_view.opponent_zones, out)
+    _add_ref_ids(battle_view.opponent_full_sideboard, out)
+    for anim in battle_view.pending_reveal_animations:
+        if anim.upgrade.scryfall_id:
+            out.add(anim.upgrade.scryfall_id)
+        if anim.target.scryfall_id:
+            out.add(anim.target.scryfall_id)
+
+
+def _collect_state_scryfall_ids(
+    all_players: list[PlayerView],
+    self_player: SelfPlayerView,
+    *,
+    available_upgrades: list[CardRef],
+    current_battle: BattleView | None,
+) -> set[str]:
+    out: set[str] = set()
+    for view in all_players:
+        _collect_player_view_ids(view, out)
+    _collect_player_view_ids(self_player, out)
+    _add_ref_ids(self_player.hand, out)
+    _add_ref_ids(self_player.sideboard, out)
+    if self_player.current_pack is not None:
+        _add_ref_ids(self_player.current_pack, out)
+    last_result = self_player.last_battle_result
+    if last_result is not None and last_result.card_gained is not None and last_result.card_gained.scryfall_id:
+        out.add(last_result.card_gained.scryfall_id)
+    _add_ref_ids(available_upgrades, out)
+    if current_battle is not None:
+        _collect_battle_view_ids(current_battle, out)
+    return out
+
+
+def _build_catalog_delta(scryfall_ids: set[str]) -> dict[str, CardCatalogEntry]:
+    catalog: dict[str, CardCatalogEntry] = {}
+    stack = list(scryfall_ids)
+    seen = set(scryfall_ids)
+    while stack:
+        sid = stack.pop()
+        try:
+            card_data = get_card_data(sid)
+        except KeyError:
+            continue
+        catalog[sid] = catalog_entry_for_scryfall_id(sid)
+        for token_sid in card_data.token_scryfall_ids:
+            if token_sid not in seen:
+                seen.add(token_sid)
+                stack.append(token_sid)
+    for sid in scryfall_ids:
+        if sid not in catalog and sid in _SYNTHETIC_CATALOG_IDS:
+            catalog[sid] = catalog_entry_for_scryfall_id(sid)
+    return catalog
+
+
 def build_game_state(game: Game, player: Player, *, game_id: str) -> GameStateResponse:
     current_battle = next(
         (
@@ -431,31 +532,42 @@ def build_game_state(game: Game, player: Player, *, game_id: str) -> GameStateRe
         )
         for candidate in game.players
     ]
-    all_players.extend(
-        build_puppet_view(
-            puppet,
-            player,
-            probabilities=probabilities,
-            most_recent_ghost_puppet_name=most_recent_ghost_puppet_name,
+    if game.puppets:
+        furthest_round = get_furthest_round(game)
+        all_players.extend(
+            build_puppet_view(
+                puppet,
+                player,
+                probabilities=probabilities,
+                most_recent_ghost_puppet_name=most_recent_ghost_puppet_name,
+                furthest_round=furthest_round,
+            )
+            for puppet in game.puppets
         )
-        for puppet in game.puppets
-    )
+    self_player = _build_self_player_view(game, player)
+    available_upgrades = cards_to_refs(game.available_upgrades)
     battle_resolution = player.battle_resolution.model_copy(deep=True) if player.battle_resolution else None
-    state = GameStateResponse(
+    scryfall_ids = _collect_state_scryfall_ids(
+        all_players,
+        self_player,
+        available_upgrades=available_upgrades,
+        current_battle=current_battle,
+    )
+    return GameStateResponse(
         game_id=game_id,
         phase=determine_game_phase(game),
         starting_life=game.config.starting_life,
         use_upgrades=game.config.use_upgrades,
         voice_chat_enabled=game.config.voice_chat_enabled,
         players=all_players,
-        self_player=_build_self_player_view(game, player),
-        available_upgrades=cards_to_refs(game.available_upgrades),
+        self_player=self_player,
+        available_upgrades=available_upgrades,
         current_battle=current_battle,
         battle_resolution=battle_resolution,
         cube_id=game.config.cube_id,
         play_mode=game.config.play_mode,
+        catalog_delta=_build_catalog_delta(scryfall_ids),
     )
-    return state.model_copy(update={"catalog_delta": build_catalog_from_state_refs(state)})
 
 
 def build_game_bootstrap(game: Game, player: Player, *, game_id: str) -> GameBootstrapResponse:
