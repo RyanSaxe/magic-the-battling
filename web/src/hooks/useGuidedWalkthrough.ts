@@ -320,8 +320,8 @@ export function useGuidedWalkthrough({
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [nextState.kind]);
 
-  // Keep background inert while active; immediately release inert once fading or hidden.
-  useLayoutEffect(() => {
+  // Keep background inert while active; useEffect ensures ancestor rootRef is attached on first mount.
+  useEffect(() => {
     const root = rootRef.current;
     const walkthrough = walkthroughRef.current;
     if (!takesTaps || !root || !walkthrough) return;
