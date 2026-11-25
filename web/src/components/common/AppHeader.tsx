@@ -6,7 +6,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useInRouterContext, useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts";
 import { useAuth } from "../../contexts/authState";
 import { useAsyncAction } from "../../hooks/useAsyncResource";
@@ -25,9 +25,38 @@ interface AppHeaderProps {
   ref?: Ref<HTMLElement>;
 }
 
+const BRAND_HOME_LINK_CLASS =
+  "inline-flex items-center min-w-0 max-w-full rounded transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[var(--color-gold-bright)] focus-visible:outline-offset-2";
+
+function BrandHomeLink(): ReactElement {
+  const inRouter = useInRouterContext();
+  if (!inRouter) {
+    return (
+      <a
+        href="/"
+        aria-label="Pitfight Home"
+        title="Home"
+        className={BRAND_HOME_LINK_CLASS}
+      >
+        <BrandLockup />
+      </a>
+    );
+  }
+  return (
+    <Link
+      to="/"
+      aria-label="Pitfight Home"
+      title="Home"
+      className={BRAND_HOME_LINK_CLASS}
+    >
+      <BrandLockup />
+    </Link>
+  );
+}
+
 /** The top bar on pages outside a game: the brand lockup, then the page's buttons by role. */
 export function AppHeader(props: AppHeaderProps): ReactElement {
-  return <TopBar lead={<BrandLockup />} {...props} />;
+  return <TopBar lead={<BrandHomeLink />} {...props} />;
 }
 
 export function GuideButton({

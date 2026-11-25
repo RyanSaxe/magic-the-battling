@@ -9,7 +9,11 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import { createBattler, getBattlers } from "../api/client";
+import { closeSeat, createBattler, getBattlers } from "../api/client";
+import {
+  useResumableGames,
+  type ResumableSeat,
+} from "../hooks/useResumableGames";
 import type { UserBattler } from "../types";
 import { Dashboard } from "./Dashboard";
 
@@ -28,6 +32,7 @@ vi.hoisted(() => {
 });
 
 vi.mock("../api/client", () => ({
+  closeSeat: vi.fn(async () => {}),
   createBattler: vi.fn(),
   getBattlers: vi.fn(),
   getFollowing: async (): Promise<{
@@ -39,6 +44,7 @@ vi.mock("../api/client", () => ({
     total_games: number;
     total_wins: number;
   }> => ({ games: [], total_games: 0, total_wins: 0 }),
+  rejoinGame: vi.fn(),
 }));
 vi.mock("../contexts", () => ({
   useToast: (): { addToast: () => void } => ({ addToast: (): void => {} }),
@@ -50,10 +56,14 @@ vi.mock("../contexts/authState", () => ({
   }),
 }));
 vi.mock("../hooks/useResumableGames", () => ({
-  useResumableGames: (): never[] => [],
+  useResumableGames: vi.fn((): ResumableSeat[] => []),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.mocked(closeSeat).mockClear();
+  vi.mocked(useResumableGames).mockReturnValue([]);
+});
 
 const preset = (id: number): UserBattler => ({
   id,
@@ -186,3 +196,86 @@ it.each([
     );
   },
 );
+
+function activeSeat(id: string, name: string): ResumableSeat {
+  return {
+    gameId: id,
+    playerName: "tester",
+    kind: "game",
+    lastActiveAt: null,
+    joinCode: null,
+    cubeId: id,
+    cubeName: name,
+    cubeImageUri: null,
+    playMode: "limited",
+    useUpgrades: true,
+    playerCount: 4,
+    canClose: true,
+    stage: 3,
+    round: 2,
+    poison: 0,
+  };
+}
+
+it("keeps Dashboard ResumeBanner single-game when only one active game exists", async () => {
+  vi.mocked(getBattlers).mockResolvedValueOnce({
+    battlers: [],
+    has_more: false,
+  });
+  vi.mocked(useResumableGames).mockReturnValue([activeSeat("g1", "Crucible")]);
+
+  render(
+    <MemoryRouter>
+      <Dashboard />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByText("Crucible")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Resume Game →" })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Close Crucible as tester" }),
+  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^See all / })).toBeNull();
+});
+
+it("opens the In progress modal from Dashboard ResumeBanner when multiple active games exist", async () => {
+  vi.mocked(getBattlers).mockResolvedValueOnce({
+    battlers: [],
+    has_more: false,
+  });
+  vi.mocked(useResumableGames).mockReturnValue([
+    activeSeat("g1", "Crucible"),
+    activeSeat("g2", "Vintage Cube"),
+  ]);
+
+  render(
+    <MemoryRouter>
+      <Dashboard />
+    </MemoryRouter>,
+  );
+
+  const seeAll = await screen.findByRole("button", { name: "See all 2" });
+  expect(
+    screen.queryByRole("button", { name: "Close Crucible as tester" }),
+  ).toBeNull();
+
+  fireEvent.click(seeAll);
+  const modal = screen.getByRole("dialog", { name: "In progress" });
+  expect(within(modal).getByText("Crucible")).toBeTruthy();
+  expect(within(modal).getByText("Vintage Cube")).toBeTruthy();
+
+  fireEvent.click(
+    within(modal).getByRole("button", { name: "Close Crucible as tester" }),
+  );
+  fireEvent.click(
+    within(screen.getByRole("dialog", { name: "Close this game?" })).getByRole(
+      "button",
+      { name: "Close Game" },
+    ),
+  );
+
+  await vi.waitFor(() => {
+    expect(closeSeat).toHaveBeenCalledWith("g1", "tester", "");
+    expect(screen.queryByRole("button", { name: /^See all / })).toBeNull();
+  });
+});

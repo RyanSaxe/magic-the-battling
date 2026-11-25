@@ -81,6 +81,16 @@ function Harness({ initial }: { initial: ResumableSeat[] }): ReactNode {
   );
 }
 
+it("keeps ResumeShelf sleek with only a close button when a single active game exists", () => {
+  render(<Harness initial={[seat("g1", "Crucible")]} />);
+
+  expect(screen.getByText("Crucible")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Close Crucible as Alice" }),
+  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /more$/ })).toBeNull();
+});
+
 it("opens In progress modal from +N more, keeps modal open on Escape over CloseSeatDialog, and closes when last game closes", async () => {
   render(<Harness initial={[seat("g1", "Crucible"), seat("g2", "Vintage")]} />);
 

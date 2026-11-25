@@ -5,7 +5,7 @@ import { useRequireAuth } from "../hooks/pages/useAuthSession";
 import { AppHeader, UserMenuButton } from "../components/common/AppHeader";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { JoinGameModal } from "../components/home/JoinGameModal";
-import { CloseSeatDialog } from "../components/ResumeGame";
+import { CloseSeatDialog, ResumeGamesDialog } from "../components/ResumeGame";
 import { AddCubeModal } from "../components/dashboard/AddCubeModal";
 import { CubeTile } from "../components/dashboard/CubeTile";
 import { DashboardFrame } from "../components/dashboard/DashboardFrame";
@@ -442,11 +442,15 @@ type SavedLibraryEntry = Extract<LibraryEntry, { kind: "saved" }>;
 function DashboardModals({
   showAddModal,
   showJoinModal,
+  showAllGames,
+  activeSeats,
   closingSeat,
   confirmingDelete,
   onCloseAddModal,
   onCreatedPreset,
   onCloseJoinModal,
+  onCloseAllGames,
+  onSelectSeatToClose,
   onKeepSeat,
   onSeatClosed,
   onKeepDelete,
@@ -455,11 +459,15 @@ function DashboardModals({
 }: {
   showAddModal: boolean;
   showJoinModal: boolean;
+  showAllGames: boolean;
+  activeSeats: ResumableSeat[];
   closingSeat: ResumableSeat | null;
   confirmingDelete: SavedLibraryEntry | null;
   onCloseAddModal: () => void;
   onCreatedPreset: (preset: SavedLibraryEntry["preset"]) => void;
   onCloseJoinModal: () => void;
+  onCloseAllGames: () => void;
+  onSelectSeatToClose: (seat: ResumableSeat) => void;
   onKeepSeat: () => void;
   onSeatClosed: (gameId: string) => void;
   onKeepDelete: () => void;
@@ -476,6 +484,13 @@ function DashboardModals({
         />
       )}
       {showJoinModal && <JoinGameModal onClose={onCloseJoinModal} />}
+      {showAllGames && (
+        <ResumeGamesDialog
+          seats={activeSeats}
+          onClose={onCloseAllGames}
+          onCloseSeat={onSelectSeatToClose}
+        />
+      )}
       {closingSeat && (
         <CloseSeatDialog
           seat={closingSeat}
@@ -506,10 +521,12 @@ export function Dashboard(): ReactElement | null {
   const { addToast } = useToast();
   const resumableGames = useResumableGames();
   const [closedSeatIds, setClosedSeatIds] = useState<string[]>([]);
+  const [showAllGames, setShowAllGames] = useState(false);
   const [closingSeat, setClosingSeat] = useState<ResumableSeat | null>(null);
-  const resumable = resumableGames.find(
+  const activeSeats = resumableGames.filter(
     (seat) => !closedSeatIds.includes(seat.gameId),
   );
+  const resumable = activeSeats[0];
 
   const libraryLoad = useFirstLoad(loadLibrary, Boolean(user));
   const myGamesLoad = useFirstLoad(loadMyGames, Boolean(user));
@@ -580,7 +597,12 @@ export function Dashboard(): ReactElement | null {
     <>
       <DashboardFrame header={<AppHeader account={<UserMenuButton />} />}>
         {resumable && (
-          <ResumeBanner seat={resumable} onClose={setClosingSeat} />
+          <ResumeBanner
+            seat={resumable}
+            totalCount={activeSeats.length}
+            onClose={setClosingSeat}
+            onShowAll={() => setShowAllGames(true)}
+          />
         )}
 
         <DashboardQuickBar
@@ -616,6 +638,8 @@ export function Dashboard(): ReactElement | null {
       <DashboardModals
         showAddModal={showAddModal}
         showJoinModal={showJoinModal}
+        showAllGames={showAllGames}
+        activeSeats={activeSeats}
         closingSeat={closingSeat}
         confirmingDelete={confirmingDelete}
         onCloseAddModal={() => setShowAddModal(false)}
@@ -627,6 +651,8 @@ export function Dashboard(): ReactElement | null {
           setShowAddModal(false);
         }}
         onCloseJoinModal={() => setShowJoinModal(false)}
+        onCloseAllGames={() => setShowAllGames(false)}
+        onSelectSeatToClose={setClosingSeat}
         onKeepSeat={() => setClosingSeat(null)}
         onSeatClosed={(gameId) => {
           setClosedSeatIds((ids) => [...ids, gameId]);
