@@ -3,6 +3,17 @@
  * phase layout, constrained frames, slack redistribution, and shell primitives.
  */
 export {
+  BATTLEFIELD_INSET,
+  battleDimsEqual,
+  computeBattleZones,
+  makeInitialBattleDims,
+  resolveBattleConfig,
+  type BattleCardDimensions,
+  type BattleZoneConfig,
+  type BattleZoneDims,
+  type ResolvedBattleZoneConfig,
+} from "./battleLayout";
+export {
   cardHeight,
   fitCards,
   horizontalGaps,

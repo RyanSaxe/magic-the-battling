@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import type {
   GameState,
   Card as CardType,
@@ -10,18 +10,16 @@ import { HandZone, BattlefieldZone } from "../../components/zones";
 import { CompactZoneDisplay } from "../../components/zones/CompactZoneDisplay";
 import { Card, CardBack, CardActionMenu } from "../../components/card";
 import { ZoneDivider } from "../../components/common/ZoneDivider";
-import { usePanelHoldsEnter } from "../../utils/enterKey";
-import { useEscapeKey } from "../../hooks/useDomEffects";
 import { useBattleLayoutMetricsSync } from "../../hooks/usePhaseHelpers";
 import { useBattleCardSizes } from "../../hooks/useBattleCardSizes";
 import { battleBoardMetrics } from "./phaseLayouts";
+import { ZoneActionMenu } from "./BattleZoneActionMenu";
 import {
   buildAppliedUpgradeMap,
   buildHiddenAppliedUpgradeMap,
 } from "../../utils/upgrades";
 import { canInteractWithBattleZone } from "../../utils/battleInteraction";
 import { canHover } from "../../utils/inputMode";
-import { POPOVER_CHROME } from "../../components/common/styles";
 
 export interface BattleCardMenu {
   card: CardType;
@@ -102,78 +100,6 @@ function countTopLevel(
 ): number {
   const attachedIds = new Set(Object.values(attachments).flat());
   return cards.filter((c) => !attachedIds.has(c.id) && predicate(c)).length;
-}
-
-function ZoneActionMenu({
-  position,
-  onDraw,
-  onShuffle,
-  onClose,
-}: {
-  position: { x: number; y: number };
-  onDraw: () => void;
-  onShuffle: () => void;
-  onClose: () => void;
-}) {
-  const menuRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (!node) return;
-      const rect = node.getBoundingClientRect();
-      const padding = 8;
-      const x = Math.max(
-        padding,
-        Math.min(position.x, window.innerWidth - rect.width - padding),
-      );
-      const y = Math.max(
-        padding,
-        Math.min(position.y, window.innerHeight - rect.height - padding),
-      );
-      node.style.left = `${x}px`;
-      node.style.top = `${y}px`;
-    },
-    [position],
-  );
-
-  usePanelHoldsEnter();
-  // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
-  useEscapeKey(
-    (event) => {
-      event.preventDefault();
-      onClose();
-    },
-    { capture: true },
-  );
-
-  return (
-    <>
-      <div className="fixed inset-0 z-50" onClick={onClose} />
-      <div
-        ref={menuRef}
-        className={`fixed ${POPOVER_CHROME} py-1 min-w-[160px] z-[51]`}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            onDraw();
-            onClose();
-          }}
-          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
-        >
-          Draw
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onShuffle();
-            onClose();
-          }}
-          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
-        >
-          Shuffle
-        </button>
-      </div>
-    </>
-  );
 }
 
 export function BattlePhase({

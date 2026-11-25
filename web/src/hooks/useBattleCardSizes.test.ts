@@ -96,5 +96,23 @@ describe("computeBattleZones", () => {
         expect(z.height).toBe(Math.round(z.width * CARD_ASPECT_RATIO));
       }
     });
+
+    it("allows cards below 40px on very short screens rather than hiding or scrolling", () => {
+      const result = computeBattleZones(1200, 350, defaults);
+      expect(result.playerHand.width).toBeLessThan(MIN_CARD_WIDTH);
+      expect(result.opponentHand.width).toBeLessThan(MIN_CARD_WIDTH);
+      expect(result.playerHand.width).toBeGreaterThan(0);
+    });
+  });
+
+  describe("hand fanning", () => {
+    it("overlaps hand cards with a negative gap before shrinking them", () => {
+      const result = computeBattleZones(500, 800, {
+        ...defaults,
+        playerHandCount: 7,
+      });
+      expect(result.playerHandGap).toBeLessThan(0);
+      expect(result.playerHand.width).toBeGreaterThan(0);
+    });
   });
 });
