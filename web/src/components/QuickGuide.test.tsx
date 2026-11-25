@@ -54,7 +54,12 @@ it("scrolls to the heading a link points to on another tab", async () => {
   render(<QuickGuide />);
 
   fireEvent.click(screen.getByRole("radio", { name: "Tips" }));
-  fireEvent.click(screen.getAllByText("treasures", { selector: "button" })[0]);
+  const [treasuresLink] = await screen.findAllByText(
+    "treasures",
+    { selector: "button" },
+    { timeout: 5000 },
+  );
+  fireEvent.click(treasuresLink);
 
   await vi.waitFor(() =>
     expect(requireElement(".guide-book-page").scrollTop).toBe(300),

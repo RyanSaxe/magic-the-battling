@@ -30,7 +30,14 @@ const backendHttpTarget = `http://localhost:${backendPort}`;
 const backendWsTarget = `ws://localhost:${backendPort}`;
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      babel: {
+        plugins: ["babel-plugin-react-compiler"],
+      },
+    }),
+    tailwindcss(),
+  ],
   server: {
     port: frontendPort,
     host: "127.0.0.1",

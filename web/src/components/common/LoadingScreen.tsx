@@ -4,10 +4,12 @@ import { BottomBar, BrandMark } from "./FrameBar";
 import { PageFrame } from "./PageFrame";
 import type { LoadingStep } from "./loadingSteps";
 
+const EMPTY_STEPS: readonly LoadingStep[] = [];
+
 interface LoadingScreenProps {
   title?: string;
-  steps: LoadingStep[];
-  current: LoadingStep;
+  steps?: readonly LoadingStep[];
+  current?: LoadingStep;
   /** Given while the wait can still be cancelled. */
   onCancel?: () => void;
 }
@@ -18,20 +20,21 @@ function stepStatusClass(index: number, currentIndex: number): string {
   return "";
 }
 
-/** The wait for a lobby or a board: an opening hand on the felt over the steps the wait is really at. */
+/** The wait for a lobby, board, or route chunk: an opening hand on the felt over any active wait steps. */
 export function LoadingScreen({
   title = "Setting the table",
-  steps,
+  steps = EMPTY_STEPS,
   current,
   onCancel,
 }: LoadingScreenProps): ReactElement {
-  const at = steps.indexOf(current);
+  const at = current === undefined ? -1 : steps.indexOf(current);
+  const showSteps = steps.length > 0 && at >= 0;
   return (
     <PageFrame
       header={<AppHeader home={<HomeButton />} />}
       center
       // The game's own tips point at buttons that aren't there until the board opens.
-      hints="play"
+      hints={showSteps ? "play" : undefined}
       footer={
         <BottomBar
           secondary={
@@ -55,20 +58,22 @@ export function LoadingScreen({
           ))}
         </div>
         <h2 className="hero-title loading-title">{title}</h2>
-        <ol className="loading-steps">
-          {steps.map((step, i) => (
-            <li
-              key={step}
-              aria-current={i === at ? "step" : undefined}
-              className={`loading-step ${stepStatusClass(i, at)}`}
-            >
-              <span className="loading-dot" aria-hidden="true">
-                {i < at && "✓"}
-              </span>
-              {step}
-            </li>
-          ))}
-        </ol>
+        {showSteps && (
+          <ol className="loading-steps">
+            {steps.map((step, i) => (
+              <li
+                key={step}
+                aria-current={i === at ? "step" : undefined}
+                className={`loading-step ${stepStatusClass(i, at)}`}
+              >
+                <span className="loading-dot" aria-hidden="true">
+                  {i < at && "✓"}
+                </span>
+                {step}
+              </li>
+            ))}
+          </ol>
+        )}
       </output>
     </PageFrame>
   );

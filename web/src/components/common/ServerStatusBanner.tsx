@@ -1,8 +1,11 @@
-import { useState, type ReactElement } from "react";
+import { Suspense, lazy, useState, type ReactElement } from "react";
 import { useLocation } from "react-router-dom";
 
-import { ServerStatusWindow } from "./ServerStatusWindow";
 import { useServerStatus } from "../../hooks/useServerStatus";
+
+const ServerStatusWindow = lazy(async () => ({
+  default: (await import("./ServerStatusWindow")).ServerStatusWindow,
+}));
 
 export function ServerStatusBanner(): ReactElement | null {
   const location = useLocation();
@@ -15,11 +18,13 @@ export function ServerStatusBanner(): ReactElement | null {
   const hidden = dismissedAt === status.updated_at;
 
   return (
-    <ServerStatusWindow
-      status={status}
-      hidden={hidden}
-      onDismiss={() => setDismissedAt(status.updated_at)}
-      inGame={false}
-    />
+    <Suspense fallback={null}>
+      <ServerStatusWindow
+        status={status}
+        hidden={hidden}
+        onDismiss={() => setDismissedAt(status.updated_at)}
+        inGame={false}
+      />
+    </Suspense>
   );
 }
