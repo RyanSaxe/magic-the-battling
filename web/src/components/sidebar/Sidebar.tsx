@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { PlayerView } from "../../types";
-import type { ScoutingTab } from "../../pages/gameSurfaces";
+import type { ScoutingTab } from "../../hooks/useGameSurfaces";
 import { PlayerList } from "../PlayerList";
 import { SidePanel } from "../common/SidePanel";
 import {

@@ -1,7 +1,6 @@
 import {
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
   useCallback,
   useMemo,
@@ -38,21 +37,14 @@ import {
 import { getGameStatus } from "../api/client";
 import { SpectateRequestModal } from "../components/SpectateRequestModal";
 import type {
-  BattleView,
   Card as CardType,
   GameStatusResponse,
   PlayerView,
-  RevealAnimation,
   ZoneName,
 } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
-import {
-  BattlePhase,
-  type BattleCardMenu,
-  type BattleSelectedCard,
-  type BattleZoneModalState,
-} from "./phases/Battle";
+import { BattlePhase, type BattleZoneModalState } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import {
   Sidebar,
@@ -132,11 +124,10 @@ import {
   getPlayerStateDisplayName,
   type Phase,
 } from "../constants/phases";
-import type {
-  GuideRequest,
-  GuidedGuideId,
-  GuidedWalkthroughContext,
-} from "../guided/types";
+import type { GuidedGuideId, GuidedWalkthroughContext } from "../guided/types";
+import type { GuideCompletionTrigger } from "../guided/guideStateMachine";
+import { useGuideSidebarSync } from "../hooks/useGuidedWalkthrough";
+import { useBattleEndFlow } from "../hooks/useBattleEndFlow";
 import {
   getRememberedSeat,
   getRememberedSpectatorName,
@@ -145,9 +136,7 @@ import {
 } from "../utils/deviceIdentity";
 import {
   isSubmitPopoverGuideStepActive,
-  matchesGuideCompletionTrigger,
   shouldDisableGameplayHotkeys,
-  shouldBlockGuidesForBattleResolution,
   type VisibleGuideStep,
 } from "./gameGuideState";
 import {
@@ -162,17 +151,13 @@ import {
   findBattleCard,
 } from "./gameHotkeys";
 import {
-  guideKept,
-  isGuideShowing,
-  isDrawerOpen,
-  isZonePanelOpen,
-  reduceGameBoard,
+  useGameSurfaces,
   type GameSurface,
   type GameSurfaceKind,
   type PanelZone,
   type ScoutingTab,
   type UpgradesWindowMode,
-} from "./gameSurfaces";
+} from "../hooks/useGameSurfaces";
 import {
   canUseBattleFaceDownAction,
   canUseBattleFlipAction,
@@ -684,7 +669,6 @@ function GameGuideLayer({
   setSidebarOpen,
   scouting,
   setScouting,
-  guideCompletionTrigger,
   onVisibleGuideStepChange,
 }: {
   rootRef: React.RefObject<HTMLElement | null>;
@@ -693,274 +677,53 @@ function GameGuideLayer({
   setSidebarOpen: (open: boolean) => void;
   scouting: Scouting | null;
   setScouting: (player: string | null, tab?: ScoutingTab) => void;
-  guideCompletionTrigger: {
-    guideId: GuidedGuideId;
-    stepId: string;
-    nonce: number;
-  } | null;
   onVisibleGuideStepChange: (step: VisibleGuideStep | null) => void;
 }) {
-  const GUIDE_HANDOFF_LINGER_MS = 450;
-  const scoutedPlayerName = scouting?.player ?? null;
-  const scoutingTab = scouting?.tab ?? "seen";
-  const { guideRequest, finishGuide, skipTutorial, updateGuideStep } =
-    useGuideContext();
-  const [activeStepState, setActiveStepState] = useState<{
-    nonce: number | null;
-    stepIndex: number;
-  }>({
-    nonce: guideRequest?.nonce ?? null,
-    stepIndex: guideRequest?.stepIndex ?? 0,
-  });
-  const [renderRequest, setRenderRequest] = useState<GuideRequest | null>(
+  const {
     guideRequest,
-  );
-  const [renderGuide, setRenderGuide] = useState(() =>
-    guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null,
-  );
-  const sidebarRestoreRef = useRef<{
-    sidebarOpen: boolean;
-    revealedPlayerName: string | null;
-    revealedPlayerTab: ScoutingTab;
-  } | null>(null);
-  const activeRequest = guideRequest ?? renderRequest;
-  const requestActive =
-    !!guideRequest && guideRequest.nonce === activeRequest?.nonce;
-  const stepIndex =
-    activeRequest && activeStepState.nonce === activeRequest.nonce
-      ? activeStepState.stepIndex
-      : (activeRequest?.stepIndex ?? 0);
+    dismissedImmediately,
+    finishGuide,
+    skipTutorial,
+    advanceGuideStep,
+    backGuideStep,
+  } = useGuideContext();
 
-  useEffect(() => {
-    if (guideRequest) {
-      queueMicrotask(() => {
-        setRenderRequest(guideRequest);
-      });
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setRenderRequest(null);
-    }, GUIDE_HANDOFF_LINGER_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [guideRequest]);
-
-  const liveGuide = useMemo(
+  const stepIndex = guideRequest?.stepIndex ?? 0;
+  const guide = useMemo(
     () =>
       guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null,
     [context, guideRequest],
   );
-  const guide = guideRequest ? liveGuide : renderGuide;
   const activeStep = guide?.steps[stepIndex] ?? null;
 
-  useEffect(() => {
-    if (guideRequest && liveGuide) {
-      queueMicrotask(() => {
-        setRenderGuide(liveGuide);
-      });
-      return;
-    }
-
-    if (!activeRequest) {
-      queueMicrotask(() => {
-        setRenderGuide(null);
-      });
-    }
-  }, [activeRequest, guideRequest, liveGuide]);
-
-  const restoreSidebarState = useCallback(() => {
-    const snapshot = sidebarRestoreRef.current;
-    if (!snapshot) {
-      return;
-    }
-
-    sidebarRestoreRef.current = null;
-    if (context.isMobile) {
-      if (sidebarOpen) {
-        setSidebarOpen(false);
-      }
-    } else if (sidebarOpen !== snapshot.sidebarOpen) {
-      setSidebarOpen(snapshot.sidebarOpen);
-    }
-    if (
-      scoutedPlayerName !== snapshot.revealedPlayerName ||
-      scoutingTab !== snapshot.revealedPlayerTab
-    ) {
-      setScouting(snapshot.revealedPlayerName, snapshot.revealedPlayerTab);
-    }
-  }, [
-    context.isMobile,
-    scoutedPlayerName,
-    scoutingTab,
-    setScouting,
-    setSidebarOpen,
-    sidebarOpen,
-  ]);
-
-  const resolvedSidebarState = useMemo(() => {
-    const sidebarState = activeStep?.sidebarState;
-    if (!sidebarState) {
-      return null;
-    }
-
-    const resolveValue = <T,>(
-      value: T | ((ctx: GuidedWalkthroughContext) => T | undefined) | undefined,
-    ): T | undefined =>
-      typeof value === "function"
-        ? (value as (ctx: GuidedWalkthroughContext) => T | undefined)(context)
-        : value;
-
-    return {
-      openOnMobile: resolveValue(sidebarState.openOnMobile),
-      playerName: resolveValue(sidebarState.playerName),
-      detailTab: resolveValue(sidebarState.detailTab),
-    };
-  }, [activeStep?.sidebarState, context]);
-
-  useLayoutEffect(() => {
-    if (!guideRequest || !resolvedSidebarState) {
-      restoreSidebarState();
-      return;
-    }
-
-    if (!sidebarRestoreRef.current) {
-      sidebarRestoreRef.current = {
-        sidebarOpen,
-        revealedPlayerName: scoutedPlayerName,
-        revealedPlayerTab: scoutingTab,
-      };
-    }
-
-    if (context.isMobile) {
-      if (resolvedSidebarState.openOnMobile === true && !sidebarOpen) {
-        setSidebarOpen(true);
-      }
-      if (resolvedSidebarState.openOnMobile === false && sidebarOpen) {
-        setSidebarOpen(false);
-      }
-    }
-    if (
-      resolvedSidebarState.playerName !== undefined &&
-      (scoutedPlayerName !== resolvedSidebarState.playerName ||
-        (resolvedSidebarState.detailTab !== undefined &&
-          scoutingTab !== resolvedSidebarState.detailTab))
-    ) {
-      setScouting(
-        resolvedSidebarState.playerName,
-        resolvedSidebarState.detailTab ?? scoutingTab,
-      );
-    }
-  }, [
-    context.isMobile,
+  useGuideSidebarSync({
     guideRequest,
-    resolvedSidebarState,
-    restoreSidebarState,
-    scoutedPlayerName,
-    scoutingTab,
-    setScouting,
-    setSidebarOpen,
+    activeStep,
+    context,
     sidebarOpen,
-  ]);
-
-  useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
-
-  useEffect(() => {
-    if (!guideRequest || !activeStep) {
-      return;
-    }
-
-    if (
-      !matchesGuideCompletionTrigger({
-        activeGuideRequest: guideRequest,
-        activeStepId: activeStep.id,
-        trigger: guideCompletionTrigger,
-      })
-    ) {
-      return;
-    }
-
-    queueMicrotask(() => {
-      setRenderRequest(null);
-      finishGuide(guideRequest.guideId);
-    });
-  }, [activeStep, finishGuide, guideCompletionTrigger, guideRequest]);
+    setSidebarOpen,
+    scouting,
+    setScouting,
+  });
 
   const handleAdvanceStep = useCallback(() => {
-    if (!guideRequest || !guide) {
-      return;
-    }
+    if (!guide) return;
+    advanceGuideStep(guide.steps.length);
+  }, [advanceGuideStep, guide]);
 
-    setActiveStepState((current) => {
-      const baseStepIndex =
-        current.nonce === guideRequest.nonce
-          ? current.stepIndex
-          : (guideRequest.stepIndex ?? 0);
-      const next = baseStepIndex + 1;
-      if (next >= guide.steps.length) {
-        queueMicrotask(() => finishGuide(guideRequest.guideId));
-        return {
-          nonce: guideRequest.nonce,
-          stepIndex: baseStepIndex,
-        };
-      }
-
-      updateGuideStep(guideRequest.guideId, next);
-      return {
-        nonce: guideRequest.nonce,
-        stepIndex: next,
-      };
-    });
-  }, [finishGuide, guide, guideRequest, updateGuideStep]);
-
-  const handleBackStep = useCallback(() => {
-    if (!guideRequest) {
-      return;
-    }
-
-    setActiveStepState((current) => {
-      const baseStepIndex =
-        current.nonce === guideRequest.nonce
-          ? current.stepIndex
-          : (guideRequest.stepIndex ?? 0);
-      const next = Math.max(0, baseStepIndex - 1);
-      if (next !== baseStepIndex) {
-        updateGuideStep(guideRequest.guideId, next);
-      }
-      return {
-        nonce: guideRequest.nonce,
-        stepIndex: next,
-      };
-    });
-  }, [guideRequest, updateGuideStep]);
-
-  useEffect(() => {
-    onVisibleGuideStepChange(
-      activeRequest && activeStep
-        ? { guideId: activeRequest.guideId, stepId: activeStep.id }
-        : null,
-    );
-  }, [activeRequest, activeStep, onVisibleGuideStepChange]);
-
-  useEffect(
-    () => () => {
-      onVisibleGuideStepChange(null);
-    },
-    [onVisibleGuideStepChange],
-  );
-
-  if (!activeRequest) return null;
   return (
     <GuidedWalkthrough
       rootRef={rootRef}
-      request={activeRequest}
+      request={guideRequest}
       context={context}
       stepIndex={stepIndex}
-      requestActive={requestActive}
+      requestActive={guideRequest !== null}
+      dismissedImmediately={dismissedImmediately}
       onClose={finishGuide}
       onSkipAll={skipTutorial}
       onAdvanceStep={handleAdvanceStep}
-      onBackStep={handleBackStep}
+      onBackStep={backGuideStep}
+      onVisibleGuideStepChange={onVisibleGuideStepChange}
     />
   );
 }
@@ -995,38 +758,6 @@ function GameContent() {
 
   const sizes = useViewportCardSizes();
   const shellMode = useGameShellMode();
-  const [
-    { open: openSurface, selectedCard: battleSelectedCard },
-    dispatchBoard,
-  ] = useReducer(reduceGameBoard, {
-    open: null,
-    selectedCard: null,
-  });
-  const sidebarOpen = isDrawerOpen(openSurface);
-  const setSidebarOpen = useCallback((open: boolean) => {
-    dispatchBoard(
-      open
-        ? { type: "open", surface: { kind: "players" } }
-        : { type: "close", kind: "players" },
-    );
-  }, []);
-  const scouting = useMemo<Scouting | null>(
-    () =>
-      openSurface?.kind === "scouting"
-        ? { player: openSurface.player, tab: openSurface.tab }
-        : null,
-    [openSurface],
-  );
-  const setScouting = useCallback(
-    (player: string | null, tab: ScoutingTab = "seen") => {
-      dispatchBoard(
-        player
-          ? { type: "scout", player, tab }
-          : { type: "close", kind: "scouting" },
-      );
-    },
-    [],
-  );
   const [fightSidebarView, setFightSidebarView] =
     useState<FightSidebarView>("fight");
   const [battleSidebarLayout, setBattleSidebarLayout] =
@@ -1034,7 +765,6 @@ function GameContent() {
   const [battleLifeRailRef, battleLifeRailHeight] = useElementHeight();
   const [sidePanelHost, setSidePanelHost] = useState<HTMLElement | null>(null);
   const usesOverlaySidebar = shellMode !== "big";
-  const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
 
   const { addToast } = useToast();
   const [phaseActionState, dispatchPhaseAction] = useReducer(
@@ -1042,10 +772,12 @@ function GameContent() {
     { phase: null, buildReady: false, connected: false },
     initialPhaseActionState,
   );
+  const [serverErrorNonce, setServerErrorNonce] = useState(0);
   const pendingPhaseAction = phaseActionState.pending;
   const handleServerError = useCallback(
     (error: AppError) => {
       dispatchPhaseAction({ type: "failed" });
+      setServerErrorNonce((count) => count + 1);
       addToast(
         getAppErrorMessage(
           error,
@@ -1172,6 +904,41 @@ function GameContent() {
   const isSpectator = !!spectatorConfig;
   const guideRootRef = useRef<HTMLDivElement>(null);
   const selfPhase = gameState?.self_player.phase;
+  const surfaces = useGameSurfaces(selfPhase);
+  const sidebarOpen = surfaces.drawerOpen;
+  const setSidebarOpen = surfaces.setDrawerOpen;
+  const scouting = surfaces.scouting;
+  const setScouting = surfaces.scout;
+  const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
+  const battleSelectedCard = surfaces.selectedCard;
+  const setBattleSelectedCard = surfaces.setSelectedCard;
+  const closeSurface = surfaces.close;
+
+  const battleEndSnapshot = useMemo(
+    () => ({
+      phase: selfPhase,
+      currentBattle: gameState?.current_battle ?? null,
+      battleResolution: gameState?.battle_resolution ?? null,
+      selfPlayerName: gameState?.self_player.name,
+      selfUpgrades: gameState?.self_player.upgrades ?? [],
+      connected: isConnected,
+    }),
+    [
+      gameState?.battle_resolution,
+      gameState?.current_battle,
+      gameState?.self_player.name,
+      gameState?.self_player.upgrades,
+      isConnected,
+      selfPhase,
+    ],
+  );
+  const battleEnd = useBattleEndFlow({
+    snapshot: battleEndSnapshot,
+    serverErrorNonce,
+    onSubmitResult: actions.battleSubmitResult,
+    onRevealUpgrade: actions.battleRevealUpgrade,
+    onCloseOverlays: () => surfaces.closeOverlays(),
+  });
 
   useEffect(() => {
     if (!session || isSpectator) return;
@@ -1226,7 +993,7 @@ function GameContent() {
   const selectedBasics = isSpectator
     ? (gameState?.self_player.chosen_basics ?? NO_BASICS)
     : pickedBasics;
-  const upgradesWindow = openSurface?.kind === "upgrades" ? openSurface : null;
+  const upgradesWindow = surfaces.upgradesWindow;
   const showUpgradesModal = upgradesWindow !== null;
   const handSlotsRef = useRef<(string | null)[]>([]);
   const [pendingBuildUpgradeAnimation, setPendingBuildUpgradeAnimation] =
@@ -1237,6 +1004,24 @@ function GameContent() {
       target: CardType;
     } | null>(null);
 
+  if (
+    pendingBuildUpgradeAnimation &&
+    gameState?.self_player.phase === "build"
+  ) {
+    const matchedUpgrade = gameState.self_player.upgrades.find(
+      (candidate) =>
+        candidate.id === pendingBuildUpgradeAnimation.upgradeId &&
+        candidate.upgrade_target?.id === pendingBuildUpgradeAnimation.targetId,
+    );
+    if (matchedUpgrade?.upgrade_target) {
+      setActiveBuildUpgradeAnimation({
+        upgrade: matchedUpgrade,
+        target: matchedUpgrade.upgrade_target,
+      });
+      setPendingBuildUpgradeAnimation(null);
+    }
+  }
+
   // Lifted state from Reward phase
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
     null,
@@ -1245,160 +1030,42 @@ function GameContent() {
     null,
   );
 
-  // Lifted state from Battle phase
-  const setBattleSelectedCard = useCallback(
-    (card: BattleSelectedCard | null) =>
-      dispatchBoard({ type: "select", card }),
-    [],
-  );
-  const [battleCardMenu, setBattleCardMenu] = useState<BattleCardMenu | null>(
-    null,
-  );
-  const [isChangingResult, setIsChangingResult] = useState(false);
-  const actionMenuOpen = openSurface?.kind === "actions";
-  const showSubmitHandPopover = openSurface?.kind === "submitHand";
-  const closeSurface = useCallback(
-    (kind: GameSurfaceKind) => dispatchBoard({ type: "close", kind }),
-    [],
-  );
-  const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(
-    null,
-  );
-  // A winner's question about unrevealed upgrades takes the choices' place, and cancelling it backs out of them.
-  const showSubmitResultPopover =
-    openSurface?.kind === "submitResult" && pendingBattleResult === null;
-  const [pendingPostRevealSubmit, setPendingPostRevealSubmit] = useState<
-    string | null
-  >(null);
-  const [visibleGuideStep, setVisibleGuideStep] =
-    useState<VisibleGuideStep | null>(null);
-  const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
-    guideId: GuidedGuideId;
-    stepId: string;
-    nonce: number;
-  } | null>(null);
-  const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<
-    string | null
-  >(null);
-  const [deckSeen, setDeckSeen] = useState(false);
-  const [cachedBattleForResolution, setCachedBattleForResolution] =
-    useState<BattleView | null>(null);
-  const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<
-    string | null
-  >(null);
-  const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<
-    Set<string>
-  >(new Set());
-  const [shownRevealAnimationIds, setShownRevealAnimationIds] = useState<
-    Set<string>
-  >(new Set());
-  const [activeRevealAnimation, setActiveRevealAnimation] =
-    useState<RevealAnimation | null>(null);
-  const battleResolutionId =
-    gameState?.battle_resolution?.resolution_id ?? null;
-
-  useEffect(() => {
-    if (gameState?.self_player.phase === "battle" && gameState.current_battle) {
-      const battleSnapshot = gameState.current_battle;
-      queueMicrotask(() => setCachedBattleForResolution(battleSnapshot));
-    }
-  }, [gameState?.current_battle, gameState?.self_player.phase]);
-
-  useEffect(() => {
-    const selfPlayer = gameState?.self_player;
-    if (
-      !selfPlayer ||
-      !pendingBuildUpgradeAnimation ||
-      selfPlayer.phase !== "build"
-    ) {
-      return;
-    }
-
-    const upgrade = selfPlayer.upgrades.find(
-      (candidate) =>
-        candidate.id === pendingBuildUpgradeAnimation.upgradeId &&
-        candidate.upgrade_target?.id === pendingBuildUpgradeAnimation.targetId,
-    );
-    if (!upgrade?.upgrade_target) {
-      return;
-    }
-
-    const nextAnimation = {
-      upgrade,
-      target: upgrade.upgrade_target,
-    };
-    queueMicrotask(() => {
-      setActiveBuildUpgradeAnimation(nextAnimation);
-      setPendingBuildUpgradeAnimation(null);
-    });
-  }, [gameState?.self_player, pendingBuildUpgradeAnimation]);
-
-  useEffect(() => {
-    const battle = gameState?.current_battle;
-    if (!battle || activeRevealAnimation || pendingBattleResult) return;
-    if (gameState?.self_player.phase !== "battle") return;
-
-    const pending = battle.pending_reveal_animations ?? [];
-    const next = pending.find(
-      (a) => !shownRevealAnimationIds.has(a.animation_id),
-    );
-    if (!next) return;
-
-    queueMicrotask(() => {
-      setActiveRevealAnimation(next);
-      setShownRevealAnimationIds((prev) => {
-        const s = new Set(prev);
-        s.add(next.animation_id);
-        return s;
-      });
-    });
-  }, [
-    gameState?.current_battle,
-    gameState?.self_player.phase,
-    activeRevealAnimation,
-    shownRevealAnimationIds,
-    pendingBattleResult,
-  ]);
-
-  const prevPhaseRef = useRef(gameState?.self_player.phase);
-  if (gameState?.self_player.phase !== prevPhaseRef.current) {
-    prevPhaseRef.current = gameState?.self_player.phase;
-    if (
-      gameState?.self_player.phase !== "battle" &&
-      battleSelectedCard !== null
-    ) {
-      setBattleSelectedCard(null);
-    }
-    if (gameState?.self_player.phase !== "battle" && battleCardMenu !== null) {
-      setBattleCardMenu(null);
-    }
-  }
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      dispatchBoard({ type: "phaseChanged", phase: selfPhase });
-      setFightSidebarView("fight");
-      if (selfPhase !== "battle") setIsChangingResult(false);
-    });
-  }, [selfPhase]);
-
-  const rulesPanel = guideKept(openSurface) ?? null;
-  const guideOnScreen = isGuideShowing(openSurface);
-  const guideMinimized = !!rulesPanel?.minimized;
-  const guideOpen = guideOnScreen && !guideMinimized;
-  const setGuideMinimized = useCallback(
-    (minimized: boolean) =>
-      dispatchBoard({ type: "guideMinimized", minimized }),
-    [],
-  );
-  const shareOpen = openSurface?.kind === "share";
-
   // Hover tracking for hotkeys
   const [hoveredCard, setHoveredCard] = useState<{
     id: string;
     zone: ZoneName;
     owner: "player" | "opponent";
   } | null>(null);
+
+  const [lastPhase, setLastPhase] = useState(selfPhase);
+  if (lastPhase !== selfPhase) {
+    setLastPhase(selfPhase);
+    setFightSidebarView("fight");
+    setHoveredCard(null);
+    if (selfPhase !== "reward") {
+      setSelectedUpgradeId(null);
+      setSelectedPoolCardId(null);
+    }
+  }
+
+  const actionMenuOpen = surfaces.actionMenuOpen;
+  const showSubmitHandPopover = surfaces.submitHandOpen;
+  // A winner's question about unrevealed upgrades takes the choices' place, and cancelling it backs out of them.
+  const showSubmitResultPopover =
+    surfaces.submitResultOpen && !battleEnd.confirmingReveal;
+  const [visibleGuideStep, setVisibleGuideStep] =
+    useState<VisibleGuideStep | null>(null);
+  const [guideCompletionTrigger, setGuideCompletionTrigger] =
+    useState<GuideCompletionTrigger | null>(null);
+  const [deckSeen, setDeckSeen] = useState(false);
+
+  const rulesPanel = surfaces.guideSurface;
+  const guideOnScreen = surfaces.guideOnScreen;
+  const guideMinimized = surfaces.guideMinimized;
+  const guideOpen = surfaces.guideExpanded;
+  const setGuideMinimized = surfaces.setGuideMinimized;
+  const shareOpen = surfaces.shareOpen;
+
   const guideCompletionNonceRef = useRef(0);
   const handleCardHover = (cardId: string, zone: ZoneName) => {
     setHoveredCard({ id: cardId, zone, owner: "player" });
@@ -1407,10 +1074,6 @@ function GameContent() {
     setHoveredCard({ id: cardId, zone, owner: "opponent" });
   };
   const handleCardHoverEnd = () => setHoveredCard(null);
-
-  useEffect(() => {
-    queueMicrotask(() => setHoveredCard(null));
-  }, [selfPhase]);
 
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
@@ -1445,9 +1108,9 @@ function GameContent() {
   const moveBattleCard = useCallback<typeof actions.battleMove>(
     (cardId, ...move) => {
       actions.battleMove(cardId, ...move);
-      dispatchBoard({ type: "cardMoved", cardId });
+      surfaces.notifyCardMoved(cardId);
     },
-    [actions],
+    [actions, surfaces],
   );
 
   // DnD setup for battle phase
@@ -1475,50 +1138,21 @@ function GameContent() {
   };
 
   // Changing a submitted result is given up whenever a menu, panel or window other than its choices opens.
-  const openGameSurface = useCallback((surface: GameSurface) => {
-    if (surface.kind !== "submitResult") setIsChangingResult(false);
-    dispatchBoard({ type: "open", surface });
-  }, []);
+  const openGameSurface = useCallback(
+    (surface: GameSurface) => {
+      if (surface.kind !== "submitResult") battleEnd.cancelChangingResult();
+      surfaces.open(surface);
+    },
+    [battleEnd, surfaces],
+  );
 
-  const closeGameplayOverlays = useCallback((except?: GameSurfaceKind) => {
-    if (except !== "submitResult") setIsChangingResult(false);
-    dispatchBoard({ type: "closeOverlays", except });
-  }, []);
-
-  useEffect(() => {
-    const phase = gameState?.self_player.phase;
-    if (
-      !battleResolutionId ||
-      !phase ||
-      phase === "battle" ||
-      !cachedBattleForResolution
-    ) {
-      return;
-    }
-    if (shownBattleResolutionIds.has(battleResolutionId)) {
-      return;
-    }
-
-    queueMicrotask(() => {
-      closeGameplayOverlays();
-      setActiveBattleResolutionId(battleResolutionId);
-      setShownBattleResolutionIds((current) => {
-        if (current.has(battleResolutionId)) {
-          return current;
-        }
-
-        const next = new Set(current);
-        next.add(battleResolutionId);
-        return next;
-      });
-    });
-  }, [
-    battleResolutionId,
-    cachedBattleForResolution,
-    closeGameplayOverlays,
-    gameState?.self_player.phase,
-    shownBattleResolutionIds,
-  ]);
+  const closeGameplayOverlays = useCallback(
+    (except?: GameSurfaceKind) => {
+      if (except !== "submitResult") battleEnd.cancelChangingResult();
+      surfaces.closeOverlays(except);
+    },
+    [battleEnd, surfaces],
+  );
 
   const openRulesPanel = useCallback(
     (target?: RulesPanelTarget) => {
@@ -1617,34 +1251,39 @@ function GameContent() {
   }, [openGameSurface]);
 
   const toggleBattleSubmitPopover = useCallback(() => {
-    if (showSubmitResultPopover) {
+    if (showSubmitResultPopover || battleEnd.submitPending) {
       closeSurface("submitResult");
       return;
     }
     openGameSurface({ kind: "submitResult" });
-  }, [closeSurface, openGameSurface, showSubmitResultPopover]);
+  }, [
+    battleEnd.submitPending,
+    closeSurface,
+    openGameSurface,
+    showSubmitResultPopover,
+  ]);
 
   const toggleZonePanel = useCallback(
     (zone: PanelZone, owner: ZoneOwner) => {
-      if (isZonePanelOpen(openSurface, zone, owner)) {
+      if (surfaces.isZonePanelOpen(zone, owner)) {
         closeSurface("zone");
         return;
       }
       openGameSurface({ kind: "zone", zone, owner });
     },
-    [closeSurface, openGameSurface, openSurface],
+    [closeSurface, openGameSurface, surfaces],
   );
 
   const setBattleZoneModalOpen = useCallback(
     (zone: BattleZoneModalState["zone"], owner: ZoneOwner, open: boolean) => {
-      const isSamePanel = isZonePanelOpen(openSurface, zone, owner);
+      const isSamePanel = surfaces.isZonePanelOpen(zone, owner);
       if (!open) {
         if (isSamePanel) closeSurface("zone");
         return;
       }
       if (!isSamePanel) openGameSurface({ kind: "zone", zone, owner });
     },
-    [closeSurface, openGameSurface, openSurface],
+    [closeSurface, openGameSurface, surfaces],
   );
 
   const openShareModal = useCallback(() => {
@@ -1654,7 +1293,6 @@ function GameContent() {
   const handleBattleResultSubmit = useCallback(
     (result: string) => {
       requestGuideCompletion("battle_result_submit", "result-submit");
-      setIsChangingResult(false);
 
       const isLoss =
         result !== gameState?.self_player.name && result !== "draw";
@@ -1662,34 +1300,10 @@ function GameContent() {
         ? getUnrevealedAppliedUpgrades(gameState.self_player.upgrades)
         : [];
 
-      if (!isLoss && unrevealed.length > 0) {
-        setPendingBattleResult(result);
-        return;
-      }
-
-      closeGameplayOverlays();
-      actions.battleSubmitResult(result);
+      battleEnd.submitResult(result, !isLoss && unrevealed.length > 0);
     },
-    [actions, closeGameplayOverlays, gameState, requestGuideCompletion],
+    [battleEnd, gameState, requestGuideCompletion],
   );
-
-  const handleRevealAndSubmit = useCallback(
-    (upgradeIds: string[]) => {
-      upgradeIds.forEach((id) => actions.battleRevealUpgrade(id));
-      setPendingPostRevealSubmit(pendingBattleResult);
-      setPendingBattleResult(null);
-      closeGameplayOverlays();
-    },
-    [actions, closeGameplayOverlays, pendingBattleResult],
-  );
-
-  const handleSkipAndSubmit = useCallback(() => {
-    if (pendingBattleResult) {
-      actions.battleSubmitResult(pendingBattleResult);
-    }
-    setPendingBattleResult(null);
-    closeGameplayOverlays();
-  }, [actions, closeGameplayOverlays, pendingBattleResult]);
 
   const handleContinue = useCallback(() => {
     if (
@@ -1705,19 +1319,6 @@ function GameContent() {
     sendPhaseAction("draft_done", actions.draftDone);
   }, [actions, sendPhaseAction]);
 
-  useEffect(() => {
-    if (selfPhase === "reward") return;
-    queueMicrotask(() => {
-      setSelectedUpgradeId(null);
-      setSelectedPoolCardId(null);
-    });
-  }, [selfPhase]);
-
-  const hasPendingBattleResolution =
-    !!battleResolutionId &&
-    gameState?.self_player.phase !== "battle" &&
-    cachedBattleForResolution !== null &&
-    !shownBattleResolutionIds.has(battleResolutionId);
   const buildSubmitGuideActive = isSubmitPopoverGuideStepActive(
     visibleGuideStep,
     "build",
@@ -1731,23 +1332,16 @@ function GameContent() {
   // A zone panel sits beside the board rather than over it, so the Fight's hotkeys, all but Enter, keep working while
   // one is open.
   const modalOpen =
-    guideOpen ||
-    showUpgradesModal ||
-    actionMenuOpen ||
-    shareOpen ||
+    surfaces.blocksHotkeys ||
     state.previewCard !== null ||
-    hasPendingBattleResolution ||
-    activeBattleResolutionId !== null ||
-    activeBuildUpgradeAnimation !== null ||
-    pendingBattleResult !== null ||
-    activeRevealAnimation !== null ||
-    pendingPostRevealSubmit !== null;
+    battleEnd.blocksHotkeys ||
+    activeBuildUpgradeAnimation !== null;
   const gameplayHotkeysDisabled = shouldDisableGameplayHotkeys({
     modalOpen,
     visibleGuideStep,
   });
   // Reveal Before Submit is where a Fight ends, so it keeps its own Enter.
-  usePanelHoldsEnter(modalOpen && pendingBattleResult === null);
+  usePanelHoldsEnter(modalOpen && !battleEnd.confirmingReveal);
   const canRoll =
     selfPhase === "draft" &&
     (gameState?.self_player.treasures ?? 0) > 0 &&
@@ -1956,8 +1550,8 @@ function GameContent() {
         }
         map["Enter"] = () => {
           const mySubmission = cb.result_submissions[sp.name];
-          if (mySubmission && !isChangingResult) {
-            setIsChangingResult(true);
+          if (mySubmission && !battleEnd.changingResult) {
+            battleEnd.startChangingResult();
           } else {
             toggleBattleSubmitPopover();
           }
@@ -2166,26 +1760,10 @@ function GameContent() {
   }
 
   const currentPhase = gameState.self_player.phase;
-  const shouldBlockGuidesForResolution = shouldBlockGuidesForBattleResolution({
-    activeBattleResolutionId,
-    battleResolutionId: gameState.battle_resolution?.resolution_id,
-    hasCachedBattle: cachedBattleForResolution !== null,
-    selfPhase: currentPhase,
-    shownResolutionIds: shownBattleResolutionIds,
-  });
-
   const { self_player, current_battle } = gameState;
-  const activeBattleResolution =
-    gameState.battle_resolution &&
-    (activeBattleResolutionId === battleResolutionId ||
-      hasPendingBattleResolution)
-      ? gameState.battle_resolution
-      : null;
-  const displayBattleResolution =
-    !!activeBattleResolution && !!cachedBattleForResolution;
-  const battleViewForDisplay =
-    current_battle ??
-    (displayBattleResolution ? cachedBattleForResolution : null);
+  const activeBattleResolution = battleEnd.activeResolution?.resolution ?? null;
+  const displayBattleResolution = battleEnd.holdsBattleScreen;
+  const battleViewForDisplay = battleEnd.battleViewForDisplay;
   const actionBarPhase = displayBattleResolution ? "battle" : currentPhase;
   const actionBarBattle = battleViewForDisplay;
   const canManipulateOpponent =
@@ -2469,7 +2047,7 @@ function GameContent() {
         </div>
       );
 
-      if (mySubmission && !isChangingResult) {
+      if (mySubmission && !battleEnd.changingResult) {
         const resultsConflict = hasBattleResultConflict({
           mySubmission,
           opponentSubmission,
@@ -2483,7 +2061,7 @@ function GameContent() {
               {resultsConflict ? "Results conflict!" : "Waiting..."}
             </span>
             <button
-              onClick={() => setIsChangingResult(true)}
+              onClick={battleEnd.startChangingResult}
               className="btn btn-secondary"
             >
               Change
@@ -2493,10 +2071,10 @@ function GameContent() {
       } else {
         right = (
           <div className="relative flex items-center gap-1.5 sm:gap-2">
-            {isChangingResult && (
+            {battleEnd.changingResult && (
               <button
                 onClick={() => {
-                  setIsChangingResult(false);
+                  battleEnd.cancelChangingResult();
                   closeSurface("submitResult");
                 }}
                 className="btn btn-secondary"
@@ -2506,10 +2084,13 @@ function GameContent() {
             )}
             <button
               onClick={toggleBattleSubmitPopover}
-              className="btn btn-primary"
+              disabled={battleEnd.submitPending}
+              className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               data-guide-target="battle-submit"
             >
-              {BATTLE_SUBMIT_BUTTON_LABEL}
+              {battleEnd.submitPending
+                ? "Submitting..."
+                : BATTLE_SUBMIT_BUTTON_LABEL}
             </button>
             {showSubmitResultPopover && (
               <SubmitPopover
@@ -2659,7 +2240,7 @@ function GameContent() {
   const sideboardContextMenu = (card: CardType, owner: ZoneOwner) =>
     canHover
       ? (e: React.MouseEvent) =>
-          setBattleCardMenu({
+          surfaces.setCardMenu({
             card,
             zone: "sideboard",
             position: { x: e.clientX, y: e.clientY },
@@ -2776,8 +2357,7 @@ function GameContent() {
     );
   };
 
-  const serverNoticeHidden =
-    !!serverNotice && dismissedServerNoticeAt === serverNotice.updated_at;
+  const serverNoticeHidden = surfaces.isServerStatusHidden(serverNotice);
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
@@ -2820,7 +2400,7 @@ function GameContent() {
               status={serverNotice}
               hidden={serverNoticeHidden}
               onDismiss={() =>
-                setDismissedServerNoticeAt(serverNotice.updated_at)
+                surfaces.dismissServerStatus(serverNotice.updated_at)
               }
               inGame
             />
@@ -2837,15 +2417,13 @@ function GameContent() {
               guideContext={guideContext!}
               isSpectator={isSpectator}
               hasOverlayOpen={
-                // A walkthrough closes what it starts over, so it waits for a Guide kept behind Players or Scouting too.
-                (rulesPanel !== null && openSurface?.kind !== "submitResult") ||
-                showUpgradesModal ||
-                shareOpen ||
-                actionMenuOpen ||
-                shouldBlockGuidesForResolution ||
+                surfaces.blocksGuides ||
+                state.previewCard !== null ||
+                battleEnd.blocksGuides ||
                 activeBuildUpgradeAnimation !== null
               }
               closeGameplayOverlays={closeGameplayOverlays}
+              completionTrigger={guideCompletionTrigger}
             >
               {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
               <div className="relative">
@@ -3074,17 +2652,17 @@ function GameContent() {
                           isMobile={sizes.isMobile}
                           selectedCard={battleSelectedCard}
                           onSelectedCardChange={setBattleSelectedCard}
-                          cardMenu={battleCardMenu}
-                          onCardMenuChange={setBattleCardMenu}
+                          cardMenu={surfaces.cardMenu}
+                          onCardMenuChange={surfaces.setCardMenu}
                           onCardHover={handleCardHover}
                           onOpponentCardHover={handleOpponentCardHover}
                           onCardHoverEnd={handleCardHoverEnd}
                           activeZoneModal={
-                            openSurface?.kind === "zone" &&
-                            openSurface.zone !== "sideboard"
+                            surfaces.zonePanel &&
+                            surfaces.zonePanel.zone !== "sideboard"
                               ? {
-                                  zone: openSurface.zone,
-                                  owner: openSurface.owner,
+                                  zone: surfaces.zonePanel.zone,
+                                  owner: surfaces.zonePanel.owner,
                                 }
                               : null
                           }
@@ -3096,8 +2674,8 @@ function GameContent() {
                             battle={battleViewForDisplay}
                             resolution={activeBattleResolution}
                             onComplete={() => {
-                              setActiveBattleResolutionId(null);
-                              setCachedBattleForResolution(null);
+                              battleEnd.completeResolution();
+                              surfaces.fightEnded();
                             }}
                           />
                         )}
@@ -3107,11 +2685,7 @@ function GameContent() {
                     {current_battle && (
                       <>
                         <DndPanel
-                          open={isZonePanelOpen(
-                            openSurface,
-                            "sideboard",
-                            "player",
-                          )}
+                          open={surfaces.isZonePanelOpen("sideboard", "player")}
                           title="Your Sideboard"
                           count={current_battle.your_zones.sideboard.length}
                           onClose={() => closeSurface("zone")}
@@ -3179,11 +2753,8 @@ function GameContent() {
                         </DndPanel>
                         <DndPanel
                           open={
-                            isZonePanelOpen(
-                              openSurface,
-                              "sideboard",
-                              "opponent",
-                            ) && !!current_battle.opponent_full_sideboard
+                            surfaces.isZonePanelOpen("sideboard", "opponent") &&
+                            !!current_battle.opponent_full_sideboard
                           }
                           title={`${current_battle.opponent_name}'s Sideboard`}
                           count={
@@ -3444,7 +3015,6 @@ function GameContent() {
                   setSidebarOpen={setSidebarOpen}
                   scouting={scouting}
                   setScouting={setScouting}
-                  guideCompletionTrigger={guideCompletionTrigger}
                   onVisibleGuideStepChange={setVisibleGuideStep}
                 />
               )}
@@ -3521,13 +3091,13 @@ function GameContent() {
             initialRevealUpgradeIds={upgradesWindow?.revealIds}
           />
         )}
-        {pendingBattleResult && (
+        {battleEnd.confirmingReveal && (
           <RevealBeforeSubmitModal
             upgrades={getUnrevealedAppliedUpgrades(self_player.upgrades)}
-            onRevealAndSubmit={handleRevealAndSubmit}
-            onSkip={handleSkipAndSubmit}
+            onRevealAndSubmit={battleEnd.confirmRevealAndSubmit}
+            onSkip={battleEnd.skipRevealAndSubmit}
             onClose={() => {
-              setPendingBattleResult(null);
+              battleEnd.cancelRevealChoice();
               closeSurface("submitResult");
             }}
           />
@@ -3539,19 +3109,13 @@ function GameContent() {
             onComplete={() => setActiveBuildUpgradeAnimation(null)}
           />
         )}
-        {activeRevealAnimation && (
+        {battleEnd.activeRevealAnimation && (
           <BattleRevealOverlay
-            upgrade={activeRevealAnimation.upgrade}
-            target={activeRevealAnimation.target}
-            playerName={activeRevealAnimation.player_name}
+            upgrade={battleEnd.activeRevealAnimation.upgrade}
+            target={battleEnd.activeRevealAnimation.target}
+            playerName={battleEnd.activeRevealAnimation.player_name}
             selfName={self_player.name}
-            onComplete={() => {
-              setActiveRevealAnimation(null);
-              if (pendingPostRevealSubmit) {
-                actions.battleSubmitResult(pendingPostRevealSubmit);
-                setPendingPostRevealSubmit(null);
-              }
-            }}
+            onComplete={battleEnd.completeRevealAnimation}
           />
         )}
         {shareOpen && (
@@ -3571,7 +3135,7 @@ function GameContent() {
               onClose={() => closeSurface("guide")}
               minimized={guideMinimized}
               onMinimizedChange={setGuideMinimized}
-              behindPanel={openSurface?.kind !== "guide"}
+              behindPanel={surfaces.topSurface?.kind !== "guide"}
               target={rulesPanel.target}
               gameId={gameId}
               playerName={gameState?.self_player.name}
