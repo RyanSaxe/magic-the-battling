@@ -10,7 +10,7 @@ class SeatClaimRefusal(StrEnum):
     GAME_NOT_FOUND = "game_not_found"
     SEAT_NOT_FOUND = "seat_not_found"
     LOGIN_REQUIRED = "login_required"
-    TOKEN_REQUIRED = "token_required"
+    TOKEN_REQUIRED = "token_required"  # noqa: S105 -- non-secret constant name
 
 
 class SeatClaimRefusedError(Exception):
@@ -34,8 +34,10 @@ def seat_token_matches(seat_token: str | None, stored_hash: str | None) -> bool:
 
 
 def token_after_claim(seat_token: str | None, stored_hash: str | None) -> str:
-    """The token a successful claim hands back. A browser that proved the seat with its token keeps it, so a lost
-    response can't lock it out. Any other claim gets a new token, which replaces the old one."""
+    """Return the token handed back after a successful seat claim.
+
+    A browser that proved the seat with its token keeps it; an account claim issues a fresh token.
+    """
     if seat_token is not None and seat_token_matches(seat_token, stored_hash):
         return seat_token
     return new_seat_token()

@@ -1,11 +1,13 @@
+from collections.abc import Callable
+
 import pytest
 
-from mtb.models.cards import Battler
+from mtb.models.cards import Battler, Card
 from mtb.models.game import Config, create_game, set_player_battlers
 from mtb.phases import draft
 
 
-def test_start_draft_creates_packs_without_dealing(card_factory):
+def test_start_draft_creates_packs_without_dealing(card_factory: Callable[..., Card]) -> None:
     """draft.start() should create packs but NOT deal them to players."""
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(20)]
@@ -19,7 +21,7 @@ def test_start_draft_creates_packs_without_dealing(card_factory):
     assert game.get_battler().cards == []  # All cards used for packs
 
 
-def test_start_draft_keeps_leftover_cards_in_battler(card_factory):
+def test_start_draft_keeps_leftover_cards_in_battler(card_factory: Callable[..., Card]) -> None:
     """draft.start() should keep leftover cards (not enough for a full pack) in battler."""
     game = create_game(["Alice"], num_players=1)
     pack_size = game.config.pack_size
@@ -35,23 +37,23 @@ def test_start_draft_keeps_leftover_cards_in_battler(card_factory):
         assert len(pack) == pack_size
 
 
-def test_start_draft_without_battler_raises():
+def test_start_draft_without_battler_raises() -> None:
     game = create_game(["Alice"], num_players=1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         draft.start(game)
 
 
-def test_start_draft_when_draft_in_progress_raises(card_factory):
+def test_start_draft_when_draft_in_progress_raises(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
     draft.start(game)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         draft.start(game)
 
 
-def test_deal_pack_to_player_deals_from_packs(card_factory):
+def test_deal_pack_to_player_deals_from_packs(card_factory: Callable[..., Card]) -> None:
     """deal_pack_to_player() should deal a pack to the specified player."""
     game = create_game(["Alice"], num_players=1)
     cards = [card_factory(f"c{i}") for i in range(15)]
@@ -66,7 +68,7 @@ def test_deal_pack_to_player_deals_from_packs(card_factory):
     assert game.get_draft_state().current_packs["Alice"] == pack
 
 
-def test_deal_pack_to_player_creates_packs_when_empty(card_factory):
+def test_deal_pack_to_player_creates_packs_when_empty(card_factory: Callable[..., Card]) -> None:
     """deal_pack_to_player() should create more packs from battler if draft.packs is empty."""
     game = create_game(["Alice", "Bob"], num_players=2)
     pack_size = game.config.pack_size
@@ -92,14 +94,14 @@ def test_deal_pack_to_player_creates_packs_when_empty(card_factory):
     assert len(pack) == pack_size
 
 
-def test_deal_pack_to_player_without_draft_raises():
+def test_deal_pack_to_player_without_draft_raises() -> None:
     game = create_game(["Alice"], num_players=1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         draft.deal_pack_to_player(game, game.players[0])
 
 
-def test_deal_pack_legacy_returns_none_when_no_packs(card_factory):
+def test_deal_pack_legacy_returns_none_when_no_packs(card_factory: Callable[..., Card]) -> None:
     """Legacy deal_pack() should return None when no packs are left."""
     game = create_game(["Alice"], num_players=1)
     pack_size = game.config.pack_size
@@ -116,7 +118,7 @@ def test_deal_pack_legacy_returns_none_when_no_packs(card_factory):
     assert pack2 is None
 
 
-def test_roll_returns_pack_to_battler_and_deals_new(card_factory):
+def test_roll_returns_pack_to_battler_and_deals_new(card_factory: Callable[..., Card]) -> None:
     """roll() should return the old pack to battler.cards and deal a new pack."""
     game = create_game(["Alice"], num_players=1)
     game.players[0].treasures = 2
@@ -136,7 +138,7 @@ def test_roll_returns_pack_to_battler_and_deals_new(card_factory):
     assert len(game.battler.cards) == battler_cards_before + 5
 
 
-def test_constructed_draft_uses_player_specific_battlers(card_factory):
+def test_constructed_draft_uses_player_specific_battlers(card_factory: Callable[..., Card]) -> None:
     config = Config(play_mode="constructed", starting_pool_size=0)
     game = create_game(["Alice", "Bob"], num_players=2, config=config)
     alice_battler = Battler(cards=[card_factory(f"alice_{i}") for i in range(5)], upgrades=[], vanguards=[])
@@ -158,7 +160,7 @@ def test_constructed_draft_uses_player_specific_battlers(card_factory):
     assert game.get_draft_state().player_packs["Bob"] == []
 
 
-def test_roll_always_succeeds_by_creating_packs(card_factory):
+def test_roll_always_succeeds_by_creating_packs(card_factory: Callable[..., Card]) -> None:
     """roll() should always succeed by creating packs from battler if needed."""
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
@@ -181,18 +183,18 @@ def test_roll_always_succeeds_by_creating_packs(card_factory):
     assert player.treasures == 2
 
 
-def test_roll_without_treasure_raises(card_factory):
+def test_roll_without_treasure_raises(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.players[0].treasures = 0
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
     draft.start(game)
     draft.deal_pack_to_player(game, game.players[0])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         draft.roll(game, game.players[0])
 
 
-def test_roll_without_current_pack_raises(card_factory):
+def test_roll_without_current_pack_raises(card_factory: Callable[..., Card]) -> None:
     """roll() should raise if player has no current pack."""
     game = create_game(["Alice"], num_players=1)
     game.players[0].treasures = 1
@@ -204,7 +206,7 @@ def test_roll_without_current_pack_raises(card_factory):
         draft.roll(game, game.players[0])
 
 
-def test_swap_exchanges_pack_card_with_player_card(card_factory):
+def test_swap_exchanges_pack_card_with_player_card(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
     draft.start(game)
@@ -215,7 +217,7 @@ def test_swap_exchanges_pack_card_with_player_card(card_factory):
     player.hand.append(player_card)
 
     pack_card = game.get_draft_state().current_packs["Alice"][0]
-    draft.swap(game, player, pack_card, player_card, "hand")
+    draft.swap(game, player, pack_card=pack_card, player_card=player_card, destination="hand")
 
     assert pack_card in player.hand
     assert player_card not in player.hand
@@ -223,7 +225,7 @@ def test_swap_exchanges_pack_card_with_player_card(card_factory):
     assert pack_card not in game.get_draft_state().current_packs["Alice"]
 
 
-def test_swap_works_with_sideboard(card_factory):
+def test_swap_works_with_sideboard(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
     draft.start(game)
@@ -234,13 +236,13 @@ def test_swap_works_with_sideboard(card_factory):
     player.sideboard.append(player_card)
 
     pack_card = game.get_draft_state().current_packs["Alice"][0]
-    draft.swap(game, player, pack_card, player_card, "sideboard")
+    draft.swap(game, player, pack_card=pack_card, player_card=player_card, destination="sideboard")
 
     assert pack_card in player.sideboard
     assert player_card in game.get_draft_state().current_packs["Alice"]
 
 
-def test_swap_card_not_in_pack_raises(card_factory):
+def test_swap_card_not_in_pack_raises(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
     draft.start(game)
@@ -249,11 +251,17 @@ def test_swap_card_not_in_pack_raises(card_factory):
     player = game.players[0]
     player.hand.append(card_factory("player_card"))
 
-    with pytest.raises(ValueError):
-        draft.swap(game, player, card_factory("not_in_pack"), card_factory("player_card"), "hand")
+    with pytest.raises(ValueError, match=r".+"):
+        draft.swap(
+            game,
+            player,
+            pack_card=card_factory("not_in_pack"),
+            player_card=card_factory("player_card"),
+            destination="hand",
+        )
 
 
-def test_end_for_player_returns_pack_to_battler(card_factory):
+def test_end_for_player_returns_pack_to_battler(card_factory: Callable[..., Card]) -> None:
     """end_for_player() should return player's pack to battler.cards."""
     game = create_game(["Alice"], num_players=1)
     cards = [card_factory(f"c{i}") for i in range(10)]
@@ -277,7 +285,7 @@ def test_end_for_player_returns_pack_to_battler(card_factory):
     assert len(game.battler.cards) == battler_cards_before + 5
 
 
-def test_end_for_player_does_not_cleanup_draft(card_factory):
+def test_end_for_player_does_not_cleanup_draft(card_factory: Callable[..., Card]) -> None:
     """end_for_player() should NOT cleanup draft state - cleanup happens at pairing time."""
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(25)]
@@ -298,17 +306,17 @@ def test_end_for_player_does_not_cleanup_draft(card_factory):
     assert game.draft_state is not None  # Still not cleaned up - cleanup is explicit now
 
 
-def test_end_draft_for_player_not_in_draft_raises(card_factory):
+def test_end_draft_for_player_not_in_draft_raises(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.players[0].phase = "build"
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
     draft.start(game)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         draft.end_for_player(game, game.players[0])
 
 
-def test_cleanup_draft_returns_all_cards_to_battler(card_factory):
+def test_cleanup_draft_returns_all_cards_to_battler(card_factory: Callable[..., Card]) -> None:
     """cleanup_draft() should return all undrafted packs and orphan current_packs to battler."""
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(25)]
@@ -329,7 +337,7 @@ def test_cleanup_draft_returns_all_cards_to_battler(card_factory):
     assert len(game.battler.cards) == battler_cards_before + total_cards_in_draft
 
 
-def test_cleanup_draft_with_no_draft_is_safe(card_factory):
+def test_cleanup_draft_with_no_draft_is_safe(card_factory: Callable[..., Card]) -> None:
     """cleanup_draft() should be safe to call when there's no draft."""
     game = create_game(["Alice"], num_players=1)
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
@@ -338,7 +346,7 @@ def test_cleanup_draft_with_no_draft_is_safe(card_factory):
     draft.cleanup_draft(game)  # Should not raise
 
 
-def test_full_draft_flow(card_factory):
+def test_full_draft_flow(card_factory: Callable[..., Card]) -> None:
     """Test complete draft flow with the new architecture."""
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(30)]
@@ -361,20 +369,20 @@ def test_full_draft_flow(card_factory):
     alice_swap_card_1 = card_factory("alice_swap_1")
     alice.hand.append(alice_swap_card_1)
     alice_pack_card = game.get_draft_state().current_packs["Alice"][0]
-    draft.swap(game, alice, alice_pack_card, alice_swap_card_1, "hand")
+    draft.swap(game, alice, pack_card=alice_pack_card, player_card=alice_swap_card_1, destination="hand")
 
     # Alice rolls
     draft.roll(game, alice)
     alice_swap_card_2 = card_factory("alice_swap_2")
     alice.sideboard.append(alice_swap_card_2)
     alice_pack_card_2 = game.get_draft_state().current_packs["Alice"][0]
-    draft.swap(game, alice, alice_pack_card_2, alice_swap_card_2, "sideboard")
+    draft.swap(game, alice, pack_card=alice_pack_card_2, player_card=alice_swap_card_2, destination="sideboard")
 
     # Bob swaps
     bob_swap_card = card_factory("bob_swap")
     bob.hand.append(bob_swap_card)
     bob_pack_card = game.get_draft_state().current_packs["Bob"][0]
-    draft.swap(game, bob, bob_pack_card, bob_swap_card, "hand")
+    draft.swap(game, bob, pack_card=bob_pack_card, player_card=bob_swap_card, destination="hand")
 
     # Add cards with ELO for hand population testing
     high_elo = card_factory("high_elo", elo=100.0)
@@ -402,7 +410,7 @@ def test_full_draft_flow(card_factory):
     assert len(game.battler.cards) > 0
 
 
-def test_battler_elo_is_static(card_factory):
+def test_battler_elo_is_static(card_factory: Callable[..., Card]) -> None:
     """Battler.elo should be static and not change when cards are removed."""
     cards = [card_factory(f"c{i}", elo=float(i * 10)) for i in range(10)]
 
@@ -418,7 +426,7 @@ def test_battler_elo_is_static(card_factory):
     assert battler.elo == expected_elo
 
 
-def test_swap_clears_command_zone_when_companion_swapped_back(card_factory):
+def test_swap_clears_command_zone_when_companion_swapped_back(card_factory: Callable[..., Card]) -> None:
     """Swapping a companion back to pack should clear command_zone."""
     game = create_game(["Alice"], num_players=1)
     game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
@@ -431,7 +439,7 @@ def test_swap_clears_command_zone_when_companion_swapped_back(card_factory):
     player.command_zone.append(companion)
 
     pack_card = game.get_draft_state().current_packs["Alice"][0]
-    draft.swap(game, player, pack_card, companion, "sideboard")
+    draft.swap(game, player, pack_card=pack_card, player_card=companion, destination="sideboard")
 
     assert pack_card in player.sideboard
     assert companion in game.get_draft_state().current_packs["Alice"]

@@ -1,14 +1,15 @@
 import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from time import monotonic
-from typing import Any
+from typing import Any, Never
 
 import anyio
 import pytest
 from fastapi.testclient import TestClient
+from httpx import Response
 from sqlalchemy import create_engine
-from sqlalchemy.orm import close_all_sessions, sessionmaker
+from sqlalchemy.orm import Session, close_all_sessions, sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.testclient import WebSocketTestSession
 
@@ -23,10 +24,11 @@ import server.services.game_manager as gm_module
 import server.services.session_manager as sm_module
 from mtb.models.card_registry import clear_registry
 from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
-from mtb.models.game import Player
+from mtb.models.game import Game, Player
 from server.db.models import Base
 from server.main import app
 from server.services.connection_manager import ConnectionManager
+from server.services.game.models import CancellableTask
 from server.services.game_manager import GameManager
 from server.services.session_manager import SessionManager
 
@@ -34,12 +36,12 @@ WS_MESSAGE_TIMEOUT_SECONDS = 1.0
 
 
 @pytest.fixture(autouse=True)
-def _disable_ws_compression(monkeypatch):
+def _disable_ws_compression(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("server.compression.WS_COMPRESSION_ENABLED", False)
 
 
 @pytest.fixture(autouse=True)
-def _no_default_cube_fetch_at_startup(monkeypatch):
+def _no_default_cube_fetch_at_startup(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(main_module, "start_loading_default_cube", lambda: None)
 
 
@@ -55,52 +57,17 @@ def _unique_objects[T](objects: list[T]) -> list[T]:
     return unique
 
 
-def _cancel_task(task: asyncio.Task | None) -> None:
+def _cancel_task(task: CancellableTask | None) -> None:
     if task is not None and not task.done():
         task.cancel()
 
 
 def _cleanup_game_manager(game_manager: GameManager) -> None:
-    _cancel_task(game_manager._snapshot_task)
-    game_manager._snapshot_task = None
-
-    for pending in list(game_manager._pending_games.values()):
-        _cancel_task(pending._loading_task)
-        pending._loading_task = None
-        for player_battler in pending.player_battlers.values():
-            if isinstance(player_battler, gm_module.BattlerLoading):
-                _cancel_task(player_battler.task)
-
-    for task in list(game_manager._post_game_cleanup_tasks.values()):
-        _cancel_task(task)
-    for task in list(game_manager._abandoned_cleanup_tasks.values()):
-        _cancel_task(task)
-    for task in list(game_manager._pending_disconnect_tasks.values()):
-        _cancel_task(task)
-    for task in list(game_manager._host_handoff_tasks.values()):
-        _cancel_task(task)
-
-    game_manager._pending_games.clear()
-    game_manager._active_games.clear()
-    game_manager._player_to_game.clear()
-    game_manager._player_id_to_name.clear()
-    game_manager._join_code_to_game.clear()
-    game_manager._post_game_cleanup_tasks.clear()
-    game_manager._abandoned_cleanup_tasks.clear()
-    game_manager._pending_disconnect_tasks.clear()
-    game_manager._host_handoff_tasks.clear()
-    game_manager._spectate_requests.clear()
-    game_manager._dirty_games.clear()
-    game_manager._last_human_activity.clear()
-    game_manager._action_locks.clear()
-    game_manager._game_starts_in_flight = 0
-    game_manager._game_start_waiters = 0
+    game_manager.clear_all_state()
 
 
 def _cleanup_connection_manager(connection_manager: ConnectionManager) -> None:
-    connection_manager._connections.clear()
-    connection_manager._pending_connections.clear()
-    connection_manager._spectators.clear()
+    connection_manager.clear_all_connections()
 
 
 def _cleanup_runtime_state() -> None:
@@ -142,9 +109,9 @@ def _cleanup_runtime_state() -> None:
     for connection_manager in connection_managers:
         _cleanup_connection_manager(connection_manager)
 
-    games_module._create_idempotency_cache.clear()
-    games_module._create_idempotency_inflight.clear()
-    games_module._create_idempotency_lock = asyncio.Lock()
+    games_module._create_idempotency_cache.clear()  # noqa: SLF001 -- internal state inspected by test
+    games_module._create_idempotency_inflight.clear()  # noqa: SLF001 -- internal state inspected by test
+    games_module._create_idempotency_lock = asyncio.Lock()  # noqa: SLF001 -- internal state inspected by test
 
     monitoring_module.stop_monitoring()
 
@@ -152,6 +119,7 @@ def _cleanup_runtime_state() -> None:
 def _install_runtime_state(
     game_manager: GameManager,
     session_manager: SessionManager,
+    *,
     connection_manager: ConnectionManager,
 ) -> None:
     sm_module.session_manager = session_manager
@@ -184,7 +152,7 @@ def _reset_runtime_state() -> None:
     game_state_module.session_manager = session_manager
     game_manager = GameManager()
     connection_manager = ConnectionManager(game_manager)
-    _install_runtime_state(game_manager, session_manager, connection_manager)
+    _install_runtime_state(game_manager, session_manager, connection_manager=connection_manager)
 
 
 def setup_battle_ready(player: Player, basics: list[str] | None = None) -> None:
@@ -194,15 +162,15 @@ def setup_battle_ready(player: Player, basics: list[str] | None = None) -> None:
 
 
 @pytest.fixture
-def card_factory():
-    def _card(name: str, type_line: str = "Creature", **kwargs) -> Card:
+def card_factory() -> Callable[..., Card]:
+    def _card(name: str, type_line: str = "Creature", **kwargs: Any) -> Card:  # noqa: ANN401 -- forwards Card kwargs
         return Card(name=name, image_url="image", id=name, type_line=type_line, **kwargs)
 
     return _card
 
 
 @pytest.fixture
-def upgrade_factory(card_factory):
+def upgrade_factory(card_factory: Callable[..., Card]) -> Callable[[str], Card]:
     def _upgrade(name: str) -> Card:
         return card_factory(name, type_line="Conspiracy")
 
@@ -210,7 +178,7 @@ def upgrade_factory(card_factory):
 
 
 @pytest.fixture(autouse=True)
-def reset_singletons():
+def reset_singletons() -> Generator[None]:
     """Install fresh runtime singletons everywhere the app imported them."""
     _reset_runtime_state()
     clear_registry()
@@ -220,20 +188,22 @@ def reset_singletons():
 
 
 @pytest.fixture(autouse=True)
-def offline_cubecobra(monkeypatch):
+def offline_cubecobra(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail every cached JSON fetch, such as CubeCobra's cube JSON, unless a test answers it."""
 
-    def _no_network(url: str):
+    def _no_network(url: str) -> Never:
         raise LookupError(url)
 
     monkeypatch.setattr("mtb.utils.json_helpers.get_json", _no_network)
 
 
 @pytest.fixture
-def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
+def mock_cube_data(
+    card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card], *, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Mock cubecobra to avoid network calls."""
 
-    def _mock(cube_id: str):
+    def _mock(cube_id: str) -> list[Card]:
         if cube_id == DEFAULT_UPGRADES_ID:
             return [upgrade_factory(f"upgrade{i}") for i in range(8)]
         if cube_id == DEFAULT_VANGUARD_ID:
@@ -244,7 +214,7 @@ def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
 
 
 @pytest.fixture
-def test_db():
+def test_db() -> Generator[None]:
     """Create an in-memory SQLite database for testing."""
     original_engine = db_module.engine
     original_session_local = db_module.SessionLocal
@@ -271,50 +241,53 @@ def test_db():
 
 
 @pytest.fixture
-def client(mock_cube_data, test_db):
+def client(mock_cube_data: None, test_db: None) -> Generator[TestClient]:
+    _ = (mock_cube_data, test_db)
     with TestClient(app) as client:
         yield client
 
 
-async def _receive_ws_with_timeout(websocket: WebSocketTestSession, timeout: float) -> Any:
-    with anyio.fail_after(timeout):
-        return await websocket._send_rx.receive()
+async def _receive_ws_with_timeout(websocket: WebSocketTestSession, wait_seconds: float) -> dict[str, Any]:
+    with anyio.fail_after(wait_seconds):
+        return dict(await websocket._send_rx.receive())  # noqa: SLF001 -- Starlette test WS queue
 
 
 def _receive_ws_message(websocket: WebSocketTestSession, timeout: float) -> dict[str, Any]:
     try:
         message = websocket.portal.call(_receive_ws_with_timeout, websocket, timeout)
     except TimeoutError as exc:
-        raise AssertionError(f"Timed out waiting {timeout:.2f}s for websocket message") from exc
+        msg = f"Timed out waiting {timeout:.2f}s for websocket message"
+        raise AssertionError(msg) from exc
     return dict(message)
 
 
 @pytest.fixture
-def ws_receive_json():
-    def _receive(websocket: WebSocketTestSession, *, timeout: float = WS_MESSAGE_TIMEOUT_SECONDS) -> Any:
+def ws_receive_json() -> Callable[..., dict[str, Any]]:
+    def _receive(websocket: WebSocketTestSession, *, timeout: float = WS_MESSAGE_TIMEOUT_SECONDS) -> dict[str, Any]:
         message = _receive_ws_message(websocket, timeout)
-        websocket._raise_on_close(message)
+        websocket._raise_on_close(message)  # noqa: SLF001 -- internal state inspected by test
         return json.loads(message["text"])
 
     return _receive
 
 
 @pytest.fixture
-def ws_receive_json_until(ws_receive_json):
+def ws_receive_json_until(ws_receive_json: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
     def _receive_until(
         websocket: WebSocketTestSession,
         predicate: Callable[[Any], bool],
         *,
         timeout: float = WS_MESSAGE_TIMEOUT_SECONDS,
         description: str = "matching websocket message",
-    ) -> Any:
+    ) -> dict[str, Any]:
         deadline = monotonic() + timeout
         seen: list[Any] = []
 
         while True:
             remaining = deadline - monotonic()
             if remaining <= 0:
-                raise AssertionError(f"Timed out waiting for {description}; saw {seen!r}")
+                msg = f"Timed out waiting for {description}; saw {seen!r}"
+                raise AssertionError(msg)
 
             message = ws_receive_json(websocket, timeout=remaining)
             seen.append(message)
@@ -325,7 +298,7 @@ def ws_receive_json_until(ws_receive_json):
 
 
 @pytest.fixture
-def game_with_players(client):
+def game_with_players(client: TestClient) -> dict[str, Any]:
     """Create game with 2 players, return credentials."""
     r1 = client.post(
         "/api/games",
@@ -347,29 +320,29 @@ async def _no_broadcast() -> None:
 
 
 @pytest.fixture
-def start_game_now():
+def start_game_now() -> Callable[..., Game]:
     """Ready every player in a lobby, then start it through GameManager as its host."""
 
-    def _start(manager: GameManager, game_id: str, db=None):
+    def _start(manager: GameManager, game_id: str, *, db: Session | None = None) -> Game:
         pending = manager.get_pending_game(game_id)
         assert pending is not None
         for player_id in pending.player_ids:
-            ready, error = manager.set_player_ready(game_id, player_id, True)
+            ready, error = manager.set_player_ready(game_id, player_id, is_ready=True)
             assert ready, error
-        return asyncio.run(manager.start_lobby(game_id, pending.host_player_id, db, on_change=_no_broadcast))
+        return asyncio.run(manager.start_lobby(game_id, pending.host_player_id, db=db, on_change=_no_broadcast))
 
     return _start
 
 
 @pytest.fixture
-def start_lobby(client):
+def start_lobby(client: TestClient) -> Callable[[str, str], Response]:
     """Ready every player in a lobby, then start it through the HTTP route as its host."""
 
-    def _start(game_id: str, host_session_id: str):
+    def _start(game_id: str, host_session_id: str) -> Response:
         pending = games_module.game_manager.get_pending_game(game_id)
         assert pending is not None
         for player_id in pending.player_ids:
-            games_module.game_manager.set_player_ready(game_id, player_id, True)
+            games_module.game_manager.set_player_ready(game_id, player_id, is_ready=True)
         return client.post(f"/api/games/{game_id}/start", params={"session_id": host_session_id})
 
     return _start

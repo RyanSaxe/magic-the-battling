@@ -1,11 +1,14 @@
+"""Shared in-memory card metadata registry for slim snapshot serialization."""
+
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from mtb.models.cards import Card
 
 _HEX8_RE = re.compile(r"^[0-9a-f]{8}$")
@@ -51,6 +54,7 @@ class CardData:
 
 
 _card_registry: dict[str, CardData] = {}
+_HEX8_LEN = 8
 
 
 def derive_scryfall_id(card_id: str) -> str:
@@ -58,9 +62,26 @@ def derive_scryfall_id(card_id: str) -> str:
     if dash_pos == -1:
         return card_id
     suffix = card_id[dash_pos + 1 :]
-    if len(suffix) == 8 and _HEX8_RE.match(suffix):
+    if len(suffix) == _HEX8_LEN and _HEX8_RE.match(suffix):
         return card_id[:dash_pos]
     return card_id
+
+
+def extract_token_scryfall_ids(tokens: Sequence[object]) -> tuple[str, ...]:
+    ids: list[str] = []
+    for token in tokens:
+        if hasattr(token, "scryfall_id"):
+            ids.append(str(token.scryfall_id))
+        elif isinstance(token, dict):
+            token_id = token.get("id", "")
+            token_sid = token.get("scryfall_id", "") or (derive_scryfall_id(token_id) if token_id else "")
+            if token_sid:
+                ids.append(token_sid)
+                if "name" in token:
+                    register_card_data(token_sid, token)
+        elif isinstance(token, str):
+            ids.append(token)
+    return tuple(ids)
 
 
 def register_card_data(scryfall_id: str, data: dict) -> None:
@@ -71,28 +92,10 @@ def register_card_data(scryfall_id: str, data: dict) -> None:
     if raw_token_ids is not None:
         token_scryfall_ids = tuple(raw_token_ids) if isinstance(raw_token_ids, list) else raw_token_ids
     else:
-        tokens = data.get("tokens", ())
-        ids: list[str] = []
-        for t in tokens:
-            if hasattr(t, "scryfall_id"):
-                ids.append(t.scryfall_id)
-            elif isinstance(t, dict):
-                t_id = t.get("id", "")
-                t_sid = t.get("scryfall_id", "") or (derive_scryfall_id(t_id) if t_id else "")
-                if t_sid:
-                    ids.append(t_sid)
-                    if "name" in t:
-                        register_card_data(t_sid, t)
-            elif isinstance(t, str):
-                ids.append(t)
-        token_scryfall_ids = tuple(ids)
+        token_scryfall_ids = extract_token_scryfall_ids(data.get("tokens", ()))
 
-    colors = data.get("colors", ())
-    if isinstance(colors, list):
-        colors = tuple(colors)
-    keywords = data.get("keywords", ())
-    if isinstance(keywords, list):
-        keywords = tuple(keywords)
+    colors = tuple(data.get("colors", ()))
+    keywords = tuple(data.get("keywords", ()))
 
     _card_registry[scryfall_id] = CardData(
         name=data.get("name", ""),
@@ -116,7 +119,8 @@ def get_card_data(scryfall_id: str) -> CardData:
     try:
         return _card_registry[scryfall_id]
     except KeyError:
-        raise KeyError(f"No CardData registered for scryfall_id={scryfall_id!r}") from None
+        msg = f"No CardData registered for scryfall_id={scryfall_id!r}"
+        raise KeyError(msg) from None
 
 
 def _expand_scryfall_ids(scryfall_ids: set[str]) -> set[str]:
@@ -138,8 +142,6 @@ def _expand_scryfall_ids(scryfall_ids: set[str]) -> set[str]:
 
 
 def export_registry(scryfall_ids: set[str] | None = None) -> dict[str, dict]:
-    from dataclasses import asdict  # noqa: PLC0415
-
     if scryfall_ids is None:
         return {sid: asdict(cd) for sid, cd in _card_registry.items()}
     expanded = _expand_scryfall_ids(scryfall_ids)

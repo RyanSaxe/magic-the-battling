@@ -51,7 +51,8 @@ def _assess_db_risks(db: dict[str, object]) -> list[str]:
     open_total = _as_int(summary.get("open_games_total"))
     unfinished = _as_int(summary.get("unfinished_started_last_window"))
     with_history = _as_int(breakdown.get("unfinished_with_history"))
-    if open_total >= 100:
+    high_open_games_threshold = 100
+    if open_total >= high_open_games_threshold:
         items.append(
             f"Open game backlog is high ({open_total} games with no ended_at). "
             "Consider an abandoned/completed lifecycle state.",
@@ -226,10 +227,12 @@ def _append_db_activity_lines(lines: list[str], report: dict[str, object]) -> No
     lines.extend(
         [
             "DB Activity",
-            "- games in window: "
-            f"started={summary.get('games_last_window')} "
-            f"completed={summary.get('completed_last_window')} "
-            f"unfinished={summary.get('unfinished_started_last_window')}",
+            (
+                "- games in window: "
+                f"started={summary.get('games_last_window')} "
+                f"completed={summary.get('completed_last_window')} "
+                f"unfinished={summary.get('unfinished_started_last_window')}"
+            ),
             f"- open games total: {summary.get('open_games_total')}",
         ],
     )
@@ -241,14 +244,18 @@ def _append_db_activity_lines(lines: list[str], report: dict[str, object]) -> No
         )
     lines.extend(
         [
-            "- window composition: "
-            f"with_history={breakdown.get('window_with_history')} "
-            f"without_history={breakdown.get('window_without_history')} "
-            f"unfinished_with_history={breakdown.get('unfinished_with_history')}",
-            "- open age buckets: "
-            f">24h={open_age.get('open_gt_24h')} "
-            f">72h={open_age.get('open_gt_72h')} "
-            f">168h={open_age.get('open_gt_168h')}",
+            (
+                "- window composition: "
+                f"with_history={breakdown.get('window_with_history')} "
+                f"without_history={breakdown.get('window_without_history')} "
+                f"unfinished_with_history={breakdown.get('unfinished_with_history')}"
+            ),
+            (
+                "- open age buckets: "
+                f">24h={open_age.get('open_gt_24h')} "
+                f">72h={open_age.get('open_gt_72h')} "
+                f">168h={open_age.get('open_gt_168h')}"
+            ),
             f"- cube breakdown: {db.get('cube_breakdown')}",
         ],
     )

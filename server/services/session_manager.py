@@ -1,3 +1,5 @@
+"""In-memory player and spectator WebSocket session store."""
+
 import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -13,7 +15,7 @@ class Session:
 
 
 class SessionManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self._sessions: dict[str, Session] = {}
         self._player_to_session: dict[str, str] = {}
 

@@ -17,7 +17,7 @@ from server.perf.models import GameResult, HarnessConfig, RunSummary
 def read_process_rss_mb(pid: int) -> float | None:
     cmd = ["ps", "-o", "rss=", "-p", str(pid)]
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603 -- trusted local subprocess args
             cmd,
             check=False,
             capture_output=True,
@@ -361,7 +361,7 @@ def check_regression_thresholds(cfg: HarnessConfig, report: dict[str, Any]) -> l
     return breaches
 
 
-def _fmt_float(value: float | int | None) -> str:
+def _fmt_float(value: float | None) -> str:
     if value is None:
         return "n/a"
     if isinstance(value, int):
@@ -434,10 +434,12 @@ def print_summary(summary: RunSummary) -> None:
     lines = [
         "",
         f"=== {summary.label} ===",
-        f"scenario={summary.scenario} games={summary.games} concurrency={summary.concurrency} "
-        f"players/game={summary.players_per_game} idle_hot_games={summary.idle_hot_games} "
-        f"puppet_count={summary.puppet_count} timeout/game={summary.timeout_per_game_sec:.1f}s "
-        f"wall={summary.wall_time_sec:.2f}s throughput={summary.throughput_games_per_sec:.2f} games/s",
+        (
+            f"scenario={summary.scenario} games={summary.games} concurrency={summary.concurrency} "
+            f"players/game={summary.players_per_game} idle_hot_games={summary.idle_hot_games} "
+            f"puppet_count={summary.puppet_count} timeout/game={summary.timeout_per_game_sec:.1f}s "
+            f"wall={summary.wall_time_sec:.2f}s throughput={summary.throughput_games_per_sec:.2f} games/s"
+        ),
         f"completed={summary.completed} succeeded={summary.succeeded} failed={summary.failed}",
         f"game duration sec: {format_stats_line(summary.duration_stats_sec)}",
         f"create_game ms: {format_stats_line(summary.create_game_stats_ms)}",

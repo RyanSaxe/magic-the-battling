@@ -56,7 +56,7 @@ def _create_test_bot(name: str, player_history_id: int) -> Puppet:
         treasures=1,
     )
     bot.snapshots = {
-        f"{stage}_{round_num}": StaticOpponent.from_snapshot(snapshot_data, name, player_history_id)
+        f"{stage}_{round_num}": StaticOpponent.from_snapshot(snapshot_data, name, history_id=player_history_id)
         for stage in range(3, 7)
         for round_num in range(1, 10)
     }
@@ -68,11 +68,11 @@ def _create_test_game(num_humans: int, num_bots: int) -> tuple[Game, GameManager
     game = create_game(human_names, num_humans)
 
     manager = GameManager()
-    manager._active_games["test-game"] = game
+    manager.active_games["test-game"] = game
     for i, player in enumerate(game.players):
         player_id = f"player-{i}"
-        manager._player_to_game[player_id] = "test-game"
-        manager._player_id_to_name[player_id] = player.name
+        manager.player_to_game[player_id] = "test-game"
+        manager.player_id_to_name[player_id] = player.name
 
     for i in range(num_bots):
         game.puppets.append(_create_test_bot(f"Bot{i + 1}", player_history_id=100 + i))
@@ -80,7 +80,7 @@ def _create_test_game(num_humans: int, num_bots: int) -> tuple[Game, GameManager
     return game, manager, [*game.players, *game.puppets]
 
 
-def _setup_for_battle(p: Participant, stage: int = 3, round_num: int = 1) -> None:
+def _setup_for_battle(p: Participant, stage: int = 3, *, round_num: int = 1) -> None:
     p.stage = stage
     p.round = round_num
     if isinstance(p, Player):
@@ -90,28 +90,28 @@ def _setup_for_battle(p: Participant, stage: int = 3, round_num: int = 1) -> Non
 
 
 def _start_battle(
-    game: Game, p1: Participant, p2: Participant, stage: int = 3, round_num: int = 1
+    game: Game, p1: Participant, *, p2: Participant, stage: int = 3, round_num: int = 1
 ) -> battle.Battle | None:
     if isinstance(p1, Puppet) and isinstance(p2, Puppet):
-        battle.resolve_puppet_vs_puppet(p1, p2, stage, round_num, use_upgrades=game.config.use_upgrades)
+        battle.resolve_puppet_vs_puppet(p1, p2, stage=stage, round_num=round_num, use_upgrades=game.config.use_upgrades)
         return None
     if isinstance(p1, Puppet):
         static_p1 = p1.get_opponent_for_round(stage, round_num)
         assert static_p1 is not None
         assert isinstance(p2, Player)
-        return battle.start(game, p2, static_p1)
+        return battle.start(game, p2, opponent=static_p1)
     if isinstance(p2, Puppet):
         static_p2 = p2.get_opponent_for_round(stage, round_num)
         assert static_p2 is not None
-        return battle.start(game, p1, static_p2)
-    return battle.start(game, p1, p2)
+        return battle.start(game, p1, opponent=static_p2)
+    return battle.start(game, p1, opponent=p2)
 
 
-def _submit_battle_result(manager: GameManager, game: Game, b: battle.Battle, winner_name: str | None) -> None:
+def _submit_battle_result(manager: GameManager, game: Game, *, b: battle.Battle, winner_name: str | None) -> None:
     result_str = winner_name or "draw"
-    manager.handle_battle_submit_result(game, b.player, result_str, "test-game", None)
+    manager.handle_battle_submit_result(game, b.player, result=result_str, game_id="test-game", db=None)
     if isinstance(b.opponent, Player):
-        manager.handle_battle_submit_result(game, b.opponent, result_str, "test-game", None)
+        manager.handle_battle_submit_result(game, b.opponent, result=result_str, game_id="test-game", db=None)
 
 
 def _count_live(game: Game) -> int:
@@ -122,7 +122,7 @@ class TestGhostAndSuddenDeathE2E:
     """E2E tests for ghost and sudden death mechanics across different player configurations."""
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_first_elimination_creates_ghost_when_odd_survivors(self, num_humans: int, num_bots: int):
+    def test_first_elimination_creates_ghost_when_odd_survivors(self, num_humans: int, num_bots: int) -> None:
         game, manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
             _setup_for_battle(p)
@@ -132,15 +132,15 @@ class TestGhostAndSuddenDeathE2E:
         for p in (p2, p3, p4):
             _set_poison(p, 0)
 
-        b1 = _start_battle(game, p1, p2)
-        b2 = _start_battle(game, p3, p4)
+        b1 = _start_battle(game, p1, p2=p2)
+        b2 = _start_battle(game, p3, p2=p4)
 
         if b1:
-            _submit_battle_result(manager, game, b1, p2.name)
+            _submit_battle_result(manager, game, b=b1, winner_name=p2.name)
         if isinstance(p1, Player):
             assert p1.phase in ("awaiting_elimination", "eliminated")
         if b2:
-            _submit_battle_result(manager, game, b2, p3.name)
+            _submit_battle_result(manager, game, b=b2, winner_name=p3.name)
 
         assert _count_live(game) == 3
         if game.most_recent_ghost:
@@ -149,7 +149,7 @@ class TestGhostAndSuddenDeathE2E:
             assert game.most_recent_ghost_puppet is not None
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_ghost_cleared_when_even_survivors(self, num_humans: int, num_bots: int):
+    def test_ghost_cleared_when_even_survivors(self, num_humans: int, num_bots: int) -> None:
         game, manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
             _setup_for_battle(p)
@@ -159,12 +159,12 @@ class TestGhostAndSuddenDeathE2E:
         for p in (p2, p3, p4):
             _set_poison(p, 0)
 
-        b1 = _start_battle(game, p1, p2)
-        b2 = _start_battle(game, p3, p4)
+        b1 = _start_battle(game, p1, p2=p2)
+        b2 = _start_battle(game, p3, p2=p4)
         if b1:
-            _submit_battle_result(manager, game, b1, p2.name)
+            _submit_battle_result(manager, game, b=b1, winner_name=p2.name)
         if b2:
-            _submit_battle_result(manager, game, b2, p3.name)
+            _submit_battle_result(manager, game, b=b2, winner_name=p3.name)
 
         assert _count_live(game) == 3
         assert game.most_recent_ghost is not None or game.most_recent_ghost_puppet is not None
@@ -182,16 +182,16 @@ class TestGhostAndSuddenDeathE2E:
             l1.poison = 10
             process_puppet_eliminations(game)
         else:
-            b3 = _start_battle(game, l1, l2, stage=3, round_num=2)
+            b3 = _start_battle(game, l1, p2=l2, stage=3, round_num=2)
             if b3:
-                _submit_battle_result(manager, game, b3, l2.name)
+                _submit_battle_result(manager, game, b=b3, winner_name=l2.name)
 
         assert _count_live(game) == 2
         assert game.most_recent_ghost is None
         assert game.most_recent_ghost_puppet is None
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_ghost_included_in_pairing_candidates(self, num_humans: int, num_bots: int):
+    def test_ghost_included_in_pairing_candidates(self, num_humans: int, num_bots: int) -> None:
         game, _manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
             _setup_for_battle(p)
@@ -212,7 +212,7 @@ class TestGhostAndSuddenDeathE2E:
             assert p1.name in [c.name for c in candidates]
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_awaiting_elimination_phase_before_elimination(self, num_humans: int, num_bots: int):
+    def test_awaiting_elimination_phase_before_elimination(self, num_humans: int, num_bots: int) -> None:
         game, manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
             _setup_for_battle(p)
@@ -222,15 +222,15 @@ class TestGhostAndSuddenDeathE2E:
         for p in (p2, p3, p4):
             _set_poison(p, 0)
 
-        b1 = _start_battle(game, p1, p2)
-        b2 = _start_battle(game, p3, p4)
+        b1 = _start_battle(game, p1, p2=p2)
+        b2 = _start_battle(game, p3, p2=p4)
 
         if b1 and isinstance(p1, Player) and b2 is not None:
-            _submit_battle_result(manager, game, b1, p2.name)
+            _submit_battle_result(manager, game, b=b1, winner_name=p2.name)
             assert p1.phase == "awaiting_elimination"
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_scenario_a_all_three_die_triggers_sudden_death(self, num_humans: int, num_bots: int):
+    def test_scenario_a_all_three_die_triggers_sudden_death(self, num_humans: int, num_bots: int) -> None:
         game, _manager, participants = _create_test_game(num_humans, num_bots)
         p1, p2, p3, p4 = participants
         for p in participants:
@@ -255,7 +255,7 @@ class TestGhostAndSuddenDeathE2E:
         assert p1.name not in [f.name for f in fighters]
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_scenario_b_two_die_triggers_sudden_death(self, num_humans: int, num_bots: int):
+    def test_scenario_b_two_die_triggers_sudden_death(self, num_humans: int, num_bots: int) -> None:
         game, _manager, participants = _create_test_game(num_humans, num_bots)
         p1, p2, p3, p4 = participants
         for p in participants:
@@ -282,7 +282,7 @@ class TestGhostAndSuddenDeathE2E:
             assert p4.name not in {f.name for f in fighters}
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_scenario_c_one_dies_no_sudden_death(self, num_humans: int, num_bots: int):
+    def test_scenario_c_one_dies_no_sudden_death(self, num_humans: int, num_bots: int) -> None:
         game, _manager, participants = _create_test_game(num_humans, num_bots)
         p1, p2, p3, p4 = participants
         for p in participants:
@@ -304,7 +304,9 @@ class TestGhostAndSuddenDeathE2E:
         assert game.most_recent_ghost is not None or game.most_recent_ghost_puppet is not None
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_sudden_death_sets_flag_and_resets_poison_to_threshold_minus_one(self, num_humans: int, num_bots: int):
+    def test_sudden_death_sets_flag_and_resets_poison_to_threshold_minus_one(
+        self, num_humans: int, num_bots: int
+    ) -> None:
         game, manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
             _setup_for_battle(p)
@@ -322,14 +324,14 @@ class TestGhostAndSuddenDeathE2E:
             if isinstance(p, Player):
                 p.phase = "awaiting_elimination"
 
-        result = manager._check_sudden_death_ready(game, "test-game", db=None)
+        result = manager.check_sudden_death_ready(game, "test-game", db=None)
         if result == "sudden_death":
             fighters = [p for p in participants if p.in_sudden_death]
             assert len(fighters) == 2
             assert all(f.poison == 9 for f in fighters)
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), MULTI_HUMAN_CONFIGS)
-    def test_sudden_death_flag_cleared_after_resolution(self, num_humans: int, num_bots: int):
+    def test_sudden_death_flag_cleared_after_resolution(self, num_humans: int, num_bots: int) -> None:
         game, manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
             _setup_for_battle(p)
@@ -340,8 +342,8 @@ class TestGhostAndSuddenDeathE2E:
         h1.in_sudden_death = True
         h2.in_sudden_death = True
 
-        b = battle.start(game, h1, h2, is_sudden_death=True)
-        _submit_battle_result(manager, game, b, h1.name)
+        b = battle.start(game, h1, opponent=h2, is_sudden_death=True)
+        _submit_battle_result(manager, game, b=b, winner_name=h1.name)
 
         if h1.phase == "eliminated" or h2.phase == "eliminated":
             for h in (h1, h2):
@@ -349,7 +351,7 @@ class TestGhostAndSuddenDeathE2E:
                     assert not h.in_sudden_death
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), MULTI_HUMAN_CONFIGS)
-    def test_would_be_dead_ready_blocks_on_active_battles(self, num_humans: int, num_bots: int):
+    def test_would_be_dead_ready_blocks_on_active_battles(self, num_humans: int, num_bots: int) -> None:
         game, _manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
             _setup_for_battle(p)
@@ -357,12 +359,28 @@ class TestGhostAndSuddenDeathE2E:
         h1, h2 = game.players[0], game.players[1]
         h1.poison = 10
         h2.poison = 10
-        battle.start(game, h1, h2)
+        battle.start(game, h1, opponent=h2)
 
         assert not would_be_dead_ready_for_elimination(game)
 
+    @staticmethod
+    def _eliminate_round_two(manager: GameManager, game: Game, *, live: list[Participant]) -> None:
+        live_humans = [p for p in live if isinstance(p, Player)]
+        live_puppets = [p for p in live if isinstance(p, Puppet)]
+        victim2: Participant = live_puppets[0] if len(live_humans) == 1 else live_humans[0]
+        survivor2: Participant = live_humans[0] if len(live_humans) == 1 else live_humans[1]
+        _set_poison(victim2, 9)
+        if isinstance(victim2, Puppet) and isinstance(survivor2, Puppet):
+            victim2.poison = 10
+            process_puppet_eliminations(game)
+        else:
+            b3 = _start_battle(game, victim2, p2=survivor2, stage=3, round_num=2)
+            if b3:
+                _submit_battle_result(manager, game, b=b3, winner_name=survivor2.name)
+        manager.check_sudden_death_ready(game, "test-game", db=None)
+
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
-    def test_full_game_flow_to_finale(self, num_humans: int, num_bots: int):
+    def test_full_game_flow_to_finale(self, num_humans: int, num_bots: int) -> None:
         """Test full game flow from 4 participants to finale (2 remaining)."""
         game, manager, participants = _create_test_game(num_humans, num_bots)
         for p in participants:
@@ -378,14 +396,14 @@ class TestGhostAndSuddenDeathE2E:
             if p != victim:
                 _set_poison(p, 0)
 
-        b1 = _start_battle(game, victim, survivor)
+        b1 = _start_battle(game, victim, p2=survivor)
         others = [p for p in participants if p not in (victim, survivor)]
-        b2 = _start_battle(game, others[0], others[1])
+        b2 = _start_battle(game, others[0], p2=others[1])
 
         if b1:
-            _submit_battle_result(manager, game, b1, survivor.name)
+            _submit_battle_result(manager, game, b=b1, winner_name=survivor.name)
         if b2:
-            _submit_battle_result(manager, game, b2, others[0].name)
+            _submit_battle_result(manager, game, b=b2, winner_name=others[0].name)
 
         assert _count_live(game) == 3
 
@@ -393,20 +411,7 @@ class TestGhostAndSuddenDeathE2E:
         for p in live:
             _setup_for_battle(p, stage=3, round_num=2)
 
-        live_humans = [p for p in live if isinstance(p, Player)]
-        live_puppets = [p for p in live if isinstance(p, Puppet)]
-        victim2: Participant = live_puppets[0] if len(live_humans) == 1 else live_humans[0]
-        survivor2: Participant = live_humans[0] if len(live_humans) == 1 else live_humans[1]
-
-        _set_poison(victim2, 9)
-        if isinstance(victim2, Puppet) and isinstance(survivor2, Puppet):
-            victim2.poison = 10
-            process_puppet_eliminations(game)
-        else:
-            b3 = _start_battle(game, victim2, survivor2, stage=3, round_num=2)
-            if b3:
-                _submit_battle_result(manager, game, b3, survivor2.name)
-        manager._check_sudden_death_ready(game, "test-game", db=None)
+        self._eliminate_round_two(manager, game, live=live)
 
         assert _count_live(game) == 2
         assert game.most_recent_ghost is None

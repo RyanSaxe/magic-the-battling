@@ -1,13 +1,25 @@
+"""Card, Battler, and CubeCobra deck validation models."""
+
 import random
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Protocol, Required, Unpack
 
-from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    PrivateAttr,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    computed_field,
+    model_serializer,
+    model_validator,
+)
 
 from mtb.models.card_registry import (
     CardData,
     CardDataInput,
     derive_scryfall_id,
+    extract_token_scryfall_ids,
     get_card_data,
     register_card_data,
 )
@@ -53,7 +65,7 @@ class Card(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _register_and_derive(cls, data: Any) -> Any:
+    def _register_and_derive(cls, data: object) -> object:
         if not isinstance(data, dict):
             return data
 
@@ -65,27 +77,13 @@ class Card(BaseModel):
 
         if "name" in data and scryfall_id:
             if "token_scryfall_ids" not in data:
-                tokens = data.get("tokens", ())
-                sids: list[str] = []
-                for token in tokens:
-                    if hasattr(token, "scryfall_id"):
-                        sids.append(token.scryfall_id)
-                    elif isinstance(token, dict):
-                        token_id = token.get("id", "")
-                        token_sid = token.get("scryfall_id", "") or (derive_scryfall_id(token_id) if token_id else "")
-                        if token_sid:
-                            sids.append(token_sid)
-                            if "name" in token:
-                                register_card_data(token_sid, token)
-                    elif isinstance(token, str):
-                        sids.append(token)
-                data["token_scryfall_ids"] = tuple(sids)
-
+                data["token_scryfall_ids"] = extract_token_scryfall_ids(data.get("tokens", ()))
             register_card_data(scryfall_id, data)
 
         return data
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: object, /) -> None:
+        _ = context
         if not self.scryfall_id:
             return
         try:
@@ -179,7 +177,7 @@ class Card(BaseModel):
         return self._tokens_cache
 
     @model_serializer(mode="wrap")
-    def _serialize(self, handler: Any, info: Any) -> dict[str, Any]:
+    def _serialize(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict[str, Any]:
         if info.context and info.context.get("slim_cards"):
             return {
                 "id": self.id,
@@ -206,9 +204,11 @@ class Card(BaseModel):
 
     def upgrade(self, upgrade: "Card") -> None:
         if not upgrade.is_upgrade:
-            raise ValueError(f"{upgrade.name} is not a conspiracy and hence cannot be an upgrade")
+            msg = f"{upgrade.name} is not a conspiracy and hence cannot be an upgrade"
+            raise ValueError(msg)
         if upgrade.upgrade_target is not None and upgrade.upgrade_target is not self:
-            raise ValueError(f"{upgrade.name} is already linked to {upgrade.upgrade_target.name}")
+            msg = f"{upgrade.name} is already linked to {upgrade.upgrade_target.name}"
+            raise ValueError(msg)
         upgrade.upgrade_target = self
 
 
@@ -228,7 +228,6 @@ class Battler(BaseModel):
 DEFAULT_BATTLER_ID = "auto"
 DEFAULT_UPGRADES_ID = "default_mtb_upgrades"
 
-# TODO: actually add a lot of vanguards to the default cube
 DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 
 
@@ -257,9 +256,10 @@ class IllegalBattlerError(ValueError):
 def build_battler(
     battler_id: str = DEFAULT_BATTLER_ID,
     upgrades_id: str | None = None,
+    *,
     vanguards_id: str | None = None,
 ) -> Battler:
-    from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415
+    from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415 -- deferred circular import
 
     cards = get_cube_data(battler_id)
     if problem := _own_supplements_problem(cards):
@@ -356,6 +356,10 @@ def find_problem_before_saving(cards: Sequence[ListedCard], play_mode: PlayMode)
     banned = [card for card in cards if _has_banned_name(card, play_mode) or _find_banned_keyword(card, play_mode)]
     if not banned:
         return None
+    return _format_banned_cards_problem(banned, play_mode)
+
+
+def _format_banned_cards_problem(banned: Sequence[ListedCard], play_mode: PlayMode) -> str:
     if len(banned) == 1:
         [card] = banned
         if _has_banned_name(card, play_mode):

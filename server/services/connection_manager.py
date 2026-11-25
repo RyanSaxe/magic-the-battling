@@ -5,14 +5,13 @@ its own beyond the socket close codes it sends.
 """
 
 import asyncio
+import contextlib
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from functools import partial
 from time import perf_counter
-from typing import Any
-
-from fastapi import WebSocket
+from typing import Any, Protocol
 
 from server.compression import send_ws
 from server.errors import ErrorCode, ws_error_payload
@@ -33,14 +32,19 @@ SPECTATE_TARGET_GONE_CLOSE_CODE = 4007
 FELL_BEHIND_CLOSE_CODE = 1012
 
 
-async def reject_websocket(websocket: WebSocket, *, code: int, reason: str, error_code: ErrorCode | str) -> None:
+class WebSocketLike(Protocol):
+    async def accept(self) -> None: ...
+    async def send_bytes(self, data: bytes, /) -> None: ...
+    async def send_json(self, data: dict[str, Any], /) -> None: ...
+    async def close(self, code: int = 1000, reason: str = "") -> None: ...
+
+
+async def reject_websocket(websocket: WebSocketLike, *, code: int, reason: str, error_code: ErrorCode | str) -> None:
     # Accept-then-close ensures browsers receive the WebSocket close code
     # instead of a generic HTTP 403 handshake rejection.
-    try:
+    with contextlib.suppress(Exception):
         await websocket.accept()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         await send_ws(
             websocket,
             {
@@ -48,8 +52,6 @@ async def reject_websocket(websocket: WebSocket, *, code: int, reason: str, erro
                 "payload": ws_error_payload(error_code, reason),
             },
         )
-    except Exception:
-        pass
     await websocket.close(code=code, reason=reason)
 
 
@@ -59,7 +61,9 @@ async def _record_broadcast(
     if sends:
         await asyncio.wait(sends)
     duration_ms = (perf_counter() - start) * 1000
-    record_ws_broadcast_latency(kind, game_id, duration_ms, recipient_count, spectator_count)
+    record_ws_broadcast_latency(
+        kind, game_id, duration_ms=duration_ms, recipients=recipient_count, spectators=spectator_count
+    )
     obs_logger.info(
         "WS broadcast latency: kind=%s game_id=%s recipients=%d spectators=%d duration_ms=%.2f",
         kind,
@@ -73,10 +77,10 @@ async def _record_broadcast(
 class ConnectionManager:
     def __init__(self, game_manager: GameManager) -> None:
         self._game_manager = game_manager
-        self._connections: dict[str, dict[str, WebSocket]] = defaultdict(dict)
+        self._connections: dict[str, dict[str, WebSocketLike]] = defaultdict(dict)
         self._pending_connections: dict[str, set[str]] = defaultdict(set)
         # game id -> watched player's name -> sockets. By name, so a player who comes back with a new id keeps them.
-        self._spectators: dict[str, dict[str, list[WebSocket]]] = defaultdict(lambda: defaultdict(list))
+        self._spectators: dict[str, dict[str, list[WebSocketLike]]] = defaultdict(lambda: defaultdict(list))
         self._background_tasks: set[asyncio.Task] = set()
         self._outgoing = OutgoingWrites()
 
@@ -85,6 +89,9 @@ class ConnectionManager:
 
     def total_connections(self) -> int:
         return sum(len(v) for v in self._connections.values())
+
+    def total_spectators(self) -> int:
+        return sum(len(sockets) for target_map in self._spectators.values() for sockets in target_map.values())
 
     async def reset_runtime_state(self) -> dict[str, int]:
         player_sockets = [ws for players in self._connections.values() for ws in players.values()]
@@ -95,18 +102,14 @@ class ConnectionManager:
 
         closed_players = 0
         for ws in player_sockets:
-            try:
+            with contextlib.suppress(Exception):
                 await ws.close(code=1012, reason="Runtime reset")
-            except Exception:
-                pass
             closed_players += 1
 
         closed_spectators = 0
         for ws in spectator_sockets:
-            try:
+            with contextlib.suppress(Exception):
                 await ws.close(code=1012, reason="Runtime reset")
-            except Exception:
-                pass
             closed_spectators += 1
 
         self._connections.clear()
@@ -119,7 +122,7 @@ class ConnectionManager:
             "pending_connections_cleared": pending_count,
         }
 
-    async def connect(self, game_id: str, player_id: str, websocket: WebSocket) -> bool:
+    async def connect(self, game_id: str, player_id: str, *, websocket: WebSocketLike) -> bool:
         if self.total_connections() >= MAX_WS_CONNECTIONS:
             self._pending_connections[game_id].discard(player_id)
             await reject_websocket(
@@ -140,7 +143,7 @@ class ConnectionManager:
             self._close(previous, code=SEAT_MOVED_CLOSE_CODE, reason="Seat opened elsewhere")
         return True
 
-    def disconnect(self, game_id: str, player_id: str, websocket: WebSocket) -> None:
+    def disconnect(self, game_id: str, player_id: str, *, websocket: WebSocketLike) -> None:
         logger.debug("Disconnect called for game_id=%s, player_id=%s", game_id, player_id)
         if game_id in self._pending_connections:
             self._pending_connections[game_id].discard(player_id)
@@ -173,7 +176,7 @@ class ConnectionManager:
         pending.discard(player_id)
         return True
 
-    async def connect_spectator(self, game_id: str, target_player_name: str, websocket: WebSocket) -> bool:
+    async def connect_spectator(self, game_id: str, target_player_name: str, *, websocket: WebSocketLike) -> bool:
         await websocket.accept()
         # The game may have been dropped, and its spectators closed, while this socket was being accepted.
         if not self._game_manager.is_loaded(game_id):
@@ -182,7 +185,7 @@ class ConnectionManager:
         self._spectators[game_id][target_player_name].append(websocket)
         return True
 
-    def disconnect_spectator(self, game_id: str, target_player_name: str, websocket: WebSocket) -> None:
+    def disconnect_spectator(self, game_id: str, target_player_name: str, *, websocket: WebSocketLike) -> None:
         if game_id in self._spectators and target_player_name in self._spectators[game_id]:
             self._spectators[game_id][target_player_name] = [
                 ws for ws in self._spectators[game_id][target_player_name] if ws != websocket
@@ -190,23 +193,25 @@ class ConnectionManager:
 
     def send(
         self,
-        websocket: WebSocket,
+        websocket: WebSocketLike,
         message: dict,
         *,
         spectator: bool = False,
         on_failure: Callable[[], None] | None = None,
     ) -> asyncio.Task:
-        return self._outgoing.add(websocket, partial(send_ws, websocket, message, spectator=spectator), on_failure)
+        return self._outgoing.add(
+            websocket, partial(send_ws, websocket, message, spectator=spectator), on_failure=on_failure
+        )
 
-    async def wait_until_sent(self, websocket: WebSocket) -> None:
+    async def wait_until_sent(self, websocket: WebSocketLike) -> None:
         await self._outgoing.wait_until_sent(websocket)
 
-    def _close(self, websocket: WebSocket, *, code: int, reason: str) -> None:
+    def _close(self, websocket: WebSocketLike, *, code: int, reason: str) -> None:
         # A close ends only when the other end lets go of it, which behind a proxy takes seconds.
         self._outgoing.add(websocket, partial(websocket.close, code=code, reason=reason))
 
     def _send_registered(
-        self, websocket: WebSocket, messages: list[dict], *, unregister: Callable[[], None], spectator: bool = False
+        self, websocket: WebSocketLike, messages: list[dict], *, unregister: Callable[[], None], spectator: bool = False
     ) -> list[asyncio.Task]:
         if self._outgoing.has_fallen_behind(websocket):
             logger.warning("Closing a socket that fell behind on its messages")
@@ -216,15 +221,15 @@ class ConnectionManager:
         return [self.send(websocket, message, spectator=spectator, on_failure=unregister) for message in messages]
 
     def _send_player(
-        self, game_id: str, player_id: str, *, websocket: WebSocket, messages: list[dict]
+        self, game_id: str, player_id: str, *, websocket: WebSocketLike, messages: list[dict]
     ) -> list[asyncio.Task]:
-        unregister = partial(self.disconnect, game_id, player_id, websocket)
+        unregister = partial(self.disconnect, game_id, player_id, websocket=websocket)
         return self._send_registered(websocket, messages, unregister=unregister)
 
     def _send_spectator(
-        self, game_id: str, target_player_name: str, *, websocket: WebSocket, messages: list[dict]
+        self, game_id: str, target_player_name: str, *, websocket: WebSocketLike, messages: list[dict]
     ) -> list[asyncio.Task]:
-        unregister = partial(self.disconnect_spectator, game_id, target_player_name, websocket)
+        unregister = partial(self.disconnect_spectator, game_id, target_player_name, websocket=websocket)
         return self._send_registered(websocket, messages, unregister=unregister, spectator=True)
 
     def _send_spectators_their_view(
@@ -258,7 +263,7 @@ class ConnectionManager:
         if websocket := self._connections.get(game_id, {}).get(player_id):
             self.send(websocket, {"type": "kicked", "payload": {}})
             self._close(websocket, code=KICKED_CLOSE_CODE, reason="Kicked by host")
-            self.disconnect(game_id, player_id, websocket)
+            self.disconnect(game_id, player_id, websocket=websocket)
 
     async def send_spectate_requests(self, game_id: str, target_player_name: str) -> None:
         """Send a player every request still waiting on their answer, oldest first."""
@@ -267,7 +272,7 @@ class ConnectionManager:
             return
         requests = self._game_manager.pending_spectate_requests(game_id, target_player_name)
         payload = {"requests": [{"request_id": r.request_id, "spectator_name": r.spectator_name} for r in requests]}
-        await self.send_to_player(game_id, target_player_id, {"type": "spectate_requests", "payload": payload})
+        await self.send_to_player(game_id, target_player_id, message={"type": "spectate_requests", "payload": payload})
 
     def spectate_requests_changed(self, game_id: str, target_player_name: str) -> None:
         self._run_soon(self.send_spectate_requests(game_id, target_player_name))
@@ -290,10 +295,10 @@ class ConnectionManager:
         websocket = self._connections.get(game_id, {}).get(player_id)
         if websocket is None:
             return
-        self.disconnect(game_id, player_id, websocket)
+        self.disconnect(game_id, player_id, websocket=websocket)
         self._close(websocket, code=GAME_ENDED_CLOSE_CODE, reason="Game ended")
 
-    async def send_to_player(self, game_id: str, player_id: str, message: dict) -> None:
+    async def send_to_player(self, game_id: str, player_id: str, *, message: dict) -> None:
         if game_id in self._connections and player_id in self._connections[game_id]:
             self._send_player(game_id, player_id, websocket=self._connections[game_id][player_id], messages=[message])
 
@@ -360,8 +365,9 @@ class ConnectionManager:
 
     async def send_error(
         self,
-        websocket: WebSocket,
+        websocket: WebSocketLike,
         message: str,
+        *,
         error_code: ErrorCode | str = ErrorCode.USER_MESSAGE,
     ) -> None:
         self.send(
@@ -432,3 +438,16 @@ class ConnectionManager:
             for target_player_name, sockets in list(target_map.items()):
                 for websocket in list(sockets):
                     self._send_spectator(game_id, target_player_name, websocket=websocket, messages=[message])
+
+    @property
+    def connections(self) -> dict[str, dict[str, WebSocketLike]]:
+        return self._connections
+
+    @property
+    def spectators(self) -> dict[str, dict[str, list[WebSocketLike]]]:
+        return self._spectators
+
+    def clear_all_connections(self) -> None:
+        self._connections.clear()
+        self._pending_connections.clear()
+        self._spectators.clear()

@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
 import base64
 import json
 import logging
 import subprocess
 from collections import Counter
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import argparse
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +32,7 @@ def run_command(args: list[str], *, timeout_sec: int, verbose: bool) -> CommandR
     if verbose:
         logger.info("[cmd] %s", " ".join(args))
     try:
-        completed = subprocess.run(
+        completed = subprocess.run(  # noqa: S603 -- trusted local subprocess args
             args,
             check=False,
             capture_output=True,
@@ -37,7 +40,8 @@ def run_command(args: list[str], *, timeout_sec: int, verbose: bool) -> CommandR
             timeout=timeout_sec,
         )
     except subprocess.TimeoutExpired as exc:
-        raise ReportError(f"Command timed out after {timeout_sec}s: {' '.join(args)}") from exc
+        msg = f"Command timed out after {timeout_sec}s: {' '.join(args)}"
+        raise ReportError(msg) from exc
 
     result = CommandResult(
         args=args,
@@ -47,7 +51,8 @@ def run_command(args: list[str], *, timeout_sec: int, verbose: bool) -> CommandR
     )
     if result.returncode != 0:
         msg = result.stderr.strip() or result.stdout.strip() or "(no output)"
-        raise ReportError(f"Command failed ({result.returncode}): {' '.join(args)}\n{msg}")
+        msg_0 = f"Command failed ({result.returncode}): {' '.join(args)}\n{msg}"
+        raise ReportError(msg_0)
     return result
 
 
@@ -61,7 +66,8 @@ def extract_first_json_value(text: str) -> object:
         except json.JSONDecodeError:
             continue
         return value
-    raise ReportError("Unable to parse JSON payload from command output.")
+    msg = "Unable to parse JSON payload from command output."
+    raise ReportError(msg)
 
 
 def extract_json_objects(text: str) -> list[dict[str, object]]:
@@ -117,7 +123,8 @@ def run_remote_python(args: argparse.Namespace, script: str) -> dict[str, object
 
     value = extract_first_json_value(payload)
     if not isinstance(value, dict):
-        raise ReportError("Unexpected remote python JSON payload.")
+        msg = "Unexpected remote python JSON payload."
+        raise ReportError(msg)
     return value
 
 
@@ -129,7 +136,8 @@ def fetch_status(args: argparse.Namespace) -> dict[str, object]:
     )
     value = extract_first_json_value(result.stdout)
     if not isinstance(value, dict):
-        raise ReportError("Unexpected status JSON payload.")
+        msg = "Unexpected status JSON payload."
+        raise ReportError(msg)
     return value
 
 
@@ -141,7 +149,8 @@ def fetch_machine_list(args: argparse.Namespace) -> list[dict[str, object]]:
     )
     value = extract_first_json_value(result.stdout)
     if not isinstance(value, list):
-        raise ReportError("Unexpected machine list JSON payload.")
+        msg = "Unexpected machine list JSON payload."
+        raise ReportError(msg)
     return [item for item in value if isinstance(item, dict)]
 
 
@@ -153,7 +162,8 @@ def fetch_checks(args: argparse.Namespace) -> dict[str, list[dict[str, object]]]
     )
     value = extract_first_json_value(result.stdout)
     if not isinstance(value, dict):
-        raise ReportError("Unexpected checks JSON payload.")
+        msg = "Unexpected checks JSON payload."
+        raise ReportError(msg)
     return {
         str(key): [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
         for key, items in value.items()

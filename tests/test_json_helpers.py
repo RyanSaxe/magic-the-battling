@@ -1,8 +1,10 @@
-import importlib
+import contextlib
 import json
 import threading
 import time
+from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import ModuleType
 from typing import ClassVar
 
 import pytest
@@ -13,7 +15,7 @@ from mtb.utils import json_helpers as json_helpers_module_impl
 class _JsonHandler(BaseHTTPRequestHandler):
     request_times: ClassVar[list[float]] = []
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         self.__class__.request_times.append(time.time())
         payload = json.dumps({"call": len(self.__class__.request_times)}).encode()
         self.send_response(200)
@@ -22,12 +24,12 @@ class _JsonHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def log_message(self, format: str, *args):
-        return
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002 -- matches external API param name
+        _ = (format, args)
 
 
 @pytest.fixture
-def json_endpoint():
+def json_endpoint() -> Generator[tuple[str, list[float]]]:
     _JsonHandler.request_times = []
     server = ThreadingHTTPServer(("127.0.0.1", 0), _JsonHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -42,22 +44,18 @@ def json_endpoint():
 
 
 @pytest.fixture
-def json_helpers_module():
+def json_helpers_module(monkeypatch: pytest.MonkeyPatch) -> Generator[ModuleType]:
     module = json_helpers_module_impl
-
-    try:
+    # Undo conftest's offline_cubecobra patch so these tests exercise real local HTTP requests.
+    monkeypatch.setattr(module, "get_json", lambda url: module._get_service().get_json(url))  # noqa: SLF001 -- real local HTTP test
+    with contextlib.suppress(Exception):
         module.stop_worker()
-    except Exception:
-        pass
-    module = importlib.reload(module)
     yield module
-    try:
+    with contextlib.suppress(Exception):
         module.stop_worker()
-    except Exception:
-        pass
 
 
-def test_get_json_caches_responses(json_helpers_module, json_endpoint):
+def test_get_json_caches_responses(json_helpers_module: ModuleType, json_endpoint: tuple[str, list[float]]) -> None:
     module = json_helpers_module
     url, request_times = json_endpoint
 
@@ -68,7 +66,9 @@ def test_get_json_caches_responses(json_helpers_module, json_endpoint):
     assert len(request_times) == 1
 
 
-def test_get_json_after_stop_worker_returns(json_helpers_module, json_endpoint):
+def test_get_json_after_stop_worker_returns(
+    json_helpers_module: ModuleType, json_endpoint: tuple[str, list[float]]
+) -> None:
     module = json_helpers_module
     url, _ = json_endpoint
 
@@ -76,7 +76,7 @@ def test_get_json_after_stop_worker_returns(json_helpers_module, json_endpoint):
 
     result: dict | None = None
 
-    def call_get():
+    def call_get() -> None:
         nonlocal result
         result = module.get_json(url)
 
@@ -88,13 +88,15 @@ def test_get_json_after_stop_worker_returns(json_helpers_module, json_endpoint):
     assert result == {"call": 1}
 
 
-def test_revalidate_and_get_on_cache_miss(json_helpers_module, json_endpoint):
+def test_revalidate_and_get_on_cache_miss(
+    json_helpers_module: ModuleType, json_endpoint: tuple[str, list[float]]
+) -> None:
     module = json_helpers_module
     url, request_times = json_endpoint
 
     result: dict | None = None
 
-    def call():
+    def call() -> None:
         nonlocal result
         result = module.revalidate_and_get(url)
 
@@ -107,14 +109,16 @@ def test_revalidate_and_get_on_cache_miss(json_helpers_module, json_endpoint):
     assert len(request_times) == 1
 
 
-def test_concurrent_requests_share_single_fetch(json_helpers_module, json_endpoint):
+def test_concurrent_requests_share_single_fetch(
+    json_helpers_module: ModuleType, json_endpoint: tuple[str, list[float]]
+) -> None:
     module = json_helpers_module
     url, request_times = json_endpoint
 
     barrier = threading.Barrier(2)
     results: list[dict] = []
 
-    def task():
+    def task() -> None:
         barrier.wait()
         results.append(module.get_json(url))
 

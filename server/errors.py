@@ -1,3 +1,5 @@
+"""Structured API and WebSocket error codes and payload builders."""
+
 from __future__ import annotations
 
 from enum import StrEnum
@@ -45,6 +47,7 @@ class AppHTTPException(HTTPException):
         self,
         status_code: int,
         code: ErrorCode | str,
+        *,
         detail: str,
         headers: dict[str, str] | None = None,
     ) -> None:
@@ -55,6 +58,7 @@ class AppHTTPException(HTTPException):
 def api_error(
     status_code: int,
     code: ErrorCode | str,
+    *,
     detail: str,
     headers: dict[str, str] | None = None,
 ) -> AppHTTPException:

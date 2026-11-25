@@ -52,7 +52,7 @@ def _transfer_card_state(card_id: str, from_zones: Zones, *, to_zones: Zones) ->
 
 class ActionHandlers(RoundService):
     def handle_draft_swap(
-        self, game: Game, player: Player, pack_card_id: str, player_card_id: str, destination: CardDestination
+        self, game: Game, player: Player, *, pack_card_id: str, player_card_id: str, destination: CardDestination
     ) -> bool:
         current_pack = game.get_draft_state().current_packs.get(player.name)
         if not current_pack:
@@ -70,7 +70,7 @@ class ActionHandlers(RoundService):
         if not player_card:
             return False
 
-        draft.swap(game, player, pack_card, player_card, destination)
+        draft.swap(game, player, pack_card=pack_card, player_card=player_card, destination=destination)
         return True
 
     def handle_draft_roll(self, game: Game, player: Player) -> bool:
@@ -86,7 +86,7 @@ class ActionHandlers(RoundService):
         return True
 
     def handle_build_move(
-        self, player: Player, card_id: str, source: BuildSource, destination: BuildSource, slot: int | None = None
+        self, player: Player, card_id: str, *, source: BuildSource, destination: BuildSource, slot: int | None = None
     ) -> bool | str:
         source_list = player.hand if source == "hand" else player.sideboard
         card = next((c for c in source_list if c.id == card_id), None)
@@ -94,15 +94,17 @@ class ActionHandlers(RoundService):
             return f"Card not found in {source}"
 
         try:
-            build.move_card(player, card, source, destination, slot)
-            return True
+            build.move_card(player, card, source=source, destination=destination, slot=slot)
         except ValueError as e:
             return str(e)
+        else:
+            return True
 
     def handle_build_swap(
         self,
         player: Player,
         card_a_id: str,
+        *,
         source_a: BuildSource,
         card_b_id: str,
         source_b: BuildSource,
@@ -116,38 +118,42 @@ class ActionHandlers(RoundService):
         if not card_a or not card_b:
             return False
 
-        build.swap_card(player, card_a, source_a, card_b, source_b)
+        build.swap_card(player, card_a, source_a=source_a, card_b=card_b, source_b=source_b)
         return True
 
-    def handle_build_set_basics(self, game: Game, player: Player, basics: list[str]) -> bool | str:
+    def handle_build_set_basics(self, game: Game, player: Player, *, basics: list[str]) -> bool | str:
         try:
-            build.set_basics(game, player, basics)
-            return True
+            build.set_basics(game, player, basics=basics)
         except ValueError as e:
             return str(e)
+        else:
+            return True
 
     def handle_build_ready(
         self,
         game: Game,
         player: Player,
+        *,
         basics: list[str],
         game_id: str | None = None,
         db: Session | None = None,
-        *,
         play_draw_preference: str = "play",
         hand_order: list[str] | None = None,
     ) -> str | None:
         try:
-            build.set_ready(game, player, basics, play_draw_preference, hand_order=hand_order)
+            build.set_ready(
+                game, player, basics=basics, play_draw_preference=play_draw_preference, hand_order=hand_order
+            )
 
             # Handle sudden death players specially
             if player.in_sudden_death:
                 return self._handle_sudden_death_build_ready(game, player, game_id=game_id, db=db)
 
             self._start_round_if_ready(game, game_id, db=db)
-            return None
         except ValueError as e:
             return str(e)
+        else:
+            return None
 
     def _handle_sudden_death_build_ready(
         self, game: Game, player: Player, *, game_id: str | None, db: Session | None
@@ -165,7 +171,7 @@ class ActionHandlers(RoundService):
                         self._record_sudden_death_builds(db, game_id, fighters=[(player, static_opp.name)])
                         transition_phase(player, "battle")
                         player.build_ready = False
-                        battle.start(game, player, static_opp, is_sudden_death=True)
+                        battle.start(game, player, opponent=static_opp, is_sudden_death=True)
                         return None
             return None
 
@@ -181,7 +187,7 @@ class ActionHandlers(RoundService):
         transition_phase(other_sd_player, "battle")
         player.build_ready = False
         other_sd_player.build_ready = False
-        battle.start(game, player, other_sd_player, is_sudden_death=True)
+        battle.start(game, player, opponent=other_sd_player, is_sudden_death=True)
         return None
 
     def _record_sudden_death_builds(
@@ -231,11 +237,12 @@ class ActionHandlers(RoundService):
     def handle_build_unready(self, player: Player) -> str | None:
         try:
             build.unready(player)
-            return None
         except ValueError as e:
             return str(e)
+        else:
+            return None
 
-    def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
+    def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, *, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id=target_card_id)
 
     def handle_build_set_companion(self, player: Player, card_id: str) -> str | None:
@@ -244,16 +251,18 @@ class ActionHandlers(RoundService):
             return "Card not found in sideboard"
         try:
             build.set_companion(player, card)
-            return None
         except ValueError as e:
             return str(e)
+        else:
+            return None
 
     def handle_build_remove_companion(self, player: Player) -> str | None:
         try:
             build.remove_companion(player)
-            return None
         except ValueError as e:
             return str(e)
+        else:
+            return None
 
     def _get_zones_for_owner(self, b: Battle, player: Player, *, owner: str) -> Zones:
         is_battle_player = player.name == b.player.name
@@ -267,7 +276,7 @@ class ActionHandlers(RoundService):
         return real_ids.get(card_id, card_id)
 
     def _track_revealed_card(self, b: Battle, card: Card, *, from_zones: Zones, to_zone: ZoneName) -> None:
-        if to_zone not in battle.REVEALED_ZONES or not battle._is_revealed_card(card):
+        if to_zone not in battle.REVEALED_ZONES or not battle.is_revealed_card(card):
             return
         if card.original_owner:
             is_owner_battle_player = card.original_owner == b.player.name
@@ -281,10 +290,10 @@ class ActionHandlers(RoundService):
         self,
         game: Game,
         player: Player,
+        *,
         card_id: str,
         from_zone: ZoneName,
         to_zone: ZoneName,
-        *,
         from_owner: str = "player",
         to_owner: str = "player",
     ) -> bool:
@@ -310,28 +319,28 @@ class ActionHandlers(RoundService):
         if from_zones is not to_zones:
             _transfer_card_state(card_id, from_zones, to_zones=to_zones)
 
-        is_token = battle._is_token(b.player_zones, card_id) or battle._is_token(b.opponent_zones, card_id)
+        is_token = battle.is_token(b.player_zones, card_id) or battle.is_token(b.opponent_zones, card_id)
         if is_token and to_zone != "battlefield":
             to_zones.get_zone(to_zone).remove(card)
             for z in (b.player_zones, b.opponent_zones):
-                battle._remove_token_state(z, card_id)
+                battle.remove_token_state(z, card_id)
             return True
 
         self._track_revealed_card(b, card, from_zones=from_zones, to_zone=to_zone)
         return True
 
     def handle_battle_submit_result(
-        self, game: Game, player: Player, result: str, game_id: str | None = None, db: Session | None = None
+        self, game: Game, player: Player, *, result: str, game_id: str | None = None, db: Session | None = None
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                battle.submit_result(b, player, result)
+                battle.submit_result(b, player, winner_name=result)
                 if battle.results_agreed(b):
                     self._end_battle(game, b, game_id=game_id, db=db)
                 return True
         return False
 
-    def handle_battle_update_life(self, game: Game, player: Player, target: str, life: int) -> bool:
+    def handle_battle_update_life(self, game: Game, player: Player, *, target: str, life: int) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
                 is_player_side = player.name == b.player.name
@@ -351,6 +360,7 @@ class ActionHandlers(RoundService):
         self,
         game: Game,
         player: Player,
+        *,
         action_type: str,
         card_id: str,
         data: dict | None = None,
@@ -358,14 +368,14 @@ class ActionHandlers(RoundService):
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
                 card_id = self._resolve_opaque_card_id(b, player, card_id=card_id)
-                updated = battle.update_card_state(b, player, action_type, card_id, data)
+                updated = battle.update_card_state(b, player, action_type=action_type, card_id=card_id, data=data)
                 if updated and action_type == "shuffle_library":
                     # With the same hidden ids, the other player could follow each card through the shuffle.
-                    b._opaque_id_key = secrets.token_bytes(32)
+                    b.opaque_id_key = secrets.token_bytes(32)
                 return updated
         return False
 
-    def handle_battle_reveal_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
+    def handle_battle_reveal_upgrade(self, game: Game, player: Player, *, upgrade_id: str) -> bool:
         for b in game.active_battles:
             if player.name not in (b.player.name, b.opponent.name):
                 continue
@@ -405,7 +415,7 @@ class ActionHandlers(RoundService):
                 return "Not your turn"
         return False
 
-    def handle_reward_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
+    def handle_reward_apply_upgrade(self, player: Player, upgrade_id: str, *, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id=target_card_id)
 
     def _apply_upgrade(self, player: Player, upgrade_id: str, *, target_card_id: str) -> bool:
@@ -418,13 +428,14 @@ class ActionHandlers(RoundService):
         if not target:
             return False
 
-        reward.apply_upgrade_to_card(player, upgrade, target)
+        reward.apply_upgrade_to_card(player, upgrade, target=target)
         return True
 
     def handle_reward_done(
         self,
         game: Game,
         player: Player,
+        *,
         upgrade_id: str | None = None,
         game_id: str | None = None,
         db: Session | None = None,

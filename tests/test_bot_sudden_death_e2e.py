@@ -25,7 +25,7 @@ def _create_test_bot(name: str, player_history_id: int) -> Puppet:
         treasures=1,
     )
     bot.snapshots = {
-        f"{stage}_{round_num}": StaticOpponent.from_snapshot(snapshot_data, name, player_history_id)
+        f"{stage}_{round_num}": StaticOpponent.from_snapshot(snapshot_data, name, history_id=player_history_id)
         for stage in range(3, 7)
         for round_num in range(1, 10)
     }
@@ -37,11 +37,11 @@ def _create_test_game(num_humans: int, num_bots: int) -> tuple[Game, GameManager
     game = create_game(human_names, num_humans)
 
     manager = GameManager()
-    manager._active_games["test-game"] = game
+    manager.active_games["test-game"] = game
     for i, player in enumerate(game.players):
         player_id = f"player-{i}"
-        manager._player_to_game[player_id] = "test-game"
-        manager._player_id_to_name[player_id] = player.name
+        manager.player_to_game[player_id] = "test-game"
+        manager.player_id_to_name[player_id] = player.name
 
     for i in range(num_bots):
         game.puppets.append(_create_test_bot(f"Bot{i + 1}", player_history_id=100 + i))
@@ -49,7 +49,7 @@ def _create_test_game(num_humans: int, num_bots: int) -> tuple[Game, GameManager
     return game, manager, [*game.players, *game.puppets]
 
 
-def _setup_for_battle(p: Participant, stage: int = 3, round_num: int = 1) -> None:
+def _setup_for_battle(p: Participant, stage: int = 3, *, round_num: int = 1) -> None:
     p.stage = stage
     p.round = round_num
     if isinstance(p, Player):
@@ -58,17 +58,17 @@ def _setup_for_battle(p: Participant, stage: int = 3, round_num: int = 1) -> Non
         p.hand = [Card(name=f"{p.name}Card", image_url="test", id=f"card-{p.name}", type_line="Creature")]
 
 
-def _submit_battle_result(manager: GameManager, game: Game, b: battle.Battle, winner_name: str | None) -> None:
+def _submit_battle_result(manager: GameManager, game: Game, *, b: battle.Battle, winner_name: str | None) -> None:
     result_str = winner_name or "draw"
-    manager.handle_battle_submit_result(game, b.player, result_str, "test-game", None)
+    manager.handle_battle_submit_result(game, b.player, result=result_str, game_id="test-game", db=None)
     if isinstance(b.opponent, Player):
-        manager.handle_battle_submit_result(game, b.opponent, result_str, "test-game", None)
+        manager.handle_battle_submit_result(game, b.opponent, result=result_str, game_id="test-game", db=None)
 
 
 class TestBotSpecificScenarios:
     """Tests specific to bot behavior in ghost/sudden death scenarios."""
 
-    def test_bot_vs_bot_sudden_death_auto_resolves(self):
+    def test_bot_vs_bot_sudden_death_auto_resolves(self) -> None:
         game, manager, participants = _create_test_game(1, 3)
         human = game.players[0]
         bot1, bot2, bot3 = game.puppets
@@ -80,14 +80,14 @@ class TestBotSpecificScenarios:
         bot2.poison = 11
         bot3.poison = 5
 
-        manager._check_sudden_death_ready(game, "test-game", db=None)
+        manager.check_sudden_death_ready(game, "test-game", db=None)
 
         eliminated_bots = [b for b in game.puppets if b.is_eliminated]
         live_puppets = [b for b in game.puppets if not b.is_eliminated]
         assert len(eliminated_bots) >= 1
         assert len(live_puppets) >= 1
 
-    def test_human_vs_bot_sudden_death_starts_build_phase(self):
+    def test_human_vs_bot_sudden_death_starts_build_phase(self) -> None:
         game, manager, participants = _create_test_game(2, 2)
         h1, h2 = game.players
         b1, b2 = game.puppets
@@ -100,7 +100,7 @@ class TestBotSpecificScenarios:
         b1.poison = 11
         h1.phase = "awaiting_elimination"
 
-        result = manager._check_sudden_death_ready(game, "test-game", db=None)
+        result = manager.check_sudden_death_ready(game, "test-game", db=None)
         if result == "sudden_death":
             assert h1.phase == "build"
             assert h1.in_sudden_death
@@ -120,42 +120,42 @@ class TestBotSpecificScenarios:
         h2.phase = "draft"
         static_puppet = b1.get_opponent_for_round(3, 1)
         assert static_puppet is not None
-        b = battle.start(game, h1, static_puppet)
-        _submit_battle_result(manager, game, b, None)
+        b = battle.start(game, h1, opponent=static_puppet)
+        _submit_battle_result(manager, game, b=b, winner_name=None)
         assert h1.phase == "build"
         assert h1.in_sudden_death
         return manager, game, h1, h2, b1
 
     @staticmethod
-    def _puppet_wins_sudden_death(manager: GameManager, game: Game, human: Player, puppet: Puppet) -> None:
+    def _puppet_wins_sudden_death(manager: GameManager, game: Game, *, human: Player, puppet: Puppet) -> None:
         human.phase = "battle"
         static_puppet = puppet.get_opponent_for_round(human.stage, human.round)
         assert static_puppet is not None
-        b = battle.start(game, human, static_puppet, is_sudden_death=True)
-        _submit_battle_result(manager, game, b, static_puppet.name)
+        b = battle.start(game, human, opponent=static_puppet, is_sudden_death=True)
+        _submit_battle_result(manager, game, b=b, winner_name=static_puppet.name)
 
-    def test_human_losing_sudden_death_to_puppet_leaves_game_running_for_surviving_human(self):
+    def test_human_losing_sudden_death_to_puppet_leaves_game_running_for_surviving_human(self) -> None:
         manager, game, h1, h2, b1 = self._start_human_vs_puppet_sudden_death_beside_a_survivor()
 
-        self._puppet_wins_sudden_death(manager, game, h1, b1)
+        self._puppet_wins_sudden_death(manager, game, human=h1, puppet=b1)
 
         assert h1.phase == "eliminated"
         assert h2.phase == "draft"
         assert not b1.is_eliminated
         assert check_game_over(game) == (None, False)
 
-    def test_human_losing_sudden_death_to_puppet_starts_final_when_survivor_already_ready(self):
+    def test_human_losing_sudden_death_to_puppet_starts_final_when_survivor_already_ready(self) -> None:
         manager, game, h1, h2, b1 = self._start_human_vs_puppet_sudden_death_beside_a_survivor()
         h2.round = 2
         h2.phase = "build"
         h2.build_ready = True
 
-        self._puppet_wins_sudden_death(manager, game, h1, b1)
+        self._puppet_wins_sudden_death(manager, game, human=h1, puppet=b1)
 
         assert h2.phase == "battle"
         assert [(b.player.name, b.opponent.name) for b in game.active_battles] == [(h2.name, b1.name)]
 
-    def test_lone_human_losing_sudden_death_to_puppet_ends_the_game(self):
+    def test_lone_human_losing_sudden_death_to_puppet_ends_the_game(self) -> None:
         game, manager, participants = _create_test_game(1, 2)
         (human,) = game.players
         b1, b2 = game.puppets
@@ -166,18 +166,18 @@ class TestBotSpecificScenarios:
         b1.poison = 9
         static_puppet = b1.get_opponent_for_round(3, 1)
         assert static_puppet is not None
-        b = battle.start(game, human, static_puppet)
-        _submit_battle_result(manager, game, b, None)
+        b = battle.start(game, human, opponent=static_puppet)
+        _submit_battle_result(manager, game, b=b, winner_name=None)
         assert human.phase == "build"
         assert human.in_sudden_death
 
-        self._puppet_wins_sudden_death(manager, game, human, b1)
+        self._puppet_wins_sudden_death(manager, game, human=human, puppet=b1)
 
         assert human.phase == "eliminated"
         assert not b1.is_eliminated
         assert check_game_over(game) == (None, True)
 
-    def test_bot_ghost_available_for_pairing(self):
+    def test_bot_ghost_available_for_pairing(self) -> None:
         game, _manager, participants = _create_test_game(2, 2)
         for p in participants:
             _setup_for_battle(p)
@@ -195,7 +195,7 @@ class TestBotSpecificScenarios:
 
 
 class TestRoundStartAfterElimination:
-    def test_round_starts_when_the_last_player_it_waited_for_is_eliminated(self):
+    def test_round_starts_when_the_last_player_it_waited_for_is_eliminated(self) -> None:
         game, manager, _ = _create_test_game(3, 1)
         a, b, c = game.players
         puppet = game.puppets[0]
@@ -211,9 +211,9 @@ class TestRoundStartAfterElimination:
         c.poison = 9
         static_puppet = puppet.get_opponent_for_round(3, 1)
         assert static_puppet is not None
-        battle.start(game, c, static_puppet)
+        battle.start(game, c, opponent=static_puppet)
 
-        manager.handle_battle_submit_result(game, c, static_puppet.name, "test-game", None)
+        manager.handle_battle_submit_result(game, c, result=static_puppet.name, game_id="test-game", db=None)
 
         assert c.phase == "eliminated"
         assert (a.phase, b.phase) == ("battle", "battle")
@@ -223,7 +223,7 @@ class TestRoundStartAfterElimination:
 class TestBotEliminations:
     """Tests for bot elimination logic."""
 
-    def test_process_puppet_eliminations_clears_ghost_when_even_survivors(self):
+    def test_process_puppet_eliminations_clears_ghost_when_even_survivors(self) -> None:
         game, _manager, _participants = _create_test_game(1, 3)
         human = game.players[0]
         bots = game.puppets
@@ -242,7 +242,7 @@ class TestBotEliminations:
 class TestEdgeCases:
     """Edge case tests for ghost and sudden death mechanics."""
 
-    def test_ghost_not_in_sudden_death_fighters(self):
+    def test_ghost_not_in_sudden_death_fighters(self) -> None:
         game, _manager, _participants = _create_test_game(4, 0)
         p1, p2, p3, p4 = game.players
         for p in game.players:
@@ -261,7 +261,7 @@ class TestEdgeCases:
         assert fighters is not None
         assert p4.name not in [f.name for f in fighters]
 
-    def test_three_at_lethal_highest_poison_eliminated(self):
+    def test_three_at_lethal_highest_poison_eliminated(self) -> None:
         game, manager, participants = _create_test_game(3, 1)
         for p in participants:
             _setup_for_battle(p)
@@ -274,14 +274,14 @@ class TestEdgeCases:
         for h in (h1, h2, h3):
             h.phase = "awaiting_elimination"
 
-        result = manager._check_sudden_death_ready(game, "test-game", db=None)
+        result = manager.check_sudden_death_ready(game, "test-game", db=None)
 
         assert result == "sudden_death"
         assert h3.phase == "eliminated"
         assert h1.phase == "build"
         assert h2.phase == "build"
 
-    def test_simultaneous_battles_both_end_before_elimination(self):
+    def test_simultaneous_battles_both_end_before_elimination(self) -> None:
         game, manager, _participants = _create_test_game(4, 0)
         p1, p2, p3, p4 = game.players
         for p in game.players:
@@ -289,20 +289,20 @@ class TestEdgeCases:
 
         p1.poison = 9
         p3.poison = 9
-        b1 = battle.start(game, p1, p2)
-        b2 = battle.start(game, p3, p4)
+        b1 = battle.start(game, p1, opponent=p2)
+        b2 = battle.start(game, p3, opponent=p4)
 
-        _submit_battle_result(manager, game, b1, p2.name)
+        _submit_battle_result(manager, game, b=b1, winner_name=p2.name)
         assert p1.phase == "awaiting_elimination"
 
-        _submit_battle_result(manager, game, b2, p4.name)
+        _submit_battle_result(manager, game, b=b2, winner_name=p4.name)
         assert len(get_live_players(game)) + len(get_live_puppets(game)) == 2
 
 
 class TestDoubleDrawBotSuddenDeath:
     """Tests for double draw scenarios where bots reach lethal."""
 
-    def test_double_draw_kills_three_bots_human_survives_triggers_sudden_death(self):
+    def test_double_draw_kills_three_bots_human_survives_triggers_sudden_death(self) -> None:
         game, manager, participants = _create_test_game(1, 3)
         human = game.players[0]
         bot1, bot2, bot3 = game.puppets
@@ -316,8 +316,8 @@ class TestDoubleDrawBotSuddenDeath:
 
         static_opponent = bot1.get_opponent_for_round(3, 1)
         assert static_opponent is not None
-        b = battle.start(game, human, static_opponent)
-        _submit_battle_result(manager, game, b, None)
+        b = battle.start(game, human, opponent=static_opponent)
+        _submit_battle_result(manager, game, b=b, winner_name=None)
 
         assert human.phase != "winner"
         live_puppets = get_live_puppets(game)
@@ -325,7 +325,7 @@ class TestDoubleDrawBotSuddenDeath:
         assert live_puppets[0].poison == 9
         assert check_game_over(game) == (None, False)
 
-    def test_double_draw_kills_all_four_triggers_sudden_death(self):
+    def test_double_draw_kills_all_four_triggers_sudden_death(self) -> None:
         game, manager, participants = _create_test_game(1, 3)
         human = game.players[0]
         bot1, bot2, bot3 = game.puppets
@@ -339,8 +339,8 @@ class TestDoubleDrawBotSuddenDeath:
 
         static_opponent = bot1.get_opponent_for_round(3, 1)
         assert static_opponent is not None
-        b = battle.start(game, human, static_opponent)
-        _submit_battle_result(manager, game, b, None)
+        b = battle.start(game, human, opponent=static_opponent)
+        _submit_battle_result(manager, game, b=b, winner_name=None)
 
         live_puppets = get_live_puppets(game)
         live_humans = get_live_players(game)

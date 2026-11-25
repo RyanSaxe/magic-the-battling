@@ -1,8 +1,10 @@
-import importlib
 import logging
+from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, text
+from fastapi.testclient import TestClient
+from httpx import Response
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import IntegrityError
 
 import server.db.database as db_module
@@ -14,12 +16,14 @@ from server.db.models import Base
 LOWERCASE_INDEXES = {"ix_users_username_lower", "ix_users_email_lower"}
 
 
-def _register(client, username: str, email: str):
+def _register(client: TestClient, username: str, *, email: str) -> Response:
     return client.post("/api/auth/register", json={"username": username, "password": "password123", "email": email})
 
 
 class TestAuthCookies:
-    def test_register_sets_secure_cookie_outside_local_dev(self, client, monkeypatch):
+    def test_register_sets_secure_cookie_outside_local_dev(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(auth_router, "AUTH_COOKIE_SECURE", True)
 
         response = client.post(
@@ -30,7 +34,7 @@ class TestAuthCookies:
         assert response.status_code == 200
         assert "Secure" in response.headers["set-cookie"]
 
-    def test_login_omits_secure_cookie_in_local_dev(self, client, monkeypatch):
+    def test_login_omits_secure_cookie_in_local_dev(self, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(auth_router, "AUTH_COOKIE_SECURE", False)
 
         register = client.post(
@@ -48,7 +52,7 @@ class TestAuthCookies:
         assert response.status_code == 200
         assert "Secure" not in response.headers["set-cookie"]
 
-    def test_login_invalid_credentials_returns_structured_error(self, client):
+    def test_login_invalid_credentials_returns_structured_error(self, client: TestClient) -> None:
         response = client.post(
             "/api/auth/login",
             json={"username": "missing_user", "password": "password123"},
@@ -59,39 +63,27 @@ class TestAuthCookies:
 
 
 class TestRuntimeConfig:
-    def test_requires_auth_secret_outside_local_dev(self, monkeypatch):
+    def test_requires_auth_secret_outside_local_dev(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("MTB_LOCAL_DEV", "0")
         monkeypatch.delenv("MTB_AUTH_SECRET_KEY", raising=False)
 
-        try:
-            with pytest.raises(RuntimeError, match="MTB_AUTH_SECRET_KEY"):
-                importlib.reload(runtime_config)
-        finally:
-            monkeypatch.setenv("MTB_LOCAL_DEV", "1")
-            importlib.reload(runtime_config)
+        with pytest.raises(RuntimeError, match="MTB_AUTH_SECRET_KEY"):
+            runtime_config.resolve_auth_secret_key()
 
-    def test_rejects_default_auth_secret_outside_local_dev(self, monkeypatch):
+    def test_rejects_default_auth_secret_outside_local_dev(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("MTB_LOCAL_DEV", "0")
         monkeypatch.setenv("MTB_AUTH_SECRET_KEY", "dev-secret-change-in-production")
 
-        try:
-            with pytest.raises(RuntimeError, match="deployment-specific secret"):
-                importlib.reload(runtime_config)
-        finally:
-            monkeypatch.setenv("MTB_LOCAL_DEV", "1")
-            monkeypatch.delenv("MTB_AUTH_SECRET_KEY", raising=False)
-            importlib.reload(runtime_config)
+        with pytest.raises(RuntimeError, match="deployment-specific secret"):
+            runtime_config.resolve_auth_secret_key()
 
-    def test_local_dev_uses_fallback_secret(self, monkeypatch):
+    def test_local_dev_uses_fallback_secret(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("MTB_LOCAL_DEV", "1")
         monkeypatch.delenv("MTB_AUTH_SECRET_KEY", raising=False)
 
-        config = importlib.reload(runtime_config)
+        assert runtime_config.resolve_auth_secret_key() == "local-dev-secret-key-change-before-production"
 
-        assert config.IS_LOCAL_DEV is True
-        assert config.AUTH_SECRET_KEY == "local-dev-secret-key-change-before-production"
-
-    def test_tokens_round_trip_with_explicit_secret(self, monkeypatch):
+    def test_tokens_round_trip_with_explicit_secret(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(auth_service, "AUTH_SECRET_KEY", "unit-test-secret-key-1234567890abcd")
 
         token = auth_service.create_access_token("user-123", "alice")
@@ -103,28 +95,28 @@ class TestRuntimeConfig:
 
 
 class TestCaseInsensitiveAccounts:
-    def test_sign_up_rejects_a_username_that_differs_only_by_case(self, client):
-        assert _register(client, "jace_fan", "jace@test.com").status_code == 200
+    def test_sign_up_rejects_a_username_that_differs_only_by_case(self, client: TestClient) -> None:
+        assert _register(client, "jace_fan", email="jace@test.com").status_code == 200
 
-        exact = _register(client, "jace_fan", "exact@test.com")
-        other_case = _register(client, "Jace_Fan", "other@test.com")
+        exact = _register(client, "jace_fan", email="exact@test.com")
+        other_case = _register(client, "Jace_Fan", email="other@test.com")
 
         assert other_case.status_code == 409
         assert other_case.json() == exact.json()
         assert other_case.json()["code"] == "USERNAME_TAKEN"
 
-    def test_sign_up_rejects_an_email_that_differs_only_by_case(self, client):
-        assert _register(client, "jace_fan", "jace.fan@test.com").status_code == 200
+    def test_sign_up_rejects_an_email_that_differs_only_by_case(self, client: TestClient) -> None:
+        assert _register(client, "jace_fan", email="jace.fan@test.com").status_code == 200
 
-        exact = _register(client, "exact_case", "jace.fan@test.com")
-        other_case = _register(client, "other_case", "Jace.Fan@Test.com")
+        exact = _register(client, "exact_case", email="jace.fan@test.com")
+        other_case = _register(client, "other_case", email="Jace.Fan@Test.com")
 
         assert other_case.status_code == 409
         assert other_case.json() == exact.json()
         assert other_case.json()["code"] == "EMAIL_IN_USE"
 
-    def test_login_accepts_any_case_and_keeps_the_name_as_typed(self, client):
-        assert _register(client, "Jace_Fan", "Jace.Fan@Test.com").status_code == 200
+    def test_login_accepts_any_case_and_keeps_the_name_as_typed(self, client: TestClient) -> None:
+        assert _register(client, "Jace_Fan", email="Jace.Fan@Test.com").status_code == 200
         client.post("/api/auth/logout")
 
         for typed in ("jace_fan", "JACE_FAN"):
@@ -136,12 +128,17 @@ class TestCaseInsensitiveAccounts:
 
     @pytest.mark.parametrize("names", [("Jace_Fan", "jace_fan"), ("jace_fan", "Jace_Fan")])
     @pytest.mark.parametrize("passwords", [("password123", "password123"), ("password123", "different456")])
-    def test_login_never_picks_between_accounts_that_differ_only_by_case(self, client, names, passwords):
+    def test_login_never_picks_between_accounts_that_differ_only_by_case(
+        self, client: TestClient, names: tuple[str, str], *, passwords: tuple[str, str]
+    ) -> None:
         db = db_module.SessionLocal()
         try:
             for index in LOWERCASE_INDEXES:
                 db.execute(text(f"DROP INDEX {index}"))
-            ids = [str(auth_service.create_user(db, *account).id) for account in zip(names, passwords, strict=True)]
+            ids = [
+                str(auth_service.create_user(db, name, password=pw).id)
+                for name, pw in zip(names, passwords, strict=True)
+            ]
         finally:
             db.close()
 
@@ -156,20 +153,21 @@ class TestCaseInsensitiveAccounts:
             assert third_spelling.status_code == 401
             assert third_spelling.json()["code"] == "INVALID_CREDENTIALS"
 
-    def test_the_database_rejects_accounts_that_differ_only_by_case(self, test_db):
+    def test_the_database_rejects_accounts_that_differ_only_by_case(self, test_db: None) -> None:
+        _ = test_db
         db = db_module.SessionLocal()
         try:
-            auth_service.create_user(db, "jace_fan", "password123", "jace@test.com")
+            auth_service.create_user(db, "jace_fan", password="password123", email="jace@test.com")  # noqa: S106 -- test fixture credential literal
             with pytest.raises(IntegrityError):
-                auth_service.create_user(db, "JACE_FAN", "password123", "other@test.com")
+                auth_service.create_user(db, "JACE_FAN", password="password123", email="other@test.com")  # noqa: S106 -- test fixture credential literal
             db.rollback()
             with pytest.raises(IntegrityError):
-                auth_service.create_user(db, "someone_else", "password123", "JACE@test.com")
+                auth_service.create_user(db, "someone_else", password="password123", email="JACE@test.com")  # noqa: S106 -- test fixture credential literal
         finally:
             db.close()
 
 
-def _database_from_before_the_indexes(tmp_path, accounts: list[tuple[str, str]]):
+def _database_from_before_the_indexes(tmp_path: Path, accounts: list[tuple[str, str]]) -> Engine:
     engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
@@ -183,12 +181,14 @@ def _database_from_before_the_indexes(tmp_path, accounts: list[tuple[str, str]])
     return engine
 
 
-def _index_names(engine) -> set[str]:
+def _index_names(engine: Engine) -> set[str]:
     with engine.connect() as conn:
         return set(conn.execute(text("SELECT name FROM sqlite_master WHERE type = 'index'")).scalars())
 
 
-def test_init_db_adds_the_lowercase_indexes_to_an_existing_database(tmp_path, monkeypatch):
+def test_init_db_adds_the_lowercase_indexes_to_an_existing_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     engine = _database_from_before_the_indexes(tmp_path, [("jace_fan", "jace@test.com")])
     monkeypatch.setattr(db_module, "engine", engine)
 
@@ -200,7 +200,9 @@ def test_init_db_adds_the_lowercase_indexes_to_an_existing_database(tmp_path, mo
         conn.execute(text("INSERT INTO users (id, username, password_hash) VALUES ('user-new', 'Jace_Fan', 'x')"))
 
 
-def test_init_db_adds_neither_index_while_accounts_differ_only_by_case(tmp_path, monkeypatch, caplog):
+def test_init_db_adds_neither_index_while_accounts_differ_only_by_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, caplog: pytest.LogCaptureFixture
+) -> None:
     accounts = [("jace_fan", "jace@test.com"), ("someone_else", "JACE@test.com")]
     engine = _database_from_before_the_indexes(tmp_path, accounts)
     monkeypatch.setattr(db_module, "engine", engine)

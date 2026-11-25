@@ -3,7 +3,7 @@ from mtb.models.cards import Card
 from server.services.game_serialization import build_catalog_from_scryfall_ids, catalog_entry_for_card
 
 
-def test_build_catalog_from_scryfall_ids_includes_synthetic_basics_and_treasure():
+def test_build_catalog_from_scryfall_ids_includes_synthetic_basics_and_treasure() -> None:
     snapshot = export_registry()
     clear_registry()
     try:
@@ -20,7 +20,7 @@ def test_build_catalog_from_scryfall_ids_includes_synthetic_basics_and_treasure(
     assert catalog["treasure"].image_url
 
 
-def test_catalog_entry_for_card_uses_live_runtime_card_when_registry_is_missing():
+def test_catalog_entry_for_card_uses_live_runtime_card_when_registry_is_missing() -> None:
     snapshot = export_registry()
     runtime_card = Card(
         id="token-test-12345678",

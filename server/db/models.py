@@ -1,13 +1,9 @@
-# ty (the Rust type checker) does not understand SQLAlchemy's Column descriptor
-# protocol. Assigning plain Python values to Column-typed attributes is valid at
-# runtime but ty reports invalid-assignment. Suppress with `ty: ignore` until ty
-# adds SQLAlchemy support. See usages in game_manager.py, ops_manager.py, and
-# share_preview.py.
+"""SQLAlchemy ORM models for games, users, histories, snapshots, and cube metadata."""
+
 from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
-    Column,
     DateTime,
     Float,
     ForeignKey,
@@ -18,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def _utc_now() -> datetime:
@@ -32,52 +28,52 @@ class Base(DeclarativeBase):
 class GameRecord(Base):
     __tablename__ = "games"
 
-    id = Column(String, primary_key=True)
-    created_at = Column(DateTime, default=_utc_now)
-    ended_at = Column(DateTime, nullable=True)
-    final_state_json = Column(Text, nullable=True)
-    winner_player_id = Column(String, nullable=True)
-    config_json = Column(Text, nullable=True)
-    shared = Column(Boolean, default=False)
-    cube_id = Column(String, nullable=True)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    final_state_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    winner_player_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shared: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    cube_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    players = relationship("GamePlayerRecord", back_populates="game")
+    players: Mapped[list["GamePlayerRecord"]] = relationship("GamePlayerRecord", back_populates="game")
 
 
 class GamePlayerRecord(Base):
     __tablename__ = "game_players"
 
-    game_id = Column(String, ForeignKey("games.id"), primary_key=True)
-    player_id = Column(String, primary_key=True)
-    player_name = Column(String, nullable=False)
-    final_poison = Column(Integer, default=0)
-    placement = Column(Integer, nullable=True)
-    is_puppet = Column(Boolean, default=False)
-    user_id = Column(String, nullable=True)
-    seat_token_hash = Column(String, nullable=True)
+    game_id: Mapped[str] = mapped_column(String, ForeignKey("games.id"), primary_key=True)
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    player_name: Mapped[str] = mapped_column(String, nullable=False)
+    final_poison: Mapped[int | None] = mapped_column(Integer, default=0)
+    placement: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_puppet: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    user_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    seat_token_hash: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    game = relationship("GameRecord", back_populates="players")
+    game: Mapped["GameRecord"] = relationship("GameRecord", back_populates="players")
 
 
 class PlayerGameHistory(Base):
     __tablename__ = "player_game_history"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    game_id = Column(String, ForeignKey("games.id"), nullable=False)
-    player_name = Column(String, nullable=False)
-    battler_elo = Column(Float, nullable=False, index=True)
-    max_stage = Column(Integer, nullable=False)
-    max_round = Column(Integer, nullable=False)
-    final_placement = Column(Integer, nullable=True)
-    final_poison = Column(Integer, nullable=True)
-    final_treasures = Column(Integer, nullable=True)
-    is_puppet = Column(Boolean, default=False)
-    source_history_id = Column(Integer, ForeignKey("player_game_history.id"), nullable=True)
-    poison_history_json = Column(Text, nullable=True)
-    user_id = Column(String, nullable=True)
-    created_at = Column(DateTime, default=_utc_now)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[str] = mapped_column(String, ForeignKey("games.id"), nullable=False)
+    player_name: Mapped[str] = mapped_column(String, nullable=False)
+    battler_elo: Mapped[float] = mapped_column(Float, nullable=False, index=True)
+    max_stage: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_round: Mapped[int] = mapped_column(Integer, nullable=False)
+    final_placement: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    final_poison: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    final_treasures: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_puppet: Mapped[bool | None] = mapped_column(Boolean, default=False)
+    source_history_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("player_game_history.id"), nullable=True)
+    poison_history_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now)
 
-    snapshots = relationship(
+    snapshots: Mapped[list["BattleSnapshot"]] = relationship(
         "BattleSnapshot", back_populates="player_history", foreign_keys="BattleSnapshot.player_history_id"
     )
 
@@ -85,27 +81,27 @@ class PlayerGameHistory(Base):
 class BattleSnapshot(Base):
     __tablename__ = "battle_snapshots"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    player_history_id = Column(Integer, ForeignKey("player_game_history.id"), nullable=False)
-    stage = Column(Integer, nullable=False)
-    round = Column(Integer, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_history_id: Mapped[int] = mapped_column(Integer, ForeignKey("player_game_history.id"), nullable=False)
+    stage: Mapped[int] = mapped_column(Integer, nullable=False)
+    round: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    hand_json = Column(Text, nullable=False)
-    vanguard_json = Column(Text, nullable=True)
-    basic_lands_json = Column(Text, nullable=False)
-    applied_upgrades_json = Column(Text, nullable=False)
-    treasures = Column(Integer, nullable=False)
-    poison = Column(Integer, nullable=True)
-    play_draw_preference = Column(String, nullable=True)
+    hand_json: Mapped[str] = mapped_column(Text, nullable=False)
+    vanguard_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    basic_lands_json: Mapped[str] = mapped_column(Text, nullable=False)
+    applied_upgrades_json: Mapped[str] = mapped_column(Text, nullable=False)
+    treasures: Mapped[int] = mapped_column(Integer, nullable=False)
+    poison: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    play_draw_preference: Mapped[str | None] = mapped_column(String, nullable=True)
     # Who this build faced in the round; older rows, recorded before pairings were kept, hold NULL.
-    opponent_name = Column(String, nullable=True)
+    opponent_name: Mapped[str | None] = mapped_column(String, nullable=True)
     # Sudden Death rebuilds share their round with the fight that sent players to it: 1 for the first, 2 after a
     # drawn one. NULL marks an ordinary build, including every build saved before Sudden Death builds were kept.
-    sudden_death_build = Column(Integer, nullable=True)
+    sudden_death_build: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    full_state_json = Column(Text, nullable=False)
+    full_state_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    player_history = relationship("PlayerGameHistory", back_populates="snapshots")
+    player_history: Mapped["PlayerGameHistory"] = relationship("PlayerGameHistory", back_populates="snapshots")
 
     __table_args__ = (Index("ix_snapshot_lookup", "player_history_id", "stage", "round"),)
 
@@ -113,10 +109,10 @@ class BattleSnapshot(Base):
 class ActiveGameSnapshot(Base):
     __tablename__ = "active_game_snapshots"
 
-    game_id = Column(String, primary_key=True)
-    state_json = Column(Text, nullable=False)
-    last_human_activity_at = Column(DateTime, default=_utc_now, nullable=False)
-    updated_at = Column(DateTime, default=_utc_now, nullable=False)
+    game_id: Mapped[str] = mapped_column(String, primary_key=True)
+    state_json: Mapped[str] = mapped_column(Text, nullable=False)
+    last_human_activity_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, nullable=False)
 
 
 class QuarantinedGameSnapshot(Base):
@@ -124,26 +120,30 @@ class QuarantinedGameSnapshot(Base):
 
     __tablename__ = "quarantined_game_snapshots"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    game_id = Column(String, nullable=False, index=True)
-    state_json = Column(Text, nullable=False)
-    last_human_activity_at = Column(DateTime, nullable=False)
-    error = Column(Text, nullable=False)
-    quarantined_at = Column(DateTime, default=_utc_now, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    game_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    state_json: Mapped[str] = mapped_column(Text, nullable=False)
+    last_human_activity_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    error: Mapped[str] = mapped_column(Text, nullable=False)
+    quarantined_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, nullable=False)
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(String, primary_key=True)
-    username = Column(String, nullable=False, unique=True)
-    email = Column(String, nullable=True, unique=True)
-    password_hash = Column(String, nullable=False)
-    created_at = Column(DateTime, default=_utc_now)
-    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    username: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    email: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now, onupdate=_utc_now)
 
-    battlers = relationship("UserBattler", back_populates="user", cascade="all, delete-orphan")
-    follows = relationship("BattlerFollow", back_populates="user", cascade="all, delete-orphan")
+    battlers: Mapped[list["UserBattler"]] = relationship(
+        "UserBattler", back_populates="user", cascade="all, delete-orphan"
+    )
+    follows: Mapped[list["BattlerFollow"]] = relationship(
+        "BattlerFollow", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 # Usernames and emails keep the case people typed, but two accounts can't differ only by case. init_db adds these
@@ -157,22 +157,22 @@ LOWERCASE_UNIQUE_USER_INDEXES = (
 class UserBattler(Base):
     __tablename__ = "user_battlers"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    cube_id = Column(String, nullable=False)
-    display_name = Column(String, nullable=True)
-    use_upgrades = Column(Boolean, default=True)
-    use_vanguards = Column(Boolean, default=False)
-    play_mode = Column(String, default="limited")
-    puppet_count = Column(Integer, default=0)
-    target_player_count = Column(Integer, default=4)
-    auto_approve_spectators = Column(Boolean, default=False)
-    guided_mode_default = Column(Boolean, default=False)
-    position = Column(Integer, default=0)
-    created_at = Column(DateTime, default=_utc_now)
-    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    cube_id: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    use_upgrades: Mapped[bool] = mapped_column(Boolean, default=True)
+    use_vanguards: Mapped[bool] = mapped_column(Boolean, default=False)
+    play_mode: Mapped[str] = mapped_column(String, default="limited")
+    puppet_count: Mapped[int] = mapped_column(Integer, default=0)
+    target_player_count: Mapped[int] = mapped_column(Integer, default=4)
+    auto_approve_spectators: Mapped[bool] = mapped_column(Boolean, default=False)
+    guided_mode_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now, onupdate=_utc_now)
 
-    user = relationship("User", back_populates="battlers")
+    user: Mapped["User"] = relationship("User", back_populates="battlers")
 
     __table_args__ = (
         Index("ix_user_battlers_user_id", "user_id"),
@@ -185,13 +185,13 @@ class UserBattler(Base):
 class BattlerFollow(Base):
     __tablename__ = "battler_follows"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    cube_id = Column(String, nullable=False)
-    display_name = Column(String, nullable=True)
-    created_at = Column(DateTime, default=_utc_now)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    cube_id: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now)
 
-    user = relationship("User", back_populates="follows")
+    user: Mapped["User"] = relationship("User", back_populates="follows")
 
     __table_args__ = (
         Index("ix_battler_follows_user_id", "user_id"),
@@ -202,17 +202,17 @@ class BattlerFollow(Base):
 class CubeMetadata(Base):
     __tablename__ = "cube_metadata"
 
-    cube_id = Column(String, primary_key=True)
-    name = Column(String, nullable=True)
-    image_uri = Column(String, nullable=True)
-    updated_at = Column(DateTime, default=_utc_now)
+    cube_id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    image_uri: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=_utc_now)
 
 
 class OpsState(Base):
     __tablename__ = "ops_state"
 
-    id = Column(Integer, primary_key=True)
-    mode = Column(String, nullable=False, default="normal")
-    message = Column(Text, nullable=True)
-    updated_by = Column(String, nullable=True)
-    updated_at = Column(DateTime, default=_utc_now, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mode: Mapped[str] = mapped_column(String, nullable=False, default="normal")
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, nullable=False)

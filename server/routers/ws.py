@@ -89,7 +89,7 @@ async def _handle_spectator_connection(
         )
         return
 
-    if not await connection_manager.connect_spectator(game_id, spectate_player, websocket):
+    if not await connection_manager.connect_spectator(game_id, spectate_player, websocket=websocket):
         return
 
     bootstrap = game_manager.get_game_bootstrap(game_id, target_player_id)
@@ -102,11 +102,11 @@ async def _handle_spectator_connection(
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        connection_manager.disconnect_spectator(game_id, spectate_player, websocket)
+        connection_manager.disconnect_spectator(game_id, spectate_player, websocket=websocket)
 
 
 async def _handle_player_disconnect(game_id: str, player_id: str, *, websocket: WebSocket) -> None:
-    connection_manager.disconnect(game_id, player_id, websocket)
+    connection_manager.disconnect(game_id, player_id, websocket=websocket)
     # A late close from a socket that a newer one replaced must not mark the still-connected player as gone,
     # and a kicked player has no seat left to mark.
     if player_id in connection_manager.get_connected_player_ids(game_id):
@@ -164,12 +164,12 @@ async def _connect_player_to_game(
     if refusal is not None:
         code, reason, error_code = refusal
         if not pending and not game:
-            connection_manager.disconnect(game_id, player_id, websocket)
+            connection_manager.disconnect(game_id, player_id, websocket=websocket)
         await reject_websocket(websocket, code=code, reason=reason, error_code=error_code)
         return None
 
     game_manager.cancel_pending_disconnect(game_id, player_id)
-    connected = await connection_manager.connect(game_id, player_id, websocket)
+    connected = await connection_manager.connect(game_id, player_id, websocket=websocket)
     if not connected:
         return None
     if pending is not None:
@@ -219,6 +219,7 @@ async def _send_initial_player_state(
 async def websocket_endpoint(
     websocket: WebSocket,
     game_id: str,
+    *,
     session_id: str,
     spectate_player: str | None = None,
     request_id: str | None = None,
@@ -266,15 +267,17 @@ async def _run_player_action(game_id: str, player_id: str, *, data: dict, websoc
     action_start = perf_counter()
     action_result = "ok"
     try:
-        await handle_message(game_id, player_id, data, websocket)
+        await handle_message(game_id, player_id, data=data, websocket=websocket)
     except Exception:
         # A bug in one action must not end the socket: the player keeps playing and can still rejoin.
         action_result = "exception"
         logger.exception("WS action failed: action=%s game_id=%s player_id=%s", action, game_id, player_id)
-        await connection_manager.send_error(websocket, "That action failed. Please try again.", ErrorCode.UNKNOWN)
+        await connection_manager.send_error(
+            websocket, "That action failed. Please try again.", error_code=ErrorCode.UNKNOWN
+        )
     finally:
         duration_ms = (perf_counter() - action_start) * 1000
-        record_ws_action_latency(action, game_id, duration_ms)
+        record_ws_action_latency(action, game_id, duration_ms=duration_ms)
         obs_logger.info(
             "WS action latency: action=%s game_id=%s player_id=%s result=%s duration_ms=%.2f",
             action,
@@ -287,7 +290,7 @@ async def _run_player_action(game_id: str, player_id: str, *, data: dict, websoc
 
 def _kick_player(r: _LobbyRequest) -> LobbyResult:
     target_id = r.payload.get("target_player_id", "")
-    if not game_manager.kick_player(r.game_id, r.player_id, target_id):
+    if not game_manager.kick_player(r.game_id, r.player_id, target_player_id=target_id):
         return False, None
     connection_manager.kick(r.game_id, target_id)
     return True, None
@@ -295,7 +298,7 @@ def _kick_player(r: _LobbyRequest) -> LobbyResult:
 
 _LOBBY_ACTIONS: dict[str, _LobbyAction] = {
     "set_ready": _LobbyAction(
-        lambda r: game_manager.set_player_ready(r.game_id, r.player_id, r.payload.get("is_ready", True)),
+        lambda r: game_manager.set_player_ready(r.game_id, r.player_id, is_ready=r.payload.get("is_ready", True)),
         "Failed to set ready state",
     ),
     "clear_battler": _LobbyAction(
@@ -313,12 +316,12 @@ _LOBBY_ACTIONS: dict[str, _LobbyAction] = {
     "kick_player": _LobbyAction(_kick_player, "Cannot kick player"),
     "set_target_player_count": _LobbyAction(
         lambda r: game_manager.set_target_player_count(
-            r.game_id, r.player_id, int(r.payload.get("target_player_count", 0))
+            r.game_id, r.player_id, target_player_count=int(r.payload.get("target_player_count", 0))
         ),
         "Cannot change player cap",
     ),
     "set_voice_chat": _LobbyAction(
-        lambda r: game_manager.set_voice_chat_enabled(r.game_id, r.player_id, r.payload.get("enabled", True)),
+        lambda r: game_manager.set_voice_chat_enabled(r.game_id, r.player_id, enabled=r.payload.get("enabled", True)),
         "Cannot toggle voice chat",
     ),
 }
@@ -327,13 +330,13 @@ _LOBBY_ACTIONS: dict[str, _LobbyAction] = {
 async def _submit_battler(game_id: str, player_id: str, *, payload: dict[str, Any], websocket: WebSocket) -> None:
     pending = game_manager.get_pending_game(game_id)
     if not pending:
-        await connection_manager.send_error(websocket, "Game not found", ErrorCode.GAME_NOT_FOUND)
+        await connection_manager.send_error(websocket, "Game not found", error_code=ErrorCode.GAME_NOT_FOUND)
         return
 
     error = game_manager.start_player_battler_preload(
         pending,
         player_id,
-        str(payload.get("battler_id", "")),
+        battler_id=str(payload.get("battler_id", "")),
         on_complete=lambda: connection_manager.broadcast_lobby_state(game_id),
     )
     if error:
@@ -369,7 +372,7 @@ async def _start_lobby(game_id: str, player_id: str, *, websocket: WebSocket) ->
         await connection_manager.send_error(
             websocket,
             "Server is updating. New games are temporarily blocked.",
-            ErrorCode.SERVER_UPDATING,
+            error_code=ErrorCode.SERVER_UPDATING,
         )
         return
 
@@ -378,7 +381,7 @@ async def _start_lobby(game_id: str, player_id: str, *, websocket: WebSocket) ->
         await game_manager.start_lobby(
             game_id,
             player_id,
-            db_session,
+            db=db_session,
             on_change=lambda: connection_manager.broadcast_lobby_state(game_id),
         )
     except LobbyStartRefusedError as exc:
@@ -427,7 +430,7 @@ async def _handle_voice_signal(game_id: str, player_id: str, *, payload: dict[st
     await connection_manager.send_to_player(
         game_id,
         target_id,
-        {
+        message={
             "type": "voice_signal",
             "payload": {
                 "signal_type": payload.get("signal_type"),
@@ -451,16 +454,18 @@ async def _handle_passthrough_action(action: str, game_id: str, *, player_id: st
 async def _seat_in_started_game(game_id: str, player_id: str, *, websocket: WebSocket) -> tuple[Game, Player] | None:
     game = game_manager.get_game(game_id)
     if not game:
-        await connection_manager.send_error(websocket, "Game not started", ErrorCode.GAME_NOT_FOUND)
+        await connection_manager.send_error(websocket, "Game not started", error_code=ErrorCode.GAME_NOT_FOUND)
         return None
     player = game_manager.get_player(game, player_id)
     if not player:
-        await connection_manager.send_error(websocket, "Player not found in game", ErrorCode.PLAYER_NOT_IN_GAME)
+        await connection_manager.send_error(
+            websocket, "Player not found in game", error_code=ErrorCode.PLAYER_NOT_IN_GAME
+        )
         return None
     return game, player
 
 
-async def handle_message(game_id: str, player_id: str, data: dict, websocket: WebSocket) -> None:
+async def handle_message(game_id: str, player_id: str, *, data: dict, websocket: WebSocket) -> None:
     action = data.get("action", "")
     payload = data.get("payload", {})
 
@@ -471,7 +476,7 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
         await connection_manager.send_error(
             websocket,
             "Server maintenance in progress. Please reconnect shortly.",
-            ErrorCode.SERVER_MAINTENANCE,
+            error_code=ErrorCode.SERVER_MAINTENANCE,
         )
         return
 
@@ -507,7 +512,7 @@ async def _report_game_action_result(
         await connection_manager.send_error(
             websocket,
             f"Unknown action: {action}",
-            ErrorCode.UNKNOWN_ACTION,
+            error_code=ErrorCode.UNKNOWN_ACTION,
         )
     elif result == "game_over":
         winners = [p for p in game.players if p.phase == "winner"]

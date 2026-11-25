@@ -1,12 +1,20 @@
-from mtb.models.cards import build_battler
+from collections.abc import Callable
+
+import pytest
+
+from mtb.models.cards import Card, build_battler
+from mtb.models.game import Game
+from server.services.game_manager import game_manager
 
 
-def test_build_battler_with_separate_upgrades_cube(monkeypatch, card_factory, upgrade_factory):
+def test_build_battler_with_separate_upgrades_cube(
+    monkeypatch: pytest.MonkeyPatch, card_factory: Callable[..., Card], *, upgrade_factory: Callable[[str], Card]
+) -> None:
     """Verify build_battler loads upgrades from separate cube when upgrades_id is provided."""
     main_cards = [card_factory(f"main{i}") for i in range(10)]
     upgrade_cards = [upgrade_factory(f"upgrade{i}") for i in range(4)]
 
-    def fake_get_cube_data(cube_id: str):
+    def fake_get_cube_data(cube_id: str) -> list[Card]:
         if cube_id == "main_cube":
             return list(main_cards)
         if cube_id == "upgrades_cube":
@@ -24,10 +32,15 @@ def test_build_battler_with_separate_upgrades_cube(monkeypatch, card_factory, up
 
 
 def test_game_manager_loads_upgrades_with_defaults(
-    reset_singletons, mock_cube_data, card_factory, upgrade_factory, start_game_now
-):
+    reset_singletons: None,
+    mock_cube_data: None,
+    *,
+    card_factory: Callable[..., Card],
+    upgrade_factory: Callable[[str], Card],
+    start_game_now: Callable[..., Game],
+) -> None:
     """Verify game_manager loads upgrades when use_upgrades=True."""
-    from server.services.game_manager import game_manager  # noqa: PLC0415
+    _ = (reset_singletons, mock_cube_data, card_factory, upgrade_factory)
 
     pending = game_manager.create_game(
         player_name="Alice",
@@ -37,7 +50,7 @@ def test_game_manager_loads_upgrades_with_defaults(
         target_player_count=2,
     )
 
-    game_manager.join_game(pending.join_code, "Bob", "bob-id")
+    game_manager.join_game(pending.join_code, "Bob", player_id="bob-id")
     game = start_game_now(game_manager, pending.game_id)
 
     assert game is not None
@@ -47,10 +60,15 @@ def test_game_manager_loads_upgrades_with_defaults(
 
 
 def test_game_manager_no_upgrades_when_disabled(
-    reset_singletons, mock_cube_data, card_factory, upgrade_factory, start_game_now
-):
+    reset_singletons: None,
+    mock_cube_data: None,
+    *,
+    card_factory: Callable[..., Card],
+    upgrade_factory: Callable[[str], Card],
+    start_game_now: Callable[..., Game],
+) -> None:
     """Verify game_manager does not load upgrades when use_upgrades=False."""
-    from server.services.game_manager import game_manager  # noqa: PLC0415
+    _ = (reset_singletons, mock_cube_data, card_factory, upgrade_factory)
 
     pending = game_manager.create_game(
         player_name="Alice",
@@ -60,7 +78,7 @@ def test_game_manager_no_upgrades_when_disabled(
         target_player_count=2,
     )
 
-    game_manager.join_game(pending.join_code, "Bob", "bob-id")
+    game_manager.join_game(pending.join_code, "Bob", player_id="bob-id")
     game = start_game_now(game_manager, pending.game_id)
 
     assert game is not None

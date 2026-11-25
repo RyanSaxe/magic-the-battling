@@ -40,7 +40,7 @@ def _make_puppet(
         applied_upgrades=[],
         treasures=0,
     )
-    static_opp = StaticOpponent.from_snapshot(snapshot, name, history_id)
+    static_opp = StaticOpponent.from_snapshot(snapshot, name, history_id=history_id)
     puppet = Puppet(
         name=name,
         player_history_id=history_id,
@@ -63,10 +63,10 @@ def _setup_pvp_battle(
     setup_battle_ready(p2)
     p1.hand = [Card(name="p1-card", image_url="test", id="p1-card", type_line="Creature")]
     p2.hand = [Card(name="p2-card", image_url="test", id="p2-card", type_line="Creature")]
-    active = battle.start(game, p1, p2)
+    active = battle.start(game, p1, opponent=p2)
     active.is_sudden_death = sudden_death
-    battle.submit_result(active, p1, winner_name)
-    battle.submit_result(active, p2, winner_name)
+    battle.submit_result(active, p1, winner_name=winner_name)
+    battle.submit_result(active, p2, winner_name=winner_name)
     return active
 
 
@@ -80,9 +80,9 @@ def _setup_static_battle(
 ) -> battle.Battle:
     setup_battle_ready(player)
     player.hand = [Card(name="human-card", image_url="test", id="human-card", type_line="Creature")]
-    active = battle.start(game, player, opponent)
+    active = battle.start(game, player, opponent=opponent)
     active.is_sudden_death = sudden_death
-    battle.submit_result(active, player, winner_name)
+    battle.submit_result(active, player, winner_name=winner_name)
     return active
 
 
@@ -312,7 +312,7 @@ class TestSuddenDeathResolution:
         for player in game.players:
             player.phase = "awaiting_elimination"
 
-        outcome = resolve_end_of_round(game, rng=random.Random(0))
+        outcome = resolve_end_of_round(game, rng=random.Random(0))  # noqa: S311 -- non-cryptographic game RNG
 
         assert outcome.status == "sudden_death"
         assert outcome.eliminated == (charlie,)
@@ -356,7 +356,7 @@ class TestSuddenDeathResolution:
         bot_b.poison = 10
         game.puppets.extend([bot_a, bot_b])
 
-        outcome = resolve_end_of_round(game, rng=random.Random(7))
+        outcome = resolve_end_of_round(game, rng=random.Random(7))  # noqa: S311 -- non-cryptographic game RNG
 
         assert outcome.status is None
         assert outcome.check_round_start is True
