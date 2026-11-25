@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useRef } from "react";
-import { afterEach, expect, it, vi } from "vitest";
-import type { GuidedWalkthroughContext } from "./types";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { GuidedGuideId, GuidedWalkthroughContext } from "./types";
 import { GuidedWalkthrough } from "./GuidedWalkthrough";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none. Reduced motion shows a step at once.
@@ -10,26 +10,35 @@ vi.hoisted(() => {
   window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList;
 });
 
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-});
-
-const request = { guideId: "welcome", nonce: 1, stepIndex: 0 } as const;
 const context = { currentPhase: "build" } as GuidedWalkthroughContext;
 
-function Board({ stepIndex }: { stepIndex?: number }) {
+function Board({
+  guideId,
+  stepIndex,
+  showGuide = stepIndex !== undefined,
+}: {
+  guideId: GuidedGuideId;
+  stepIndex?: number;
+  showGuide?: boolean;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   return (
     <div ref={rootRef} data-testid="root">
+      <button>Home</button>
       <i data-testid="animation" />
       <span data-guide-target="timeline-stage-round" data-testid="target" />
-      {stepIndex !== undefined && (
+      <footer>
+        <div data-guide-target="build-submit-popover">
+          <button>Play</button>
+        </div>
+        <button>Submit Hand</button>
+      </footer>
+      {showGuide && (
         <GuidedWalkthrough
           rootRef={rootRef}
-          request={request}
+          request={{ guideId, nonce: 1, stepIndex: stepIndex ?? 0 }}
           context={context}
-          stepIndex={stepIndex}
+          stepIndex={stepIndex ?? 0}
           requestActive
           onClose={() => {}}
           onSkipAll={() => {}}
@@ -41,12 +50,39 @@ function Board({ stepIndex }: { stepIndex?: number }) {
   );
 }
 
-it("shows each step and follows its target while an animation changes the page every frame", async () => {
+beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class {
     observe() {}
     unobserve() {}
     disconnect() {}
   });
+  Element.prototype.scrollIntoView ??= () => {};
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+it("takes keys only to its own controls and the target its step lets players use, until it closes", async () => {
+  const { rerender } = render(<Board guideId="build_play_draw" showGuide={false} />);
+  const home = screen.getByText("Home");
+  const play = screen.getByText("Play");
+  const submit = screen.getByText("Submit Hand");
+
+  rerender(<Board guideId="build_play_draw" stepIndex={0} showGuide />);
+  // jsdom doesn't act on inert, so this reads where it's set.
+  expect(home.closest("[inert]")).not.toBeNull();
+  await waitFor(() => expect(screen.getByRole("dialog").closest("[inert]")).toBeNull());
+  await waitFor(() => expect(play.closest("[inert]")).toBeNull());
+  expect(submit.closest("[inert]")).not.toBeNull();
+
+  rerender(<Board guideId="build_play_draw" showGuide={false} />);
+  expect(home.closest("[inert]")).toBeNull();
+  expect(submit.closest("[inert]")).toBeNull();
+});
+
+it("shows each step and follows its target while an animation changes the page every frame", async () => {
   let nextId = 0;
   const queued = new Map<number, FrameRequestCallback>();
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -55,7 +91,7 @@ it("shows each step and follows its target while an animation changes the page e
   });
   vi.stubGlobal("cancelAnimationFrame", (id: number) => queued.delete(id));
 
-  const { rerender } = render(<Board />);
+  const { rerender } = render(<Board guideId="welcome" />);
   // jsdom lays nothing out, so the board and the step's target get places of their own.
   Object.defineProperties(screen.getByTestId("root"), { clientWidth: { value: 1000 }, clientHeight: { value: 800 } });
   const target = screen.getByTestId("target");
@@ -78,11 +114,11 @@ it("shows each step and follows its target while an animation changes the page e
   };
   const spotlightLeft = () => document.querySelector<HTMLElement>(".border-amber-300\\/80")?.style.left;
 
-  rerender(<Board stepIndex={0} />);
+  rerender(<Board guideId="welcome" stepIndex={0} />);
   await drawFrames(10);
   expect(screen.queryByRole("dialog")?.textContent ?? "no card").toContain("Playing Pitfight");
 
-  rerender(<Board stepIndex={1} />);
+  rerender(<Board guideId="welcome" stepIndex={1} />);
   await drawFrames(10);
   expect(spotlightLeft()).toBe("88px");
 

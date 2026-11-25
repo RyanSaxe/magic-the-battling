@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ShareGameResponse, SharePlayerSnapshot } from '../types'
 import { ShareGame } from './ShareGame'
 
@@ -13,20 +13,6 @@ vi.hoisted(() => {
     addEventListener() {},
     removeEventListener() {},
   })) as unknown as typeof window.matchMedia
-})
-
-vi.mock('../api/client', () => ({ getShareGame: async () => sharedGame() }))
-vi.mock('../contexts', () => ({ useToast: () => ({ addToast: () => {} }) }))
-vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: null, loading: false }) }))
-
-beforeEach(() => {
-  // The page measures itself, and jsdom has no ResizeObserver.
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-})
-
-afterEach(() => {
-  cleanup()
-  vi.unstubAllGlobals()
 })
 
 function snapshot(round: number, suddenDeathBuild: number | null = null): SharePlayerSnapshot {
@@ -46,6 +32,8 @@ function snapshot(round: number, suddenDeathBuild: number | null = null): ShareP
   }
 }
 
+let activeSnapshots: SharePlayerSnapshot[] = []
+
 function sharedGame(): ShareGameResponse {
   return {
     game_id: 'game-1',
@@ -61,13 +49,29 @@ function sharedGame(): ShareGameResponse {
         final_poison: 0,
         final_treasures: null,
         is_puppet: false,
-        snapshots: [snapshot(2), snapshot(3), snapshot(3, 1), snapshot(3, 2)],
+        snapshots: activeSnapshots,
       },
     ],
   }
 }
 
-it('Prev and Next step through every round and Sudden Death build in order', async () => {
+vi.mock('../api/client', () => ({ getShareGame: async () => sharedGame() }))
+vi.mock('../contexts', () => ({ useToast: () => ({ addToast: () => {} }) }))
+vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: null, loading: false }) }))
+
+beforeEach(() => {
+  // The page measures itself, and jsdom has no ResizeObserver.
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  // The round list scrolls to the chosen round, and jsdom has no scrollIntoView.
+  Element.prototype.scrollIntoView = () => {}
+})
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+function renderShare() {
   render(
     <MemoryRouter initialEntries={['/game/game-1/share/Alice']}>
       <Routes>
@@ -75,6 +79,11 @@ it('Prev and Next step through every round and Sudden Death build in order', asy
       </Routes>
     </MemoryRouter>,
   )
+}
+
+it('Prev and Next step through every round and Sudden Death build in order', async () => {
+  activeSnapshots = [snapshot(2), snapshot(3), snapshot(3, 1), snapshot(3, 2)]
+  renderShare()
   const rounds = ['Stage 3 - Round 2', 'Stage 3 - Round 3', 'Stage 3 - Round 3 · Sudden Death', 'Stage 3 - Round 3 · Sudden Death 2']
   const shows = (round: string) => screen.findByText(round, { selector: 'button' })
 
@@ -87,4 +96,25 @@ it('Prev and Next step through every round and Sudden Death build in order', asy
     fireEvent.click(screen.getByText('Next', { selector: 'button' }))
     await shows(round)
   }
+})
+
+it('closes the round list on the click of a tap on the board or on its own button', async () => {
+  activeSnapshots = [snapshot(1), snapshot(2)]
+  renderShare()
+  const roundButton = await screen.findByText('Stage 3 - Round 2', { selector: 'button' })
+  const earlierRound = () => screen.queryByText('Stage 3 - Round 1', { selector: 'button' })
+
+  fireEvent.click(roundButton)
+  fireEvent.mouseDown(roundButton)
+  fireEvent.click(roundButton)
+  expect(earlierRound()).toBeNull()
+
+  fireEvent.click(roundButton)
+  const tapTarget = document.querySelector('.board-backdrop')
+  expect(tapTarget).not.toBeNull()
+  fireEvent.mouseDown(tapTarget!)
+  expect(earlierRound()).not.toBeNull()
+
+  fireEvent.click(tapTarget!)
+  expect(earlierRound()).toBeNull()
 })

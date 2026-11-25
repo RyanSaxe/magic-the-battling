@@ -2,9 +2,9 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
-import { useWebSocket } from './useWebSocket'
+import { connectAfterCurrentTask, useWebSocket } from './useWebSocket'
 
-function render(gameId: string, sessionId: string) {
+function renderSocket(gameId: string, sessionId: string) {
   return renderHook(({ game, session }) => useWebSocket(game, session, null), {
     initialProps: { game: gameId, session: sessionId },
   })
@@ -19,6 +19,38 @@ async function openSocket(): Promise<FakeWebSocket> {
   return socket
 }
 
+describe('connectAfterCurrentTask', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('connects once the current task ends', () => {
+    const connect = vi.fn()
+    connectAfterCurrentTask(connect)
+
+    expect(connect).not.toHaveBeenCalled()
+    vi.runAllTimers()
+    expect(connect).toHaveBeenCalledOnce()
+  })
+
+  it('opens only the remounted connection when StrictMode cleans up the first mount', () => {
+    const firstMount = vi.fn()
+    const secondMount = vi.fn()
+
+    const cleanupFirstMount = connectAfterCurrentTask(firstMount)
+    cleanupFirstMount()
+    connectAfterCurrentTask(secondMount)
+    vi.runAllTimers()
+
+    expect(firstMount).not.toHaveBeenCalled()
+    expect(secondMount).toHaveBeenCalledOnce()
+  })
+})
+
 describe('useWebSocket connection status', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -32,7 +64,7 @@ describe('useWebSocket connection status', () => {
   })
 
   it('starts a new game clean, without the previous game error or lobby', async () => {
-    const hook = render('game-A', 'session-A')
+    const hook = renderSocket('game-A', 'session-A')
     const socket = await openSocket()
     act(() => {
       socket.serverMessage({ type: 'lobby_state', payload: { game_id: 'game-A', players: [] } })
@@ -48,11 +80,11 @@ describe('useWebSocket connection status', () => {
     expect(hook.result.current.lobbyState).toBeNull()
   })
 
-  it('reconnects after a dropped connection', async () => {
-    const hook = render('game-A', 'session-A')
+  it.each([1000, 1001, 1006, 1011])('reconnects after close code %i', async (closeCode) => {
+    const hook = renderSocket('game-A', 'session-A')
     const socket = await openSocket()
 
-    act(() => socket.serverClose(1006))
+    act(() => socket.serverClose(closeCode))
     expect(hook.result.current.status.kind).toBe('reconnecting')
     await act(async () => {
       vi.advanceTimersByTime(1_000)
@@ -62,11 +94,14 @@ describe('useWebSocket connection status', () => {
   })
 
   it.each([
-    [4006, 'SEAT_MOVED'],
-    [4005, 'KICKED'],
+    [1013, 'WS_CAPACITY'],
     [4001, 'INVALID_SESSION'],
+    [4004, 'GAME_NOT_FOUND'],
+    [4005, 'KICKED'],
+    [4006, 'SEAT_MOVED'],
+    [4007, 'SPECTATE_TARGET_NOT_FOUND'],
   ])('stops for good on close code %i', async (closeCode, errorCode) => {
-    const hook = render('game-A', 'session-A')
+    const hook = renderSocket('game-A', 'session-A')
     const socket = await openSocket()
 
     act(() => socket.serverClose(closeCode))
@@ -79,7 +114,7 @@ describe('useWebSocket connection status', () => {
   })
 
   it('ends when the host removes the player, before the socket closes', async () => {
-    const hook = render('game-A', 'session-A')
+    const hook = renderSocket('game-A', 'session-A')
     const socket = await openSocket()
 
     act(() => socket.serverMessage({ type: 'kicked', payload: {} }))
@@ -88,7 +123,7 @@ describe('useWebSocket connection status', () => {
   })
 
   it('shows the requests to watch exactly as the server last listed them', async () => {
-    const hook = render('game-A', 'session-A')
+    const hook = renderSocket('game-A', 'session-A')
     const socket = await openSocket()
     const carol = { request_id: 'request-1', spectator_name: 'Carol' }
     const dan = { request_id: 'request-2', spectator_name: 'Dan' }
@@ -101,7 +136,7 @@ describe('useWebSocket connection status', () => {
   })
 
   it('starts each connection with no requests to watch', async () => {
-    const hook = render('game-A', 'session-A')
+    const hook = renderSocket('game-A', 'session-A')
     const socket = await openSocket()
     act(() => {
       socket.serverMessage({
