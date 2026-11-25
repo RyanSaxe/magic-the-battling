@@ -1,3 +1,4 @@
+/** Dashed placeholder card slot used for empty hand and basic-land targets in Build. */
 import type { ReactElement } from "react";
 import { enterPressesControl } from "../../utils/enterKey";
 
@@ -52,6 +53,10 @@ export function CardSlot({
           if (!shouldActivateSlotOnKey(e)) return;
           e.preventDefault();
           onClick();
+        }}
+        onKeyUp={(e) => {
+          // Native <button> synthesizes a click on Space keyup even when keydown called preventDefault().
+          if (e.key === " " || e.key === "Spacebar") e.preventDefault();
         }}
       >
         {labelElement}

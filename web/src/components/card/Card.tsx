@@ -668,6 +668,10 @@ export function Card(props: CardProps): ReactElement {
             aria-pressed={props.selected}
             className="absolute inset-0 z-0 cursor-pointer border-0 bg-transparent p-0 rounded-[inherit]"
             onKeyDown={interactions.onFaceKeyDown}
+            onKeyUp={(e) => {
+              // Native <button> synthesizes a click on Space keyup even when keydown called preventDefault().
+              if (e.key === " " || e.key === "Spacebar") e.preventDefault();
+            }}
           />
         )}
         {isLoading && (
