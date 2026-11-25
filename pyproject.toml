@@ -5,7 +5,7 @@ description = "A FastAPI application for the Pitfight MtG format"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115.6",
+    "fastapi>=0.165.0",
     "uvicorn[standard]>=0.35.0",
     "pydantic>=2.7",
     "httpx>=0.28.1",

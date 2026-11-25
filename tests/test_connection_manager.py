@@ -4,7 +4,6 @@ import json
 import time
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import WebSocket
@@ -20,13 +19,35 @@ def anyio_backend():
     return "asyncio"
 
 
+class _FakeWebSocket:
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+        self.closed: int | None = None
+        self.accepted = False
+        self.accept_gate = asyncio.Event()
+        self.accept_gate.set()
+
+    async def accept(self) -> None:
+        await self.accept_gate.wait()
+        self.accepted = True
+
+    async def send_bytes(self, data: bytes) -> None:
+        self.sent.append(json.loads(gzip.decompress(data)))
+
+    async def send_json(self, message: dict) -> None:
+        self.sent.append(message)
+
+    async def close(self, code: int = 1000, reason: str = "") -> None:
+        self.closed = code
+
+
 class TestDisconnectRaceCondition:
     """Regression: stale WS1 disconnect must not evict newer WS2."""
 
     def test_stale_disconnect_does_not_remove_newer_connection(self):
         cm = ConnectionManager()
-        old_ws = MagicMock(name="old_ws")
-        new_ws = MagicMock(name="new_ws")
+        old_ws = cast(WebSocket, _FakeWebSocket())
+        new_ws = cast(WebSocket, _FakeWebSocket())
 
         cm._connections["game1"]["player1"] = new_ws
 
@@ -36,7 +57,7 @@ class TestDisconnectRaceCondition:
 
     def test_matching_disconnect_removes_connection(self):
         cm = ConnectionManager()
-        ws = MagicMock(name="ws")
+        ws = cast(WebSocket, _FakeWebSocket())
 
         cm._connections["game1"]["player1"] = ws
 
@@ -46,7 +67,7 @@ class TestDisconnectRaceCondition:
 
     def test_disconnect_cleans_up_empty_game(self):
         cm = ConnectionManager()
-        ws = MagicMock(name="ws")
+        ws = cast(WebSocket, _FakeWebSocket())
 
         cm._connections["game1"]["player1"] = ws
 
@@ -57,15 +78,13 @@ class TestDisconnectRaceCondition:
 
 class TestConnectionCapacity:
     @pytest.mark.anyio
-    async def test_connect_capacity_reject_clears_pending_connection(self):
+    async def test_connect_capacity_reject_clears_pending_connection(self, monkeypatch):
         cm = ConnectionManager()
-        ws = MagicMock(name="ws")
-        ws.accept = AsyncMock()
-        ws.close = AsyncMock()
+        ws = _FakeWebSocket()
 
         cm.reserve_connection("game1", "player1")
-        with patch.object(cm, "total_connections", return_value=MAX_WS_CONNECTIONS):
-            connected = await cm.connect("game1", "player1", ws)
+        monkeypatch.setattr(cm, "total_connections", lambda: MAX_WS_CONNECTIONS)
+        connected = await cm.connect("game1", "player1", cast(WebSocket, ws))
 
         assert connected is False
         assert "player1" not in cm._pending_connections["game1"]
@@ -77,30 +96,10 @@ class TestConnectionCapacity:
         assert cm.clear_stale_pending_connection("game1", "player1") is True
         assert "player1" not in cm._pending_connections["game1"]
 
-        connected_ws = MagicMock(name="ws")
+        connected_ws = cast(WebSocket, _FakeWebSocket())
         cm._connections["game1"]["player2"] = connected_ws
         cm.reserve_connection("game1", "player2")
         assert cm.clear_stale_pending_connection("game1", "player2") is False
-
-
-class _SpectateSocket:
-    def __init__(self):
-        self.sent: list[dict] = []
-        self.closed: int | None = None
-        self.accept_gate = asyncio.Event()
-        self.accept_gate.set()
-
-    async def accept(self):
-        await self.accept_gate.wait()
-
-    async def send_bytes(self, data: bytes):
-        self.sent.append(json.loads(gzip.decompress(data)))
-
-    async def send_json(self, message):
-        self.sent.append(message)
-
-    async def close(self, code: int = 1000, reason: str = ""):
-        self.closed = code
 
 
 class TestSpectateMessages:
@@ -121,7 +120,7 @@ class TestSpectateMessages:
 
         monkeypatch.setattr(compression.gzip, "compress", compress_first_slowly)
         cm = ConnectionManager()
-        player = _SpectateSocket()
+        player = _FakeWebSocket()
         cm._connections["game1"]["p1"] = cast(WebSocket, player)
 
         cm.spectate_requests_changed("game1", "Bob")
@@ -138,7 +137,7 @@ class TestSpectateMessages:
         loaded = {"game1": True}
         monkeypatch.setattr(ws_module, "_game_is_loaded", lambda game_id: loaded.get(game_id, False))
         cm = ConnectionManager()
-        spectator = _SpectateSocket()
+        spectator = _FakeWebSocket()
         spectator.accept_gate.clear()
 
         connecting = asyncio.create_task(cm.connect_spectator("game1", "Bob", cast(WebSocket, spectator)))
@@ -150,3 +149,27 @@ class TestSpectateMessages:
         assert not await connecting
         assert spectator.closed == 4004
         assert not cm._spectators.get("game1")
+
+
+class TestConnectionManagerPendingConnections:
+    def test_reserve_connection_marks_player_as_connected(self):
+        cm = ConnectionManager()
+        assert not cm.is_player_connected("game1", "player1")
+
+        cm.reserve_connection("game1", "player1")
+        assert cm.is_player_connected("game1", "player1")
+
+    def test_reserved_player_not_included_in_active_connected_ids(self):
+        cm = ConnectionManager()
+        cm.reserve_connection("game1", "player1")
+
+        connected_ids = cm.get_connected_player_ids("game1")
+        assert "player1" not in connected_ids
+
+    def test_disconnect_clears_pending_connection(self):
+        cm = ConnectionManager()
+        cm.reserve_connection("game1", "player1")
+        assert cm.is_player_connected("game1", "player1")
+
+        cm.disconnect("game1", "player1", cast(WebSocket, _FakeWebSocket()))
+        assert not cm.is_player_connected("game1", "player1")

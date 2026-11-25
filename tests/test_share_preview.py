@@ -1,16 +1,16 @@
 import asyncio
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 from playwright.async_api import Error as PlaywrightError
+from starlette.requests import Request
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import server.routers.share_preview as share_preview_module
 from server.main import app
-from server.routers.share_preview import RATE_LIMIT_MAX, SlidingWindowRateLimiter, _build_og_html
+from server.routers.share_preview import RATE_LIMIT_MAX, SlidingWindowRateLimiter, _build_og_html, serve_index
 from server.schemas.api import ShareGameResponse, SharePlayerData
 from server.services.preview import PreviewService
 
@@ -131,42 +131,107 @@ class TestSiteLinkPreview:
         monkeypatch.setattr(share_preview_module, "INDEX_HTML", source)
 
         html = client.get("/game/missing/share/Alice", headers={"Host": 'x"><script>'}).text
-
-        assert "x&quot;&gt;&lt;script&gt;/og-image.png" in html
         assert 'x"><script>' not in html
+
+        # Starlette 1.x ignores malformed Host headers before they reach handlers, so also
+        # verify serve_index escapes raw unencoded query text that arrives in an ASGI scope.
+        request = Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "scheme": "https",
+                "path": "/game/missing/share/Alice",
+                "query_string": b'q="><script>',
+                "headers": [(b"host", b"pitfight.test")],
+            }
+        )
+        body = bytes(serve_index(request).body).decode("utf-8")
+        assert '"><script>' not in body
+        assert "q=&quot;&gt;&lt;script&gt;" in body
+
+
+class _FakePage:
+    def __init__(self, png: bytes = b"png_data") -> None:
+        self._png = png
+
+    async def goto(self, _url: str, **_kwargs: Any) -> None:
+        pass
+
+    async def wait_for_selector(self, _selector: str, **_kwargs: Any) -> None:
+        pass
+
+    async def screenshot(self, **_kwargs: Any) -> bytes:
+        return self._png
+
+
+class _FakeContext:
+    def __init__(self, page: _FakePage | None = None) -> None:
+        self._page = page or _FakePage()
+
+    async def new_page(self) -> _FakePage:
+        return self._page
+
+    async def close(self) -> None:
+        pass
+
+
+class _FakeBrowser:
+    def __init__(self, *, error: Exception | None = None, png: bytes = b"png_data") -> None:
+        self._error = error
+        self._png = png
+
+    async def new_context(self, **_kwargs: Any) -> _FakeContext:
+        if self._error is not None:
+            raise self._error
+        return _FakeContext(_FakePage(self._png))
+
+    async def close(self) -> None:
+        pass
+
+
+class _FakeChromium:
+    def __init__(self, browser: _FakeBrowser) -> None:
+        self._browser = browser
+
+    async def launch(self, **_kwargs: Any) -> _FakeBrowser:
+        return self._browser
+
+
+class _FakePlaywright:
+    def __init__(self, browser: _FakeBrowser | None = None) -> None:
+        self.chromium = _FakeChromium(browser or _FakeBrowser())
+
+    async def stop(self) -> None:
+        pass
+
+
+class _FakePlaywrightStarter:
+    def __init__(self, playwright: _FakePlaywright) -> None:
+        self._playwright = playwright
+
+    async def start(self) -> _FakePlaywright:
+        return self._playwright
 
 
 class TestPreviewServiceRestart:
-    def test_restart_on_target_closed_error(self):
+    def test_restart_on_target_closed_error(self, monkeypatch):
         service = PreviewService()
-        service._browser = MagicMock()
-        service._playwright = MagicMock()
-
         target_closed = PlaywrightError("Browser.new_context: Target page, context or browser has been closed")
-        service._browser.new_context = AsyncMock(side_effect=target_closed)
+        service._browser = cast(Any, _FakeBrowser(error=target_closed))
+        service._playwright = cast(Any, _FakePlaywright())
 
-        mock_playwright_cm = AsyncMock()
-        mock_browser = AsyncMock()
-        mock_browser.new_context.return_value = AsyncMock()
-        mock_context = mock_browser.new_context.return_value
-        mock_page = AsyncMock()
-        mock_page.screenshot.return_value = b"png_data"
-        mock_context.new_page.return_value = mock_page
-        mock_playwright_cm.chromium.launch.return_value = mock_browser
+        restarted = _FakePlaywright(_FakeBrowser(png=b"png_data"))
+        monkeypatch.setattr("server.services.preview.async_playwright", lambda: _FakePlaywrightStarter(restarted))
 
-        with patch("server.services.preview.async_playwright") as mock_pw:
-            mock_pw.return_value.start = AsyncMock(return_value=mock_playwright_cm)
-            result = asyncio.run(service.screenshot("http://example.com/embed", "cache_key_123"))
+        result = asyncio.run(service.screenshot("http://example.com/embed", "cache_key_123"))
 
         assert result == b"png_data"
 
     def test_non_target_closed_error_propagates(self):
         service = PreviewService()
-        service._browser = MagicMock()
-        service._playwright = MagicMock()
-
         other_error = PlaywrightError("Some other Playwright error")
-        service._browser.new_context = AsyncMock(side_effect=other_error)
+        service._browser = cast(Any, _FakeBrowser(error=other_error))
+        service._playwright = cast(Any, _FakePlaywright())
 
         with pytest.raises(PlaywrightError, match="Some other Playwright error"):
             asyncio.run(service.screenshot("http://example.com/embed", "cache_key_456"))

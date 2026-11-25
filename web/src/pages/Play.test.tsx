@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { gameBootstrap } from '../../e2e/gameStates'
+import { closeSeat, createGame } from '../api/client'
+import { UPGRADES_HELP } from '../constants/rules'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
-import { closeSeat, createGame } from '../api/client'
 import { getRememberedSeat } from '../utils/deviceIdentity'
 import { Play } from './Play'
 
@@ -50,13 +52,17 @@ async function settle() {
   })
 }
 
-async function startGoldfishUntilTheStartIsSent() {
+async function renderPlay() {
   render(
     <MemoryRouter>
       <Play />
     </MemoryRouter>,
   )
   await settle()
+}
+
+async function startGoldfishUntilTheStartIsSent() {
+  await renderPlay()
   await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
   await settle()
   const socket = FakeWebSocket.latest()
@@ -87,28 +93,124 @@ async function startGoldfishUntilTheStartIsSent() {
   return { socket, lobby }
 }
 
-describe('Play: starting a Goldfish game', () => {
-  beforeEach(() => {
-    installMemoryLocalStorage()
-    vi.stubGlobal('WebSocket', FakeWebSocket)
-    FakeWebSocket.instances = []
-    toasts.length = 0
-    gamesCreated = 0
-    vi.mocked(closeSeat).mockClear()
-  })
+beforeEach(() => {
+  installMemoryLocalStorage()
+  vi.stubGlobal('WebSocket', FakeWebSocket)
+  FakeWebSocket.instances = []
+  toasts.length = 0
+  gamesCreated = 0
+  vi.mocked(closeSeat).mockClear()
+})
 
-  afterEach(() => {
-    cleanup()
-    vi.unstubAllGlobals()
-  })
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
-  it('starts Goldfish once on Enter in the name field', async () => {
-    render(
-      <MemoryRouter>
-        <Play />
-      </MemoryRouter>,
+describe('Play: cancelling or leaving a pending start', () => {
+  it.each([
+    ['a Goldfish game', null, 'Start Game'],
+    ['a lobby', 'Play with Friends', 'Create Lobby'],
+  ])('drops %s that the server answers after Cancel', async (_, mode, start) => {
+    let answer!: (game: Awaited<ReturnType<typeof createGame>>) => void
+    vi.mocked(createGame).mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    await renderPlay()
+    if (mode) fireEvent.click(screen.getByText(mode))
+    fireEvent.click(screen.getByRole('button', { name: start }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await act(async () =>
+      answer({ game_id: 'late', join_code: 'ABC123', session_id: 's', player_id: 'p', seat_token: 't' }),
     )
     await settle()
+
+    expect(getRememberedSeat('late')).toBeNull()
+    expect(FakeWebSocket.instances).toHaveLength(0)
+  })
+
+  const { catalog, state } = gameBootstrap({ phase: 'build', counts: {} })
+
+  it.each([
+    ['Goldfish', null, 'Start Game', { type: 'game_bootstrap', payload: { catalog, state: { ...state, game_id: 'game' } } }],
+    [
+      'Play with Friends',
+      'Play with Friends',
+      'Create Lobby',
+      { type: 'lobby_state', payload: { game_id: 'game', players: [], cube_loading_status: 'ready' } },
+    ],
+  ])('%s gives up a start left by Home, and keeps one that completes', async (_, mode, start, completed) => {
+    const startFromPlay = async () => {
+      vi.mocked(createGame).mockResolvedValueOnce({
+        game_id: 'game', join_code: 'ABC123', session_id: 's', player_id: 'p', seat_token: 't',
+      })
+      render(
+        <MemoryRouter initialEntries={['/play']}>
+          <Routes>
+            <Route path="/play" element={<Play />} />
+            <Route path="*" element={<p>Left Play</p>} />
+          </Routes>
+        </MemoryRouter>,
+      )
+      await settle()
+      if (mode) fireEvent.click(screen.getByText(mode))
+      await act(async () => screen.getByRole('button', { name: start }).click())
+      await settle()
+      act(() => FakeWebSocket.latest().serverOpen())
+    }
+
+    await startFromPlay()
+    act(() => FakeWebSocket.latest().serverMessage(completed))
+    await settle()
+    expect(screen.getByText('Left Play')).toBeTruthy()
+    expect(closeSeat).not.toHaveBeenCalled()
+    cleanup()
+
+    await startFromPlay()
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    await settle()
+
+    expect(screen.getByText('Left Play')).toBeTruthy()
+    expect(closeSeat).toHaveBeenCalledWith('game', expect.any(String), 't')
+    expect(getRememberedSeat('game')).toBeNull()
+  })
+})
+
+describe('Play: setup info tooltips', () => {
+  it('takes the whole tap that closes the Guided Mode note, so it never presses Start Game', async () => {
+    await renderPlay()
+    const info = screen.getByRole('button', { name: 'What guided mode does' })
+    fireEvent.click(info)
+
+    const tapTarget = document.querySelector('.board-backdrop')
+    expect(tapTarget).not.toBeNull()
+    fireEvent.pointerDown(tapTarget!)
+    expect(info.getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(tapTarget!)
+    expect(info.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('shows the Upgrades tip in Play settings without toggling the switch', async () => {
+    await renderPlay()
+    fireEvent.click(screen.getByRole('button', { name: 'Change settings' }))
+
+    const toggle = screen.getByRole('switch', { name: 'Upgrades' }) as HTMLInputElement
+    expect(toggle.checked).toBe(true)
+
+    const info = screen.getByRole('button', { name: 'What upgrades are' })
+    fireEvent.click(info)
+
+    expect(toggle.checked).toBe(true)
+    expect(screen.getByRole('tooltip').textContent).toBe(UPGRADES_HELP)
+
+    fireEvent.click(screen.getByText('Upgrades'))
+    expect(toggle.checked).toBe(false)
+  })
+})
+
+describe('Play: starting a Goldfish game', () => {
+  it('starts Goldfish once on Enter in the name field', async () => {
+    await renderPlay()
     const name = screen.getByPlaceholderText('Enter your name')
 
     await act(async () => {
@@ -123,12 +225,7 @@ describe('Play: starting a Goldfish game', () => {
   })
 
   it('lets the player start again after a failed start', async () => {
-    render(
-      <MemoryRouter>
-        <Play />
-      </MemoryRouter>,
-    )
-    await settle()
+    await renderPlay()
 
     await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
     await settle()
@@ -185,33 +282,18 @@ describe('Play: starting a Goldfish game', () => {
   })
 
   it("fills in the name a guest last played under", async () => {
-    render(
-      <MemoryRouter>
-        <Play />
-      </MemoryRouter>,
-    )
-    await settle()
+    await renderPlay()
     fireEvent.change(screen.getByPlaceholderText('Enter your name'), { target: { value: 'Kellogg' } })
     await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
     cleanup()
 
-    render(
-      <MemoryRouter>
-        <Play />
-      </MemoryRouter>,
-    )
-    await settle()
+    await renderPlay()
 
     expect(screen.getByPlaceholderText<HTMLInputElement>('Enter your name').value).toBe('Kellogg')
   })
 
   it('does not offer a failed start for resuming', async () => {
-    render(
-      <MemoryRouter>
-        <Play />
-      </MemoryRouter>,
-    )
-    await settle()
+    await renderPlay()
 
     await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
     await settle()
@@ -228,12 +310,7 @@ describe('Play: starting a Goldfish game', () => {
   })
 
   it('starts with the fewer opponents picked when puppet data is short', async () => {
-    render(
-      <MemoryRouter>
-        <Play />
-      </MemoryRouter>,
-    )
-    await settle()
+    await renderPlay()
     const serveLobby = async (gameId: string, puppetCount: number) => {
       const socket = FakeWebSocket.latest()
       act(() => {
@@ -270,12 +347,7 @@ describe('Play: starting a Goldfish game', () => {
   })
 
   it('gives up the seat of a failed start, and keeps one that moved', async () => {
-    render(
-      <MemoryRouter>
-        <Play />
-      </MemoryRouter>,
-    )
-    await settle()
+    await renderPlay()
     const start = async () => {
       await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
       await settle()
