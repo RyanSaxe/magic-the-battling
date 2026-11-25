@@ -7,21 +7,21 @@ from server.routers.ws import _handle_voice_signal
 
 
 @pytest.fixture
-def anyio_backend():
+def anyio_backend() -> str:
     return "asyncio"
 
 
 @pytest.fixture
-def two_players(monkeypatch):
+def two_players(monkeypatch: pytest.MonkeyPatch) -> tuple[str, list[tuple[str, str, dict]]]:
     game_id = "test-game"
     gm = ws_module.game_manager
-    gm._player_id_to_name["alice-id"] = "Alice"
-    gm._player_id_to_name["bob-id"] = "Bob"
-    gm._player_to_game["alice-id"] = game_id
-    gm._player_to_game["bob-id"] = game_id
+    gm.player_id_to_name["alice-id"] = "Alice"
+    gm.player_id_to_name["bob-id"] = "Bob"
+    gm.player_to_game["alice-id"] = game_id
+    gm.player_to_game["bob-id"] = game_id
     sent: list[tuple[str, str, dict]] = []
 
-    async def record_send(target_game_id: str, player_id: str, message: dict) -> None:
+    async def record_send(target_game_id: str, player_id: str, *, message: dict) -> None:
         sent.append((target_game_id, player_id, message))
 
     monkeypatch.setattr(ws_module.connection_manager, "send_to_player", record_send)
@@ -30,7 +30,7 @@ def two_players(monkeypatch):
 
 class TestHandleVoiceSignal:
     @pytest.mark.anyio
-    async def test_relays_signal_to_target(self, two_players):
+    async def test_relays_signal_to_target(self, two_players: tuple[str, list[tuple[str, str, dict]]]) -> None:
         game_id, sent = two_players
         await _handle_voice_signal(
             game_id,
@@ -58,7 +58,7 @@ class TestHandleVoiceSignal:
         ]
 
     @pytest.mark.anyio
-    async def test_drops_signal_without_target(self, two_players):
+    async def test_drops_signal_without_target(self, two_players: tuple[str, list[tuple[str, str, dict]]]) -> None:
         game_id, sent = two_players
         await _handle_voice_signal(
             game_id,
@@ -72,7 +72,7 @@ class TestHandleVoiceSignal:
         assert sent == []
 
     @pytest.mark.anyio
-    async def test_drops_signal_for_unknown_target(self, two_players):
+    async def test_drops_signal_for_unknown_target(self, two_players: tuple[str, list[tuple[str, str, dict]]]) -> None:
         game_id, sent = two_players
         await _handle_voice_signal(
             game_id,
@@ -87,11 +87,13 @@ class TestHandleVoiceSignal:
         assert sent == []
 
     @pytest.mark.anyio
-    async def test_drops_signal_for_target_in_different_game(self, two_players):
+    async def test_drops_signal_for_target_in_different_game(
+        self, two_players: tuple[str, list[tuple[str, str, dict]]]
+    ) -> None:
         game_id, sent = two_players
         gm = ws_module.game_manager
-        gm._player_id_to_name["charlie-id"] = "Charlie"
-        gm._player_to_game["charlie-id"] = "other-game"
+        gm.player_id_to_name["charlie-id"] = "Charlie"
+        gm.player_to_game["charlie-id"] = "other-game"
 
         await _handle_voice_signal(
             game_id,

@@ -33,15 +33,17 @@ logger = logging.getLogger(__name__)
 
 
 class BattlerLoader(GameManagerState):
-    def _load_battler(self, cube_id: str, use_upgrades: bool, *, use_vanguards: bool, play_mode: PlayMode) -> Battler:
+    def _load_battler(self, cube_id: str, *, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
-        battler = build_battler(cube_id, upgrades_id, vanguards_id)
+        battler = build_battler(cube_id, upgrades_id, vanguards_id=vanguards_id)
         validate_battler(battler, play_mode=play_mode)
         return battler
 
-    def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, *, use_vanguards: bool) -> Battler:
-        return self._load_battler(battler_id, use_upgrades, use_vanguards=use_vanguards, play_mode="constructed")
+    def _load_constructed_battler(self, battler_id: str, *, use_upgrades: bool, use_vanguards: bool) -> Battler:
+        return self._load_battler(
+            battler_id, use_upgrades=use_upgrades, use_vanguards=use_vanguards, play_mode="constructed"
+        )
 
     def _normalize_battler_error(self, battler_id: str, play_mode: PlayMode, *, error: Exception) -> str:
         noun = "deck" if play_mode == "constructed" else "cube"
@@ -73,12 +75,12 @@ class BattlerLoader(GameManagerState):
                     partial(
                         self._load_battler,
                         pending.cube_id,
-                        pending.use_upgrades,
+                        use_upgrades=pending.use_upgrades,
                         use_vanguards=pending.use_vanguards,
                         play_mode=pending.play_mode,
                     ),
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- broad boundary catch
             logger.warning("Failed to preload battler %s: %s", pending.cube_id, e)
             error_message = self._normalize_battler_error(pending.cube_id, pending.play_mode, error=e)
         finally:
@@ -100,7 +102,7 @@ class BattlerLoader(GameManagerState):
         try:
             loop = asyncio.get_running_loop()
             task = loop.create_task(self._preload_battler(pending, on_complete))
-            pending._loading_task = task
+            pending.loading_task = task
         except RuntimeError:
             pending.battler_loading = False
 
@@ -121,12 +123,12 @@ class BattlerLoader(GameManagerState):
                     partial(
                         self._load_constructed_battler,
                         battler_id,
-                        pending.use_upgrades,
+                        use_upgrades=pending.use_upgrades,
                         use_vanguards=pending.use_vanguards,
                     ),
                 )
             loaded = BattlerReady(battler_id, battler)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- broad boundary catch
             logger.warning("Failed to preload player battler %s: %s", battler_id, e)
             loaded = BattlerFailed(battler_id, self._normalize_battler_error(battler_id, "constructed", error=e))
 
@@ -142,6 +144,7 @@ class BattlerLoader(GameManagerState):
         self,
         pending: PendingGame,
         player_id: str,
+        *,
         battler_id: str,
         on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> str | None:
@@ -165,7 +168,7 @@ class BattlerLoader(GameManagerState):
         self._set_player_battler(pending, player_id, slot=BattlerLoading(battler_id, task))
         return None
 
-    def record_player_battler_error(self, pending: PendingGame, player_id: str, battler_id: str, error: str) -> None:
+    def record_player_battler_error(self, pending: PendingGame, player_id: str, *, battler_id: str, error: str) -> None:
         self._set_player_battler(pending, player_id, slot=BattlerFailed(battler_id, error))
 
     def _build_constructed_battlers_by_player(self, pending: PendingGame) -> dict[str, Battler]:
@@ -173,6 +176,7 @@ class BattlerLoader(GameManagerState):
         for player_id, player_name in zip(pending.player_ids, pending.player_names, strict=False):
             player_battler = pending.player_battlers.get(player_id)
             if not isinstance(player_battler, BattlerReady):
-                raise LobbyStartFailedError("All players must submit a valid deck")
+                msg = "All players must submit a valid deck"
+                raise LobbyStartFailedError(msg)
             battlers_by_player[player_name] = player_battler.battler
         return battlers_by_player

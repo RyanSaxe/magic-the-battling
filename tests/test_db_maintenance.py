@@ -70,7 +70,7 @@ def _snapshot_rows(db_path: Path) -> tuple[list[tuple], list[tuple]]:
         )
 
 
-def test_inspect_db_maintenance_reports_pending_changes(tmp_path):
+def test_inspect_db_maintenance_reports_pending_changes(tmp_path: Path) -> None:
     db_path = tmp_path / "snapshots.db"
     _init_snapshot_tables(db_path)
     with sqlite3.connect(str(db_path)) as conn:
@@ -96,7 +96,7 @@ def test_inspect_db_maintenance_reports_pending_changes(tmp_path):
     assert result.backup_path is None
 
 
-def test_apply_db_maintenance_creates_bak_and_rewrites_original_db(tmp_path):
+def test_apply_db_maintenance_creates_bak_and_rewrites_original_db(tmp_path: Path) -> None:
     db_path = tmp_path / "snapshots.db"
     _init_snapshot_tables(db_path)
     with sqlite3.connect(str(db_path)) as conn:
@@ -134,7 +134,7 @@ def test_apply_db_maintenance_creates_bak_and_rewrites_original_db(tmp_path):
     assert '"card_registry"' in full_state_json
 
 
-def test_inspect_db_maintenance_counts_a_current_snapshot_that_does_not_restore_as_failed(tmp_path):
+def test_inspect_db_maintenance_counts_a_current_snapshot_that_does_not_restore_as_failed(tmp_path: Path) -> None:
     db_path = tmp_path / "snapshots.db"
     _init_snapshot_tables(db_path)
     unrestorable = json.dumps({"data": {"players": "renamed-field"}, "card_registry": {}})
@@ -147,7 +147,7 @@ def test_inspect_db_maintenance_counts_a_current_snapshot_that_does_not_restore_
     assert result.snapshot_storage.active_game_snapshots.already_current == 0
 
 
-def test_backup_copies_the_database_and_leaves_the_live_file_in_place(tmp_path):
+def test_backup_copies_the_database_and_leaves_the_live_file_in_place(tmp_path: Path) -> None:
     db_path = tmp_path / "mtb.db"
     writer = sqlite3.connect(str(db_path))
     writer.execute("PRAGMA journal_mode=WAL")
@@ -165,10 +165,10 @@ def test_backup_copies_the_database_and_leaves_the_live_file_in_place(tmp_path):
             assert conn.execute("SELECT id FROM users").fetchall() == [("u1",)]
 
 
-def test_maintain_db_has_nothing_to_do_on_a_fresh_volume(tmp_path):
+def test_maintain_db_has_nothing_to_do_on_a_fresh_volume(tmp_path: Path) -> None:
     db_path = tmp_path / "mtb.db"
 
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 -- trusted local subprocess args
         [sys.executable, str(MAINTAIN_DB_SCRIPT), "--apply", "--db-path", str(db_path)],
         capture_output=True,
         text=True,
@@ -208,14 +208,14 @@ def _init_presets_as_before_autoincrement(db_path: Path) -> None:
 
 
 @pytest.mark.parametrize("database", ["existing", "new"])
-def test_a_deleted_presets_id_is_never_reused(tmp_path, database):
+def test_a_deleted_presets_id_is_never_reused(tmp_path: Path, database: str) -> None:
     db_path = tmp_path / "mtb.db"
     if database == "existing":
         _init_presets_as_before_autoincrement(db_path)
     engine = create_engine(f"sqlite:///{db_path}")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        db.add(User(id="u1", username="alice", password_hash="hash"))
+        db.add(User(id="u1", username="alice", password_hash="hash"))  # noqa: S106 -- test fixture credential literal
         db.add_all(UserBattler(id=preset_id, user_id="u1", cube_id=f"cube-{preset_id}") for preset_id in (1, 2, 5))
         db.commit()
         presets = db.execute(select(UserBattler.__table__).order_by(UserBattler.id)).all()

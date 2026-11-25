@@ -1,3 +1,5 @@
+"""Structured latency and egress metrics recording."""
+
 import json
 import logging
 import math
@@ -32,12 +34,11 @@ def _resolve_log_directory() -> Path:
     return Path(__file__).resolve().parent.parent / "data" / "logs"
 
 
-_logging_configured = False
+_logging_configured_holder = [False]
 
 
 def configure_logging() -> None:
-    global _logging_configured
-    if _logging_configured:
+    if _logging_configured_holder[0]:
         return
 
     root = logging.getLogger()
@@ -60,7 +61,7 @@ def configure_logging() -> None:
     file_handler.setFormatter(JsonLineFormatter())
     root.addHandler(file_handler)
 
-    _logging_configured = True
+    _logging_configured_holder[0] = True
     logging.getLogger(OBSERVABILITY_LOGGER_NAME).info(
         "Configured logging with persistent JSON logs at %s", log_dir / "server.jsonl"
     )
@@ -97,7 +98,7 @@ class LatencyRecorder:
         self._ws_action_samples: list[dict[str, Any]] = []
         self._ws_broadcast_samples: list[dict[str, Any]] = []
 
-    def record_http(self, method: str, path: str, status: int, duration_ms: float) -> None:
+    def record_http(self, method: str, path: str, *, status: int, duration_ms: float) -> None:
         with self._lock:
             self._http_samples.append(
                 {
@@ -109,7 +110,7 @@ class LatencyRecorder:
                 }
             )
 
-    def record_ws_action(self, action: str, game_id: str, duration_ms: float) -> None:
+    def record_ws_action(self, action: str, game_id: str, *, duration_ms: float) -> None:
         with self._lock:
             self._ws_action_samples.append(
                 {
@@ -123,6 +124,7 @@ class LatencyRecorder:
         self,
         kind: str,
         game_id: str,
+        *,
         duration_ms: float,
         recipients: int,
         spectators: int,
@@ -159,22 +161,25 @@ class LatencyRecorder:
 _latency_recorder = LatencyRecorder()
 
 
-def record_http_latency(method: str, path: str, status: int, duration_ms: float) -> None:
-    _latency_recorder.record_http(method, path, status, duration_ms)
+def record_http_latency(method: str, path: str, *, status: int, duration_ms: float) -> None:
+    _latency_recorder.record_http(method, path, status=status, duration_ms=duration_ms)
 
 
-def record_ws_action_latency(action: str, game_id: str, duration_ms: float) -> None:
-    _latency_recorder.record_ws_action(action, game_id, duration_ms)
+def record_ws_action_latency(action: str, game_id: str, *, duration_ms: float) -> None:
+    _latency_recorder.record_ws_action(action, game_id, duration_ms=duration_ms)
 
 
 def record_ws_broadcast_latency(
     kind: str,
     game_id: str,
+    *,
     duration_ms: float,
     recipients: int,
     spectators: int,
 ) -> None:
-    _latency_recorder.record_ws_broadcast(kind, game_id, duration_ms, recipients, spectators)
+    _latency_recorder.record_ws_broadcast(
+        kind, game_id, duration_ms=duration_ms, recipients=recipients, spectators=spectators
+    )
 
 
 def flush_latency_metrics() -> dict[str, Any]:

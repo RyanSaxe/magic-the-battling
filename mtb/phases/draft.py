@@ -1,6 +1,8 @@
+"""Draft-phase pack dealing, swapping, rolling, and completion."""
+
 import random
 
-from mtb.models.cards import Card
+from mtb.models.cards import Battler, Card
 from mtb.models.game import Config, DraftState, Game, Player
 from mtb.models.types import CardDestination
 from mtb.phases import build
@@ -17,12 +19,13 @@ def _get_player_collection(player: Player, destination: CardDestination) -> list
             return player.upgrades
 
 
-def _get_player_battler(player: Player):
+def _get_player_battler(player: Player) -> Battler:
     if player.battler is not None:
         return player.battler
     if player.game.battler is not None:
         return player.game.battler
-    raise ValueError(f"Player {player.name} has no battler")
+    msg = f"Player {player.name} has no battler"
+    raise ValueError(msg)
 
 
 def _create_packs_from_cards(cards: list[Card], pack_size: int) -> tuple[list[list[Card]], list[Card]]:
@@ -35,9 +38,11 @@ def _create_packs_from_cards(cards: list[Card], pack_size: int) -> tuple[list[li
 
 def _create_shared_packs_from_battler(game: Game) -> None:
     if game.battler is None:
-        raise ValueError("Game has no shared battler")
+        msg = "Game has no shared battler"
+        raise ValueError(msg)
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
 
     cards = game.battler.cards.copy()
     random.shuffle(cards)
@@ -48,7 +53,8 @@ def _create_shared_packs_from_battler(game: Game) -> None:
 
 def _create_player_packs_from_battler(game: Game, player: Player) -> None:
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
 
     battler = _get_player_battler(player)
     cards = battler.cards.copy()
@@ -61,7 +67,8 @@ def _create_player_packs_from_battler(game: Game, player: Player) -> None:
 
 def _get_pack_queue(game: Game, player: Player) -> list[list[Card]]:
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
     return game.draft_state.undealt_packs(player)
 
 
@@ -74,7 +81,8 @@ def cards_needed_for_first_draft(config: Config, num_players: int) -> int:
 def start(game: Game) -> None:
     """Initialize draft state for the next draft phase."""
     if game.draft_state is not None:
-        raise ValueError("Draft already in progress")
+        msg = "Draft already in progress"
+        raise ValueError(msg)
 
     game.draft_state = DraftState(packs=[])
     if game.config.play_mode == "limited":
@@ -84,7 +92,8 @@ def start(game: Game) -> None:
 def deal_pack_to_player(game: Game, player: Player) -> list[Card]:
     """Deal a pack to a specific player entering draft phase."""
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
 
     queue = _get_pack_queue(game, player)
     if not queue:
@@ -94,7 +103,8 @@ def deal_pack_to_player(game: Game, player: Player) -> list[Card]:
             _create_player_packs_from_battler(game, player)
 
     if not queue:
-        raise ValueError("No cards available to create packs")
+        msg = "No cards available to create packs"
+        raise ValueError(msg)
 
     pack = queue.pop()
     game.draft_state.current_packs[player.name] = pack
@@ -104,7 +114,8 @@ def deal_pack_to_player(game: Game, player: Player) -> list[Card]:
 def deal_pack(game: Game, player: Player) -> list[Card] | None:
     """Legacy function - deals a pack if available, returns None otherwise."""
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
 
     queue = _get_pack_queue(game, player)
     if not queue:
@@ -118,13 +129,16 @@ def deal_pack(game: Game, player: Player) -> list[Card] | None:
 def roll(game: Game, player: Player) -> list[Card]:
     """Roll a new pack by returning the current pack to the player's battler."""
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
     if player.treasures <= 0:
-        raise ValueError("Player has no treasures to spend")
+        msg = "Player has no treasures to spend"
+        raise ValueError(msg)
 
     current_pack = game.draft_state.current_packs.get(player.name)
     if current_pack is None:
-        raise ValueError("Player has no current pack")
+        msg = "Player has no current pack"
+        raise ValueError(msg)
 
     _get_player_battler(player).cards.extend(current_pack)
     player.treasures -= 1
@@ -135,23 +149,28 @@ def roll(game: Game, player: Player) -> list[Card]:
 def swap(
     game: Game,
     player: Player,
+    *,
     pack_card: Card,
     player_card: Card,
     destination: CardDestination,
 ) -> None:
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
 
     current_pack = game.draft_state.current_packs.get(player.name)
     if current_pack is None:
-        raise ValueError("Player has no current pack")
+        msg = "Player has no current pack"
+        raise ValueError(msg)
 
     if pack_card not in current_pack:
-        raise ValueError("Card not in player's current pack")
+        msg = "Card not in player's current pack"
+        raise ValueError(msg)
 
     player_collection = _get_player_collection(player, destination)
     if player_card not in player_collection:
-        raise ValueError(f"Card not in player's {destination}")
+        msg = f"Card not in player's {destination}"
+        raise ValueError(msg)
 
     pack_idx = current_pack.index(pack_card)
     player_idx = player_collection.index(player_card)
@@ -166,9 +185,11 @@ def swap(
 def end_for_player(game: Game, player: Player) -> None:
     """End draft for a player, returning their current pack to their battler."""
     if player.phase != "draft":
-        raise ValueError("Player is not in draft phase")
+        msg = "Player is not in draft phase"
+        raise ValueError(msg)
     if game.draft_state is None:
-        raise ValueError("No draft in progress")
+        msg = "No draft in progress"
+        raise ValueError(msg)
 
     current_pack = game.draft_state.current_packs.pop(player.name, None)
     if current_pack:
@@ -178,22 +199,27 @@ def end_for_player(game: Game, player: Player) -> None:
     build.populate_hand(player)
 
 
-def cleanup_draft(game: Game) -> None:
-    """Clean up draft state. Called at pairing time."""
+def _return_undealt_packs(game: Game) -> None:
     if game.draft_state is None:
         return
-
     if game.config.play_mode == "limited":
         if game.battler is not None:
             for pack in game.draft_state.packs:
                 game.battler.cards.extend(pack)
-    else:
-        for player_name, packs in game.draft_state.player_packs.items():
-            player = next((candidate for candidate in game.players if candidate.name == player_name), None)
-            if player is None or player.battler is None:
-                continue
-            for pack in packs:
-                player.battler.cards.extend(pack)
+        return
+    for player_name, packs in game.draft_state.player_packs.items():
+        player = next((candidate for candidate in game.players if candidate.name == player_name), None)
+        if player is None or player.battler is None:
+            continue
+        for pack in packs:
+            player.battler.cards.extend(pack)
+
+
+def cleanup_draft(game: Game) -> None:
+    if game.draft_state is None:
+        return
+
+    _return_undealt_packs(game)
 
     for player_name, pack in game.draft_state.current_packs.items():
         player = next((candidate for candidate in game.players if candidate.name == player_name), None)

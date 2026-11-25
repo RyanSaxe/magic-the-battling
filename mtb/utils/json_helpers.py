@@ -2,6 +2,7 @@
 
 import asyncio
 import atexit
+import contextlib
 import logging
 import threading
 import time
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 # ----- Tunables -----
 _MIN_INTERVAL = 0.1  # seconds: minimum spacing between HTTP calls
 _TIMEOUT = httpx.Timeout(30.0, connect=5.0)
+_HTTP_NOT_MODIFIED = 304
 _CACHE_MAX = 4096  # max entries to keep in memory
 
 
@@ -67,21 +69,24 @@ class _JsonService:
         self._rate_lock = asyncio.Lock()
         self._last_call = 0.0
         self._inflight: dict[str, asyncio.Task[Any]] = {}
-        self._inflight_revalidations: dict[str, asyncio.Task[None]] = {}
+        self._inflight_revalidations: dict[str, asyncio.Task[Any]] = {}
 
-    def get_json(self, url: str) -> Any:
+    def is_cached(self, url: str) -> bool:
+        return url in self._cache
+
+    def get_json(self, url: str) -> dict[str, Any]:
         return self._runtime.run(self._get_json(url))
 
     def revalidate(self, url: str) -> None:
         self._runtime.run(self._revalidate(url))
 
-    def revalidate_and_get(self, url: str) -> Any:
+    def revalidate_and_get(self, url: str) -> dict[str, Any]:
         return self._runtime.run(self._revalidate_and_get(url))
 
     def refresh(self, url: str) -> None:
         self._runtime.run(self._refresh(url))
 
-    async def _get_json(self, url: str) -> Any:
+    async def _get_json(self, url: str) -> dict[str, Any]:
         async with self._lock:
             entry = self._cache.get(url)
             if entry is not None:
@@ -118,10 +123,8 @@ class _JsonService:
                 self._inflight_revalidations.pop(url, None)
 
     async def _do_revalidate(self, url: str, etag: str) -> None:
-        try:
+        with contextlib.suppress(Exception):
             await self._update_from_site(url, etag)
-        except Exception:
-            pass
 
     async def _refresh(self, url: str) -> None:
         async with self._lock:
@@ -140,7 +143,7 @@ class _JsonService:
             self._last_call = time.monotonic()
 
         response = await self._client.get(url, headers={"If-None-Match": etag})
-        if response.status_code == 304:
+        if response.status_code == _HTTP_NOT_MODIFIED:
             return
         response.raise_for_status()
         new_entry = _CacheEntry(data=response.json(), etag=response.headers.get("etag"))
@@ -148,11 +151,11 @@ class _JsonService:
             self._cache[url] = new_entry
             self._cache.move_to_end(url)
 
-    async def _revalidate_and_get(self, url: str) -> Any:
+    async def _revalidate_and_get(self, url: str) -> dict[str, Any]:
         await self._revalidate(url)
         return await self._get_json(url)
 
-    async def _fetch_and_store(self, url: str) -> Any:
+    async def _fetch_and_store(self, url: str) -> dict[str, Any]:
         logger.info("fetching: %s", url)
         try:
             data, etag = await self._rate_limited_fetch(url)
@@ -191,30 +194,28 @@ class _JsonService:
             self._runtime.stop()
 
 
-_SERVICE: _JsonService | None = None
+_SERVICE_HOLDER: list[_JsonService | None] = [None]
 _SERVICE_LOCK = threading.Lock()
 
 
 def _get_service() -> _JsonService:
-    global _SERVICE
     with _SERVICE_LOCK:
-        if _SERVICE is None:
-            _SERVICE = _JsonService()
-        return _SERVICE
+        if _SERVICE_HOLDER[0] is None:
+            _SERVICE_HOLDER[0] = _JsonService()
+        return _SERVICE_HOLDER[0]
 
 
 def stop_worker() -> None:
-    global _SERVICE
     with _SERVICE_LOCK:
-        if _SERVICE is not None:
-            _SERVICE.shutdown()
-            _SERVICE = None
+        if _SERVICE_HOLDER[0] is not None:
+            _SERVICE_HOLDER[0].shutdown()
+            _SERVICE_HOLDER[0] = None
 
 
 atexit.register(stop_worker)
 
 
-def get_json(url: str) -> Any:
+def get_json(url: str) -> dict[str, Any]:
     return _get_service().get_json(url)
 
 
@@ -222,16 +223,16 @@ def revalidate_json(url: str) -> None:
     _get_service().revalidate(url)
 
 
-def revalidate_and_get(url: str) -> Any:
+def revalidate_and_get(url: str) -> dict[str, Any]:
     return _get_service().revalidate_and_get(url)
 
 
-def get_fresh_json(url: str) -> Any:
-    """The URL's JSON as the site has it now. Unlike revalidate_and_get, raises when the site can't be asked."""
+def get_fresh_json(url: str) -> dict[str, Any]:
+    """Fetch fresh JSON from the URL, raising if the remote request fails."""
     if is_cached(url):
         _get_service().refresh(url)
     return get_json(url)
 
 
 def is_cached(url: str) -> bool:
-    return url in _get_service()._cache
+    return _get_service().is_cached(url)

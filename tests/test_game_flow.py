@@ -1,9 +1,11 @@
-from mtb.models.cards import Battler
+from collections.abc import Callable
+
+from mtb.models.cards import Battler, Card
 from mtb.models.game import create_game, set_battler
 from mtb.phases import battle, build, draft, reward
 
 
-def test_full_round_flow_round_1(card_factory, upgrade_factory):
+def test_full_round_flow_round_1(card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]) -> None:
     """Round 1 starts in build phase (no draft), then goes to draft for round 2.
 
     Note: battle.end() no longer sets phases - that's now handled by game_manager._end_battle().
@@ -29,17 +31,17 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
     # Manually fill hands (player agency in the real UI)
     for p in [alice, bob]:
         for _ in range(hand_size):
-            build.move_card(p, p.sideboard[0], "sideboard", "hand")
+            build.move_card(p, p.sideboard[0], source="sideboard", destination="hand")
 
-    build.set_ready(game, alice, ["Plains", "Island", "Mountain"], "play")
-    build.set_ready(game, bob, ["Forest", "Swamp", "Mountain"], "play")
+    build.set_ready(game, alice, basics=["Plains", "Island", "Mountain"], play_draw_preference="play")
+    build.set_ready(game, bob, basics=["Forest", "Swamp", "Mountain"], play_draw_preference="play")
     assert build.all_ready(game)
     alice.phase = "battle"
     bob.phase = "battle"
 
-    b = battle.start(game, alice, bob)
-    battle.submit_result(b, alice, "Alice")
-    battle.submit_result(b, bob, "Alice")
+    b = battle.start(game, alice, opponent=bob)
+    battle.submit_result(b, alice, winner_name="Alice")
+    battle.submit_result(b, bob, winner_name="Alice")
     result = battle.end(game, b)
     assert result.winner is alice
 
@@ -47,7 +49,7 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
     alice.phase = "reward"
     bob.phase = "reward"
 
-    reward.start(game, result.winner, result.loser)
+    reward.start(game, result.winner, loser=result.loser)
     reward.end_for_player(game, alice)
     reward.end_for_player(game, bob)
 
@@ -58,7 +60,7 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
     assert bob.round == 2
 
 
-def test_full_round_flow_round_2(card_factory, upgrade_factory):
+def test_full_round_flow_round_2(card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]) -> None:
     """Round 2+ starts with draft phase.
 
     Note: battle.end() no longer sets phases - that's now handled by game_manager._end_battle().
@@ -84,11 +86,11 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
 
     alice_swap_card = alice.sideboard[0]
     alice_pack_card = game.get_draft_state().current_packs["Alice"][0]
-    draft.swap(game, alice, alice_pack_card, alice_swap_card, "sideboard")
+    draft.swap(game, alice, pack_card=alice_pack_card, player_card=alice_swap_card, destination="sideboard")
 
     bob_swap_card = bob.sideboard[0]
     bob_pack_card = game.get_draft_state().current_packs["Bob"][0]
-    draft.swap(game, bob, bob_pack_card, bob_swap_card, "sideboard")
+    draft.swap(game, bob, pack_card=bob_pack_card, player_card=bob_swap_card, destination="sideboard")
 
     draft.end_for_player(game, alice)
     draft.end_for_player(game, bob)
@@ -99,24 +101,24 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     hand_size = game.config.starting_stage
     for p in [alice, bob]:
         for _ in range(hand_size):
-            build.move_card(p, p.sideboard[0], "sideboard", "hand")
+            build.move_card(p, p.sideboard[0], source="sideboard", destination="hand")
 
-    build.set_ready(game, alice, ["Plains", "Island", "Mountain"], "play")
-    build.set_ready(game, bob, ["Forest", "Swamp", "Mountain"], "play")
+    build.set_ready(game, alice, basics=["Plains", "Island", "Mountain"], play_draw_preference="play")
+    build.set_ready(game, bob, basics=["Forest", "Swamp", "Mountain"], play_draw_preference="play")
     assert build.all_ready(game)
     alice.phase = "battle"
     bob.phase = "battle"
 
-    b = battle.start(game, alice, bob)
-    battle.submit_result(b, alice, "Alice")
-    battle.submit_result(b, bob, "Alice")
+    b = battle.start(game, alice, opponent=bob)
+    battle.submit_result(b, alice, winner_name="Alice")
+    battle.submit_result(b, bob, winner_name="Alice")
     result = battle.end(game, b)
 
     # In production, game_manager._end_battle() sets phases. Here we simulate that.
     alice.phase = "reward"
     bob.phase = "reward"
 
-    reward.start(game, result.winner, result.loser)
+    reward.start(game, result.winner, loser=result.loser)
     reward.end_for_player(game, alice)
     reward.end_for_player(game, bob)
     assert alice.phase == "draft"
@@ -125,7 +127,9 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     assert bob.round == 3
 
 
-def test_populate_hand_restores_previous_hand_ids(card_factory, upgrade_factory):
+def test_populate_hand_restores_previous_hand_ids(
+    card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]
+) -> None:
     """Regression test: populate_hand should restore previous hand cards still in pool."""
     game = create_game(["Alice"], num_players=1)
     upgrades = [upgrade_factory(f"u{i}") for i in range(4)]

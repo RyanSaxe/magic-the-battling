@@ -5,8 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from server.perf.models import (
     BASIC_LANDS,
@@ -18,6 +17,9 @@ from server.perf.models import (
     WebSocketProto,
 )
 from server.perf.transport import decode_ws_message, remaining_timeout
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 async def recv_ws_message(ctx: PhaseContext) -> dict[str, Any]:
@@ -50,16 +52,19 @@ def _parse_ws_state_message(
         msg = payload.get("message", "Unknown game error") if isinstance(payload, dict) else "Unknown game error"
         raise GameFlowError(str(msg))
     if msg_type == "kicked" and not allow_lobby:
-        raise GameFlowError("player was kicked")
+        msg_0 = "player was kicked"
+        raise GameFlowError(msg_0)
     if msg_type == "game_bootstrap":
         state = payload.get("state") if isinstance(payload, dict) else None
         if isinstance(state, dict):
             return "game_bootstrap", state
-        raise GameFlowError("game_bootstrap payload did not contain object state")
+        msg_0 = "game_bootstrap payload did not contain object state"
+        raise GameFlowError(msg_0)
     if msg_type == "game_state" or (allow_lobby and msg_type == "lobby_state"):
         if isinstance(payload, dict):
             return msg_type, payload
-        raise GameFlowError(f"{msg_type} payload was not an object")
+        msg_0 = f"{msg_type} payload was not an object"
+        raise GameFlowError(msg_0)
     return None
 
 
@@ -129,7 +134,8 @@ async def draft_swap_once(ctx: PhaseContext, state: dict[str, Any]) -> dict[str,
     self_player = state["self_player"]
     current_pack = self_player.get("current_pack") or []
     if not current_pack:
-        raise GameFlowError("draft pack is empty")
+        msg = "draft pack is empty"
+        raise GameFlowError(msg)
     pack_card_id = str(current_pack[0]["id"])
     player_card_id, destination = choose_swap_target(self_player)
     payload = {
@@ -176,7 +182,8 @@ async def apply_pending_build_upgrades(ctx: PhaseContext, state: dict[str, Any])
             return state
         hand = self_player.get("hand", [])
         if not hand:
-            raise GameFlowError("cannot apply build upgrade: hand is empty")
+            msg = "cannot apply build upgrade: hand is empty"
+            raise GameFlowError(msg)
         upgrade_id = str(pending[0]["id"])
         payload = {
             "upgrade_id": upgrade_id,
@@ -199,7 +206,8 @@ async def play_build_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str
             break
         sideboard = self_player.get("sideboard", [])
         if not sideboard:
-            raise GameFlowError("cannot fill hand: sideboard is empty")
+            msg = "cannot fill hand: sideboard is empty"
+            raise GameFlowError(msg)
         card_id = str(sideboard[0]["id"])
         payload = {
             "card_id": card_id,
@@ -256,7 +264,8 @@ async def ensure_current_battle(ctx: PhaseContext, state: dict[str, Any]) -> dic
         if candidate.get("current_battle") or _phase_of(candidate) != "battle":
             return candidate
         candidate = await wait_for_game_state(ctx)
-    raise GameFlowError("battle phase reached without current_battle payload")
+    msg = "battle phase reached without current_battle payload"
+    raise GameFlowError(msg)
 
 
 def _choose_battle_winner(state: dict[str, Any]) -> str:

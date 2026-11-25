@@ -1,3 +1,5 @@
+"""Post-battle poison calculation, reward distribution, and upgrade application."""
+
 import random
 from uuid import uuid4
 
@@ -103,36 +105,40 @@ def award_random_card(game: Game, player: Player) -> Card | None:
     if not any(piles):
         return None
 
-    index = random.choices(range(len(piles)), weights=[len(pile) for pile in piles])[0]
-    card = piles[index].pop(random.randrange(len(piles[index])))
+    index = random.choices(range(len(piles)), weights=[len(pile) for pile in piles])[0]  # noqa: S311 -- non-cryptographic game RNG
+    card = piles[index].pop(random.randrange(len(piles[index])))  # noqa: S311 -- non-cryptographic game RNG
     if index > 0:
         # A pack is never dealt short: a loose card fills the gap, and with none the rest of the pack becomes loose.
         if battler.cards:
-            piles[index].append(battler.cards.pop(random.randrange(len(battler.cards))))
+            piles[index].append(battler.cards.pop(random.randrange(len(battler.cards))))  # noqa: S311 -- non-cryptographic game RNG
         else:
             battler.cards.extend(packs.pop(index - 1))
     player.sideboard.append(card)
     return card
 
 
-def pick_upgrade(game: Game, player: Player, upgrade: Card) -> None:
+def pick_upgrade(game: Game, player: Player, *, upgrade: Card) -> None:
     if upgrade not in game.available_upgrades:
-        raise ValueError("Upgrade not available in this game")
+        msg = "Upgrade not available in this game"
+        raise ValueError(msg)
 
     copy = upgrade.model_copy()
     copy.id = f"{copy.id.rsplit('-', 1)[0]}-{uuid4().hex[:8]}"
     player.upgrades.append(copy)
 
 
-def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
+def apply_upgrade_to_card(player: Player, upgrade: Card, *, target: Card) -> None:
     if upgrade not in player.upgrades:
-        raise ValueError("Player does not have this upgrade")
+        msg = "Player does not have this upgrade"
+        raise ValueError(msg)
 
     if is_applied_upgrade(upgrade):
-        raise ValueError("Upgrade has already been applied")
+        msg = "Upgrade has already been applied"
+        raise ValueError(msg)
 
     if target not in player.hand and target not in player.sideboard:
-        raise ValueError("Target card not in player's hand or sideboard")
+        msg = "Target card not in player's hand or sideboard"
+        raise ValueError(msg)
 
     upgrade.upgrade_target = target
     upgrade.is_revealed = False
@@ -140,17 +146,19 @@ def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
 
 def reveal_upgrade(player: Player, upgrade: Card) -> None:
     if upgrade not in player.upgrades:
-        raise ValueError("Player does not have this upgrade")
+        msg = "Player does not have this upgrade"
+        raise ValueError(msg)
     if not is_applied_upgrade(upgrade):
-        raise ValueError("Upgrade has not been applied")
+        msg = "Upgrade has not been applied"
+        raise ValueError(msg)
     upgrade.is_revealed = True
 
 
 def _award_rewards(
     game: Game,
     player: Player,
-    opponent_name: str,
     *,
+    opponent_name: str,
     winner_name: str | None,
     is_draw: bool,
     poison_dealt: int,
@@ -177,21 +185,24 @@ def _award_rewards(
     )
 
 
-def start(game: Game, winner: Player | None, loser: Player | None, is_draw: bool = False) -> None:
+def start(game: Game, winner: Player | None, *, loser: Player | None, is_draw: bool = False) -> None:
     if is_draw:
         if winner is None or loser is None:
-            raise ValueError("Both players must be provided for a draw")
-        _start_draw(game, winner, loser)
+            msg = "Both players must be provided for a draw"
+            raise ValueError(msg)
+        _start_draw(game, winner, player2=loser)
     else:
         if winner is None or loser is None:
-            raise ValueError("Winner and loser must be provided")
-        _start_with_result(game, winner, loser)
+            msg = "Winner and loser must be provided"
+            raise ValueError(msg)
+        _start_with_result(game, winner, loser=loser)
 
 
-def _start_draw(game: Game, player1: Player, player2: Player) -> None:
+def _start_draw(game: Game, player1: Player, *, player2: Player) -> None:
     for player in (player1, player2):
         if player.phase != "reward":
-            raise ValueError(f"{player.name} is not in reward phase")
+            msg = f"{player.name} is not in reward phase"
+            raise ValueError(msg)
 
     other = {player1.name: player2, player2.name: player1}
     for player in (player1, player2):
@@ -202,7 +213,7 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
         _award_rewards(
             game,
             player,
-            opponent.name,
+            opponent_name=opponent.name,
             winner_name=None,
             is_draw=True,
             poison_dealt=poison_dealt,
@@ -210,7 +221,7 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
         )
 
 
-def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
+def apply_bot_poison(game: Game, opponent: StaticOpponent, *, poison: int) -> None:
     for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
             if not fake.is_eliminated:
@@ -221,8 +232,8 @@ def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
 def _record_bot_result(
     game: Game,
     player: Player,
-    opponent: StaticOpponent,
     *,
+    opponent: StaticOpponent,
     player_won: bool,
     is_draw: bool,
     poison_dealt: int,
@@ -250,7 +261,7 @@ def _record_bot_result(
             break
 
 
-def apply_poison_pvp(game: Game, player: Player, opponent: Player, is_draw: bool, winner_name: str | None) -> dict:
+def apply_poison_pvp(game: Game, player: Player, *, opponent: Player, is_draw: bool, winner_name: str | None) -> dict:
     """Apply poison for PvP battle. Returns poison info dict."""
     if is_draw:
         p1_poison = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
@@ -267,23 +278,24 @@ def apply_poison_pvp(game: Game, player: Player, opponent: Player, is_draw: bool
         poison = calculate_damage(player, use_upgrades=game.config.use_upgrades)
         opponent.poison += poison
         return {"winner": player, "loser": opponent, "poison": poison}
-    else:
-        poison = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
-        player.poison += poison
-        return {"winner": opponent, "loser": player, "poison": poison}
+    poison = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
+    player.poison += poison
+    return {"winner": opponent, "loser": player, "poison": poison}
 
 
-def apply_poison_static(game: Game, player: Player, opponent: StaticOpponent, player_won: bool, is_draw: bool) -> dict:
+def apply_poison_static(
+    game: Game, player: Player, *, opponent: StaticOpponent, player_won: bool, is_draw: bool
+) -> dict:
     """Apply poison and record the puppet's result for a static opponent battle. Returns poison info dict."""
     poison_dealt = 0
     poison_taken = 0
 
     if player_won:
         poison_dealt = calculate_damage(player, use_upgrades=game.config.use_upgrades)
-        apply_bot_poison(game, opponent, poison_dealt)
+        apply_bot_poison(game, opponent, poison=poison_dealt)
     elif is_draw:
         poison_dealt = calculate_damage(player, use_upgrades=game.config.use_upgrades)
-        apply_bot_poison(game, opponent, poison_dealt)
+        apply_bot_poison(game, opponent, poison=poison_dealt)
         poison_taken = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
         player.poison += poison_taken
     else:
@@ -293,7 +305,7 @@ def apply_poison_static(game: Game, player: Player, opponent: StaticOpponent, pl
     _record_bot_result(
         game,
         player,
-        opponent,
+        opponent=opponent,
         player_won=player_won,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
@@ -303,11 +315,12 @@ def apply_poison_static(game: Game, player: Player, opponent: StaticOpponent, pl
     return {"poison_dealt": poison_dealt, "poison_taken": poison_taken}
 
 
-def start_rewards_only(game: Game, winner: Player, loser: Player, poison_dealt: int) -> None:
+def start_rewards_only(game: Game, winner: Player, *, loser: Player, poison_dealt: int) -> None:
     """Start reward phase for PvP - poison already applied, just do rewards."""
     for player in (winner, loser):
         if player.phase != "reward":
-            raise ValueError(f"{player.name} is not in reward phase")
+            msg = f"{player.name} is not in reward phase"
+            raise ValueError(msg)
 
     for player in (winner, loser):
         is_winner = player.name == winner.name
@@ -315,7 +328,7 @@ def start_rewards_only(game: Game, winner: Player, loser: Player, poison_dealt: 
         _award_rewards(
             game,
             player,
-            opponent.name,
+            opponent_name=opponent.name,
             winner_name=winner.name,
             is_draw=False,
             poison_dealt=poison_dealt if is_winner else 0,
@@ -323,11 +336,12 @@ def start_rewards_only(game: Game, winner: Player, loser: Player, poison_dealt: 
         )
 
 
-def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: int, p2_poison: int) -> None:
+def start_rewards_draw(game: Game, player1: Player, *, player2: Player, p1_poison: int, p2_poison: int) -> None:
     """Start reward phase for PvP draw - poison already applied, just do rewards."""
     for player in (player1, player2):
         if player.phase != "reward":
-            raise ValueError(f"{player.name} is not in reward phase")
+            msg = f"{player.name} is not in reward phase"
+            raise ValueError(msg)
 
     poison_taken_lookup = {player1.name: p1_poison, player2.name: p2_poison}
     other = {player1.name: player2, player2.name: player1}
@@ -339,7 +353,7 @@ def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: 
         _award_rewards(
             game,
             player,
-            opponent.name,
+            opponent_name=opponent.name,
             winner_name=None,
             is_draw=True,
             poison_dealt=poison_dealt,
@@ -350,8 +364,8 @@ def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: 
 def start_rewards_single(
     game: Game,
     player: Player,
-    opponent_name: str,
     *,
+    opponent_name: str,
     won: bool,
     poison_dealt: int,
     poison_taken: int,
@@ -359,17 +373,15 @@ def start_rewards_single(
 ) -> None:
     """Start reward phase for a single player (when other player is at lethal)."""
     if player.phase != "reward":
-        raise ValueError(f"{player.name} is not in reward phase")
+        msg = f"{player.name} is not in reward phase"
+        raise ValueError(msg)
 
-    if is_draw:
-        winner_name = None
-    else:
-        winner_name = player.name if won else opponent_name
+    winner_name = None if is_draw else player.name if won else opponent_name
 
     _award_rewards(
         game,
         player,
-        opponent_name,
+        opponent_name=opponent_name,
         winner_name=winner_name,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
@@ -380,8 +392,8 @@ def start_rewards_single(
 def start_vs_static_rewards_only(
     game: Game,
     player: Player,
-    opponent: StaticOpponent,
     *,
+    opponent: StaticOpponent,
     player_won: bool,
     is_draw: bool,
     poison_dealt: int,
@@ -389,7 +401,8 @@ def start_vs_static_rewards_only(
 ) -> None:
     """Start reward phase for static opponent - poison already applied, just do rewards."""
     if player.phase != "reward":
-        raise ValueError("Player is not in reward phase")
+        msg = "Player is not in reward phase"
+        raise ValueError(msg)
 
     winner_name: str | None
     if player_won:
@@ -402,7 +415,7 @@ def start_vs_static_rewards_only(
     _award_rewards(
         game,
         player,
-        opponent.name,
+        opponent_name=opponent.name,
         winner_name=winner_name,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
@@ -427,13 +440,14 @@ def set_last_battle_result_no_rewards(
     )
 
 
-def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result: BattleResult) -> None:
+def start_vs_static(game: Game, player: Player, *, opponent: StaticOpponent, result: BattleResult) -> None:
     """Legacy function - applies poison AND rewards.
 
     For new flow, use apply_poison_static + start_vs_static_rewards_only.
     """
     if player.phase != "reward":
-        raise ValueError("Player is not in reward phase")
+        msg = "Player is not in reward phase"
+        raise ValueError(msg)
 
     player_won = result.winner is not None and result.winner.name == player.name
     is_draw = result.is_draw
@@ -451,17 +465,17 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
 
     if player_won:
         poison_dealt = calculate_damage(player, use_upgrades=game.config.use_upgrades)
-        apply_bot_poison(game, opponent, poison_dealt)
+        apply_bot_poison(game, opponent, poison=poison_dealt)
     else:
         poison_taken = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
         player.poison += poison_taken
         if is_draw:
-            apply_bot_poison(game, opponent, calculate_damage(player, use_upgrades=game.config.use_upgrades))
+            apply_bot_poison(game, opponent, poison=calculate_damage(player, use_upgrades=game.config.use_upgrades))
 
     _award_rewards(
         game,
         player,
-        opponent.name,
+        opponent_name=opponent.name,
         winner_name=winner_name,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
@@ -471,7 +485,7 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
     _record_bot_result(
         game,
         player,
-        opponent,
+        opponent=opponent,
         player_won=player_won,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
@@ -479,11 +493,13 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
     )
 
 
-def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
+def _start_with_result(game: Game, winner: Player, *, loser: Player) -> None:
     if winner.phase != "reward":
-        raise ValueError("Winner is not in reward phase")
+        msg = "Winner is not in reward phase"
+        raise ValueError(msg)
     if loser.phase != "reward":
-        raise ValueError("Loser is not in reward phase")
+        msg = "Loser is not in reward phase"
+        raise ValueError(msg)
 
     poison_dealt = apply_poison(winner, loser)
 
@@ -493,7 +509,7 @@ def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
         _award_rewards(
             game,
             player,
-            opponent.name,
+            opponent_name=opponent.name,
             winner_name=winner.name,
             is_draw=False,
             poison_dealt=poison_dealt if is_winner else 0,
@@ -501,15 +517,17 @@ def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
         )
 
 
-def end_for_player(game: Game, player: Player, upgrade_choice: Card | None = None) -> None:
+def end_for_player(game: Game, player: Player, *, upgrade_choice: Card | None = None) -> None:
     if player.phase != "reward":
-        raise ValueError("Player is not in reward phase")
+        msg = "Player is not in reward phase"
+        raise ValueError(msg)
 
     if is_stage_increasing(player):
         if game.config.use_upgrades and len(game.available_upgrades) > 0:
             if upgrade_choice is None:
-                raise ValueError("Must provide upgrade choice when stage is increasing")
-            pick_upgrade(game, player, upgrade_choice)
+                msg = "Must provide upgrade choice when stage is increasing"
+                raise ValueError(msg)
+            pick_upgrade(game, player, upgrade=upgrade_choice)
         player.stage += 1
         player.round = 1
     else:

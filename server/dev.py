@@ -1,4 +1,8 @@
+"""Local development runner launching the FastAPI backend and Vite frontend."""
+
 import argparse
+import contextlib
+import logging
 import os
 import shutil
 import signal
@@ -8,48 +12,58 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
+from types import FrameType
+
+MAX_PORT = 65535
+NPM_BIN = shutil.which("npm") or "npm"
+
+logger = logging.getLogger(__name__)
 
 
 def _build_frontend(web_dir: Path, dist_dir: Path) -> None:
     if dist_dir.exists():
         shutil.rmtree(dist_dir)
-        print("Cleaned up old build...")
+        logger.info("Cleaned up old build...")
 
-    print("Building frontend...")
-    result = subprocess.run(["npm", "run", "build"], cwd=web_dir, check=False)
+    logger.info("Building frontend...")
+    result = subprocess.run([NPM_BIN, "run", "build"], cwd=web_dir, check=False)  # noqa: S603 -- trusted local subprocess args
     if result.returncode != 0:
-        print("Frontend build failed!")
+        logger.error("Frontend build failed!")
         sys.exit(1)
-    print("Build complete.\n")
+    logger.info("Build complete.\n")
 
 
-def _create_cleanup(processes: list[subprocess.Popen], post_cleanup: list[Callable[[], None]]):
-    def cleanup(_signum=None, _frame=None):
-        for proc in processes:
-            if proc.poll() is None:
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                except (ProcessLookupError, OSError):
-                    pass
-        for proc in processes:
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+def _stop_processes(processes: list[subprocess.Popen[bytes]]) -> None:
+    for proc in processes:
+        if proc.poll() is None:
+            with contextlib.suppress(ProcessLookupError, OSError):
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    for proc in processes:
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
+
+def _create_cleanup(
+    processes: list[subprocess.Popen[bytes]],
+    post_cleanup: list[Callable[[], None]],
+) -> Callable[[int | None, FrameType | None], None]:
+    def cleanup(_signum: int | None = None, _frame: FrameType | None = None) -> None:
+        _stop_processes(processes)
         for callback in post_cleanup:
             try:
                 callback()
-            except Exception as exc:
-                print(f"Cleanup callback failed: {exc}")
+            except OSError:
+                logger.exception("Cleanup callback failed")
         sys.exit(0)
 
     return cleanup
 
 
 def _validated_port(value: int, name: str) -> int:
-    if value < 1 or value > 65535:
-        msg = f"{name} must be between 1 and 65535, got {value}"
+    if value < 1 or value > MAX_PORT:
+        msg = f"{name} must be between 1 and {MAX_PORT}, got {value}"
         raise ValueError(msg)
     return value
 
@@ -97,30 +111,35 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _setup_db_copy(
-    project_root: Path, db_copy: bool, db_source: str | None, cleanup_callbacks: list[Callable[[], None]]
+    project_root: Path,
+    *,
+    db_copy: bool,
+    db_source: str | None,
+    cleanup_callbacks: list[Callable[[], None]],
 ) -> Path | None:
     if not db_copy:
         return None
 
     try:
         temp_db_path, source_db_path = _create_temp_db_copy(project_root, db_source)
-    except FileNotFoundError as exc:
-        print(exc)
+    except FileNotFoundError:
+        logger.exception("Failed to create temporary DB copy")
         sys.exit(1)
 
     cleanup_callbacks.append(lambda: shutil.rmtree(temp_db_path.parent, ignore_errors=True))
-    print(f"Using temporary DB copy: {temp_db_path}")
-    print(f"  source: {source_db_path}\n")
+    logger.info("Using temporary DB copy: %s", temp_db_path)
+    logger.info("  source: %s\n", source_db_path)
     return temp_db_path
 
 
 def _start_backend(
     project_root: Path,
     backend_port: int,
+    *,
     reload_enabled: bool,
     no_compress: bool,
     temp_db_path: Path | None,
-) -> subprocess.Popen:
+) -> subprocess.Popen[bytes]:
     uvicorn_cmd = [
         sys.executable,
         "-m",
@@ -142,7 +161,7 @@ def _start_backend(
     if temp_db_path is not None:
         backend_env["DATABASE_PATH"] = str(temp_db_path)
 
-    return subprocess.Popen(
+    return subprocess.Popen(  # noqa: S603 -- trusted local subprocess args
         uvicorn_cmd,
         cwd=project_root,
         start_new_session=True,
@@ -150,44 +169,48 @@ def _start_backend(
     )
 
 
-def _start_frontend(web_dir: Path, frontend_port: int, backend_port: int) -> subprocess.Popen:
+def _start_frontend(web_dir: Path, *, frontend_port: int, backend_port: int) -> subprocess.Popen[bytes]:
     frontend_env = {
         **os.environ,
         "VITE_BACKEND_PORT": str(backend_port),
         "VITE_FRONTEND_PORT": str(frontend_port),
     }
-    return subprocess.Popen(
-        ["npm", "run", "dev", "--", "--port", str(frontend_port)],
+    return subprocess.Popen(  # noqa: S603 -- trusted local subprocess args
+        [NPM_BIN, "run", "dev", "--", "--port", str(frontend_port)],
         cwd=web_dir,
         start_new_session=True,
         env=frontend_env,
     )
 
 
-def _print_startup(build_only: bool, backend_port: int, frontend_port: int) -> None:
+def _log_startup(*, build_only: bool, backend_port: int, frontend_port: int) -> None:
     if build_only:
-        print(f"Server running at http://localhost:{backend_port}")
+        logger.info("Server running at http://localhost:%d", backend_port)
     else:
-        print("Dev servers starting...")
-        print(f"  Backend:  http://localhost:{backend_port}")
-        print(f"  Frontend: http://localhost:{frontend_port}")
-    print("Press Ctrl+C to stop.\n")
+        logger.info("Dev servers starting...")
+        logger.info("  Backend:  http://localhost:%d", backend_port)
+        logger.info("  Frontend: http://localhost:%d", frontend_port)
+    logger.info("Press Ctrl+C to stop.\n")
 
 
-def _wait_for_exit(processes: list[subprocess.Popen], cleanup: Callable[[], None]) -> None:
+def _wait_for_exit(
+    processes: list[subprocess.Popen[bytes]],
+    cleanup: Callable[[int | None, FrameType | None], None],
+) -> None:
     try:
         while True:
             for proc in processes:
                 ret = proc.poll()
                 if ret is not None:
-                    print(f"Process exited with code {ret}, shutting down...")
-                    cleanup()
+                    logger.info("Process exited with code %d, shutting down...", ret)
+                    cleanup(None, None)
             time.sleep(0.5)
     except KeyboardInterrupt:
-        cleanup()
+        cleanup(None, None)
 
 
-def main():
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = _build_parser()
     args = parser.parse_args()
 
@@ -197,23 +220,34 @@ def main():
     backend_port = _validated_port(args.backend_port, "--backend-port")
     frontend_port = _validated_port(args.frontend_port, "--frontend-port")
     cleanup_callbacks: list[Callable[[], None]] = []
-    temp_db_path = _setup_db_copy(project_root, args.db_copy, args.db_source, cleanup_callbacks)
+    temp_db_path = _setup_db_copy(
+        project_root,
+        db_copy=args.db_copy,
+        db_source=args.db_source,
+        cleanup_callbacks=cleanup_callbacks,
+    )
 
     if args.build:
         _build_frontend(web_dir, dist_dir)
 
-    backend = _start_backend(project_root, backend_port, args.reload, args.no_compress, temp_db_path)
+    backend = _start_backend(
+        project_root,
+        backend_port,
+        reload_enabled=args.reload,
+        no_compress=args.no_compress,
+        temp_db_path=temp_db_path,
+    )
     processes = [backend]
 
     if not args.build:
-        frontend = _start_frontend(web_dir, frontend_port, backend_port)
+        frontend = _start_frontend(web_dir, frontend_port=frontend_port, backend_port=backend_port)
         processes.append(frontend)
 
     cleanup = _create_cleanup(processes, cleanup_callbacks)
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
 
-    _print_startup(args.build, backend_port, frontend_port)
+    _log_startup(build_only=args.build, backend_port=backend_port, frontend_port=frontend_port)
     _wait_for_exit(processes, cleanup)
 
 

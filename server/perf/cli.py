@@ -7,13 +7,15 @@ import asyncio
 import json
 import logging
 import sys
-from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from server.perf.metrics import check_regression_thresholds
 from server.perf.models import DEFAULT_BACKEND_PORT, DEFAULT_BASE_URL, VALID_PUPPET_COUNTS, HarnessConfig
 from server.perf.runner import run_harness
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +30,18 @@ def _parse_int_list(raw: str, *, flag_name: str, min_value: int, bound_label: st
         try:
             parsed = int(token)
         except ValueError as exc:
-            raise ValueError(f"invalid {flag_name} value: {token}") from exc
+            msg = f"invalid {flag_name} value: {token}"
+            raise ValueError(msg) from exc
         if parsed < min_value:
-            raise ValueError(f"{flag_name} value must be {bound_label}: {parsed}")
+            msg = f"{flag_name} value must be {bound_label}: {parsed}"
+            raise ValueError(msg)
         if parsed not in seen:
             values.append(parsed)
             seen.add(parsed)
 
     if not values:
-        raise ValueError(f"--{flag_name} did not contain any {bound_label} integers")
+        msg = f"--{flag_name} did not contain any {bound_label} integers"
+        raise ValueError(msg)
     return values
 
 
@@ -227,31 +232,44 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 def _validate_numeric_bounds(args: argparse.Namespace) -> None:
     if args.games is not None and args.games <= 0:
-        raise ValueError("--games must be positive")
+        msg = "--games must be positive"
+        raise ValueError(msg)
     if args.hot_games < 0:
-        raise ValueError("--hot-games must be non-negative")
-    if args.players_per_table < 2 or args.players_per_table > 8:
-        raise ValueError("--players-per-table must be between 2 and 8")
+        msg = "--hot-games must be non-negative"
+        raise ValueError(msg)
+    min_table, max_table = 2, 8
+    if args.players_per_table < min_table or args.players_per_table > max_table:
+        msg = "--players-per-table must be between 2 and 8"
+        raise ValueError(msg)
     if args.spectators_per_game < 0:
-        raise ValueError("--spectators-per-game must be non-negative")
+        msg = "--spectators-per-game must be non-negative"
+        raise ValueError(msg)
     if args.concurrency is not None and args.concurrency <= 0:
-        raise ValueError("--concurrency must be positive")
-    if args.backend_port < 1 or args.backend_port > 65535:
-        raise ValueError("--backend-port must be between 1 and 65535")
+        msg = "--concurrency must be positive"
+        raise ValueError(msg)
+    max_port = 65535
+    if args.backend_port < 1 or args.backend_port > max_port:
+        msg = "--backend-port must be between 1 and 65535"
+        raise ValueError(msg)
 
 
 def _validate_args(args: argparse.Namespace) -> None:
     _validate_numeric_bounds(args)
     if args.rss_sample_interval_sec <= 0:
-        raise ValueError("--rss-sample-interval-sec must be positive")
+        msg = "--rss-sample-interval-sec must be positive"
+        raise ValueError(msg)
     if args.ws_action_jitter_ms < 0:
-        raise ValueError("--ws-action-jitter-ms must be non-negative")
+        msg = "--ws-action-jitter-ms must be non-negative"
+        raise ValueError(msg)
     if args.max_p95_ms is not None and args.max_p95_ms <= 0:
-        raise ValueError("--max-p95-ms must be positive")
+        msg = "--max-p95-ms must be positive"
+        raise ValueError(msg)
     if args.max_rss_mb is not None and args.max_rss_mb <= 0:
-        raise ValueError("--max-rss-mb must be positive")
+        msg = "--max-rss-mb must be positive"
+        raise ValueError(msg)
     if args.fresh_server_per_sweep and not args.db_copy:
-        raise ValueError("--fresh-server-per-sweep requires --db-copy")
+        msg = "--fresh-server-per-sweep requires --db-copy"
+        raise ValueError(msg)
 
 
 def parse_args(argv: list[str] | None = None) -> HarnessConfig:
@@ -321,13 +339,13 @@ async def main_async(
     try:
         cfg = parse_args(argv)
     except ValueError as exc:
-        logger.error("error: %s", exc)
+        logger.error("error: %s", exc)  # noqa: TRY400 -- CLI validation message without traceback
         return 2
 
     try:
         report = await runner(cfg)
-    except Exception as exc:
-        logger.error("[harness] failed: %s", exc)
+    except Exception:
+        logger.exception("[harness] failed")
         return 1
 
     if cfg.json_output:

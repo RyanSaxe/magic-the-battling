@@ -7,15 +7,16 @@ from server.services.spectate_requests import SpectateRequest
 
 
 class SpectatorService(GameManagerState):
-    def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> SpectateRequest:
+    def create_spectate_request(self, game_id: str, target_player_name: str, *, spectator_name: str) -> SpectateRequest:
         """Ask to watch a player. Open Spectating approves it at once; otherwise it waits for the player's answer.
 
-        Raises TooManySpectateRequestsError when the server holds too many requests."""
+        Raises TooManySpectateRequestsError when the server holds too many requests.
+        """
         self.cleanup_expired_spectate_requests()
         request = self._spectate_requests.create(
             game_id,
             target_player_name,
-            spectator_name,
+            spectator_name=spectator_name,
             approve=self._auto_approves_spectators(game_id),
         )
         if request.status == "pending":
@@ -39,7 +40,8 @@ class SpectatorService(GameManagerState):
     def respond_to_spectate_request(self, request_id: str, *, game_id: str, responder_id: str, allowed: bool) -> bool:
         """Approve or deny a pending request; only the player it asks to watch may answer it.
 
-        The responder's requests are sent again either way, since they answered from what their screen showed."""
+        The responder's requests are sent again either way, since they answered from what their screen showed.
+        """
         responder_name = self.get_player_name(responder_id)
         request = self.get_spectate_request(game_id, request_id)
         answered = (

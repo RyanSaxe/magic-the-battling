@@ -1,3 +1,5 @@
+"""Periodic server health and resource monitoring task."""
+
 import asyncio
 import json
 import logging
@@ -13,7 +15,7 @@ from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
 
-_task: asyncio.Task | None = None
+_task_holder: list[asyncio.Task | None] = [None]
 
 INTERVAL_SECONDS = 60
 
@@ -22,13 +24,11 @@ async def _monitor_loop() -> None:
     while True:
         await asyncio.sleep(INTERVAL_SECONDS)
 
-        games = len(game_manager._active_games)
+        games = game_manager.loaded_games_count()
         hot_games = game_manager.hot_games_count()
-        pending = len(game_manager._pending_games)
-        connections = sum(len(v) for v in connection_manager._connections.values())
-        spectators = sum(
-            len(ws_list) for targets in connection_manager._spectators.values() for ws_list in targets.values()
-        )
+        pending = game_manager.pending_games_count()
+        connections = connection_manager.total_connections()
+        spectators = connection_manager.total_spectators()
         sessions = session_manager.size()
         rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         mem_mb = rss // (1024 * 1024) if sys.platform == "darwin" else rss // 1024
@@ -56,13 +56,11 @@ async def _monitor_loop() -> None:
 
 
 def start_monitoring() -> None:
-    global _task
-    _task = asyncio.create_task(_monitor_loop())
+    _task_holder[0] = asyncio.create_task(_monitor_loop())
     logger.info("Started periodic monitoring (every %ds)", INTERVAL_SECONDS)
 
 
 def stop_monitoring() -> None:
-    global _task
-    if _task is not None:
-        _task.cancel()
-        _task = None
+    if _task_holder[0] is not None:
+        _task_holder[0].cancel()
+        _task_holder[0] = None

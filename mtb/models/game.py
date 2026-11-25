@@ -1,10 +1,21 @@
+"""Live game state, player, puppet, battle, and snapshot restoration models."""
+
 import json
 import random
 import secrets
 import weakref
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator, model_serializer
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    Field,
+    PrivateAttr,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+)
 
 from mtb.models.card_registry import export_registry, import_registry
 from mtb.models.cards import Battler, Card
@@ -29,7 +40,7 @@ class StaticOpponent(BaseModel):
     source_player_history_id: int | None = None
 
     @classmethod
-    def from_player(cls, player: "Player", hand_revealed: bool = False) -> "StaticOpponent":
+    def from_player(cls, player: "Player", *, hand_revealed: bool = False) -> "StaticOpponent":
         upgrades = []
         for upgrade in player.upgrades:
             copy = upgrade.model_copy()
@@ -51,7 +62,7 @@ class StaticOpponent(BaseModel):
         )
 
     @classmethod
-    def from_snapshot(cls, snapshot: "BattleSnapshotData", player_name: str, history_id: int) -> "StaticOpponent":
+    def from_snapshot(cls, snapshot: "BattleSnapshotData", player_name: str, *, history_id: int) -> "StaticOpponent":
         applied_upgrades = []
         for upgrade in snapshot.applied_upgrades:
             copy = upgrade.model_copy()
@@ -233,7 +244,7 @@ class Player(BaseModel):
     game_ref: weakref.ref["Game"] | None = Field(default=None, exclude=True)
 
     @model_serializer(mode="wrap")
-    def _serialize(self, handler: Any, info: Any) -> dict[str, Any]:
+    def _serialize(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict[str, Any]:
         data = handler(self)
         if info.context and info.context.get("exclude_shared_battler"):
             data.pop("battler", None)
@@ -242,10 +253,12 @@ class Player(BaseModel):
     @property
     def game(self) -> "Game":
         if self.game_ref is None:
-            raise ValueError("Player is not associated with a game")
+            msg = "Player is not associated with a game"
+            raise ValueError(msg)
         game = self.game_ref()
         if game is None:
-            raise ValueError("Game reference is no longer valid")
+            msg = "Game reference is no longer valid"
+            raise ValueError(msg)
         return game
 
     @property
@@ -257,7 +270,7 @@ class Player(BaseModel):
         return self.game.config.starting_stage + self.vanquishers
 
     def slotted_hand(self) -> list[str | None]:
-        """The hand by slot. A card with no saved slot, as in an older game, takes the first empty one."""
+        """Return the hand by slot, placing any card without a saved slot in the first empty one."""
         in_hand = {card.id for card in self.hand}
         slots = [card_id if card_id in in_hand else None for card_id in self.hand_slots[: self.hand_size]]
         slots += [None] * (self.hand_size - len(slots))
@@ -313,12 +326,10 @@ class Game(BaseModel):
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
     most_recent_ghost: StaticOpponent | None = None
-    # TODO(v1.0): remove most_recent_ghost_bot alias once historical games are cleared on v1.0 launch
     most_recent_ghost_puppet: Puppet | None = Field(
         default=None,
         validation_alias=AliasChoices("most_recent_ghost_puppet", "most_recent_ghost_bot"),
     )
-    # TODO(v1.0): remove fake_players alias once historical games are cleared on v1.0 launch
     puppets: list[Puppet] = Field(
         default_factory=list,
         validation_alias=AliasChoices("puppets", "fake_players"),
@@ -326,7 +337,8 @@ class Game(BaseModel):
     stage: int = 3
     round: int = 1
 
-    def model_post_init(self, _context: Any) -> None:
+    def model_post_init(self, context: object, /) -> None:
+        _ = context
         for player in self.players:
             player.game_ref = weakref.ref(self)
         self.normalize_player_battlers()
@@ -342,29 +354,32 @@ class Game(BaseModel):
 
     def get_draft_state(self) -> DraftState:
         if self.draft_state is None:
-            raise RuntimeError("Draft state not initialized - call draft.start() first")
+            msg = "Draft state not initialized - call draft.start() first"
+            raise RuntimeError(msg)
         return self.draft_state
 
     def get_battler(self) -> Battler:
         if self.battler is None:
-            raise RuntimeError("Battler not initialized - call set_battler() first")
+            msg = "Battler not initialized - call set_battler() first"
+            raise RuntimeError(msg)
         return self.battler
+
+    def _normalize_limited_battler(self) -> None:
+        canonical = self.battler or next(
+            (player.battler for player in self.players if player.battler is not None), None
+        )
+        if canonical is None:
+            return
+        self.battler = canonical
+        for player in self.players:
+            player.battler = canonical
 
     def normalize_player_battlers(self) -> None:
         if not self.players:
             return
-
         if self.config.play_mode == "limited":
-            canonical = self.battler
-            if canonical is None:
-                canonical = next((player.battler for player in self.players if player.battler is not None), None)
-            if canonical is None:
-                return
-            self.battler = canonical
-            for player in self.players:
-                player.battler = canonical
+            self._normalize_limited_battler()
             return
-
         if self.battler is not None:
             for player in self.players:
                 if player.battler is None:
@@ -394,23 +409,17 @@ class Zones(BaseModel):
     revealed_card_ids: list[str] = Field(default_factory=list)
 
     def get_zone(self, zone_name: ZoneName) -> list[Card]:
-        match zone_name:
-            case "battlefield":
-                return self.battlefield
-            case "graveyard":
-                return self.graveyard
-            case "exile":
-                return self.exile
-            case "hand":
-                return self.hand
-            case "sideboard":
-                return self.sideboard
-            case "upgrades":
-                return self.upgrades
-            case "command_zone":
-                return self.command_zone
-            case "library":
-                return self.library
+        zone_map: dict[ZoneName, list[Card]] = {
+            "battlefield": self.battlefield,
+            "graveyard": self.graveyard,
+            "exile": self.exile,
+            "hand": self.hand,
+            "sideboard": self.sideboard,
+            "upgrades": self.upgrades,
+            "command_zone": self.command_zone,
+            "library": self.library,
+        }
+        return zone_map[zone_name]
 
 
 class PendingRevealAnimation(BaseModel):
@@ -435,13 +444,22 @@ class Battle(BaseModel):
     pending_reveal_animations: list[PendingRevealAnimation] = Field(default_factory=list)
     _opaque_id_key: bytes = PrivateAttr(default_factory=lambda: secrets.token_bytes(32))
 
+    @property
+    def opaque_id_key(self) -> bytes:
+        return self._opaque_id_key
 
-def create_game(player_names: list[str], num_players: int, config: Config | None = None) -> Game:
+    @opaque_id_key.setter
+    def opaque_id_key(self, value: bytes) -> None:
+        self._opaque_id_key = value
+
+
+def create_game(player_names: list[str], num_players: int, *, config: Config | None = None) -> Game:
     if num_players < len(player_names):
-        raise ValueError("Number of players cannot be less than the number of provided player names")
+        msg = "Number of players cannot be less than the number of provided player names"
+        raise ValueError(msg)
     if num_players > len(player_names):
-        # TODO: add fake players from the DB
-        raise NotImplementedError("Filling in with fake players is not implemented yet")
+        msg = "Filling in with fake players is not implemented yet"
+        raise NotImplementedError(msg)
 
     if config is None:
         config = Config()
@@ -466,7 +484,8 @@ def set_player_battlers(game: Game, battlers_by_player: dict[str, Battler]) -> N
     for player in game.players:
         battler = battlers_by_player.get(player.name)
         if battler is None:
-            raise ValueError(f"No battler provided for player {player.name}")
+            msg = f"No battler provided for player {player.name}"
+            raise ValueError(msg)
         player.battler = battler
 
     game.normalize_player_battlers()
@@ -479,7 +498,8 @@ def _deal_starting_pool(game: Game) -> None:
     shuffled_battlers: set[int] = set()
     for player in game.players:
         if player.battler is None:
-            raise ValueError(f"Player {player.name} has no battler")
+            msg = f"Player {player.name} has no battler"
+            raise ValueError(msg)
 
         battler_key = id(player.battler)
         if battler_key not in shuffled_battlers:
@@ -491,7 +511,7 @@ def _deal_starting_pool(game: Game) -> None:
         player.populate_hand()
 
 
-def _collect_scryfall_ids(data: Any) -> set[str]:
+def _collect_scryfall_ids(data: object) -> set[str]:
     ids: set[str] = set()
     stack: list[Any] = [data]
 

@@ -84,5 +84,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except ReportError as exc:
-        logger.error("Error: %s", exc)
+        logger.exception("Fly activity report failed")
         raise SystemExit(1) from exc

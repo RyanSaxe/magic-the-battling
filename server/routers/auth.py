@@ -1,5 +1,8 @@
-# ruff: noqa: B008
+"""User registration, login, logout, and session authentication routes."""
+
 import logging
+from collections.abc import Generator
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -22,7 +25,7 @@ from server.services.auth import (
 logger = logging.getLogger(__name__)
 
 
-def _get_db():
+def _get_db() -> Generator[Session]:
     db = database.SessionLocal()
     try:
         yield db
@@ -54,18 +57,18 @@ def _account_to_sign_in(db: Session, username: str) -> User | None:
     return matches[0] if len(matches) == 1 else None
 
 
-@router.post("/register", response_model=UserResponse)
-def register(request: RegisterRequest, db: Session = Depends(_get_db)):
+@router.post("/register")
+def register(request: RegisterRequest, db: Annotated[Session, Depends(_get_db)]) -> JSONResponse:
     existing = db.query(User).filter(func.lower(User.username) == func.lower(request.username)).first()
     if existing:
-        raise api_error(409, ErrorCode.USERNAME_TAKEN, "Username already taken")
+        raise api_error(409, ErrorCode.USERNAME_TAKEN, detail="Username already taken")
 
     if request.email:
         email_exists = db.query(User).filter(func.lower(User.email) == func.lower(request.email)).first()
         if email_exists:
-            raise api_error(409, ErrorCode.EMAIL_IN_USE, "Email already in use")
+            raise api_error(409, ErrorCode.EMAIL_IN_USE, detail="Email already in use")
 
-    user = create_user(db, request.username, request.password, request.email)
+    user = create_user(db, request.username, password=request.password, email=request.email)
     db.add(BattlerFollow(user_id=str(user.id), cube_id="auto"))
     db.commit()
     token = create_access_token(str(user.id), str(user.username))
@@ -78,11 +81,11 @@ def register(request: RegisterRequest, db: Session = Depends(_get_db)):
     return response
 
 
-@router.post("/login", response_model=UserResponse)
-def login(request: LoginRequest, db: Session = Depends(_get_db)):
+@router.post("/login")
+def login(request: LoginRequest, db: Annotated[Session, Depends(_get_db)]) -> JSONResponse:
     user = _account_to_sign_in(db, request.username)
     if not user or not verify_password(request.password, str(user.password_hash)):
-        raise api_error(401, ErrorCode.INVALID_CREDENTIALS, "Invalid username or password")
+        raise api_error(401, ErrorCode.INVALID_CREDENTIALS, detail="Invalid username or password")
 
     token = create_access_token(str(user.id), str(user.username))
 
@@ -95,14 +98,14 @@ def login(request: LoginRequest, db: Session = Depends(_get_db)):
 
 
 @router.post("/logout")
-def logout():
+def logout() -> JSONResponse:
     response = JSONResponse(content={"ok": True})
     response.delete_cookie(key=COOKIE_NAME, path="/")
     return response
 
 
-@router.get("/me", response_model=UserResponse)
-def me(user: User = Depends(get_current_user)):
+@router.get("/me")
+def me(user: Annotated[User, Depends(get_current_user)]) -> UserResponse:
     return UserResponse(
         user_id=str(user.id),
         username=str(user.username),

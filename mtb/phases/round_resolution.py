@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 from mtb.models.game import (
@@ -23,7 +23,6 @@ from mtb.models.game import (
     Puppet,
     StaticOpponent,
 )
-from mtb.models.types import Phase
 from mtb.phases import battle, reward
 from mtb.phases.elimination import (
     Participant,
@@ -42,6 +41,9 @@ from mtb.phases.elimination import (
     would_be_dead_ready_for_elimination,
 )
 
+if TYPE_CHECKING:
+    from mtb.models.types import Phase
+
 ResolutionStatus = Literal["game_over", "sudden_death"]
 
 LEGAL_PHASE_TRANSITIONS: dict[Phase, frozenset[Phase]] = {
@@ -56,6 +58,7 @@ LEGAL_PHASE_TRANSITIONS: dict[Phase, frozenset[Phase]] = {
 }
 
 _TERMINAL_PHASES: frozenset[Phase] = frozenset({"eliminated", "winner", "game_over"})
+_FINALE_PARTICIPANT_COUNT = 2
 
 
 class InvalidPhaseTransitionError(ValueError):
@@ -113,7 +116,7 @@ def transition_phase(player: Player, target: Phase) -> Phase:
 
 def _eliminate_human(game: Game, player: Player) -> None:
     transition_phase(player, "eliminated")
-    eliminate_player(game, player, player.round, player.stage)
+    eliminate_player(game, player, round_num=player.round, stage_num=player.stage)
 
 
 def finalize_game_over(game: Game, winner: Player | None) -> None:
@@ -340,9 +343,9 @@ def _apply_static_poison(
     is_finale = (
         puppet is not None
         and not puppet.is_eliminated
-        and len(get_live_players(game)) + len(get_live_puppets(game)) == 2
+        and len(get_live_players(game)) + len(get_live_puppets(game)) == _FINALE_PARTICIPANT_COUNT
     )
-    poison_info = reward.apply_poison_static(game, player, opponent, player_won, is_draw)
+    poison_info = reward.apply_poison_static(game, player, opponent=opponent, player_won=player_won, is_draw=is_draw)
     winner_name: str | None = player.name if player_won else (None if is_draw else opponent.name)
     poison_to_lose = game.config.poison_to_lose
     return _StaticPoisonSummary(
@@ -386,7 +389,7 @@ def _resolve_static_sudden_death(
 
     if summary.player_at_lethal and summary.bot_at_lethal:
         _set_static_no_rewards(player, opponent.name, summary=summary)
-        setup_sudden_death_battle(game, player, puppet)
+        setup_sudden_death_battle(game, player, p2=puppet)
         transition_phase(player, "build")
         return RoundResolutionOutcome()
 
@@ -415,7 +418,7 @@ def _resolve_static_sudden_death(
     reward.start_vs_static_rewards_only(
         game,
         player,
-        opponent,
+        opponent=opponent,
         player_won=summary.player_won,
         is_draw=summary.is_draw,
         poison_dealt=summary.poison_dealt,
@@ -451,7 +454,7 @@ def _resolve_static_finale_or_reward(
     reward.start_vs_static_rewards_only(
         game,
         player,
-        opponent,
+        opponent=opponent,
         player_won=summary.player_won,
         is_draw=summary.is_draw,
         poison_dealt=summary.poison_dealt,
@@ -504,7 +507,7 @@ def _resolve_static_battle(
 
     if summary.is_finale and summary.player_at_lethal and summary.bot_at_lethal and summary.puppet is not None:
         _set_static_no_rewards(player, opponent.name, summary=summary)
-        setup_sudden_death_battle(game, player, summary.puppet)
+        setup_sudden_death_battle(game, player, p2=summary.puppet)
         transition_phase(player, "build")
         player.in_sudden_death = True
         summary.puppet.in_sudden_death = True
@@ -520,7 +523,7 @@ def _resolve_static_battle(
         reward.start_vs_static_rewards_only(
             game,
             player,
-            opponent,
+            opponent=opponent,
             player_won=summary.player_won,
             is_draw=summary.is_draw,
             poison_dealt=summary.poison_dealt,
@@ -541,14 +544,14 @@ def _apply_pvp_poison(
     opponent_start_poison: int,
 ) -> _PvpPoisonSummary:
     is_draw = result.is_draw
-    is_finale = len(get_live_players(game)) + len(get_live_puppets(game)) == 2
+    is_finale = len(get_live_players(game)) + len(get_live_puppets(game)) == _FINALE_PARTICIPANT_COUNT
     p1_poison = 0
     p2_poison = 0
     poison_dealt = 0
     winner_name: str | None = None
 
     if is_draw:
-        poison_info = reward.apply_poison_pvp(game, player, opponent, True, None)
+        poison_info = reward.apply_poison_pvp(game, player, opponent=opponent, is_draw=True, winner_name=None)
         p1_poison = poison_info["player_poison_taken"]
         p2_poison = poison_info["opponent_poison_taken"]
     else:
@@ -556,7 +559,7 @@ def _apply_pvp_poison(
         if winner is None or result.loser is None:
             msg = "Non-draw PvP battle must have both winner and loser"
             raise ValueError(msg)
-        poison_info = reward.apply_poison_pvp(game, player, opponent, False, winner.name)
+        poison_info = reward.apply_poison_pvp(game, player, opponent=opponent, is_draw=False, winner_name=winner.name)
         poison_dealt = poison_info["poison"]
         winner_name = winner.name
 
@@ -633,14 +636,16 @@ def _start_pvp_rewards(game: Game, player: Player, *, opponent: Player, summary:
     transition_phase(player, "reward")
     transition_phase(opponent, "reward")
     if summary.is_draw:
-        reward.start_rewards_draw(game, player, opponent, summary.p1_poison, summary.p2_poison)
+        reward.start_rewards_draw(
+            game, player, player2=opponent, p1_poison=summary.p1_poison, p2_poison=summary.p2_poison
+        )
         return
     winner = summary.battle_result.winner
     loser = summary.battle_result.loser
     if winner is None or loser is None:
         msg = "Non-draw PvP battle must have both winner and loser"
         raise ValueError(msg)
-    reward.start_rewards_only(game, winner, loser, summary.poison_dealt)
+    reward.start_rewards_only(game, winner, loser=loser, poison_dealt=summary.poison_dealt)
 
 
 def _start_single_reward(
@@ -658,7 +663,7 @@ def _start_single_reward(
         reward.start_rewards_single(
             game,
             player,
-            opponent_name,
+            opponent_name=opponent_name,
             won=False,
             poison_dealt=poison_dealt,
             poison_taken=poison_taken,
@@ -669,7 +674,7 @@ def _start_single_reward(
     reward.start_rewards_single(
         game,
         player,
-        opponent_name,
+        opponent_name=opponent_name,
         won=player_won,
         poison_dealt=poison_dealt if player_won else 0,
         poison_taken=0 if player_won else poison_dealt,
@@ -694,7 +699,7 @@ def _resolve_pvp_finale(
 
     if summary.player_at_lethal and summary.opponent_at_lethal:
         _set_pvp_results_no_rewards(player, opponent, summary=summary)
-        setup_sudden_death_battle(game, player, opponent)
+        setup_sudden_death_battle(game, player, p2=opponent)
         transition_phase(player, "build")
         transition_phase(opponent, "build")
         player.in_sudden_death = True
@@ -890,10 +895,10 @@ def resolve_end_of_round(game: Game, *, rng: random.Random | None = None) -> Rou
     humans = [fighter for fighter in (f1, f2) if isinstance(fighter, Player)]
     puppets = [fighter for fighter in (f1, f2) if isinstance(fighter, Puppet)]
 
-    if len(puppets) == 2:
+    if len(puppets) == _FINALE_PARTICIPANT_COUNT:
         return _resolve_puppet_vs_puppet_sudden_death(game, puppets, prior_eliminated=eliminated, rng=rng)
 
-    setup_sudden_death_battle(game, f1, f2)
+    setup_sudden_death_battle(game, f1, p2=f2)
     for human in humans:
         human.in_sudden_death = True
         transition_phase(human, "build")
@@ -928,7 +933,7 @@ def resolve_reward_done(
 
     opponent_name = player.last_opponent_name
     upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None) if upgrade_id else None
-    reward.end_for_player(game, player, upgrade)
+    reward.end_for_player(game, player, upgrade_choice=upgrade)
     _advance_puppet_if_needed(game, opponent_name)
 
     dead_puppets = tuple(process_puppet_eliminations(game)) if not get_would_be_dead(game) else ()

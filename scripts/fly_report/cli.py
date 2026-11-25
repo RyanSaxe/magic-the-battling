@@ -68,13 +68,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _validate_args(args: argparse.Namespace) -> None:
     if args.hours <= 0:
-        raise ReportError("--hours must be > 0")
+        msg = "--hours must be > 0"
+        raise ReportError(msg)
     if args.timeout_sec <= 0:
-        raise ReportError("--timeout-sec must be > 0")
+        msg = "--timeout-sec must be > 0"
+        raise ReportError(msg)
     if args.log_rotate_count < 0:
-        raise ReportError("--log-rotate-count must be >= 0")
+        msg = "--log-rotate-count must be >= 0"
+        raise ReportError(msg)
     if shutil.which("fly") is None:
-        raise ReportError("fly CLI is not installed or not in PATH.")
+        msg = "fly CLI is not installed or not in PATH."
+        raise ReportError(msg)
 
 
 def _collect_logs_summary(args: argparse.Namespace) -> dict[str, object] | None:

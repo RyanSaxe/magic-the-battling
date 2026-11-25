@@ -1,11 +1,14 @@
+"""Shared game social preview image route."""
+
 import hashlib
 import logging
 import re
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from html import escape
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
@@ -35,7 +38,9 @@ INDEX_HTML = Path(__file__).parent.parent.parent / "web" / "dist" / "index.html"
 
 
 class SlidingWindowRateLimiter:
-    def __init__(self, *, window_seconds: float, max_requests: int, clock: Callable[[], float] = time.monotonic):
+    def __init__(
+        self, *, window_seconds: float, max_requests: int, clock: Callable[[], float] = time.monotonic
+    ) -> None:
         self._window_seconds = window_seconds
         self._max_requests = max_requests
         self._clock = clock
@@ -66,7 +71,7 @@ class SlidingWindowRateLimiter:
 _preview_rate_limiter = SlidingWindowRateLimiter(window_seconds=RATE_LIMIT_WINDOW, max_requests=RATE_LIMIT_MAX)
 
 
-def _get_db():
+def _get_db() -> Generator[Session]:
     db = database.SessionLocal()
     try:
         yield db
@@ -82,9 +87,9 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameResponse | None:
+def _fetch_share_data(game_id: str, player_name: str, *, db: Session) -> ShareGameResponse | None:
     try:
-        share_data = build_share_data(db, game_id, player_name)
+        share_data = build_share_data(db, game_id, player_name=player_name)
     except AppHTTPException:
         return None
     # Mid-game the preview would show the sharer's last build without its hand, so previews wait for the game to end.
@@ -93,7 +98,7 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
 
     # Share pages are public for finished games; this flag is bookkeeping for
     # "someone actively shared this game", not an authorization gate.
-    db.query(GameRecord).filter(GameRecord.id == game_id, GameRecord.shared.isnot(True)).update(
+    db.query(GameRecord).filter(GameRecord.id == game_id, GameRecord.shared.isnot(True)).update(  # noqa: FBT003 -- external library boolean arg
         {GameRecord.shared: True}
     )
     db.commit()
@@ -104,7 +109,7 @@ _STATIC_OG_RE = re.compile(r"\s*<meta\s+(?:property=\"og:|name=\"twitter:)[^>]*/
 
 
 def _build_og_html(
-    index_html: str, game_id: str, player_name: str, share_data: ShareGameResponse, base_url: str
+    index_html: str, game_id: str, *, player_name: str, share_data: ShareGameResponse, base_url: str
 ) -> str:
     owner = next((p for p in share_data.players if p.name == share_data.owner_name), None)
     placement = ""
@@ -140,13 +145,14 @@ def _build_og_html(
 async def share_page_with_og(
     game_id: str,
     player_name: str,
+    *,
     request: Request,
-    db: Session = Depends(_get_db),  # noqa: B008
+    db: Annotated[Session, Depends(_get_db)],
 ) -> Response:
     if not VALID_ID_RE.match(game_id) or not VALID_NAME_RE.match(player_name):
         return serve_index(request)
 
-    share_data = _fetch_share_data(game_id, player_name, db)
+    share_data = _fetch_share_data(game_id, player_name, db=db)
     if not share_data:
         return serve_index(request)
 
@@ -165,7 +171,7 @@ async def share_page_with_og(
         return Response(status_code=304)
 
     base_url = str(request.base_url).rstrip("/")
-    html = _build_og_html(index_html, game_id, player_name, share_data, base_url)
+    html = _build_og_html(index_html, game_id, player_name=player_name, share_data=share_data, base_url=base_url)
     return HTMLResponse(
         content=html,
         headers={
@@ -180,8 +186,9 @@ async def share_page_with_og(
 async def preview_image(
     game_id: str,
     player_name: str,
+    *,
     request: Request,
-    db: Session = Depends(_get_db),  # noqa: B008
+    db: Annotated[Session, Depends(_get_db)],
 ) -> Response:
     if not VALID_ID_RE.match(game_id) or not VALID_NAME_RE.match(player_name):
         return Response(status_code=400)
@@ -189,7 +196,7 @@ async def preview_image(
     if not _preview_rate_limiter.allow(_client_ip(request)):
         return Response(status_code=429, headers={"Retry-After": "60"})
 
-    share_data = _fetch_share_data(game_id, player_name, db)
+    share_data = _fetch_share_data(game_id, player_name, db=db)
     if not share_data:
         return Response(status_code=404)
 
@@ -222,7 +229,7 @@ async def preview_image(
 
 
 def serve_index(request: Request) -> Response:
-    """The app's page, whose link preview tags name the site and page it was requested at."""
+    """Render the app page with Open Graph link preview tags for the requested route."""
     if not INDEX_HTML.exists():
         return Response(status_code=404)
     site_url = escape(str(request.base_url).rstrip("/"), quote=True)

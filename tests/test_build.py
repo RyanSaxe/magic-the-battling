@@ -1,42 +1,45 @@
+from collections.abc import Callable
+
 import pytest
 
+from mtb.models.cards import Card
 from mtb.models.game import create_game
 from mtb.phases import build
 
 
-def test_move_card_between_hand_and_sideboard(card_factory):
+def test_move_card_between_hand_and_sideboard(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     card = card_factory("test")
     player.hand.append(card)
 
-    build.move_card(player, card, "hand", "sideboard")
+    build.move_card(player, card, source="hand", destination="sideboard")
 
     assert card not in player.hand
     assert card in player.sideboard
 
 
-def test_move_card_same_source_destination_noop(card_factory):
+def test_move_card_same_source_destination_noop(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     card = card_factory("test")
     player.hand.append(card)
 
-    build.move_card(player, card, "hand", "hand")
+    build.move_card(player, card, source="hand", destination="hand")
 
     assert card in player.hand
 
 
-def test_move_card_not_in_source_raises(card_factory):
+def test_move_card_not_in_source_raises(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     card = card_factory("test")
 
-    with pytest.raises(ValueError):
-        build.move_card(player, card, "hand", "sideboard")
+    with pytest.raises(ValueError, match=r".+"):
+        build.move_card(player, card, source="hand", destination="sideboard")
 
 
-def test_move_card_from_sideboard_to_hand_rejects_when_hand_is_full(card_factory):
+def test_move_card_from_sideboard_to_hand_rejects_when_hand_is_full(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     player.hand.extend([card_factory(f"h{i}") for i in range(player.hand_size)])
@@ -44,13 +47,13 @@ def test_move_card_from_sideboard_to_hand_rejects_when_hand_is_full(card_factory
     player.sideboard.append(sideboard_card)
 
     with pytest.raises(ValueError, match="Hand is full"):
-        build.move_card(player, sideboard_card, "sideboard", "hand")
+        build.move_card(player, sideboard_card, source="sideboard", destination="hand")
 
     assert len(player.hand) == player.hand_size
     assert sideboard_card in player.sideboard
 
 
-def test_set_companion_copies_card_to_command_zone(card_factory):
+def test_set_companion_copies_card_to_command_zone(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test requirement")
@@ -63,7 +66,7 @@ def test_set_companion_copies_card_to_command_zone(card_factory):
     assert player.command_zone[0].id == companion.id
 
 
-def test_set_companion_replaces_existing_companion(card_factory):
+def test_set_companion_replaces_existing_companion(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     companion1 = card_factory("Lurrus", "Creature", oracle_text="Companion — test requirement")
@@ -80,7 +83,7 @@ def test_set_companion_replaces_existing_companion(card_factory):
     assert player.command_zone[0].id == companion2.id
 
 
-def test_set_companion_non_companion_raises(card_factory):
+def test_set_companion_non_companion_raises(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     card = card_factory("NotCompanion", "Creature")
@@ -90,7 +93,7 @@ def test_set_companion_non_companion_raises(card_factory):
         build.set_companion(player, card)
 
 
-def test_remove_companion_clears_command_zone(card_factory):
+def test_remove_companion_clears_command_zone(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test requirement")
@@ -103,7 +106,8 @@ def test_remove_companion_clears_command_zone(card_factory):
     assert len(player.command_zone) == 0
 
 
-def test_remove_companion_no_companion_raises(card_factory):
+def test_remove_companion_no_companion_raises(card_factory: Callable[..., Card]) -> None:
+    _ = card_factory
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
 
@@ -111,21 +115,21 @@ def test_remove_companion_no_companion_raises(card_factory):
         build.remove_companion(player)
 
 
-def test_move_card_clears_command_zone_when_companion_moved_from_sideboard(card_factory):
+def test_move_card_clears_command_zone_when_companion_moved_from_sideboard(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test requirement")
     player.sideboard.append(companion)
     build.set_companion(player, companion)
 
-    build.move_card(player, companion, "sideboard", "hand")
+    build.move_card(player, companion, source="sideboard", destination="hand")
 
     assert companion in player.hand
     assert companion not in player.sideboard
     assert len(player.command_zone) == 0
 
 
-def test_swap_card_clears_command_zone_when_companion_swapped_from_sideboard(card_factory):
+def test_swap_card_clears_command_zone_when_companion_swapped_from_sideboard(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test requirement")
@@ -134,7 +138,7 @@ def test_swap_card_clears_command_zone_when_companion_swapped_from_sideboard(car
     player.hand.append(other_card)
     build.set_companion(player, companion)
 
-    build.swap_card(player, companion, "sideboard", other_card, "hand")
+    build.swap_card(player, companion, source_a="sideboard", card_b=other_card, source_b="hand")
 
     assert companion in player.hand
     assert other_card in player.sideboard
@@ -142,73 +146,73 @@ def test_swap_card_clears_command_zone_when_companion_swapped_from_sideboard(car
 
 
 class TestSetBasics:
-    def test_set_basics_stores_a_partial_pick(self):
+    def test_set_basics_stores_a_partial_pick(self) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
 
-        build.set_basics(game, player, ["Plains"])
+        build.set_basics(game, player, basics=["Plains"])
 
         assert player.chosen_basics == ["Plains"]
 
-    def test_set_basics_rejects_unknown_land(self):
+    def test_set_basics_rejects_unknown_land(self) -> None:
         game = create_game(["Alice"], num_players=1)
 
         with pytest.raises(ValueError, match="Invalid basic land"):
-            build.set_basics(game, game.players[0], ["Plains", "Bayou"])
+            build.set_basics(game, game.players[0], basics=["Plains", "Bayou"])
 
-    def test_set_basics_rejects_more_than_the_allowed_count(self):
+    def test_set_basics_rejects_more_than_the_allowed_count(self) -> None:
         game = create_game(["Alice"], num_players=1)
 
         with pytest.raises(ValueError, match="Cannot choose more than"):
-            build.set_basics(game, game.players[0], ["Plains", "Island", "Swamp", "Forest"])
+            build.set_basics(game, game.players[0], basics=["Plains", "Island", "Swamp", "Forest"])
 
-    def test_set_basics_rejects_changes_after_ready(self, card_factory):
+    def test_set_basics_rejects_changes_after_ready(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         player.hand.extend([card_factory(f"c{i}") for i in range(3)])
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"])
+        build.set_ready(game, player, basics=["Plains", "Island", "Mountain"])
 
         with pytest.raises(ValueError, match="while ready"):
-            build.set_basics(game, player, ["Swamp"])
+            build.set_basics(game, player, basics=["Swamp"])
 
         assert player.chosen_basics == ["Plains", "Island", "Mountain"]
 
 
 class TestPlayDrawPreference:
-    def test_set_ready_stores_play_preference(self, card_factory):
+    def test_set_ready_stores_play_preference(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         player.hand.extend([card_factory(f"c{i}") for i in range(3)])
 
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play")
+        build.set_ready(game, player, basics=["Plains", "Island", "Mountain"], play_draw_preference="play")
 
         assert player.play_draw_preference == "play"
         assert player.build_ready is True
 
-    def test_set_ready_stores_draw_preference(self, card_factory):
+    def test_set_ready_stores_draw_preference(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         player.hand.extend([card_factory(f"c{i}") for i in range(3)])
 
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "draw")
+        build.set_ready(game, player, basics=["Plains", "Island", "Mountain"], play_draw_preference="draw")
 
         assert player.play_draw_preference == "draw"
         assert player.build_ready is True
 
-    def test_set_ready_rejects_invalid_preference(self, card_factory):
+    def test_set_ready_rejects_invalid_preference(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         player.hand.extend([card_factory(f"c{i}") for i in range(3)])
 
         with pytest.raises(ValueError, match="Invalid play/draw preference"):
-            build.set_ready(game, player, ["Plains", "Island", "Mountain"], "invalid")
+            build.set_ready(game, player, basics=["Plains", "Island", "Mountain"], play_draw_preference="invalid")
 
-    def test_unready_clears_preference(self, card_factory):
+    def test_unready_clears_preference(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         player.hand.extend([card_factory(f"c{i}") for i in range(3)])
 
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play")
+        build.set_ready(game, player, basics=["Plains", "Island", "Mountain"], play_draw_preference="play")
         assert player.play_draw_preference == "play"
 
         build.unready(player)
@@ -216,30 +220,32 @@ class TestPlayDrawPreference:
         assert player.play_draw_preference is None
         assert player.build_ready is False
 
-    def test_set_ready_defaults_to_play(self, card_factory):
+    def test_set_ready_defaults_to_play(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         player.hand.extend([card_factory(f"c{i}") for i in range(3)])
 
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"])
+        build.set_ready(game, player, basics=["Plains", "Island", "Mountain"])
 
         assert player.play_draw_preference == "play"
 
 
 class TestHandOrder:
-    def test_set_ready_reorders_hand(self, card_factory):
+    def test_set_ready_reorders_hand(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         cards = [card_factory(f"c{i}") for i in range(3)]
         player.hand.extend(cards)
 
         hand_order = [cards[2].id, cards[0].id, cards[1].id]
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play", hand_order=hand_order)
+        build.set_ready(
+            game, player, basics=["Plains", "Island", "Mountain"], play_draw_preference="play", hand_order=hand_order
+        )
 
         assert [c.id for c in player.hand] == hand_order
         assert player.build_ready is True
 
-    def test_set_ready_ignores_mismatched_hand_order(self, card_factory):
+    def test_set_ready_ignores_mismatched_hand_order(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         cards = [card_factory(f"c{i}") for i in range(3)]
@@ -247,34 +253,38 @@ class TestHandOrder:
         original_order = [c.id for c in player.hand]
 
         build.set_ready(
-            game, player, ["Plains", "Island", "Mountain"], "play", hand_order=["bad_id", cards[0].id, cards[1].id]
+            game,
+            player,
+            basics=["Plains", "Island", "Mountain"],
+            play_draw_preference="play",
+            hand_order=["bad_id", cards[0].id, cards[1].id],
         )
 
         assert [c.id for c in player.hand] == original_order
         assert player.build_ready is True
 
-    def test_set_ready_without_hand_order(self, card_factory):
+    def test_set_ready_without_hand_order(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         player = game.players[0]
         cards = [card_factory(f"c{i}") for i in range(3)]
         player.hand.extend(cards)
         original_order = [c.id for c in player.hand]
 
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play")
+        build.set_ready(game, player, basics=["Plains", "Island", "Mountain"], play_draw_preference="play")
 
         assert [c.id for c in player.hand] == original_order
 
 
-def test_set_ready_rejects_underfull_hand(card_factory):
+def test_set_ready_rejects_underfull_hand(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     player.hand.extend([card_factory(f"c{i}") for i in range(2)])
 
     with pytest.raises(ValueError, match="Hand must have exactly"):
-        build.set_ready(game, player, ["Plains", "Island", "Mountain"])
+        build.set_ready(game, player, basics=["Plains", "Island", "Mountain"])
 
 
-def test_populate_hand_restores_previous_hand(card_factory):
+def test_populate_hand_restores_previous_hand(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     cards = [card_factory(f"c{i}") for i in range(5)]
@@ -288,7 +298,7 @@ def test_populate_hand_restores_previous_hand(card_factory):
     assert len(player.sideboard) == 2
 
 
-def test_populate_hand_skips_missing_cards(card_factory):
+def test_populate_hand_skips_missing_cards(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     cards = [card_factory(f"c{i}") for i in range(5)]
@@ -301,7 +311,7 @@ def test_populate_hand_skips_missing_cards(card_factory):
     assert len(player.sideboard) == 3
 
 
-def test_populate_hand_empty_previous_hand(card_factory):
+def test_populate_hand_empty_previous_hand(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     cards = [card_factory(f"c{i}") for i in range(5)]

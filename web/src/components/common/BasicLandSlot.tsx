@@ -1,3 +1,4 @@
+/** Interactive Build-phase basic land slot with an accessible land picker popover. */
 import { useState, useRef, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { useDocumentEvent, useEscapeKey } from "../../hooks/useDomEffects";
@@ -114,13 +115,17 @@ export function BasicLandSlot({
   };
 
   const emptyLabel = isMobile ? "+\nLand" : "Click to pick basic land";
+  const triggerLabel = selected ? `Basic land: ${selected}` : "Pick basic land";
 
   return (
     <div ref={triggerRef}>
       <button
         type="button"
         onClick={handleOpen}
-        className="cursor-pointer border-0 bg-transparent p-0 text-left block"
+        aria-label={triggerLabel}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="cursor-pointer border-0 bg-transparent p-0 text-left block focus-visible:outline-2 focus-visible:outline-[var(--color-gold)] focus-visible:outline-offset-[-2px] rounded-[var(--card-border-radius)]"
       >
         {selected ? (
           <BasicLandCard name={selected} dimensions={dimensions} />
@@ -148,7 +153,7 @@ export function BasicLandSlot({
                 >
                   <img
                     src={BASIC_LAND_IMAGES[name]}
-                    alt={name}
+                    alt=""
                     className="object-cover"
                     style={{
                       width: landSize.w,

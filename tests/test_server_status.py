@@ -1,9 +1,11 @@
+from fastapi.testclient import TestClient
+
 from server.services.ops_manager import ops_manager
 
 
 class TestServerStatus:
-    def test_returns_normal_status_by_default(self, client):
-        ops_manager.set_mode("normal", "", "test")
+    def test_returns_normal_status_by_default(self, client: TestClient) -> None:
+        ops_manager.set_mode("normal", "", updated_by="test")
 
         response = client.get("/api/server/status")
 
@@ -14,11 +16,11 @@ class TestServerStatus:
         assert data["scheduled_for_utc"] is None
         assert data["estimated_recovery_minutes"] is None
 
-    def test_draining_status_includes_schedule_fields(self, client):
+    def test_draining_status_includes_schedule_fields(self, client: TestClient) -> None:
         ops_manager.set_mode(
             "draining",
             "Server update scheduled for 2099-01-01 12:00 UTC. New games are temporarily paused.",
-            "test",
+            updated_by="test",
         )
 
         try:
@@ -31,13 +33,13 @@ class TestServerStatus:
             assert isinstance(data["estimated_recovery_minutes"], int)
             assert data["estimated_recovery_minutes"] > 0
         finally:
-            ops_manager.set_mode("normal", "", "test")
+            ops_manager.set_mode("normal", "", updated_by="test")
 
-    def test_create_game_during_drain_returns_retry_after(self, client):
+    def test_create_game_during_drain_returns_retry_after(self, client: TestClient) -> None:
         ops_manager.set_mode(
             "draining",
             "Server update scheduled for 2099-01-01 12:00 UTC. New games are temporarily paused.",
-            "test",
+            updated_by="test",
         )
 
         try:
@@ -46,4 +48,4 @@ class TestServerStatus:
             assert response.headers.get("retry-after") is not None
             assert "Server is updating" in response.json()["detail"]
         finally:
-            ops_manager.set_mode("normal", "", "test")
+            ops_manager.set_mode("normal", "", updated_by="test")

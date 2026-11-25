@@ -1,7 +1,7 @@
 /**
  * DOM measurement and viewport positioning hook for Guided Mode spotlights and tooltips.
  */
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import type { GuidePlacement, GuideTargetId } from "../guided/types";
 
 const CARD_MARGIN = 12;
@@ -703,7 +703,9 @@ export function useGuidePositioning({
 }: UseGuidePositioningOptions): PositionState | null {
   const [state, setState] = useState<PositionState | null>(null);
 
-  useLayoutEffect(() => {
+  // Use useEffect so ancestor refs (such as Game's guideRootRef) are attached
+  // even when GuidedWalkthrough mounts on the first render.
+  useEffect(() => {
     const root = rootRef.current;
     const card = cardRef.current;
     if (!root || !card) {

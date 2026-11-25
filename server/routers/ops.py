@@ -1,5 +1,8 @@
+"""Operator capacity, maintenance, and runtime-control routes."""
+
 import logging
 import secrets
+from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException
 
@@ -32,19 +35,21 @@ def _to_state_response() -> OpsStateResponse:
     )
 
 
-@router.get("/state", response_model=OpsStateResponse)
-def get_ops_state(x_ops_token: str | None = Header(default=None)):
+@router.get("/state")
+def get_ops_state(x_ops_token: Annotated[str | None, Header()] = None) -> OpsStateResponse:
     _authorize(x_ops_token)
     return _to_state_response()
 
 
-@router.post("/mode", response_model=OpsStateResponse)
-async def set_ops_mode(request: OpsSetModeRequest, x_ops_token: str | None = Header(default=None)):
+@router.post("/mode")
+async def set_ops_mode(
+    request: OpsSetModeRequest, x_ops_token: Annotated[str | None, Header()] = None
+) -> OpsStateResponse:
     _authorize(x_ops_token)
     snapshot = ops_manager.set_mode(
         request.mode,
         request.message.strip() or None,
-        request.updated_by or "ops-api",
+        updated_by=request.updated_by or "ops-api",
     )
 
     await connection_manager.broadcast_server_notice(
@@ -57,14 +62,14 @@ async def set_ops_mode(request: OpsSetModeRequest, x_ops_token: str | None = Hea
     return _to_state_response()
 
 
-@router.get("/capacity", response_model=OpsCapacityResponse)
-def get_capacity(x_ops_token: str | None = Header(default=None)):
+@router.get("/capacity")
+def get_capacity(x_ops_token: Annotated[str | None, Header()] = None) -> OpsCapacityResponse:
     _authorize(x_ops_token)
     start_capacity = game_manager.game_start_capacity()
     return OpsCapacityResponse(
         loaded_games=game_manager.loaded_games_count(),
         hot_games=game_manager.hot_games_count(),
-        pending_games=len(game_manager._pending_games),
+        pending_games=game_manager.pending_games_count(),
         sessions=session_manager.size(),
         game_starts_in_flight=start_capacity["in_flight"],
         game_start_waiters=start_capacity["waiters"],
@@ -74,7 +79,7 @@ def get_capacity(x_ops_token: str | None = Header(default=None)):
 
 
 @router.post("/runtime-reset")
-async def reset_runtime_state(x_ops_token: str | None = Header(default=None)):
+async def reset_runtime_state(x_ops_token: Annotated[str | None, Header()] = None) -> dict[str, object]:
     _authorize(x_ops_token)
     connection_stats = await connection_manager.reset_runtime_state()
     game_stats = game_manager.reset_runtime_state()

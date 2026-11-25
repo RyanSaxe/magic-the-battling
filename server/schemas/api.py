@@ -1,3 +1,5 @@
+"""Pydantic models for HTTP and WebSocket game, lobby, and share payloads."""
+
 from datetime import datetime
 from typing import Annotated, Literal
 
@@ -21,10 +23,12 @@ def _validate_player_name(value: str) -> str:
     # PydanticCustomError keeps the message free of pydantic's "Value error, " prefix, since clients show it as is.
     name = value.strip()
     if not name:
-        raise PydanticCustomError("player_name_blank", "Player name is required.")
+        msg = "player_name_blank"
+        raise PydanticCustomError(msg, "Player name is required.")
     if len(name) > MAX_PLAYER_NAME_LENGTH:
+        msg = "player_name_too_long"
         raise PydanticCustomError(
-            "player_name_too_long",
+            msg,
             "Player name must be {max_length} characters or fewer.",
             {"max_length": MAX_PLAYER_NAME_LENGTH},
         )

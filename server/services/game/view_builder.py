@@ -7,8 +7,7 @@ without mutating ``Game``, ``Player``, ``Puppet``, ``Battle``, or manager state.
 from __future__ import annotations
 
 import hmac
-from collections.abc import Collection
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from mtb.models.cards import Card
@@ -36,6 +35,9 @@ from server.services.game_serialization import (
 )
 from server.services.share import build_share_data as build_share_state
 
+if TYPE_CHECKING:
+    from collections.abc import Collection
+
 _PHASE_PRIORITY: tuple[str, ...] = (
     "battle",
     "reward",
@@ -55,7 +57,7 @@ def hidden_card_opaque_ids(battle: Battle, zones: Zones) -> dict[str, str]:
     # Derived from the battle's key, not stored, so every view of the battle shows the same ids
     # and an action that sends one back resolves whichever view was built last.
     hidden_ids = {*zones.face_down_card_ids, *(card.id for card in zones.library)}
-    return {card_id: _opaque_card_id(battle._opaque_id_key, card_id) for card_id in hidden_ids}
+    return {card_id: _opaque_card_id(battle.opaque_id_key, card_id) for card_id in hidden_ids}
 
 
 def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], *, opaque_ids: dict[str, str]) -> list[Card]:
@@ -311,8 +313,9 @@ def _prior_puppet_snapshot(puppet: Puppet, viewer: Player) -> StaticOpponent | N
         return puppet_snapshot_for_round(puppet, stage=viewer.stage, round_num=viewer.round)
     if viewer.round > 1:
         return puppet_snapshot_for_round(puppet, stage=viewer.stage, round_num=viewer.round - 1)
-    if viewer.stage > 3:
-        return puppet_snapshot_for_round(puppet, stage=viewer.stage - 1, round_num=3)
+    starting_stage = 3
+    if viewer.stage > starting_stage:
+        return puppet_snapshot_for_round(puppet, stage=viewer.stage - 1, round_num=starting_stage)
     return None
 
 

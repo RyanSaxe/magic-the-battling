@@ -1,14 +1,18 @@
+"""Card, player, and game payload serialization helpers."""
+
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
 from mtb.models.card_registry import export_registry, get_card_data
 from mtb.models.cards import Battler, Card
-from mtb.models.game import Game, LastBattleResult, Zones
 from mtb.phases.battle import BASIC_LAND_IMAGES, TREASURE_TOKEN_IMAGE
 from server.schemas.api import CardCatalogEntry, CardRef, GameStateResponse, LastBattleResultView, ZonesView
+
+if TYPE_CHECKING:
+    from mtb.models.game import Game, LastBattleResult, Zones
 
 _SYNTHETIC_CATALOG_ENTRIES = {
     **{
@@ -175,7 +179,7 @@ def build_catalog_from_battler(battler: Battler) -> dict[str, CardCatalogEntry]:
 
 def build_catalog_from_game(game: Game) -> dict[str, CardCatalogEntry]:
     cards_by_scryfall_id: dict[str, Card] = {}
-    _collect_cards(game, cards_by_scryfall_id, set())
+    _collect_cards(game, cards_by_scryfall_id, seen=set())
     return build_catalog_from_cards(cards_by_scryfall_id)
 
 
@@ -202,71 +206,45 @@ def build_catalog_from_cards(cards_by_scryfall_id: dict[str, Card]) -> dict[str,
 
 def build_catalog_from_state_refs(state: GameStateResponse) -> dict[str, CardCatalogEntry]:
     scryfall_ids: set[str] = set()
-    _collect_ref_scryfall_ids(state, scryfall_ids, set())
+    _collect_ref_scryfall_ids(state, scryfall_ids, seen=set())
     return build_catalog_from_scryfall_ids(scryfall_ids)
 
 
-def _collect_cards(obj: Any, cards_by_scryfall_id: dict[str, Card], seen: set[int]) -> None:
-    if obj is None:
-        return
+def _iter_nested_children(obj: object) -> list[object]:
+    if isinstance(obj, dict):
+        return list(obj.values())
+    if isinstance(obj, list | tuple | set):
+        return list(obj)
+    if isinstance(obj, BaseModel):
+        return [getattr(obj, name) for name in type(obj).model_fields if name != "game_ref"]
+    return []
 
+
+def _collect_cards(obj: object, cards_by_scryfall_id: dict[str, Card], *, seen: set[int]) -> None:
+    if obj is None or isinstance(obj, str | int | float | bool):
+        return
     if isinstance(obj, Card):
         if obj.scryfall_id:
             cards_by_scryfall_id.setdefault(obj.scryfall_id, obj)
         return
-
-    if isinstance(obj, str | int | float | bool):
-        return
-
     obj_id = id(obj)
     if obj_id in seen:
         return
     seen.add(obj_id)
+    for child in _iter_nested_children(obj):
+        _collect_cards(child, cards_by_scryfall_id, seen=seen)
 
-    if isinstance(obj, dict):
-        for value in obj.values():
-            _collect_cards(value, cards_by_scryfall_id, seen)
+
+def _collect_ref_scryfall_ids(obj: object, scryfall_ids: set[str], *, seen: set[int]) -> None:
+    if obj is None or isinstance(obj, str | int | float | bool):
         return
-
-    if isinstance(obj, list | tuple | set):
-        for item in obj:
-            _collect_cards(item, cards_by_scryfall_id, seen)
-        return
-
-    if isinstance(obj, BaseModel):
-        for field_name in type(obj).model_fields:
-            if field_name == "game_ref":
-                continue
-            _collect_cards(getattr(obj, field_name), cards_by_scryfall_id, seen)
-
-
-def _collect_ref_scryfall_ids(obj: Any, scryfall_ids: set[str], seen: set[int]) -> None:
-    if obj is None:
-        return
-
     if isinstance(obj, CardRef):
         if obj.scryfall_id:
             scryfall_ids.add(obj.scryfall_id)
         return
-
-    if isinstance(obj, str | int | float | bool):
-        return
-
     obj_id = id(obj)
     if obj_id in seen:
         return
     seen.add(obj_id)
-
-    if isinstance(obj, dict):
-        for value in obj.values():
-            _collect_ref_scryfall_ids(value, scryfall_ids, seen)
-        return
-
-    if isinstance(obj, list | tuple | set):
-        for item in obj:
-            _collect_ref_scryfall_ids(item, scryfall_ids, seen)
-        return
-
-    if isinstance(obj, BaseModel):
-        for field_name in type(obj).model_fields:
-            _collect_ref_scryfall_ids(getattr(obj, field_name), scryfall_ids, seen)
+    for child in _iter_nested_children(obj):
+        _collect_ref_scryfall_ids(child, scryfall_ids, seen=seen)

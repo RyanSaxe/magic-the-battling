@@ -1,15 +1,19 @@
+"""Legacy preset cube ID migration helpers."""
+
 from __future__ import annotations
 
 import sqlite3
 from contextlib import closing
-from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING
 
 from sqlalchemy import MetaData, Table
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 from server.db.models import User, UserBattler
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def presets_reuse_ids(db_path: Path) -> bool:
@@ -20,9 +24,16 @@ def presets_reuse_ids(db_path: Path) -> bool:
 
 def rebuild_presets_table(db_path: Path) -> None:
     """Rebuild user_battlers with AUTOINCREMENT, which SQLite can't add to an existing table, keeping every row."""
-    presets = cast(Table, UserBattler.__table__)
+    presets = UserBattler.__table__
+    if not isinstance(presets, Table):
+        msg = "UserBattler table is not a SQLAlchemy Table"
+        raise TypeError(msg)
     metadata = MetaData()
-    cast(Table, User.__table__).to_metadata(metadata)
+    user_table = User.__table__
+    if not isinstance(user_table, Table):
+        msg = "User table is not a SQLAlchemy Table"
+        raise TypeError(msg)
+    user_table.to_metadata(metadata)
     rebuilt = presets.to_metadata(metadata, name="user_battlers_rebuilt")
     dialect = sqlite.dialect()
 
@@ -33,7 +44,7 @@ def rebuild_presets_table(db_path: Path) -> None:
         # The old table's own column list, so a column the model lacks fails the copy instead of being dropped.
         columns = ", ".join(f'"{row[1]}"' for row in conn.execute("PRAGMA table_info(user_battlers)"))
         conn.execute(str(CreateTable(rebuilt).compile(dialect=dialect)))
-        conn.execute(f"INSERT INTO {rebuilt.name} ({columns}) SELECT {columns} FROM user_battlers")
+        conn.execute(f"INSERT INTO {rebuilt.name} ({columns}) SELECT {columns} FROM user_battlers")  # noqa: S608 -- validated static table name
         conn.execute("DROP TABLE user_battlers")
         conn.execute(f"ALTER TABLE {rebuilt.name} RENAME TO user_battlers")
         for index in presets.indexes:

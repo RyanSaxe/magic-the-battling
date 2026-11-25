@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from conftest import setup_battle_ready
 
 from mtb.models.cards import Battler, Card
@@ -11,7 +13,7 @@ def _make_card(name: str) -> Card:
 
 
 class TestGhostMechanics:
-    def test_player_becomes_ghost_at_poison_threshold(self):
+    def test_player_becomes_ghost_at_poison_threshold(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie", "Dave"], num_players=4)
         alice, bob, charlie, dave = game.players
 
@@ -28,7 +30,7 @@ class TestGhostMechanics:
         assert game.most_recent_ghost is not None
         assert game.most_recent_ghost.name == alice.name
 
-    def test_ghost_cleared_when_remaining_players_even(self):
+    def test_ghost_cleared_when_remaining_players_even(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -42,7 +44,7 @@ class TestGhostMechanics:
         assert alice in eliminated
         assert game.most_recent_ghost is None
 
-    def test_ghost_excluded_from_normal_pairing(self):
+    def test_ghost_excluded_from_normal_pairing(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -55,7 +57,7 @@ class TestGhostMechanics:
         assert alice not in candidates
         assert charlie in candidates
 
-    def test_ghost_excluded_from_can_start_pairing(self):
+    def test_ghost_excluded_from_can_start_pairing(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -63,9 +65,9 @@ class TestGhostMechanics:
         bob.phase = "battle"
         charlie.phase = "battle"
 
-        assert battle.can_start_pairing(game, 1, game.config.starting_stage) is True
+        assert battle.can_start_pairing(game, 1, stage=game.config.starting_stage) is True
 
-    def test_ghost_not_paired_until_player_is_lone_remaining(self):
+    def test_ghost_not_paired_until_player_is_lone_remaining(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -74,13 +76,13 @@ class TestGhostMechanics:
         setup_battle_ready(bob)
         setup_battle_ready(charlie)
 
-        battle.start(game, bob, charlie)
+        battle.start(game, bob, opponent=charlie)
 
         assert battle.find_opponent(game, bob) is None
         assert battle.find_opponent(game, charlie) is None
         assert battle.find_opponent(game, alice) is None
 
-    def test_start_battle_allows_ghost_opponent(self):
+    def test_start_battle_allows_ghost_opponent(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
 
@@ -90,13 +92,13 @@ class TestGhostMechanics:
         game.most_recent_ghost = ghost
         setup_battle_ready(alice)
 
-        b = battle.start(game, alice, ghost)
+        b = battle.start(game, alice, opponent=ghost)
         assert b.player is alice
         assert b.opponent is ghost
 
 
 class TestSuddenDeath:
-    def test_no_sudden_death_when_survivors_gte_2(self):
+    def test_no_sudden_death_when_survivors_gte_2(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie", "Dave"], num_players=4)
         alice, bob, charlie, dave = game.players
 
@@ -115,7 +117,7 @@ class TestSuddenDeath:
         assert charlie.phase != "eliminated"
         assert dave.phase != "eliminated"
 
-    def test_sudden_death_triggers_when_multiple_deaths_would_skip_finale(self):
+    def test_sudden_death_triggers_when_multiple_deaths_would_skip_finale(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -125,19 +127,19 @@ class TestSuddenDeath:
 
         assert elimination.needs_sudden_death(game) is True
 
-    def test_setup_sudden_death_resets_poison(self):
+    def test_setup_sudden_death_resets_poison(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
 
         alice.poison = 12
         bob.poison = 15
 
-        elimination.setup_sudden_death_battle(game, alice, bob)
+        elimination.setup_sudden_death_battle(game, alice, p2=bob)
 
         assert alice.poison == 9
         assert bob.poison == 9
 
-    def test_would_be_dead_returns_players_at_threshold(self):
+    def test_would_be_dead_returns_players_at_threshold(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -151,7 +153,7 @@ class TestSuddenDeath:
         assert charlie in would_die
         assert bob not in would_die
 
-    def test_get_live_players_excludes_ghosts(self):
+    def test_get_live_players_excludes_ghosts(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -165,7 +167,7 @@ class TestSuddenDeath:
 
 
 class TestSuddenDeathFighters:
-    def test_get_fighters_returns_none_when_not_needed(self):
+    def test_get_fighters_returns_none_when_not_needed(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -175,7 +177,7 @@ class TestSuddenDeathFighters:
 
         assert elimination.get_sudden_death_fighters(game) is None
 
-    def test_get_fighters_returns_both_when_two_would_die(self):
+    def test_get_fighters_returns_both_when_two_would_die(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
@@ -189,7 +191,7 @@ class TestSuddenDeathFighters:
         assert alice in fighters
         assert bob in fighters
 
-    def test_get_fighters_two_lowest_poison_fight_with_three(self):
+    def test_get_fighters_two_lowest_poison_fight_with_three(self) -> None:
         """When 3+ players at lethal, the 2 with lowest poison fight."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
@@ -207,7 +209,7 @@ class TestSuddenDeathFighters:
 
 
 class TestFinale:
-    def test_game_ends_when_1_player_remains(self):
+    def test_game_ends_when_1_player_remains(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
 
@@ -224,7 +226,7 @@ class TestFinale:
         assert len(live) == 1
         assert bob in live
 
-    def test_finale_triggers_sudden_death_on_mutual_kill(self):
+    def test_finale_triggers_sudden_death_on_mutual_kill(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
 
@@ -233,7 +235,7 @@ class TestFinale:
 
         assert elimination.needs_sudden_death(game) is True
 
-    def test_eliminate_player_sets_all_fields(self):
+    def test_eliminate_player_sets_all_fields(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, _bob = game.players
 
@@ -248,7 +250,7 @@ class TestFinale:
 
 
 class TestWouldBeDeadReadyForElimination:
-    def test_returns_true_when_no_would_be_dead(self):
+    def test_returns_true_when_no_would_be_dead(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         alice.poison = 5
@@ -256,7 +258,7 @@ class TestWouldBeDeadReadyForElimination:
 
         assert elimination.would_be_dead_ready_for_elimination(game) is True
 
-    def test_returns_true_when_all_would_be_dead_in_draft(self):
+    def test_returns_true_when_all_would_be_dead_in_draft(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         alice.poison = 10
@@ -266,7 +268,7 @@ class TestWouldBeDeadReadyForElimination:
 
         assert elimination.would_be_dead_ready_for_elimination(game) is True
 
-    def test_returns_true_when_all_would_be_dead_in_awaiting_elimination(self):
+    def test_returns_true_when_all_would_be_dead_in_awaiting_elimination(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         alice.poison = 10
@@ -276,7 +278,7 @@ class TestWouldBeDeadReadyForElimination:
 
         assert elimination.would_be_dead_ready_for_elimination(game) is True
 
-    def test_returns_false_when_some_in_reward(self):
+    def test_returns_false_when_some_in_reward(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         alice.poison = 10
@@ -286,7 +288,7 @@ class TestWouldBeDeadReadyForElimination:
 
         assert elimination.would_be_dead_ready_for_elimination(game) is False
 
-    def test_returns_false_when_some_in_battle(self):
+    def test_returns_false_when_some_in_battle(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         alice.poison = 10
@@ -296,7 +298,7 @@ class TestWouldBeDeadReadyForElimination:
 
         assert elimination.would_be_dead_ready_for_elimination(game) is False
 
-    def test_would_be_dead_returns_false_with_active_battles(self):
+    def test_would_be_dead_returns_false_with_active_battles(self) -> None:
         """would_be_dead_ready_for_elimination returns False when battles are in progress."""
         game = create_game(["Alice", "Bob", "Charlie", "Dave"], num_players=4)
         alice, bob, charlie, dave = game.players
@@ -309,12 +311,12 @@ class TestWouldBeDeadReadyForElimination:
         for p in game.players:
             setup_battle_ready(p)
 
-        battle.start(game, alice, bob)
-        battle.start(game, charlie, dave)
+        battle.start(game, alice, opponent=bob)
+        battle.start(game, charlie, opponent=dave)
 
         b = game.active_battles[0]
-        battle.submit_result(b, alice, "draw")
-        battle.submit_result(b, bob, "draw")
+        battle.submit_result(b, alice, winner_name="draw")
+        battle.submit_result(b, bob, winner_name="draw")
         battle.end(game, b)
 
         assert len(game.active_battles) == 1
@@ -324,7 +326,7 @@ class TestWouldBeDeadReadyForElimination:
 
 
 class TestEliminationFlow:
-    def test_survivor_goes_directly_to_draft(self, card_factory):
+    def test_survivor_goes_directly_to_draft(self, card_factory: Callable[..., Card]) -> None:
         """A player not at lethal poison should go to draft after reward."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
@@ -340,9 +342,9 @@ class TestEliminationFlow:
         game.draft_state = DraftState(packs=[])
 
         manager = GameManager()
-        manager._active_games["test"] = game
-        manager._player_id_to_name["alice_id"] = "Alice"
-        manager._player_to_game["alice_id"] = "test"
+        manager.active_games["test"] = game
+        manager.player_id_to_name["alice_id"] = "Alice"
+        manager.player_to_game["alice_id"] = "test"
 
         result = manager.handle_reward_done(game, alice)
 
@@ -350,7 +352,7 @@ class TestEliminationFlow:
         assert alice.phase == "draft"
         assert "Alice" in game.draft_state.current_packs
 
-    def test_single_lethal_player_eliminated_after_active_battles_complete(self):
+    def test_single_lethal_player_eliminated_after_active_battles_complete(self) -> None:
         """A lethal player waits in awaiting_elimination while other battles run, then is eliminated."""
         game = create_game(["Alice", "Bob", "Charlie", "Dave"], num_players=4)
         alice, bob, charlie, dave = game.players
@@ -358,21 +360,21 @@ class TestEliminationFlow:
         for p in game.players:
             setup_battle_ready(p)
 
-        battle.start(game, alice, bob)
-        battle.start(game, charlie, dave)
+        battle.start(game, alice, opponent=bob)
+        battle.start(game, charlie, opponent=dave)
 
         manager = GameManager()
-        manager._active_games["test"] = game
+        manager.active_games["test"] = game
 
-        manager.handle_battle_submit_result(game, alice, bob.name, "test")
-        manager.handle_battle_submit_result(game, bob, bob.name, "test")
+        manager.handle_battle_submit_result(game, alice, result=bob.name, game_id="test")
+        manager.handle_battle_submit_result(game, bob, result=bob.name, game_id="test")
         assert alice.phase == "awaiting_elimination"
 
-        manager.handle_battle_submit_result(game, charlie, charlie.name, "test")
-        manager.handle_battle_submit_result(game, dave, charlie.name, "test")
+        manager.handle_battle_submit_result(game, charlie, result=charlie.name, game_id="test")
+        manager.handle_battle_submit_result(game, dave, result=charlie.name, game_id="test")
         assert alice.phase == "eliminated"
 
-    def test_sudden_death_triggered_when_both_lethal_ready(self):
+    def test_sudden_death_triggered_when_both_lethal_ready(self) -> None:
         """When both lethal players finish battle, sudden death starts for both."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
@@ -385,13 +387,13 @@ class TestEliminationFlow:
         alice.hand = [_make_card("Test1")]
         bob.hand = [_make_card("Test2")]
 
-        battle.start(game, alice, bob)
+        battle.start(game, alice, opponent=bob)
         charlie.phase = "draft"
         manager = GameManager()
-        manager._active_games["test"] = game
+        manager.active_games["test"] = game
 
-        manager.handle_battle_submit_result(game, alice, "draw", "test")
-        manager.handle_battle_submit_result(game, bob, "draw", "test")
+        manager.handle_battle_submit_result(game, alice, result="draw", game_id="test")
+        manager.handle_battle_submit_result(game, bob, result="draw", game_id="test")
 
         assert alice.phase == "build"
         assert bob.phase == "build"
@@ -401,7 +403,7 @@ class TestEliminationFlow:
         assert bob.in_sudden_death is True
         assert len(game.active_battles) == 0
 
-    def test_three_player_sudden_death_two_lowest_fight(self):
+    def test_three_player_sudden_death_two_lowest_fight(self) -> None:
         """When 3 players reach lethal, the 2 lowest poison fight and highest is eliminated."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
@@ -413,15 +415,15 @@ class TestEliminationFlow:
             p.hand = [_make_card(f"Card-{p.name}")]
 
         ghost = StaticOpponent(name="Ghost", hand=[_make_card("GhostCard")], chosen_basics=["Plains"] * 3)
-        battle.start(game, alice, bob)
-        battle.start(game, charlie, ghost)
+        battle.start(game, alice, opponent=bob)
+        battle.start(game, charlie, opponent=ghost)
 
         manager = GameManager()
-        manager._active_games["test"] = game
+        manager.active_games["test"] = game
 
-        manager.handle_battle_submit_result(game, alice, "draw", "test")
-        manager.handle_battle_submit_result(game, bob, "draw", "test")
-        manager.handle_battle_submit_result(game, charlie, ghost.name, "test")
+        manager.handle_battle_submit_result(game, alice, result="draw", game_id="test")
+        manager.handle_battle_submit_result(game, bob, result="draw", game_id="test")
+        manager.handle_battle_submit_result(game, charlie, result=ghost.name, game_id="test")
 
         assert alice.phase == "build"
         assert bob.phase == "build"
@@ -432,7 +434,7 @@ class TestEliminationFlow:
 class TestCompleteGamePlacement:
     """Regression tests: remaining participants ranked by poison, not all tied."""
 
-    def test_complete_game_ranks_puppets_by_poison_no_winner(self):
+    def test_complete_game_ranks_puppets_by_poison_no_winner(self) -> None:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
         alice.phase = "eliminated"
@@ -444,14 +446,14 @@ class TestCompleteGamePlacement:
         game.puppets.extend([bot1, bot2, bot3])
 
         manager = GameManager()
-        manager._active_games["test"] = game
+        manager.active_games["test"] = game
         manager.complete_game("test", winner=None)
 
         assert bot2.placement == 1
         assert bot3.placement == 2
         assert bot1.placement == 3
 
-    def test_complete_game_ranks_remaining_by_poison_with_winner(self):
+    def test_complete_game_ranks_remaining_by_poison_with_winner(self) -> None:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
 
@@ -460,7 +462,7 @@ class TestCompleteGamePlacement:
         game.puppets.extend([bot1, bot2])
 
         manager = GameManager()
-        manager._active_games["test"] = game
+        manager.active_games["test"] = game
         manager.complete_game("test", winner=alice)
 
         assert alice.placement == 1
@@ -468,7 +470,7 @@ class TestCompleteGamePlacement:
         assert bot1.placement == 3
 
 
-def test_less_poison_places_higher_in_a_round_and_sudden_death_places_its_loser():
+def test_less_poison_places_higher_in_a_round_and_sudden_death_places_its_loser() -> None:
     game = create_game(["Alice", "Bob", "Cara", "Dan"], num_players=4)
     game.config.use_upgrades = False
     alice, bob, cara, dan = game.players
@@ -490,22 +492,22 @@ def test_less_poison_places_higher_in_a_round_and_sudden_death_places_its_loser(
     setup_battle_ready(alice)
     alice.round = 1
     ghost = StaticOpponent(name="Ghost", hand=[_make_card("GhostCard")], chosen_basics=["Plains"] * 3)
-    battle.start(game, bob, cara)
-    battle.start(game, dan, ghost)
+    battle.start(game, bob, opponent=cara)
+    battle.start(game, dan, opponent=ghost)
     alice.phase, alice.round = "draft", 2
 
     manager = GameManager()
-    manager.handle_battle_submit_result(game, bob, "draw", "g1")
-    manager.handle_battle_submit_result(game, cara, "draw", "g1")
-    manager.handle_battle_submit_result(game, dan, ghost.name, "g1")
+    manager.handle_battle_submit_result(game, bob, result="draw", game_id="g1")
+    manager.handle_battle_submit_result(game, cara, result="draw", game_id="g1")
+    manager.handle_battle_submit_result(game, dan, result=ghost.name, game_id="g1")
     assert (low.placement, dan.placement, high.placement) == (4, 5, 6)
 
     bob.vanquishers = 4
     setup_battle_ready(bob)
     setup_battle_ready(cara)
-    battle.start(game, bob, cara, is_sudden_death=True)
-    manager.handle_battle_submit_result(game, bob, bob.name, "g1")
-    manager.handle_battle_submit_result(game, cara, bob.name, "g1")
+    battle.start(game, bob, opponent=cara, is_sudden_death=True)
+    manager.handle_battle_submit_result(game, bob, result=bob.name, game_id="g1")
+    manager.handle_battle_submit_result(game, cara, result=bob.name, game_id="g1")
 
     assert cara.poison > high.poison
     assert (cara.placement, low.placement, dan.placement, high.placement) == (3, 4, 5, 6)

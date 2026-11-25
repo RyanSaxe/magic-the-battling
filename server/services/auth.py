@@ -1,4 +1,4 @@
-from __future__ import annotations
+"""Password hashing, JWT cookie signing, and current-user dependencies."""
 
 import logging
 from datetime import UTC, datetime, timedelta
@@ -57,7 +57,7 @@ def _user_from_token(request: Request, db: Session) -> User | None:
 def get_current_user(request: Request) -> User:
     user = get_optional_user(request)
     if not user:
-        raise api_error(401, ErrorCode.NOT_AUTHENTICATED, "Not authenticated")
+        raise api_error(401, ErrorCode.NOT_AUTHENTICATED, detail="Not authenticated")
     return user
 
 
@@ -67,7 +67,7 @@ def get_optional_user(request: Request) -> User | None:
         return _user_from_token(request, db)
 
 
-def create_user(db: Session, username: str, password: str, email: str | None = None) -> User:
+def create_user(db: Session, username: str, *, password: str, email: str | None = None) -> User:
     user = User(
         id=uuid4().hex,
         username=username,

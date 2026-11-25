@@ -1,11 +1,13 @@
-# ruff: noqa: B008
+"""Cube/deck preview, catalog, and metadata routes."""
+
 import json
 import logging
-from typing import cast
+from collections.abc import Generator
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, case, distinct, func, or_
+from sqlalchemy import ColumnElement, Exists, and_, case, distinct, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from mtb.models.cards import find_problem_before_saving
@@ -37,7 +39,7 @@ from server.services.auth import get_current_user, get_optional_user
 logger = logging.getLogger(__name__)
 
 
-def _get_db():
+def _get_db() -> Generator[Session]:
     db = database.SessionLocal()
     try:
         yield db
@@ -47,28 +49,28 @@ def _get_db():
 
 def _battler_to_response(b: UserBattler) -> UserBattlerResponse:
     return UserBattlerResponse(
-        id=cast(int, b.id),
-        cube_id=cast(str, b.cube_id),
-        display_name=cast(str, b.display_name) if b.display_name else None,
-        use_upgrades=cast(bool, b.use_upgrades),
-        use_vanguards=cast(bool, b.use_vanguards),
-        play_mode=cast(str, b.play_mode),
-        puppet_count=cast(int, b.puppet_count),
-        target_player_count=cast(int, b.target_player_count),
-        auto_approve_spectators=cast(bool, b.auto_approve_spectators),
-        guided_mode_default=cast(bool, b.guided_mode_default),
-        position=cast(int, b.position),
+        id=int(b.id),
+        cube_id=str(b.cube_id),
+        display_name=str(b.display_name) if b.display_name else None,
+        use_upgrades=bool(b.use_upgrades),
+        use_vanguards=bool(b.use_vanguards),
+        play_mode=str(b.play_mode),
+        puppet_count=int(b.puppet_count),
+        target_player_count=int(b.target_player_count),
+        auto_approve_spectators=bool(b.auto_approve_spectators),
+        guided_mode_default=bool(b.guided_mode_default),
+        position=int(b.position),
         created_at=str(b.created_at.isoformat()) if b.created_at else "",
     )
 
 
-def _game_play_mode():
-    """A game's play mode, counting games saved before Constructed existed as Limited."""
+def _game_play_mode() -> ColumnElement[str]:
+    """Return a game's play mode, defaulting legacy saves to Limited."""
     extracted = func.json_extract(GameRecord.config_json, "$.play_mode")
     return case((extracted == "constructed", "constructed"), else_="limited")
 
 
-def _game_uses_upgrades():
+def _game_uses_upgrades() -> ColumnElement[bool]:
     """Whether a game used upgrades, counting games saved before the setting existed as using them."""
     return func.coalesce(func.json_extract(GameRecord.config_json, "$.use_upgrades"), True)
 
@@ -77,11 +79,11 @@ PresetSettings = tuple[str, str, bool]
 
 
 def _preset_settings(battler: UserBattler) -> PresetSettings:
-    return (str(battler.cube_id), normalize_play_mode(cast(str, battler.play_mode)), bool(battler.use_upgrades))
+    return (str(battler.cube_id), normalize_play_mode(str(battler.play_mode)), bool(battler.use_upgrades))
 
 
-def _my_stats_by_settings(db: Session, user_id: str, cube_ids: set[str]) -> dict[PresetSettings, dict]:
-    """The player's finished games on each cube, split by play mode and upgrades setting."""
+def _my_stats_by_settings(db: Session, user_id: str, *, cube_ids: set[str]) -> dict[PresetSettings, dict]:
+    """Summarize finished games on each cube by play mode and upgrades setting."""
     if not cube_ids:
         return {}
     play_mode = _game_play_mode().label("play_mode")
@@ -124,10 +126,10 @@ def _cube_metadata_map(db: Session, cube_ids: set[str]) -> dict[str, CubeMetadat
     return {str(m.cube_id): m for m in db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids))}
 
 
-def _battler_responses(db: Session, user_id: str, battlers: list[UserBattler]) -> list[UserBattlerResponse]:
+def _battler_responses(db: Session, user_id: str, *, battlers: list[UserBattler]) -> list[UserBattlerResponse]:
     cube_ids = {str(b.cube_id) for b in battlers}
     cube_stats = _cube_stats_for_ids(db, cube_ids)
-    my_stats = _my_stats_by_settings(db, user_id, cube_ids)
+    my_stats = _my_stats_by_settings(db, user_id, cube_ids=cube_ids)
     metadata_map = _cube_metadata_map(db, cube_ids)
 
     results = []
@@ -190,10 +192,11 @@ _LAST_BUILD_FIRST = (
 
 @router.get("")
 def list_battlers(
-    offset: int = Query(default=0, ge=0),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    *,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, object]:
     battlers = (
         db.query(UserBattler)
         .filter(UserBattler.user_id == user.id)
@@ -204,29 +207,30 @@ def list_battlers(
     )
     has_more = len(battlers) > BATTLERS_PAGE_SIZE
     battlers = battlers[:BATTLERS_PAGE_SIZE]
-    return {"battlers": _battler_responses(db, str(user.id), battlers), "has_more": has_more}
+    return {"battlers": _battler_responses(db, str(user.id), battlers=battlers), "has_more": has_more}
 
 
 @router.post("")
 def create_battler(
     request: UserBattlerCreate,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    user: Annotated[User, Depends(get_current_user)],
+    *,
+    db: Annotated[Session, Depends(_get_db)],
+) -> UserBattlerResponse:
     known, problem = True, None
     try:
         cards = get_cube_list(request.cube_id)
         known = cards is not None
         if cards is not None:
             problem = find_problem_before_saving(cards, request.play_mode)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 -- broad boundary catch
         # When CubeCobra can't be asked or read, the preset saves unchecked. Start still checks it.
         logger.warning("Couldn't ask CubeCobra about cube %s, so saving it unchecked: %r", request.cube_id, error)
     if not known:
-        raise api_error(404, ErrorCode.CUBE_NOT_FOUND, f"CubeCobra has no cube with the ID '{request.cube_id}'.")
+        raise api_error(404, ErrorCode.CUBE_NOT_FOUND, detail=f"CubeCobra has no cube with the ID '{request.cube_id}'.")
     if problem:
         noun = "deck" if request.play_mode == "constructed" else "cube"
-        raise api_error(422, ErrorCode.INVALID_REQUEST, f"This {noun} wasn't saved: {problem}")
+        raise api_error(422, ErrorCode.INVALID_REQUEST, detail=f"This {noun} wasn't saved: {problem}")
     max_pos = db.query(func.max(UserBattler.position)).filter(UserBattler.user_id == user.id).scalar()
     battler = UserBattler(
         user_id=user.id,
@@ -245,7 +249,7 @@ def create_battler(
     db.commit()
     db.refresh(battler)
     _save_cube_metadata(db, request.cube_id)
-    [resp] = _battler_responses(db, str(user.id), [battler])
+    [resp] = _battler_responses(db, str(user.id), battlers=[battler])
     return resp
 
 
@@ -253,31 +257,33 @@ def create_battler(
 def update_battler(
     battler_id: int,
     request: UserBattlerUpdate,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    *,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(_get_db)],
+) -> UserBattlerResponse:
     battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
     if not battler:
-        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, detail="Battler not found")
 
     updates = request.model_dump(exclude_none=True)
     for field, value in updates.items():
         setattr(battler, field, value)
     db.commit()
     db.refresh(battler)
-    [resp] = _battler_responses(db, str(user.id), [battler])
+    [resp] = _battler_responses(db, str(user.id), battlers=[battler])
     return resp
 
 
 @router.delete("/{battler_id}")
 def delete_battler(
     battler_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    user: Annotated[User, Depends(get_current_user)],
+    *,
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, bool]:
     battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
     if not battler:
-        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, detail="Battler not found")
     db.delete(battler)
     db.commit()
     return {"ok": True}
@@ -287,9 +293,10 @@ GAMES_PAGE_SIZE = 20
 
 
 def _save_cube_metadata(db: Session, cube_id: str) -> None:
-    """Closes the session first, so a slow CubeCobra doesn't hold one of the pool's few connections.
+    """Close the session first, so a slow CubeCobra doesn't hold one of the pool's few connections.
 
-    Closing detaches what the session loaded, and its next query takes a connection again."""
+    Closing detaches what the session loaded, and its next query takes a connection again.
+    """
     db.close()
     database.save_cube_metadata(cube_id)
 
@@ -302,7 +309,7 @@ def _load_cube_metadata(db: Session, cube_id: str) -> CubeMetadata | None:
     return meta
 
 
-def _has_placed_seat(db: Session, player_user_id: str | None = None):
+def _has_placed_seat(db: Session, player_user_id: str | None = None) -> Exists:
     """Whether a human finished the game with a placement, or, given player_user_id, whether that player did."""
     seat_filter = [
         PlayerGameHistory.game_id == GameRecord.id,
@@ -315,7 +322,7 @@ def _has_placed_seat(db: Session, player_user_id: str | None = None):
 
 
 def _popular_setup(db: Session, cube_id: str) -> CubeSetup | None:
-    """The cube's most played mode and upgrades setting, the more recent one on a tie."""
+    """Find the cube's most played mode and upgrades setting."""
     play_mode = _game_play_mode().label("play_mode")
     uses_upgrades = _game_uses_upgrades().label("uses_upgrades")
     row = (
@@ -339,7 +346,7 @@ def _query_cube_games(
     offset: int,
     player_user_id: str | None = None,
 ) -> dict:
-    """A page of a cube's finished games. With player_user_id, only that player's games, each shown by their seat."""
+    """Query a page of a cube's finished games."""
     meta = _load_cube_metadata(db, cube_id)
     base_filter = [
         GameRecord.cube_id == cube_id,
@@ -396,7 +403,7 @@ def _query_cube_games(
                 player_count=len(histories),
                 human_count=len(humans),
                 best_human_name=str(best.player_name),
-                best_human_placement=cast(int, best.final_placement) if best.final_placement is not None else None,
+                best_human_placement=int(best.final_placement) if best.final_placement is not None else None,
                 cube_id=cube_id,
                 cube_name=cube_name,
                 cube_image_uri=cube_image_uri,
@@ -418,19 +425,21 @@ def _query_cube_games(
 @router.get("/cube/{cube_id}/games")
 def list_cube_games(
     cube_id: str,
-    play_mode: str | None = Query(default=None),
-    use_upgrades: bool | None = Query(default=None),
-    offset: int = Query(default=0, ge=0),
-    db: Session = Depends(_get_db),
-):
+    *,
+    play_mode: Annotated[str | None, Query()] = None,
+    use_upgrades: Annotated[bool | None, Query()] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, object]:
     return _query_cube_games(db, cube_id, play_mode=play_mode, use_upgrades=use_upgrades, offset=offset)
 
 
 @router.get("/cube/{cube_id}")
 def get_cube_summary(
     cube_id: str,
-    current_user: User | None = Depends(get_optional_user),
-    db: Session = Depends(_get_db),
+    current_user: Annotated[User | None, Depends(get_optional_user)],
+    *,
+    db: Annotated[Session, Depends(_get_db)],
 ) -> CubeSummaryResponse:
     meta = _load_cube_metadata(db, cube_id)
     follow = None
@@ -447,7 +456,7 @@ def get_cube_summary(
         **_cube_stats_for_ids(db, {cube_id}).get(cube_id, {}),
         popular_setup=_popular_setup(db, cube_id),
         is_following=follow is not None,
-        follow_id=cast(int, follow.id) if follow else None,
+        follow_id=int(follow.id) if follow else None,
     )
 
 
@@ -455,16 +464,16 @@ def get_cube_summary(
 def list_battler_games(
     battler_id: int,
     *,
-    play_mode: str | None = Query(default=None),
-    use_upgrades: bool | None = Query(default=None),
-    mine_only: bool = Query(default=False),
-    offset: int = Query(default=0, ge=0),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    play_mode: Annotated[str | None, Query()] = None,
+    use_upgrades: Annotated[bool | None, Query()] = None,
+    mine_only: Annotated[bool, Query()] = False,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, object]:
     battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
     if not battler:
-        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, detail="Battler not found")
 
     player_user_id = str(user.id) if mine_only else None
     return _query_cube_games(
@@ -477,10 +486,12 @@ def list_battler_games(
     )
 
 
-def _my_game_matches(db: Session, user_id: str, search: str):
-    """Whether a game of the player's matches the search: its cube's name or id, the name of one of the
+def _my_game_matches(db: Session, user_id: str, *, search: str) -> ColumnElement[bool]:
+    """Check whether a game of the player's matches the search: its cube's name or id, the name of one of the.
+
     player's presets with the game's cube and settings, the name of another player in the game, or a card
-    the player had in a fight."""
+    the player had in a fight.
+    """
     other_seat = aliased(PlayerGameHistory)
     named_cube = (
         db.query(CubeMetadata.cube_id)
@@ -518,12 +529,13 @@ def _my_game_matches(db: Session, user_id: str, search: str):
 
 @router.get("/my-games")
 def list_my_games(
-    offset: int = Query(default=0, ge=0),
-    q: str = Query(default="", max_length=100),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
-    """The player's finished games, newest first, or with q, those it matches. The totals count the same games."""
+    *,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    q: Annotated[str, Query(max_length=100)] = "",
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, object]:
+    """List the player's finished games, newest first, with optional search."""
     user_filter = [
         PlayerGameHistory.user_id == str(user.id),
         PlayerGameHistory.is_puppet.is_(False),
@@ -531,7 +543,7 @@ def list_my_games(
         GameRecord.ended_at.isnot(None),
     ]
     if search := q.strip():
-        user_filter.append(_my_game_matches(db, str(user.id), search))
+        user_filter.append(_my_game_matches(db, str(user.id), search=search))
     total_games = (
         db.query(func.count(PlayerGameHistory.id))
         .join(GameRecord, GameRecord.id == PlayerGameHistory.game_id)
@@ -596,7 +608,7 @@ def list_my_games(
                 player_count=len(all_histories),
                 human_count=len(humans),
                 best_human_name=str(hist.player_name),
-                best_human_placement=cast(int, hist.final_placement) if hist.final_placement is not None else None,
+                best_human_placement=int(hist.final_placement) if hist.final_placement is not None else None,
                 cube_id=game_cube_id,
                 cube_name=str(meta.name) if meta and meta.name else None,
                 cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
@@ -614,10 +626,11 @@ def list_my_games(
 
 @router.get("/following")
 def list_following(
-    offset: int = Query(default=0, ge=0),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    *,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, object]:
     follows = (
         db.query(BattlerFollow)
         .filter(BattlerFollow.user_id == user.id)
@@ -641,9 +654,9 @@ def list_following(
         stats = stats_map.get(cid, {})
         results.append(
             FollowedBattlerResponse(
-                id=cast(int, f.id),
+                id=int(f.id),
                 cube_id=cid,
-                display_name=cast(str, f.display_name) if f.display_name else None,
+                display_name=str(f.display_name) if f.display_name else None,
                 cube_name=str(meta.name) if meta and meta.name else None,
                 cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
                 created_at=str(f.created_at.isoformat()) if f.created_at else "",
@@ -660,13 +673,14 @@ def list_following(
 @router.get("/{battler_id}")
 def get_battler(
     battler_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    user: Annotated[User, Depends(get_current_user)],
+    *,
+    db: Annotated[Session, Depends(_get_db)],
+) -> UserBattlerResponse:
     battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
     if not battler:
-        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
-    [resp] = _battler_responses(db, str(user.id), [battler])
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, detail="Battler not found")
+    [resp] = _battler_responses(db, str(user.id), battlers=[battler])
     return resp
 
 
@@ -678,16 +692,17 @@ class FollowCubeRequest(BaseModel):
 @router.post("/follow")
 def follow_cube(
     request: FollowCubeRequest,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    user: Annotated[User, Depends(get_current_user)],
+    *,
+    db: Annotated[Session, Depends(_get_db)],
+) -> FollowedBattlerResponse:
     existing = (
         db.query(BattlerFollow)
         .filter(BattlerFollow.user_id == user.id, BattlerFollow.cube_id == request.cube_id)
         .first()
     )
     if existing:
-        raise api_error(409, ErrorCode.ALREADY_FOLLOWING, "Already following this cube")
+        raise api_error(409, ErrorCode.ALREADY_FOLLOWING, detail="Already following this cube")
 
     follow = BattlerFollow(user_id=user.id, cube_id=request.cube_id, display_name=request.display_name)
     db.add(follow)
@@ -696,9 +711,9 @@ def follow_cube(
     _save_cube_metadata(db, request.cube_id)
     meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == request.cube_id).first()
     return FollowedBattlerResponse(
-        id=cast(int, follow.id),
-        cube_id=cast(str, follow.cube_id),
-        display_name=cast(str, follow.display_name) if follow.display_name else None,
+        id=int(follow.id),
+        cube_id=str(follow.cube_id),
+        display_name=str(follow.display_name) if follow.display_name else None,
         cube_name=str(meta.name) if meta and meta.name else None,
         cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
         created_at=str(follow.created_at.isoformat()) if follow.created_at else "",
@@ -708,12 +723,13 @@ def follow_cube(
 @router.delete("/follow/{follow_id}")
 def unfollow_cube(
     follow_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
+    user: Annotated[User, Depends(get_current_user)],
+    *,
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, bool]:
     follow = db.query(BattlerFollow).filter(BattlerFollow.id == follow_id, BattlerFollow.user_id == user.id).first()
     if not follow:
-        raise api_error(404, ErrorCode.FOLLOW_NOT_FOUND, "Follow not found")
+        raise api_error(404, ErrorCode.FOLLOW_NOT_FOUND, detail="Follow not found")
     db.delete(follow)
     db.commit()
     return {"ok": True}
