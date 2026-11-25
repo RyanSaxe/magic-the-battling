@@ -322,7 +322,7 @@ class TestGhostAndSuddenDeathE2E:
             if isinstance(p, Player):
                 p.phase = "awaiting_elimination"
 
-        result = manager._check_sudden_death_ready(game, "test-game", None)
+        result = manager._check_sudden_death_ready(game, "test-game", db=None)
         if result == "sudden_death":
             fighters = [p for p in participants if p.in_sudden_death]
             assert len(fighters) == 2
@@ -406,7 +406,7 @@ class TestGhostAndSuddenDeathE2E:
             b3 = _start_battle(game, victim2, survivor2, stage=3, round_num=2)
             if b3:
                 _submit_battle_result(manager, game, b3, survivor2.name)
-        manager._check_sudden_death_ready(game, "test-game", None)
+        manager._check_sudden_death_ready(game, "test-game", db=None)
 
         assert _count_live(game) == 2
         assert game.most_recent_ghost is None

@@ -80,7 +80,7 @@ class TestBotSpecificScenarios:
         bot2.poison = 11
         bot3.poison = 5
 
-        manager._check_sudden_death_ready(game, "test-game", None)
+        manager._check_sudden_death_ready(game, "test-game", db=None)
 
         eliminated_bots = [b for b in game.puppets if b.is_eliminated]
         live_puppets = [b for b in game.puppets if not b.is_eliminated]
@@ -100,7 +100,7 @@ class TestBotSpecificScenarios:
         b1.poison = 11
         h1.phase = "awaiting_elimination"
 
-        result = manager._check_sudden_death_ready(game, "test-game", None)
+        result = manager._check_sudden_death_ready(game, "test-game", db=None)
         if result == "sudden_death":
             assert h1.phase == "build"
             assert h1.in_sudden_death
@@ -274,7 +274,7 @@ class TestEdgeCases:
         for h in (h1, h2, h3):
             h.phase = "awaiting_elimination"
 
-        result = manager._check_sudden_death_ready(game, "test-game", None)
+        result = manager._check_sudden_death_ready(game, "test-game", db=None)
 
         assert result == "sudden_death"
         assert h3.phase == "eliminated"

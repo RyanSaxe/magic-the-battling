@@ -18,6 +18,7 @@ import server.monitoring as monitoring_module
 import server.routers.games as games_module
 import server.routers.ops as ops_module
 import server.routers.ws as ws_module
+import server.services.game.state as game_state_module
 import server.services.game_manager as gm_module
 import server.services.session_manager as sm_module
 from mtb.models.card_registry import clear_registry
@@ -25,7 +26,7 @@ from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
 from mtb.models.game import Player
 from server.db.models import Base
 from server.main import app
-from server.routers.ws import ConnectionManager
+from server.services.connection_manager import ConnectionManager
 from server.services.game_manager import GameManager
 from server.services.session_manager import SessionManager
 
@@ -119,7 +120,7 @@ def _cleanup_runtime_state() -> None:
     session_managers = _unique_objects(
         [
             sm_module.session_manager,
-            gm_module.session_manager,
+            game_state_module.session_manager,
             ws_module.session_manager,
             games_module.session_manager,
             ops_module.session_manager,
@@ -154,7 +155,7 @@ def _install_runtime_state(
     connection_manager: ConnectionManager,
 ) -> None:
     sm_module.session_manager = session_manager
-    gm_module.session_manager = session_manager
+    game_state_module.session_manager = session_manager
     ws_module.session_manager = session_manager
     games_module.session_manager = session_manager
     ops_module.session_manager = session_manager
@@ -180,9 +181,9 @@ def _reset_runtime_state() -> None:
     _cleanup_runtime_state()
 
     session_manager = SessionManager()
-    gm_module.session_manager = session_manager
+    game_state_module.session_manager = session_manager
     game_manager = GameManager()
-    connection_manager = ConnectionManager()
+    connection_manager = ConnectionManager(game_manager)
     _install_runtime_state(game_manager, session_manager, connection_manager)
 
 

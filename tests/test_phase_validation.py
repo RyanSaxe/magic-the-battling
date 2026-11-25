@@ -3,7 +3,7 @@
 import pytest
 
 from mtb.models.game import Player
-from server.routers.ws import ACTION_REQUIRED_PHASES, _validate_action_phase
+from server.routers.ws_actions import ACTION_REQUIRED_PHASES, validate_action_phase
 
 
 class TestValidateActionPhase:
@@ -34,7 +34,7 @@ class TestValidateActionPhase:
     )
     def test_action_accepts_correct_phase(self, action, phase):
         player = Player(name="Test", phase=phase)
-        assert _validate_action_phase(action, player) is None
+        assert validate_action_phase(action, player) is None
 
     @pytest.mark.parametrize(
         ("action", "required_phase", "wrong_phase"),
@@ -54,16 +54,16 @@ class TestValidateActionPhase:
     )
     def test_action_rejects_wrong_phase(self, action, required_phase, wrong_phase):
         player = Player(name="Test", phase=wrong_phase)
-        error = _validate_action_phase(action, player)
+        error = validate_action_phase(action, player)
         assert error is not None
         assert required_phase in error
         assert wrong_phase in error
         assert action in error
 
     def test_unknown_action_returns_none(self, player):
-        assert _validate_action_phase("unknown_action", player) is None
-        assert _validate_action_phase("set_ready", player) is None
-        assert _validate_action_phase("start_game", player) is None
+        assert validate_action_phase("unknown_action", player) is None
+        assert validate_action_phase("set_ready", player) is None
+        assert validate_action_phase("start_game", player) is None
 
     def test_action_required_phases_covers_all_game_actions(self):
         expected_actions = {

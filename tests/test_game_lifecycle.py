@@ -62,7 +62,7 @@ def test_the_scheduled_cleanup_still_removes_a_finished_game(mock_cube_data, tes
 
 
 def test_a_reconnect_after_game_over_keeps_the_post_game_cleanup(mock_cube_data, test_db, monkeypatch):
-    monkeypatch.setattr("server.services.game_manager.POST_GAME_CLEANUP_SECONDS", 0.05)
+    monkeypatch.setattr("server.services.game.round_service.POST_GAME_CLEANUP_SECONDS", 0.05)
     game_manager = gm_module.game_manager
 
     async def scenario() -> bool:
@@ -82,7 +82,7 @@ def test_a_reconnect_after_game_over_keeps_the_post_game_cleanup(mock_cube_data,
 
 
 def test_a_finished_game_unloaded_before_its_cleanup_is_still_retired(mock_cube_data, test_db, monkeypatch):
-    monkeypatch.setattr("server.services.game_manager.POST_GAME_CLEANUP_SECONDS", 0.05)
+    monkeypatch.setattr("server.services.game.round_service.POST_GAME_CLEANUP_SECONDS", 0.05)
     game_manager = gm_module.game_manager
 
     async def scenario() -> bool:

@@ -35,7 +35,7 @@ class TestHandleVoiceSignal:
         await _handle_voice_signal(
             game_id,
             "alice-id",
-            {
+            payload={
                 "signal_type": "offer",
                 "data": {"sdp": "..."},
                 "target_player": "Bob",
@@ -63,7 +63,7 @@ class TestHandleVoiceSignal:
         await _handle_voice_signal(
             game_id,
             "alice-id",
-            {
+            payload={
                 "signal_type": "offer",
                 "data": {"sdp": "..."},
             },
@@ -77,7 +77,7 @@ class TestHandleVoiceSignal:
         await _handle_voice_signal(
             game_id,
             "alice-id",
-            {
+            payload={
                 "signal_type": "offer",
                 "data": {"sdp": "..."},
                 "target_player": "Charlie",
@@ -96,7 +96,7 @@ class TestHandleVoiceSignal:
         await _handle_voice_signal(
             game_id,
             "alice-id",
-            {
+            payload={
                 "signal_type": "offer",
                 "data": {"sdp": "..."},
                 "target_player": "Charlie",

@@ -339,7 +339,7 @@ def test_a_spectator_keeps_watching_a_player_who_joins_the_lobby_again(
 def test_spectators_see_the_game_end_and_are_closed_when_it_is_cleaned_up(
     client, start_game, ws_receive_json_until, monkeypatch
 ):
-    monkeypatch.setattr("server.services.game_manager.POST_GAME_CLEANUP_SECONDS", 0.05)
+    monkeypatch.setattr("server.services.game.round_service.POST_GAME_CLEANUP_SECONDS", 0.05)
     host, _ = start_game("Alice", "Bob", auto_approve_spectators=True)
     game_id = host["game_id"]
     request_id = _request_to_watch(client, game_id, "Alice")
@@ -423,7 +423,7 @@ def test_a_spectator_is_told_when_their_player_leaves_the_lobby_before_the_start
 def test_a_spectator_reconnecting_after_the_game_was_dropped_is_told_it_ended(
     client, start_game, ws_receive_json, monkeypatch
 ):
-    monkeypatch.setattr("server.services.game_manager.IDLE_EVICT_MINUTES", 0)
+    monkeypatch.setattr("server.services.game.snapshot_store.IDLE_EVICT_MINUTES", 0)
     host, _ = start_game("Alice", "Bob", auto_approve_spectators=True)
     game_id = host["game_id"]
     request_id = _request_to_watch(client, game_id, "Alice")
