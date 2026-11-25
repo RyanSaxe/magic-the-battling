@@ -206,6 +206,7 @@ it("makes interactive cards keyboard-focusable and activates on Enter and Space 
 
   const spaceNotPrevented = fireEvent.keyDown(cardButton, { key: " " });
   expect(spaceNotPrevented).toBe(false);
+  expect(fireEvent.keyUp(cardButton, { key: " " })).toBe(false);
   expect(onSelect).toHaveBeenCalledTimes(2);
 
   rerender(<Card card={ANCIENT_TOMB} onClick={onSelect} faceDown />);
