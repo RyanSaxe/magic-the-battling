@@ -164,26 +164,6 @@ card-outside-zone
   reward-stage-end     1280x800        4/436  7d944da5
   reward-stage-end     1366x768        4/436  3982bfbd
   reward-stage-end     1440x900        4/436  3982bfbd
-measurement-changes-layout
-  battle               320x568           5/5  ebb62454
-  battle               375x667           5/5  a666684b
-  battle               393x852           5/5  efaf50dc
-  battle               430x932           5/5  04b41794
-  battle               768x1024          5/5  c5dcd170
-  battle               820x1180          5/5  97f38605
-  battle               1024x768          5/5  6a45c6cc
-  battle               1024x500          5/5  d2e1ed92
-  battle               1180x820          4/5  81fca39d
-  battle               1280x600          4/5  0dbbea95
-  battle               1280x720          4/5  6f402add
-  battle               1280x800          4/5  c858d585
-  battle               1366x768          4/5  2e75466d
-  battle               1366x1024         4/5  3bc924e1
-  battle               1440x600          4/5  453e0b1d
-  battle               1440x900          4/5  178ce601
-  battle               1536x864          4/5  a3a42625
-  battle               1920x1080         4/5  1bd5741d
-  battle               2560x1440         4/5  b14cd30d
 
 Layout fingerprints: a hash of every size the sweep renders, per phase and viewport.
   battle               320x568     64c32fe4

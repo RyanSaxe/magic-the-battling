@@ -108,7 +108,7 @@ function fitFannedRow(
     maxCardWidth,
   } = box;
   const heightCap = Math.floor(availableHeight / CARD_ASPECT_RATIO);
-  const idealWidth = Math.max(minCardWidth, Math.min(heightCap, maxCardWidth));
+  const idealWidth = Math.min(heightCap, maxCardWidth);
 
   if (count <= 1) {
     return { ...makeZoneDims(idealWidth, 1, 1), gap };
