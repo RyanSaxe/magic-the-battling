@@ -1,4 +1,23 @@
+# prek runs these before each commit, and CI runs `prek run --all-files`.
+# Formatters fix files rather than only reporting them.
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        # CI's checkout stages nothing, so check every file it is given.
+        args: [--enforce-all]
+
+  - repo: https://github.com/rvben/rumdl-pre-commit
+    rev: v0.3.6
+    hooks:
+      - id: rumdl-check
+        args: [--fix]
+
+  # Python: ruff and ty stay pinned in pyproject.toml / uv.lock.
   - repo: local
     hooks:
       - id: ruff
@@ -20,6 +39,24 @@ repos:
         types: [python]
         pass_filenames: false
 
+      - id: uv-lock-check
+        name: uv-lock-check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+  # Web: oxfmt formats web files; ESLint and tsc stay until Wave 3 locks oxlint.
+  - repo: local
+    hooks:
+      - id: oxfmt
+        name: oxfmt
+        entry: >-
+          bash -c 'cd web && npx --no-install oxfmt --no-error-on-unmatched-pattern "${@#web/}"' --
+        language: system
+        files: ^web/.*\.([cm]?[jt]sx?|css|html|json|ya?ml|toml)$
+        exclude: ^web/(dist|node_modules|package-lock\.json)
+
       - id: eslint
         name: eslint
         entry: bash -c 'cd web && npm run lint'
@@ -33,3 +70,21 @@ repos:
         language: system
         files: ^web/src/.*\.(ts|tsx)$
         pass_filenames: false
+
+  # Shell
+  - repo: local
+    hooks:
+      - id: shfmt
+        name: shfmt
+        entry: shfmt --write --indent 2
+        language: system
+        types: [shell]
+        # shfmt has no zsh dialect.
+        exclude: \.zsh$
+
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: system
+        types: [shell]
+        exclude: \.zsh$
