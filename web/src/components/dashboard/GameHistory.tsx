@@ -1,7 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
-import type { CubeGamesPage } from "../../api/client";
+import { useCallback, type ReactNode } from "react";
 import { useToast } from "../../contexts";
-import type { GameSummary, PlayMode } from "../../types";
+import {
+  useGameHistory,
+  type GameFilters,
+  type LoadGames,
+} from "../../hooks/pages/useDashboardData";
+import type { PlayMode } from "../../types";
 import {
   countLabel,
   modeLabel,
@@ -13,24 +17,7 @@ import { LoadMoreButton } from "./ResultList";
 import { NoticeTile } from "./Section";
 import { SegmentedFilter } from "./SegmentedFilter";
 
-export interface GameFilters {
-  playMode: PlayMode | null;
-  useUpgrades: boolean | null;
-  mineOnly: boolean;
-}
-
-export type LoadGames = (
-  filters: GameFilters,
-  offset: number,
-) => Promise<CubeGamesPage>;
-
-/** A loaded list, stamped with the filters it was loaded for, so a list for older filters never shows. */
-interface LoadedGames {
-  filters: GameFilters;
-  games: GameSummary[];
-  hasMore: boolean;
-  totalGames: number;
-}
+export type { GameFilters, LoadGames };
 
 type ModeChoice = "all" | PlayMode;
 type UpgradesChoice = "all" | "on" | "off";
@@ -71,59 +58,12 @@ export function GameHistory({
   title,
 }: GameHistoryProps) {
   const { addToast } = useToast();
-  const [filters, setFilters] = useState<GameFilters>(initialFilters);
-  const [loaded, setLoaded] = useState<LoadedGames | null>(null);
-  const [failedFilters, setFailedFilters] = useState<GameFilters | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadGames(filters, 0)
-      .then((page) => {
-        if (cancelled) return;
-        setLoaded({
-          filters,
-          games: page.games,
-          hasMore: page.has_more,
-          totalGames: page.total_games,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setFailedFilters(filters);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [filters, loadGames, attempt]);
-
-  const current = loaded?.filters === filters ? loaded : null;
-  const failed = failedFilters === filters && !current;
-
-  const loadMore = async () => {
-    if (!current) return;
-    setLoadingMore(true);
-    try {
-      const page = await loadGames(filters, current.games.length);
-      setLoaded((prev) =>
-        prev && prev.filters === filters
-          ? {
-              ...prev,
-              games: [...prev.games, ...page.games],
-              hasMore: page.has_more,
-              totalGames: page.total_games,
-            }
-          : prev,
-      );
-    } catch {
-      addToast("Failed to load games", "error");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  const change = (update: Partial<GameFilters>) =>
-    setFilters((prev) => ({ ...prev, ...update }));
+  const handleLoadMoreError = useCallback(
+    () => addToast("Failed to load games", "error"),
+    [addToast],
+  );
+  const { filters, change, current, failed, retry, loadingMore, loadMore } =
+    useGameHistory(loadGames, initialFilters, handleLoadMoreError);
 
   return (
     <section aria-label="Game history" className="flex flex-col gap-3">
@@ -185,10 +125,7 @@ export function GameHistory({
         <NoticeTile
           action={{
             label: "Retry",
-            onClick: () => {
-              setFailedFilters(null);
-              setAttempt((n) => n + 1);
-            },
+            onClick: retry,
           }}
         >
           The games didn&apos;t load.

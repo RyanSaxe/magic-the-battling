@@ -1,4 +1,4 @@
-import { useEffect, useRef, useLayoutEffect, useCallback } from "react";
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   getPhaseReferenceLabel,
@@ -6,6 +6,11 @@ import {
   getPhaseTip,
 } from "../constants/phases";
 import type { Phase } from "../constants/phases";
+import {
+  useEscapeKey,
+  useLayoutMeasure,
+  useWindowEvent,
+} from "../hooks/useDomEffects";
 import { usePanelHoldsEnter } from "../utils/enterKey";
 import { BoardBackdrop } from "./common/BoardBackdrop";
 import { POPOVER_CHROME } from "./common/styles";
@@ -41,60 +46,51 @@ export function PhasePopover({
   const arrowRef = useRef<HTMLDivElement>(null);
   usePanelHoldsEnter(!isClosing);
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      // A press on the bars closes at once and still clicks. Over the board, the backdrop waits for the click.
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(target) &&
-        !backdropRef.current?.contains(target)
-      ) {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleEscape);
-    window.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      window.removeEventListener("keydown", handleEscape);
-      window.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [onClose]);
-
-  const positionPopover = useCallback(() => {
-    const el = popoverRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // Keeps clear of the felt's gold edge, which the bars' padding lines up with.
-    const pad =
-      parseFloat(getComputedStyle(el).getPropertyValue("--bar-inline")) + 8;
-
-    let top = anchorRect.bottom + 8;
-    let left = anchorRect.left + anchorRect.width / 2 - rect.width / 2;
-
-    if (left + rect.width > vw - pad) left = vw - pad - rect.width;
-    if (left < pad) left = pad;
-    if (top + rect.height > vh - pad) top = anchorRect.top - rect.height - 8;
-
-    el.style.top = `${top}px`;
-    el.style.left = `${left}px`;
-    el.style.transform = "none";
-    el.style.visibility = "visible";
-
-    if (arrowRef.current) {
-      const arrowLeft = anchorRect.left + anchorRect.width / 2 - left;
-      const minArrowLeft = 12;
-      const maxArrowLeft = Math.max(minArrowLeft, rect.width - 18);
-      arrowRef.current.style.left = `${Math.max(minArrowLeft, Math.min(arrowLeft - 6, maxArrowLeft))}px`;
+  useEscapeKey(onClose);
+  useWindowEvent("mousedown", (e) => {
+    const target = e.target;
+    if (!(target instanceof Node)) return;
+    // A press on the bars closes at once and still clicks. Over the board, the backdrop waits for the click.
+    if (
+      popoverRef.current &&
+      !popoverRef.current.contains(target) &&
+      !backdropRef.current?.contains(target)
+    ) {
+      onClose();
     }
-  }, [anchorRect]);
+  });
 
-  useLayoutEffect(positionPopover, [positionPopover]);
+  useLayoutMeasure(
+    popoverRef,
+    (el) => {
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Keeps clear of the felt's gold edge, which the bars' padding lines up with.
+      const pad =
+        parseFloat(getComputedStyle(el).getPropertyValue("--bar-inline")) + 8;
+
+      let top = anchorRect.bottom + 8;
+      let left = anchorRect.left + anchorRect.width / 2 - rect.width / 2;
+
+      if (left + rect.width > vw - pad) left = vw - pad - rect.width;
+      if (left < pad) left = pad;
+      if (top + rect.height > vh - pad) top = anchorRect.top - rect.height - 8;
+
+      el.style.top = `${top}px`;
+      el.style.left = `${left}px`;
+      el.style.transform = "none";
+      el.style.visibility = "visible";
+
+      if (arrowRef.current) {
+        const arrowLeft = anchorRect.left + anchorRect.width / 2 - left;
+        const minArrowLeft = 12;
+        const maxArrowLeft = Math.max(minArrowLeft, rect.width - 18);
+        arrowRef.current.style.left = `${Math.max(minArrowLeft, Math.min(arrowLeft - 6, maxArrowLeft))}px`;
+      }
+    },
+    [anchorRect],
+  );
 
   return (
     <>

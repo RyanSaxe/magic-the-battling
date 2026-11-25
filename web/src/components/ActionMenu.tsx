@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Card as CardType, ZoneName, CardStateAction } from "../types";
 import type { ZoneOwner } from "../dnd/types";
+import { useLayoutMeasure } from "../hooks/useDomEffects";
 import { useOpenSubmenus } from "../hooks/useOpenSubmenus";
 import { MenuPrompt } from "./common/MenuPrompt";
 import type { BattleSelectedCard } from "../pages/phases/Battle";
@@ -100,11 +101,13 @@ export function ActionMenu({
 
   // The menu sits on the Actions button and grows upward, so a submenu would move every row above the one clicked.
   // Keeping the size it opened with makes a submenu push the rows below it down, inside the menu's scroll.
-  useLayoutEffect(() => {
-    const node = menuRef.current;
-    if (!node) return;
-    node.style.height = `${node.getBoundingClientRect().height}px`;
-  }, []);
+  useLayoutMeasure(
+    menuRef,
+    (node) => {
+      node.style.height = `${node.getBoundingClientRect().height}px`;
+    },
+    [],
+  );
 
   const isYourTurn = battle.current_turn_name === playerName;
   // A puppet can't press Pass, so the player facing it passes for it, as the sidebar and P already do.

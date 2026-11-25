@@ -1,16 +1,24 @@
 import {
   useCallback,
-  useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
+import {
+  currentViewportBox,
+  isDesktopViewport,
+  useCollapsedPanelHeight,
+  useFloatingWindowPointerInteraction,
+} from "../../hooks/ui/useFloatingWindowLayout";
+import {
+  useLocalStorageSync,
+  useResizeObserver,
+  useViewportSync,
+} from "../../hooks/useDomEffects";
 import type { ServerNoticeStatus } from "../../types";
 import { FloatingWindow } from "./FloatingWindow";
 import {
-  DESKTOP_BREAKPOINT_PX,
   DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
   WINDOW_MARGIN_PX,
   clampDesktopPanelOrigin,
@@ -45,32 +53,6 @@ type InteractionState = {
   startX: number;
   startY: number;
 } | null;
-
-function isDesktopViewport(): boolean {
-  return (
-    typeof window !== "undefined" && window.innerWidth >= DESKTOP_BREAKPOINT_PX
-  );
-}
-
-function currentViewportBox(): ViewportBox {
-  if (typeof window === "undefined") {
-    return { width: 0, height: 0, left: 0, top: 0 };
-  }
-  const viewport = window.visualViewport;
-  return viewport
-    ? {
-        width: Math.round(viewport.width),
-        height: Math.round(viewport.height),
-        left: Math.round(viewport.offsetLeft),
-        top: Math.round(viewport.offsetTop),
-      }
-    : {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        left: 0,
-        top: 0,
-      };
-}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -253,9 +235,6 @@ export function ServerStatusWindow({
     resolveInitialCollapsedState(),
   );
   const [interaction, setInteraction] = useState<InteractionState>(null);
-  const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(
-    DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
-  );
   const [mobileCollapsedOrigin, setMobileCollapsedOrigin] = useState<{
     x: number;
     y: number;
@@ -285,6 +264,12 @@ export function ServerStatusWindow({
     setInteraction(null);
   }, []);
 
+  const collapsedPanelHeight = useCollapsedPanelHeight(
+    collapsedPanelRef,
+    isCollapsed,
+    [collapsedLabel],
+  );
+
   const syncDesktopWindow = useCallback(
     (collapsed: boolean) => {
       if (!isDesktopViewport()) {
@@ -304,6 +289,16 @@ export function ServerStatusWindow({
     },
     [collapsedPanelHeight],
   );
+
+  useViewportSync(() => {
+    const desktop = isDesktopViewport();
+    setIsDesktop(desktop);
+    if (!desktop) {
+      stopInteraction();
+      return;
+    }
+    syncDesktopWindow(isCollapsed);
+  });
 
   const handleCollapse = useCallback(() => {
     stopInteraction();
@@ -393,63 +388,9 @@ export function ServerStatusWindow({
     [desktopPanel, isCollapsed, isDesktop, mobileCollapsedRect],
   );
 
-  useEffect(() => {
-    const syncViewport = () => {
-      const desktop = isDesktopViewport();
-      setIsDesktop(desktop);
-      if (!desktop) {
-        stopInteraction();
-        return;
-      }
-      syncDesktopWindow(isCollapsed);
-    };
-
-    window.addEventListener("resize", syncViewport);
-    window.visualViewport?.addEventListener("resize", syncViewport);
-    window.visualViewport?.addEventListener("scroll", syncViewport);
-    return () => {
-      window.removeEventListener("resize", syncViewport);
-      window.visualViewport?.removeEventListener("resize", syncViewport);
-      window.visualViewport?.removeEventListener("scroll", syncViewport);
-    };
-  }, [isCollapsed, stopInteraction, syncDesktopWindow]);
-
-  useLayoutEffect(() => {
-    if (!isCollapsed) {
-      return;
-    }
-    const node = collapsedPanelRef.current;
-    if (!node) {
-      return;
-    }
-    const updateHeight = () => {
-      const nextHeight = Math.max(
-        DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
-        Math.ceil(node.getBoundingClientRect().height),
-      );
-      setCollapsedPanelHeight((previous) =>
-        previous === nextHeight ? previous : nextHeight,
-      );
-    };
-    updateHeight();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [isCollapsed, collapsedLabel]);
-
-  useLayoutEffect(() => {
-    if (isCollapsed || !isDesktop) {
-      return;
-    }
-    const node = expandedPanelRef.current;
-    if (!node) {
-      return;
-    }
-    const updateHeight = () => {
+  useResizeObserver(
+    expandedPanelRef,
+    (node) => {
       const nextHeight = Math.ceil(node.getBoundingClientRect().height);
       setDesktopWindow((previous) => {
         if (!previous || previous.height === nextHeight) {
@@ -457,45 +398,26 @@ export function ServerStatusWindow({
         }
         return { ...previous, height: nextHeight };
       });
-    };
-    updateHeight();
+    },
+    !isCollapsed && isDesktop,
+    [displayMessage, heading, recoveryHint],
+  );
 
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [displayMessage, heading, isCollapsed, isDesktop, recoveryHint]);
-
-  useEffect(() => {
-    if (!desktopWindow) {
-      return;
-    }
-    try {
-      window.localStorage.setItem(
-        WINDOW_STORAGE_KEY,
-        serializeStoredWindowState({
+  useLocalStorageSync(
+    WINDOW_STORAGE_KEY,
+    desktopWindow
+      ? serializeStoredWindowState({
           windowState: desktopWindow,
           isCollapsed,
-        }),
-      );
-    } catch {
-      // Best effort only.
-    }
-  }, [desktopWindow, isCollapsed]);
+        })
+      : null,
+  );
 
-  useEffect(() => {
-    if (!interaction || hidden || (!isDesktop && !isCollapsed)) {
-      return;
-    }
-
-    const previousUserSelect = document.body.style.userSelect;
-    const previousCursor = document.body.style.cursor;
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "grabbing";
-
-    const handlePointerMove = (event: PointerEvent) => {
+  useFloatingWindowPointerInteraction({
+    active: Boolean(interaction && !hidden && (isDesktop || isCollapsed)),
+    cursor: "grabbing",
+    onMove: (event) => {
+      if (!interaction) return;
       if (!isDesktop) {
         const viewport = currentViewportBox();
         const panel = collapsedPanelSize(viewport, collapsedPanelHeight);
@@ -523,21 +445,9 @@ export function ServerStatusWindow({
           collapsedPanelHeight,
         );
       });
-    };
-
-    const handlePointerUp = () => {
-      setInteraction(null);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    return () => {
-      document.body.style.userSelect = previousUserSelect;
-      document.body.style.cursor = previousCursor;
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, [collapsedPanelHeight, hidden, interaction, isCollapsed, isDesktop]);
+    },
+    onEnd: stopInteraction,
+  });
 
   if (hidden) {
     return null;

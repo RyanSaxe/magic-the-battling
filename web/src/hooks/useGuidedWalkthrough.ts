@@ -3,7 +3,7 @@
  * keyboard shortcuts, `inert` background trapping, and temporary sidebar overrides.
  *
  * Encapsulates all DOM/timer effects for `GuidedWalkthrough` and `GameGuideLayer`
- * using `reduceWalkthrough` and React 19.2 `useEffectEvent` with zero `queueMicrotask`.
+ * using `reduceWalkthrough` and React 19.2 `useEffectEvent` with no deferred microtask workarounds.
  */
 import {
   useEffect,

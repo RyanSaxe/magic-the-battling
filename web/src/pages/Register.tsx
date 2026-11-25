@@ -1,6 +1,7 @@
-import { useState, type ComponentPropsWithoutRef } from "react";
+import { useCallback, useState, type ComponentPropsWithoutRef } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/authState";
+import { useAsyncAction } from "../hooks/useAsyncResource";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
 import { SurfaceCard } from "../components/common/SurfaceCard";
@@ -110,7 +111,6 @@ export function Register() {
     field: RegisterField;
     message: string;
   } | null>(null);
-  const [loading, setLoading] = useState(false);
   // How many fields, from the top, the player has left or skipped past. An empty field explains itself only after
   // that, so a new form isn't covered in reasons.
   const [fieldsPassed, setFieldsPassed] = useState(0);
@@ -126,26 +126,29 @@ export function Register() {
   const serverReason = (field: RegisterField) =>
     serverError?.field === field ? serverError.message : null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { run: submitRegister, pending: loading } = useAsyncAction(
+    useCallback(async () => {
+      setServerError(null);
+      try {
+        await register(username, password, email);
+        navigate(returnTo);
+      } catch (err) {
+        const appError = unknownToAppError(
+          err,
+          "register",
+          "Registration failed",
+        );
+        setServerError({
+          field: fieldForRegisterError(appError.code, appError.message),
+          message: appError.message,
+        });
+      }
+    }, [register, username, password, email, navigate, returnTo]),
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setServerError(null);
-    setLoading(true);
-    try {
-      await register(username, password, email);
-      navigate(returnTo);
-    } catch (err) {
-      const appError = unknownToAppError(
-        err,
-        "register",
-        "Registration failed",
-      );
-      setServerError({
-        field: fieldForRegisterError(appError.code, appError.message),
-        message: appError.message,
-      });
-    } finally {
-      setLoading(false);
-    }
+    void submitRegister();
   };
 
   return (

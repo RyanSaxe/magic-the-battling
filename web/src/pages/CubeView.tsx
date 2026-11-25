@@ -24,6 +24,7 @@ import {
   getCubeSummary,
   unfollowCube,
 } from "../api/client";
+import { useAsyncAction } from "../hooks/useAsyncResource";
 import { useFirstLoad } from "../hooks/useFirstLoad";
 import { formatWhen, modeLabel, upgradesLabel } from "../utils/accountFormat";
 import { unknownToAppError } from "../utils/appError";
@@ -36,7 +37,6 @@ export function CubeView() {
   const { user, loading: authLoading } = useAuth();
   const { addToast } = useToast();
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const [changingFollow, setChangingFollow] = useState(false);
   // Waits for sign-in to be known, since the summary says whether this player follows the cube.
   const loadSummary = useCallback(() => getCubeSummary(cubeId), [cubeId]);
   const summaryLoad = useFirstLoad(loadSummary, !authLoading);
@@ -53,33 +53,32 @@ export function CubeView() {
     [cubeId],
   );
 
-  const toggleFollow = async () => {
-    if (!summary) return;
-    setChangingFollow(true);
-    try {
-      if (summary.follow_id !== null) {
-        await unfollowCube(summary.follow_id);
-        summaryLoad.update({
-          status: "loaded",
-          value: { ...summary, is_following: false, follow_id: null },
-        });
-      } else {
-        const follow = await followCube(cubeId);
-        summaryLoad.update({
-          status: "loaded",
-          value: { ...summary, is_following: true, follow_id: follow.id },
-        });
+  const { run: toggleFollow, pending: changingFollow } = useAsyncAction(
+    useCallback(async () => {
+      if (!summary) return;
+      try {
+        if (summary.follow_id !== null) {
+          await unfollowCube(summary.follow_id);
+          summaryLoad.update({
+            status: "loaded",
+            value: { ...summary, is_following: false, follow_id: null },
+          });
+        } else {
+          const follow = await followCube(cubeId);
+          summaryLoad.update({
+            status: "loaded",
+            value: { ...summary, is_following: true, follow_id: follow.id },
+          });
+        }
+      } catch (err) {
+        addToast(
+          unknownToAppError(err, "follow-cube", "Failed to change the follow")
+            .message,
+          "error",
+        );
       }
-    } catch (err) {
-      addToast(
-        unknownToAppError(err, "follow-cube", "Failed to change the follow")
-          .message,
-        "error",
-      );
-    } finally {
-      setChangingFollow(false);
-    }
-  };
+    }, [summary, summaryLoad, cubeId, addToast]),
+  );
 
   const title = summary?.cube_name ?? cubeId;
   const setup = summary?.popular_setup;

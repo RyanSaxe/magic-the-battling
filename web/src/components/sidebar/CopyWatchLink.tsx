@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FaCheck, FaLink } from "react-icons/fa6";
 import { useToast } from "../../contexts";
+import { useTimeout } from "../../hooks/useDomEffects";
 import { copyText } from "../../utils/clipboard";
 
 const COPIED_MS = 2000;
@@ -9,11 +10,7 @@ export function CopyWatchLink({ url }: { url: string }) {
   const { addToast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!copied) return;
-    const timeout = setTimeout(() => setCopied(false), COPIED_MS);
-    return () => clearTimeout(timeout);
-  }, [copied]);
+  useTimeout(() => setCopied(false), copied ? COPIED_MS : null);
 
   const copy = async () => {
     if (await copyText(url)) setCopied(true);

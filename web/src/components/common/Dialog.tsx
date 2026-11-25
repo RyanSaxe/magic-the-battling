@@ -1,66 +1,17 @@
 import {
-  useEffect,
   useId,
   useRef,
   useState,
   type FormEventHandler,
   type ReactNode,
 } from "react";
+import {
+  useDialogEscape,
+  useDialogFocusTrap,
+} from "../../hooks/ui/useDialogBehavior";
 import { SurfaceCard } from "./SurfaceCard";
 import { CloseButton } from "./CloseButton";
 import { DIALOG_BACKDROP } from "./styles";
-
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function focusFirst(controls: HTMLElement[]) {
-  for (const control of controls) {
-    control.focus();
-    // A hidden control doesn't take focus.
-    if (document.activeElement !== control) continue;
-    // The browser selects a field's text when Tab reaches it, and focus() doesn't.
-    if (control instanceof HTMLInputElement) control.select();
-    return;
-  }
-}
-
-// Not inert on the page: that would also switch off clicks on toasts and the other layers drawn over a dialog.
-function keepFocusInside(dialog: HTMLElement, controls: () => HTMLElement[]) {
-  // A request to watch or a second dialog can open over this one, and Tab/focus must stay in the top layer.
-  const isOnTop = () => {
-    const dialogs = document.querySelectorAll('[role="dialog"]');
-    const topDialog = dialogs[dialogs.length - 1];
-    if (topDialog && !dialog.contains(topDialog)) return false;
-    return typeof document.elementFromPoint === "function"
-      ? dialog.contains(document.elementFromPoint(0, 0))
-      : true;
-  };
-
-  const handleTab = (event: KeyboardEvent) => {
-    if (event.key !== "Tab" || event.isComposing || !isOnTop()) return;
-    event.preventDefault();
-    const order = event.shiftKey ? controls().reverse() : controls();
-    const next = order.indexOf(document.activeElement as HTMLElement) + 1;
-    focusFirst([...order.slice(next), ...order.slice(0, next)]);
-  };
-  // Tab from the browser's address bar lands on the page without a keydown, and with no element losing focus.
-  const handleFocus = (event: FocusEvent) => {
-    if (
-      event.relatedTarget ||
-      dialog.contains(event.target as Node) ||
-      !isOnTop()
-    )
-      return;
-    focusFirst(controls());
-  };
-
-  window.addEventListener("keydown", handleTab);
-  document.addEventListener("focusin", handleFocus);
-  return () => {
-    window.removeEventListener("keydown", handleTab);
-    document.removeEventListener("focusin", handleFocus);
-  };
-}
 
 /**
  * A dialog over a dimmed page: a walnut card with a title and a ✕ that closes it. Clicking the
@@ -88,38 +39,8 @@ export function Dialog({
   // Read during the first render, before an autoFocus field inside takes focus.
   const [opener] = useState(() => document.activeElement);
 
-  useEffect(() => {
-    const dialog = dialogRef.current!;
-    const body = bodyRef.current!;
-    const close = closeRef.current!;
-    // The ✕ comes first on the page and last here, so that the body's first control is where focus starts.
-    const controls = () => [
-      ...body.querySelectorAll<HTMLElement>(FOCUSABLE),
-      close,
-    ];
-    if (!dialog.contains(document.activeElement)) controls()[0].focus();
-    const stopKeepingFocusInside = keepFocusInside(dialog, controls);
-    return () => {
-      stopKeepingFocusInside();
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
-    };
-  }, [opener]);
-
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing)
-        return;
-      // When one dialog opens over another, only the top one answers Escape.
-      const dialogs = document.querySelectorAll('[role="dialog"]');
-      const topDialog = dialogs[dialogs.length - 1];
-      if (topDialog && !dialogRef.current?.contains(topDialog)) return;
-      // Handled, so a panel open under the dialog doesn't close with it.
-      event.preventDefault();
-      onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+  useDialogFocusTrap({ dialogRef, bodyRef, closeRef, opener });
+  useDialogEscape(dialogRef, onClose);
 
   const cardProps = {
     role: "dialog",

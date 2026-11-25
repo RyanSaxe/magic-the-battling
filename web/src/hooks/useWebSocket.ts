@@ -1,4 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+/**
+ * WebSocket transport and state hydration hook for live game and lobby sessions.
+ */
+import {
+  useState,
+  useEffect,
+  useEffectEvent,
+  useCallback,
+  useRef,
+} from "react";
 import type {
   CardCatalogEntry,
   CompactGameState,
@@ -112,14 +121,12 @@ export function useWebSocket(
       : initialConnectionState(connectionKey);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const onServerErrorRef = useRef(onServerError);
-  useEffect(() => {
-    onServerErrorRef.current = onServerError;
-  }, [onServerError]);
-  const onVoiceSignalRef = useRef(onVoiceSignal);
-  useEffect(() => {
-    onVoiceSignalRef.current = onVoiceSignal;
-  }, [onVoiceSignal]);
+  const handleServerError = useEffectEvent((error: AppError) => {
+    onServerError?.(error);
+  });
+  const handleVoiceSignal = useEffectEvent((payload: VoiceSignalPayload) => {
+    onVoiceSignal?.(payload);
+  });
 
   useEffect(() => {
     if (!gameId || !sessionId || !connectionKey) return;
@@ -220,7 +227,7 @@ export function useWebSocket(
                 lobbyStartStatus === "starting" &&
                 lobby.start_status === "failed"
               ) {
-                onServerErrorRef.current?.(
+                handleServerError(
                   createAppError({
                     code: "USER_MESSAGE",
                     detail: lobby.start_error,
@@ -232,7 +239,7 @@ export function useWebSocket(
               lobbyStartStatus = lobby.start_status;
               update((s) => ({ ...s, lobbyState: lobby }));
             } else if (message.type === "error") {
-              onServerErrorRef.current?.(
+              handleServerError(
                 wsPayloadToAppError(
                   message.payload,
                   "default",
@@ -257,7 +264,7 @@ export function useWebSocket(
             } else if (message.type === "kicked") {
               end(KICKED_ERROR());
             } else if (message.type === "voice_signal") {
-              onVoiceSignalRef.current?.(message.payload);
+              handleVoiceSignal(message.payload);
             }
           } catch (err) {
             console.error("Failed to process WebSocket message:", err);

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { useWindowEvent } from "../../hooks/useDomEffects";
 import type { Card as CardType } from "../../types";
 import { UpgradeStack } from "../sidebar/UpgradeStack";
 import { CardGrid } from "./CardGrid";
@@ -32,22 +33,18 @@ export function RevealBeforeSubmitModal({
   }, []);
 
   const dialogRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (enterPressesControl(e, dialogRef.current)) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        onClose();
-      } else if (e.key === "Enter" && selectedIds.length > 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (enterMayAdvance(e)) onRevealAndSubmit(selectedIds);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, onRevealAndSubmit, selectedIds]);
+  useWindowEvent("keydown", (e) => {
+    if (enterPressesControl(e, dialogRef.current)) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    } else if (e.key === "Enter" && selectedIds.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (enterMayAdvance(e)) onRevealAndSubmit(selectedIds);
+    }
+  });
 
   const [ref, dims] = useCardLayout(upgradeListLayoutConfig(upgrades.length));
 

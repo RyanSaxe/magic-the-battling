@@ -1,4 +1,5 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useRef, useState } from "react";
+import { useWindowEvent } from "../../hooks/useDomEffects";
 import type { Card as CardType } from "../../types";
 import { Card, CardPreviewContext } from "../card";
 import { UpgradeStack } from "../sidebar/UpgradeStack";
@@ -105,64 +106,50 @@ export function UpgradesModal({
   );
 
   const dialogRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // The Enter that opened this can still be held down, and neither applying nor revealing can be undone.
-      if (e.key === "Enter" && e.repeat) {
-        e.preventDefault();
-        return;
+  useWindowEvent("keydown", (e) => {
+    // The Enter that opened this can still be held down, and neither applying nor revealing can be undone.
+    if (e.key === "Enter" && e.repeat) {
+      e.preventDefault();
+      return;
+    }
+    if (enterPressesControl(e, dialogRef.current)) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (mode === "reveal" && selectedRevealUpgradeIds.length > 0) {
+        setSelectedRevealUpgradeIds([]);
+      } else {
+        onClose();
       }
-      if (enterPressesControl(e, dialogRef.current)) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        if (mode === "reveal" && selectedRevealUpgradeIds.length > 0) {
-          setSelectedRevealUpgradeIds([]);
-        } else {
-          onClose();
-        }
-      } else if (
-        e.key === "Enter" &&
-        mode === "apply" &&
-        selectedUpgradeId &&
-        selectedTargetId &&
-        onApply
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        const active = document.activeElement;
-        if (active instanceof HTMLElement) {
-          active.blur();
-        }
-        applyUpgrade(selectedUpgradeId, selectedTargetId);
-      } else if (
-        e.key === "Enter" &&
-        mode === "reveal" &&
-        selectedRevealUpgradeIds.length > 0 &&
-        onReveal
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        const active = document.activeElement;
-        if (active instanceof HTMLElement) {
-          active.blur();
-        }
-        revealUpgrade(selectedRevealUpgradeIds);
+    } else if (
+      e.key === "Enter" &&
+      mode === "apply" &&
+      selectedUpgradeId &&
+      selectedTargetId &&
+      onApply
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) {
+        active.blur();
       }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    applyUpgrade,
-    mode,
-    onClose,
-    onApply,
-    onReveal,
-    revealUpgrade,
-    selectedRevealUpgradeIds,
-    selectedTargetId,
-    selectedUpgradeId,
-  ]);
+      applyUpgrade(selectedUpgradeId, selectedTargetId);
+    } else if (
+      e.key === "Enter" &&
+      mode === "reveal" &&
+      selectedRevealUpgradeIds.length > 0 &&
+      onReveal
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) {
+        active.blur();
+      }
+      revealUpgrade(selectedRevealUpgradeIds);
+    }
+  });
 
   const selectedUpgrade =
     unapplied.find((u) => u.id === selectedUpgradeId) ?? null;

@@ -1,7 +1,7 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/authState";
 import { useToast } from "../contexts";
+import { useRequireAuth } from "../hooks/pages/useAuthSession";
 import { AppHeader, UserMenuButton } from "../components/common/AppHeader";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { JoinGameModal } from "../components/home/JoinGameModal";
@@ -106,7 +106,7 @@ async function loadMyGames(): Promise<MyGames> {
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useRequireAuth("/dashboard");
   const { addToast } = useToast();
   const resumableGames = useResumableGames();
   const [closedSeatIds, setClosedSeatIds] = useState<string[]>([]);
@@ -124,11 +124,6 @@ export function Dashboard() {
     LibraryEntry,
     { kind: "saved" }
   > | null>(null);
-
-  useEffect(() => {
-    if (!authLoading && !user)
-      navigate("/login?returnTo=/dashboard", { replace: true });
-  }, [authLoading, user, navigate]);
 
   const library =
     libraryLoad.state.status === "loaded" ? libraryLoad.state.value : null;

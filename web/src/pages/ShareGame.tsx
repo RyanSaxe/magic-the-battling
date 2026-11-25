@@ -1,17 +1,6 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  type RefObject,
-} from "react";
+import { useState, useRef, useCallback, type RefObject } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getShareGame } from "../api/client";
-import type {
-  ShareGameResponse,
-  SharePlayerSnapshot,
-  Card as CardType,
-} from "../types";
+import type { SharePlayerSnapshot, Card as CardType } from "../types";
 import { ShareRoundDetail } from "../components/share/ShareRoundDetail";
 import {
   buildSharePlayerViews,
@@ -21,6 +10,8 @@ import {
   getShareRoundValue,
   parseShareRoundValue,
 } from "../utils/share";
+import { useShareGameData } from "../hooks/pages/useShareGame";
+import { useDocumentEvent, useEscapeKey } from "../hooks/useDomEffects";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { useGameShellMode } from "../hooks/useGameShellMode";
 import { useElementHeight } from "../hooks/useElementHeight";
@@ -37,7 +28,7 @@ import { SidePanel } from "../components/common/SidePanel";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
 import { NoticeFrame } from "../components/common/NoticeFrame";
-import { type AppError, unknownToAppError } from "../utils/appError";
+import type { AppError } from "../utils/appError";
 import { POPOVER_CHROME } from "../components/common/styles";
 
 interface RoundOption {
@@ -79,26 +70,18 @@ function RoundPopover({
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        anchorRef.current?.contains(target) ||
-        backdropRef.current?.contains(target)
-      )
-        return;
-      onClose();
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [anchorRef, onClose]);
+  useDocumentEvent("mousedown", (e) => {
+    if (
+      e.target instanceof Node &&
+      (anchorRef.current?.contains(e.target) ||
+        backdropRef.current?.contains(e.target))
+    ) {
+      return;
+    }
+    onClose();
+  });
+
+  useEscapeKey(onClose, { target: "document" });
 
   return (
     <>
@@ -148,11 +131,15 @@ export function ShareGame() {
   const navigate = useNavigate();
   const sizes = useViewportCardSizes();
   const shellMode = useGameShellMode();
-  const [data, setData] = useState<ShareGameResponse | null>(null);
-  const [error, setError] = useState<AppError | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedRound, setSelectedRound] = useState("");
-  const [selectedPlayer, setSelectedPlayer] = useState("");
+  const {
+    data,
+    error,
+    loading,
+    selectedRound,
+    setSelectedRound,
+    selectedPlayer,
+    setSelectedPlayer,
+  } = useShareGameData(gameId, playerName);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [roundPopoverOpen, setRoundPopoverOpen] = useState(false);
   const roundAnchorRef = useRef<HTMLDivElement>(null);
@@ -186,27 +173,6 @@ export function ShareGame() {
       return next;
     });
   }, []);
-
-  useEffect(() => {
-    if (!gameId || !playerName) return;
-    getShareGame(gameId, playerName)
-      .then((res) => {
-        setData(res);
-        setSelectedPlayer(res.owner_name);
-        const ownerPlayer = res.players.find(
-          (player) => player.name === res.owner_name,
-        );
-        const referenceSnapshots =
-          ownerPlayer?.snapshots ?? res.players[0]?.snapshots ?? [];
-        setSelectedRound(getLatestRoundValue(referenceSnapshots));
-      })
-      .catch((e) =>
-        setError(
-          unknownToAppError(e, "share-game", "Failed to load shared game"),
-        ),
-      )
-      .finally(() => setLoading(false));
-  }, [gameId, playerName]);
 
   const ownerPlayer = data?.players.find((p) => p.name === data.owner_name);
   const referenceSnapshots =

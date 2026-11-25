@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect, type ReactNode, type Ref } from "react";
+import { useCallback, useState, useRef, type ReactNode, type Ref } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts";
 import { useAuth } from "../../contexts/authState";
+import { useAsyncAction } from "../../hooks/useAsyncResource";
+import { useDocumentEvent } from "../../hooks/useDomEffects";
 import { useHotkeys } from "../../hooks/useHotkeys";
 import { JoinGameModal } from "../home/JoinGameModal";
 import { BoardBackdrop } from "./BoardBackdrop";
@@ -71,23 +73,30 @@ export function UserMenuButton() {
   const { addToast } = useToast();
   const [open, setOpen] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        ref.current?.contains(target) ||
-        backdropRef.current?.contains(target)
-      )
-        return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const performLogout = useCallback(
+    () =>
+      logout().then(
+        () => {
+          navigate("/");
+        },
+        () => {
+          addToast("Something went wrong.", "error");
+        },
+      ),
+    [addToast, logout, navigate],
+  );
+  const { run: runLogout, pending: loggingOut } = useAsyncAction(performLogout);
+
+  useDocumentEvent("mousedown", (e) => {
+    const target = e.target;
+    if (!(target instanceof Node)) return;
+    if (ref.current?.contains(target) || backdropRef.current?.contains(target))
+      return;
+    setOpen(false);
+  });
   useHotkeys({ escape: () => setOpen(false) }, open);
 
   return (
@@ -177,17 +186,9 @@ export function UserMenuButton() {
             <div className="border-t gold-divider my-1" />
             <button
               disabled={loggingOut}
-              onClick={async () => {
+              onClick={() => {
                 setOpen(false);
-                setLoggingOut(true);
-                try {
-                  await logout();
-                  navigate("/");
-                } catch {
-                  addToast("Something went wrong.", "error");
-                } finally {
-                  setLoggingOut(false);
-                }
+                void runLogout();
               }}
               className="w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors disabled:opacity-50"
             >

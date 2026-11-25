@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useAutoCloseOnEmpty } from "../hooks/ui/useDialogBehavior";
 import type { ResumableSeat } from "../hooks/useResumableGames";
 import { useResumeSeat } from "../hooks/useResumeSeat";
 import { countLabel } from "../utils/accountFormat";
@@ -341,9 +342,7 @@ export function ResumeGamesDialog({
   onClose: () => void;
   onCloseSeat: (seat: ResumableSeat) => void;
 }) {
-  useEffect(() => {
-    if (seats.length === 0) onClose();
-  }, [seats.length, onClose]);
+  useAutoCloseOnEmpty(seats.length === 0, onClose);
   if (seats.length === 0) return null;
   const hasCloseColumn = seats.some((seat) => seat.canClose);
   return (
