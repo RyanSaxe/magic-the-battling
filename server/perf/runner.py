@@ -12,11 +12,10 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Self
 
 import httpx
 
@@ -45,6 +44,9 @@ from server.perf.scenarios import (
 )
 from server.perf.seeding import resolve_db_source, seed_puppet_histories
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,7 +68,8 @@ async def wait_for_health(
             except httpx.HTTPError:
                 await asyncio.sleep(0.3)
                 continue
-            if response.status_code == 200:
+            http_ok = 200
+            if response.status_code == http_ok:
                 return
             await asyncio.sleep(0.3)
     msg = f"server health check timed out after {timeout_sec:.1f}s ({health_url})"
@@ -83,7 +86,7 @@ async def fetch_server_status(base_url: str, ops_token: str | None) -> dict[str,
             response = await client.get("/api/ops/capacity", headers={"x-ops-token": ops_token})
             response.raise_for_status()
             payload = response.json()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- broad boundary catch
         return None
 
     if not isinstance(payload, dict):
@@ -141,7 +144,7 @@ class ManagedServer:
         env["MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS"] = "0"
         return env
 
-    async def __aenter__(self) -> ManagedServer:
+    async def __aenter__(self) -> Self:
         self.base_url = f"http://127.0.0.1:{self.config.backend_port}"
         env = self._build_env()
         cmd = [
@@ -150,13 +153,13 @@ class ManagedServer:
             "uvicorn",
             "server.main:app",
             "--host",
-            "0.0.0.0",
+            "127.0.0.1",
             "--port",
             str(self.config.backend_port),
         ]
-        self.process = subprocess.Popen(
+        self.process = subprocess.Popen(  # noqa: ASYNC220, S603 -- managed local server process; trusted local subprocess args
             cmd,
-            cwd=Path(__file__).resolve().parents[2],
+            cwd=Path(__file__).parents[2],
             env=env,
             start_new_session=True,
         )
@@ -178,10 +181,8 @@ class ManagedServer:
 
     async def __aexit__(self, *_exc_info: object) -> None:
         if self.process is not None and self.process.poll() is None:
-            try:
+            with suppress(OSError):
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-            except OSError:
-                pass
             try:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
@@ -371,7 +372,8 @@ async def calibrate_timeout(cfg: HarnessConfig, concurrency: int) -> tuple[float
 
     if not result.success:
         msg = result.error or "calibration game failed"
-        raise RuntimeError(f"calibration failed: {msg}")
+        msg_0 = f"calibration failed: {msg}"
+        raise RuntimeError(msg_0)
 
     chosen = cfg.game_timeout_sec
     if chosen is None:

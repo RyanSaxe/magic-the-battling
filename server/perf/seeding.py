@@ -94,7 +94,7 @@ def _is_varied_basics_json(raw: object) -> bool:
         return False
     try:
         basics = json.loads(raw)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- broad boundary catch
         return False
     if not isinstance(basics, list) or not basics:
         return False

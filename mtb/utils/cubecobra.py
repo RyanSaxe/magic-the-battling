@@ -1,3 +1,5 @@
+"""CubeCobra URL parsing and cube/deck list fetching."""
+
 import hashlib
 import os
 import random
@@ -40,7 +42,7 @@ def _env_flag_enabled(name: str) -> bool:
 def _mock_rng(cube_id: str) -> random.Random:
     digest = hashlib.sha256(cube_id.encode("utf-8")).digest()
     seed = int.from_bytes(digest[:8], "big")
-    return random.Random(seed)
+    return random.Random(seed)  # noqa: S311 -- non-cryptographic game RNG
 
 
 def _mock_card(
@@ -95,8 +97,12 @@ def cube_json_url(cube_id: str) -> str:
     return f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
 
 
+CUBE_URL_MIN_SEGMENTS = 3
+HTTP_NOT_FOUND = 404
+
+
 def cube_id_from_input(text: str) -> str:
-    """The cube ID in what a player entered: the ID itself, or a link to one of the cube's pages on CubeCobra.
+    """Extract the cube ID from a raw ID or CubeCobra URL.
 
     Raises ValueError for a link to anything else.
     """
@@ -107,13 +113,18 @@ def cube_id_from_input(text: str) -> str:
     host = url.hostname or ""
     segments = [segment for segment in url.path.split("/") if segment]
     # A cube's pages are /cube/<page>/<id>, such as /cube/list/vintage and /cube/overview/vintage.
-    if (host == "cubecobra.com" or host.endswith(".cubecobra.com")) and len(segments) >= 3 and segments[0] == "cube":
+    if (
+        (host == "cubecobra.com" or host.endswith(".cubecobra.com"))
+        and len(segments) >= CUBE_URL_MIN_SEGMENTS
+        and segments[0] == "cube"
+    ):
         return unquote(segments[2])
-    raise ValueError(f"not a link to a cube on CubeCobra: {text}")
+    msg = f"not a link to a cube on CubeCobra: {text}"
+    raise ValueError(msg)
 
 
 def get_cube_list(cube_id: str) -> Sequence[ListedCard] | None:
-    """The cube's cards as CubeCobra lists them now, without fetching their tokens from Scryfall.
+    """Fetch the cube's cards from CubeCobra without fetching tokens from Scryfall.
 
     None when CubeCobra answers that it has no cube with this ID. Other failures to ask it are raised.
     """
@@ -122,7 +133,7 @@ def get_cube_list(cube_id: str) -> Sequence[ListedCard] | None:
     try:
         data = json_helpers.get_fresh_json(cube_json_url(cube_id))
     except HTTPStatusError as error:
-        if error.response.status_code == 404:
+        if error.response.status_code == HTTP_NOT_FOUND:
             return None
         raise
     listed = [card["details"] for card in data["cards"]["mainboard"]]
@@ -136,8 +147,7 @@ def get_cube_data(cube_id: str) -> list[Card]:
     data = revalidate_and_get(cube_json_url(cube_id))
     cube = data["cards"]["mainboard"]
 
-    results = list(_CARD_EXECUTOR.map(cubecobra_to_card, cube))
-    return results
+    return list(_CARD_EXECUTOR.map(cubecobra_to_card, cube))
 
 
 def cubecobra_to_card(card_json: dict) -> Card:

@@ -2,6 +2,7 @@ import asyncio
 import json
 import sqlite3
 from contextlib import closing
+from pathlib import Path
 
 import pytest
 
@@ -24,33 +25,33 @@ from server.perf.load_harness import (
 )
 
 
-def test_parse_sweep_uses_fallback_when_none():
+def test_parse_sweep_uses_fallback_when_none() -> None:
     assert parse_sweep(None, 10) == [10]
 
 
-def test_parse_sweep_preserves_order_and_deduplicates():
+def test_parse_sweep_preserves_order_and_deduplicates() -> None:
     assert parse_sweep("1,10,10,100,1,1000", 5) == [1, 10, 100, 1000]
 
 
-def test_parse_sweep_rejects_non_positive():
+def test_parse_sweep_rejects_non_positive() -> None:
     with pytest.raises(ValueError, match="positive"):
         parse_sweep("1,0,3", 5)
 
 
-def test_parse_hot_sweep_uses_fallback_when_none():
+def test_parse_hot_sweep_uses_fallback_when_none() -> None:
     assert parse_hot_sweep(None, 25) == [25]
 
 
-def test_parse_hot_sweep_allows_zero_and_deduplicates():
+def test_parse_hot_sweep_allows_zero_and_deduplicates() -> None:
     assert parse_hot_sweep("0,50,50,100,0", 5) == [0, 50, 100]
 
 
-def test_parse_hot_sweep_rejects_negative():
+def test_parse_hot_sweep_rejects_negative() -> None:
     with pytest.raises(ValueError, match="non-negative"):
         parse_hot_sweep("0,-1,3", 5)
 
 
-def test_timeout_scales_with_concurrency():
+def test_timeout_scales_with_concurrency() -> None:
     low = choose_timeout_seconds(
         single_game_seconds=20.0,
         concurrency=10,
@@ -68,7 +69,7 @@ def test_timeout_scales_with_concurrency():
     assert high > low
 
 
-def test_timeout_respects_bounds():
+def test_timeout_respects_bounds() -> None:
     minimum = choose_timeout_seconds(
         single_game_seconds=1.0,
         concurrency=1,
@@ -87,14 +88,14 @@ def test_timeout_respects_bounds():
     assert maximum == 120.0
 
 
-def test_cap_overrides_scale_with_games():
+def test_cap_overrides_scale_with_games() -> None:
     small = cap_overrides_for(10)
     large = cap_overrides_for(1000)
     assert int(large["MTB_MAX_HOT_GAMES"]) > int(small["MTB_MAX_HOT_GAMES"])
     assert int(large["MTB_MAX_WS_CONNECTIONS"]) > int(small["MTB_MAX_WS_CONNECTIONS"])
 
 
-def test_harness_config_scales_caps_for_combined_hot_and_active_games():
+def test_harness_config_scales_caps_for_combined_hot_and_active_games() -> None:
     cfg = HarnessConfig(
         base_url="http://127.0.0.1:8000",
         sweep_games=[50],
@@ -129,47 +130,47 @@ def test_harness_config_scales_caps_for_combined_hot_and_active_games():
     assert cfg.max_requested_loaded_games == 1050
 
 
-def test_parse_args_disable_ws_gzip_flag():
+def test_parse_args_disable_ws_gzip_flag() -> None:
     cfg = parse_args(["--games", "1", "--disable-ws-gzip"])
     assert cfg.disable_ws_gzip is True
 
 
-def test_parse_args_hot_game_flags():
+def test_parse_args_hot_game_flags() -> None:
     cfg = parse_args(["--games", "10", "--hot-games", "50", "--hot-sweep", "0,50,100"])
     assert cfg.hot_game_counts == [0, 50, 100]
 
 
-def test_parse_args_mock_cube_data_defaults_true():
+def test_parse_args_mock_cube_data_defaults_true() -> None:
     cfg = parse_args(["--games", "1"])
     assert cfg.mock_cube_data is True
 
 
-def test_parse_args_real_cube_data_flag():
+def test_parse_args_real_cube_data_flag() -> None:
     cfg = parse_args(["--games", "1", "--real-cube-data"])
     assert cfg.mock_cube_data is False
 
 
-def test_parse_args_runtime_reset_toggle():
+def test_parse_args_runtime_reset_toggle() -> None:
     cfg = parse_args(["--games", "1", "--no-runtime-reset-between-sweeps"])
     assert cfg.reset_runtime_between_sweeps is False
 
 
-def test_parse_args_fresh_server_per_sweep_requires_db_copy():
+def test_parse_args_fresh_server_per_sweep_requires_db_copy() -> None:
     with pytest.raises(ValueError, match="requires --db-copy"):
         parse_args(["--games", "1", "--fresh-server-per-sweep"])
 
 
-def test_parse_args_fresh_server_per_sweep_flag():
+def test_parse_args_fresh_server_per_sweep_flag() -> None:
     cfg = parse_args(["--games", "1", "--db-copy", "--fresh-server-per-sweep"])
     assert cfg.fresh_server_per_sweep is True
 
 
-def test_parse_args_ws_action_jitter():
+def test_parse_args_ws_action_jitter() -> None:
     cfg = parse_args(["--games", "1", "--ws-action-jitter-ms", "25"])
     assert cfg.ws_action_jitter_ms == 25.0
 
 
-def test_rss_window_dict():
+def test_rss_window_dict() -> None:
     window = rss_window_dict([100.0, 105.0, 103.0, 110.0])
     assert window["count"] == 4
     assert window["start"] == 100.0
@@ -179,7 +180,7 @@ def test_rss_window_dict():
     assert window["delta_peak"] == 10.0
 
 
-def test_summarize_run_reports_rss_per_successful_game():
+def test_summarize_run_reports_rss_per_successful_game() -> None:
     cfg = HarnessConfig(
         base_url="http://127.0.0.1:8000",
         sweep_games=[10],
@@ -242,7 +243,7 @@ def test_summarize_run_reports_rss_per_successful_game():
     }
 
 
-def test_summarize_run_preserves_idle_hot_game_context():
+def test_summarize_run_preserves_idle_hot_game_context() -> None:
     cfg = HarnessConfig(
         base_url="http://127.0.0.1:8000",
         sweep_games=[50],
@@ -307,7 +308,7 @@ def test_summarize_run_preserves_idle_hot_game_context():
     }
 
 
-def _init_seed_schema(db_path):
+def _init_seed_schema(db_path: Path) -> None:
     with closing(sqlite3.connect(str(db_path))) as conn:
         conn.executescript(
             """
@@ -346,7 +347,7 @@ def _init_seed_schema(db_path):
         )
 
 
-def _insert_history(conn, *, game_id: str, config_json: str, player_name: str, elo: float):
+def _insert_history(conn: sqlite3.Connection, *, game_id: str, config_json: str, player_name: str, elo: float) -> None:
     conn.execute("INSERT INTO games (id, config_json, shared) VALUES (?, ?, 0)", (game_id, config_json))
     cursor = conn.execute(
         """
@@ -356,6 +357,7 @@ def _insert_history(conn, *, game_id: str, config_json: str, player_name: str, e
         """,
         (game_id, player_name, elo),
     )
+    assert cursor.lastrowid is not None
     history_id = int(cursor.lastrowid)
     conn.execute(
         """
@@ -374,7 +376,7 @@ def _insert_history(conn, *, game_id: str, config_json: str, player_name: str, e
     )
 
 
-def test_seed_puppet_histories_backfills_when_existing_histories_miss_target_elo(tmp_path):
+def test_seed_puppet_histories_backfills_when_existing_histories_miss_target_elo(tmp_path: Path) -> None:
     db_path = tmp_path / "seed.db"
     _init_seed_schema(db_path)
     config_json = json.dumps({"use_upgrades": True, "use_vanguards": False, "cube_id": "auto"})
@@ -411,7 +413,9 @@ def test_seed_puppet_histories_backfills_when_existing_histories_miss_target_elo
     assert seeded_again == 0
 
 
-def test_main_logs_validation_error_to_stderr_not_stdout(capsys, caplog):
+def test_main_logs_validation_error_to_stderr_not_stdout(
+    capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture
+) -> None:
     exit_code = main(["--games", "0"])
     captured = capsys.readouterr()
     assert exit_code == 2
@@ -419,7 +423,7 @@ def test_main_logs_validation_error_to_stderr_not_stdout(capsys, caplog):
     assert "error: --games must be positive" in caplog.text
 
 
-def test_print_summary_writes_structured_output_to_stdout(capsys):
+def test_print_summary_writes_structured_output_to_stdout(capsys: pytest.CaptureFixture[str]) -> None:
     cfg = parse_args(["--games", "1"])
     summary = summarize_run(
         label="stdout-check",
@@ -442,7 +446,7 @@ def test_print_summary_writes_structured_output_to_stdout(capsys):
     assert captured.err == ""
 
 
-def test_fly_activity_report_compatibility_and_formatting():
+def test_fly_activity_report_compatibility_and_formatting() -> None:
     summary = summarize_logs(
         [{"timestamp": "2026-01-01T00:00:00Z", "level": "info", "message": "Game started: abc"}],
         source="fly",
@@ -465,7 +469,7 @@ def test_fly_activity_report_compatibility_and_formatting():
     assert summary["event_counts"] == {"game_started": 1}
 
 
-def test_parse_args_multiplayer_and_spectator_flags():
+def test_parse_args_multiplayer_and_spectator_flags() -> None:
     cfg = parse_args(["--multiplayer-tables", "2,4", "--players-per-table", "4", "--spectators-per-game", "3"])
     assert cfg.multiplayer_tables == [2, 4]
     assert cfg.players_per_table == 4
@@ -474,14 +478,14 @@ def test_parse_args_multiplayer_and_spectator_flags():
     assert cfg.max_requested_ws_connections == 4 * (4 + 3)
 
 
-def test_parse_args_keeps_default_goldfish_sweep_when_games_and_multiplayer_omitted():
+def test_parse_args_keeps_default_goldfish_sweep_when_games_and_multiplayer_omitted() -> None:
     cfg = parse_args([])
     assert cfg.sweep_games == [10]
     assert cfg.multiplayer_tables == []
     assert cfg.spectators_per_game == 0
 
 
-def test_parse_args_validates_new_flags():
+def test_parse_args_validates_new_flags() -> None:
     with pytest.raises(ValueError, match="players-per-table"):
         parse_args(["--players-per-table", "1"])
     with pytest.raises(ValueError, match="spectators-per-game"):
@@ -492,7 +496,7 @@ def test_parse_args_validates_new_flags():
         parse_args(["--max-rss-mb", "-5"])
 
 
-def test_check_regression_thresholds_detects_p95_and_rss_breaches():
+def test_check_regression_thresholds_detects_p95_and_rss_breaches() -> None:
     cfg = parse_args(["--games", "1", "--max-p95-ms", "50", "--max-rss-mb", "300"])
     report = {
         "sweeps": [
@@ -512,8 +516,8 @@ def test_check_regression_thresholds_detects_p95_and_rss_breaches():
     assert "peak=340.50MB > 300.00MB" in breaches[2]
 
 
-def test_main_async_exits_nonzero_and_logs_breach(caplog):
-    async def fake_run_harness(_cfg):
+def test_main_async_exits_nonzero_and_logs_breach(caplog: pytest.LogCaptureFixture) -> None:
+    async def fake_run_harness(_cfg: object) -> dict[str, object]:
         return {
             "sweeps": [
                 {

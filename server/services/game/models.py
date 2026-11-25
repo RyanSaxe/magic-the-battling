@@ -1,11 +1,10 @@
-"""Lobby and seat types the game manager hands out: pending lobbies, constructed decks while they load,
-and the errors a lobby start or seat change can raise."""
+"""Lobby and seat types the game manager hands out: pending lobbies, constructed decks while they load."""
 
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import ClassVar
+from typing import ClassVar, Protocol
 
 from mtb.models.cards import (
     Battler,
@@ -23,10 +22,15 @@ class BattlerMissing:
     status: ClassVar[BattlerLoadingStatus] = "missing"
 
 
+class CancellableTask(Protocol):
+    def done(self) -> bool: ...
+    def cancel(self) -> object: ...
+
+
 @dataclass(frozen=True)
 class BattlerLoading:
     battler_id: str
-    task: asyncio.Task = field(repr=False, compare=False)
+    task: CancellableTask = field(repr=False, compare=False)
     status: ClassVar[BattlerLoadingStatus] = "loading"
 
 
@@ -87,7 +91,7 @@ class PendingGame:
     seat_token_hashes: dict[str, str] = field(default_factory=dict)
     host_away_since: datetime | None = None
     previous_host_id: str | None = None
-    _loading_task: asyncio.Task | None = field(default=None, repr=False)
+    loading_task: asyncio.Task | None = field(default=None, repr=False)
 
     def has_player_named(self, name: str) -> bool:
         """Whether a player in this lobby already has the name, ignoring case."""

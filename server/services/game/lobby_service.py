@@ -1,7 +1,7 @@
-"""Lobbies before their game starts: creating and joining them, readying up, the host and table settings,
-players leaving, and starting the game."""
+"""Lobbies before their game starts: creating and joining them, readying up, the host and table."""
 
 import asyncio
+import contextlib
 import json
 import logging
 import secrets
@@ -66,6 +66,8 @@ JOIN_CODE_ALPHABET = string.ascii_uppercase + string.digits
 
 
 JOIN_CODE_LENGTH = 6
+MIN_TABLE_PLAYERS = 2
+MAX_TABLE_PLAYERS = 8
 
 
 def _copy_for_dealing(battler: Battler) -> Battler:
@@ -91,6 +93,28 @@ def _table_refusal(pending: PendingGame, *, available_bots: Callable[[], int | N
         if available is None or available < pending.puppet_count:
             return "Not enough puppets are available for this table"
 
+    return None
+
+
+def _target_player_count_error(pending: PendingGame | None, player_id: str, *, target_player_count: int) -> str | None:
+    if not pending:
+        return "Game not found"
+    if not pending.accepts_changes:
+        return LOBBY_STARTING_MESSAGE
+    if player_id != pending.host_player_id:
+        return "Only the host can change the player cap"
+    if (
+        target_player_count < MIN_TABLE_PLAYERS
+        or target_player_count > MAX_TABLE_PLAYERS
+        or target_player_count % 2 != 0
+    ):
+        return (
+            "Player cap must be between 2 and 8"
+            if target_player_count < MIN_TABLE_PLAYERS or target_player_count > MAX_TABLE_PLAYERS
+            else "Player cap must be an even number"
+        )
+    if target_player_count < len(pending.player_names) + pending.puppet_count:
+        return "Player cap cannot be lower than occupied slots"
     return None
 
 
@@ -142,7 +166,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         return pending
 
     def join_game(
-        self, join_code: str, player_name: str, player_id: str, user_id: str | None = None
+        self, join_code: str, player_name: str, *, player_id: str, user_id: str | None = None
     ) -> PendingGame | None:
         pending = self.get_pending_game_by_code(join_code)
         if not pending or not pending.accepts_changes:
@@ -154,7 +178,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         total = len(pending.player_names) + pending.puppet_count
         if total >= pending.target_player_count:
             return None
-        if total >= 8:
+        if total >= MAX_TABLE_PLAYERS:
             return None
 
         pending.player_names.append(player_name)
@@ -185,7 +209,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             case BattlerMissing():
                 return False, "Submit a valid deck before readying up"
 
-    def set_player_ready(self, game_id: str, player_id: str, is_ready: bool) -> tuple[bool, str | None]:
+    def set_player_ready(self, game_id: str, player_id: str, *, is_ready: bool) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
         if not pending:
             return False, "Game not found"
@@ -230,7 +254,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             return "Game has already started"
         if by != pending.host_player_id:
             return "Only the host can start the game"
-        if pending.target_player_count < 2:
+        if pending.target_player_count < MIN_TABLE_PLAYERS:
             return "Need at least 2 players to start"
         return _table_refusal(pending, available_bots=available_bots)
 
@@ -238,6 +262,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         self,
         game_id: str,
         by: str,
+        *,
         db: Session | None,
         on_change: Callable[[], Awaitable[None]],
     ) -> Game:
@@ -250,7 +275,8 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         async with self.get_action_lock(game_id):
             pending = self._pending_games.get(game_id)
             if pending is None:
-                raise LobbyStartRefusedError("Game not found")
+                msg = "Game not found"
+                raise LobbyStartRefusedError(msg)
             refusal = self.start_rules(pending, by) or self._server_start_refusal()
             if refusal:
                 raise LobbyStartRefusedError(refusal)
@@ -306,10 +332,12 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
                 if pending.play_mode == "limited":
                     await self._finish_loading_cube(pending)
                 if self._pending_games.get(pending.game_id) is not pending:
-                    raise LobbyStartFailedError("The lobby closed while it was starting")
+                    msg = "The lobby closed while it was starting"
+                    raise LobbyStartFailedError(msg)
                 async with self.get_action_lock(pending.game_id):
                     if self._pending_games.get(pending.game_id) is not pending:
-                        raise LobbyStartFailedError("The lobby closed while it was starting")
+                        msg = "The lobby closed while it was starting"
+                        raise LobbyStartFailedError(msg)
                     allowed, reason = self.can_accept_loaded_game()
                     if not allowed:
                         raise LobbyStartFailedError(reason)
@@ -318,11 +346,9 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             raise LobbyStartFailedError(str(exc)) from exc
 
     async def _finish_loading_cube(self, pending: PendingGame) -> None:
-        if pending._loading_task and not pending._loading_task.done():
-            try:
-                await asyncio.wait_for(pending._loading_task, timeout=30.0)
-            except TimeoutError:
-                pass
+        if pending.loading_task and not pending.loading_task.done():
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(pending.loading_task, timeout=30.0)
 
         if pending.battler_error:
             raise LobbyStartFailedError(pending.battler_error)
@@ -336,7 +362,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
                 partial(
                     self._load_battler,
                     pending.cube_id,
-                    pending.use_upgrades,
+                    use_upgrades=pending.use_upgrades,
                     use_vanguards=pending.use_vanguards,
                     play_mode=pending.play_mode,
                 ),
@@ -356,19 +382,21 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
             cube_id=pending.cube_id,
             play_mode=pending.play_mode,
         )
-        game = create_game(pending.player_names, len(pending.player_names), config)
+        game = create_game(pending.player_names, len(pending.player_names), config=config)
         # Dealing shuffles and slices a battler's cards, so the game deals from its own copies and a start that
         # fails after this leaves the lobby's cube and decks whole for the next attempt.
         if pending.play_mode == "limited":
             battler = pending.battler
             if battler is None:
-                raise LobbyStartFailedError("The cube isn't loaded")
+                msg = "The cube isn't loaded"
+                raise LobbyStartFailedError(msg)
             needed = draft.cards_needed_for_first_draft(config, len(pending.player_names))
             if len(battler.cards) < needed:
-                raise LobbyStartFailedError(
+                msg = (
                     f"This cube has {len(battler.cards)} playable cards and needs at least {needed} "
                     "to give everyone a pack."
                 )
+                raise LobbyStartFailedError(msg)
             set_battler(game, _copy_for_dealing(battler))
             target_elo = battler.elo or 1200.0
         else:
@@ -434,7 +462,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         return True
 
     def _remove_lobby_seat(self, pending: PendingGame, player_id: str) -> None:
-        """The one way a seat leaves a lobby, whether the host removed it or its player stayed away."""
+        """Remove a seat from a lobby, whether kicked by host or timed out."""
         self._set_player_battler(pending, player_id, slot=BattlerMissing())
         pending.player_battlers.pop(player_id)
         index = pending.player_ids.index(player_id)
@@ -446,7 +474,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         self._player_id_to_name.pop(player_id, None)
 
         if not pending.player_ids:
-            self._cleanup_game(pending.game_id)
+            self.cleanup_game(pending.game_id)
         elif player_id == pending.host_player_id:
             self._pass_host_after_removal(pending)
 
@@ -454,6 +482,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         self,
         game_id: str,
         player_id: str,
+        *,
         on_removed: Callable[[], Coroutine[Any, Any, None]] | None = None,
         delay: float = 600.0,
     ) -> None:
@@ -506,6 +535,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         self,
         game_id: str,
         player_id: str,
+        *,
         on_host_change: Callable[[], Coroutine[Any, Any, None]],
     ) -> None:
         pending = self._pending_games.get(game_id)
@@ -570,7 +600,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         total = len(pending.player_names) + pending.puppet_count
         if total >= pending.target_player_count:
             return False
-        if total >= 8:
+        if total >= MAX_TABLE_PLAYERS:
             return False
         available = self._count_available_bots(pending)
         if available is None or available <= pending.puppet_count:
@@ -579,28 +609,16 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         return True
 
     def set_target_player_count(
-        self, game_id: str, player_id: str, target_player_count: int
+        self, game_id: str, player_id: str, *, target_player_count: int
     ) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
-        if not pending:
-            return False, "Game not found"
-        if not pending.accepts_changes:
-            return False, LOBBY_STARTING_MESSAGE
-        if player_id != pending.host_player_id:
-            return False, "Only the host can change the player cap"
-        if target_player_count < 2 or target_player_count > 8:
-            return False, "Player cap must be between 2 and 8"
-        if target_player_count % 2 != 0:
-            return False, "Player cap must be an even number"
-
-        occupied_slots = len(pending.player_names) + pending.puppet_count
-        if target_player_count < occupied_slots:
-            return False, "Player cap cannot be lower than occupied slots"
-
+        error = _target_player_count_error(pending, player_id, target_player_count=target_player_count)
+        if error is not None or pending is None:
+            return False, error
         pending.target_player_count = target_player_count
         return True, None
 
-    def set_voice_chat_enabled(self, game_id: str, player_id: str, enabled: bool) -> tuple[bool, str | None]:
+    def set_voice_chat_enabled(self, game_id: str, player_id: str, *, enabled: bool) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
         if not pending or pending.is_started:
             return False, "Game not found"
@@ -620,7 +638,7 @@ class LobbyService(BattlerLoader, PuppetLoader, SnapshotStore):
         pending.puppet_count -= 1
         return True
 
-    def kick_player(self, game_id: str, host_player_id: str, target_player_id: str) -> bool:
+    def kick_player(self, game_id: str, host_player_id: str, *, target_player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
         if not pending or not pending.accepts_changes:
             return False

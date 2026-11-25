@@ -1,9 +1,11 @@
+"""Server maintenance mode and deploy-warning notice manager."""
+
 import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from math import ceil
-from typing import Literal, cast
+from typing import Literal
 
 from server.db import database
 from server.db.models import OpsState
@@ -40,14 +42,16 @@ class OpsManager:
                 session.commit()
                 session.refresh(row)
 
-            mode_raw = cast(str | None, row.mode) or "normal"
-            if mode_raw in VALID_MODES:
-                self._mode = cast(OpsMode, mode_raw)
+            mode_raw = str(row.mode) if row.mode else "normal"
+            if mode_raw == "draining":
+                self._mode = "draining"
+            elif mode_raw == "maintenance":
+                self._mode = "maintenance"
             else:
                 self._mode = "normal"
-            self._message = cast(str | None, row.message) or None
-            self._updated_by = cast(str | None, row.updated_by) or None
-            self._updated_at = cast(datetime | None, row.updated_at) or datetime.now(UTC)
+            self._message = str(row.message) if row.message else None
+            self._updated_by = str(row.updated_by) if row.updated_by else None
+            self._updated_at = row.updated_at if isinstance(row.updated_at, datetime) else datetime.now(UTC)
         finally:
             session.close()
 
@@ -67,7 +71,7 @@ class OpsManager:
             updated_at=self._updated_at,
         )
 
-    def set_mode(self, mode: OpsMode, message: str | None, updated_by: str | None) -> OpsSnapshot:
+    def set_mode(self, mode: OpsMode, message: str | None, *, updated_by: str | None) -> OpsSnapshot:
         if mode not in VALID_MODES:
             msg = f"Invalid mode: {mode}"
             raise ValueError(msg)
@@ -80,10 +84,10 @@ class OpsManager:
                 row = OpsState(id=1)
                 session.add(row)
 
-            row.mode = mode  # ty: ignore[invalid-assignment]
-            row.message = message  # ty: ignore[invalid-assignment]
-            row.updated_by = updated_by  # ty: ignore[invalid-assignment]
-            row.updated_at = now  # ty: ignore[invalid-assignment]
+            row.mode = mode
+            row.message = message
+            row.updated_by = updated_by
+            row.updated_at = now
             session.commit()
         finally:
             session.close()

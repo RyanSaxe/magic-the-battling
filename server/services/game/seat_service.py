@@ -1,12 +1,11 @@
-"""A player's seats across games: status checks, resumable games, reclaiming a seat on another device,
-closing a seat, and the per-player game views."""
+"""A player's seats across games: status checks, resumable games, reclaiming a seat on another device."""
 
 import json
 import secrets
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -173,14 +172,14 @@ def _lobbies_then_latest_game(game: ResumableGame) -> tuple[bool, datetime]:
 
 def _with_cube_metadata(session: Session, games: list[ResumableGame]) -> list[ResumableGame]:
     cube_ids = {game.cube_id for game in games}
-    metadata = {
-        cast(str, row.cube_id): row for row in session.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids))
-    }
+    metadata = {str(row.cube_id): row for row in session.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids))}
     return [
         game.model_copy(
             update={
-                "cube_name": cast(str | None, meta.name) if (meta := metadata.get(game.cube_id)) else None,
-                "cube_image_uri": cast(str | None, meta.image_uri) if meta else None,
+                "cube_name": (str(_v) if (_v := meta.name) is not None else None)
+                if (meta := metadata.get(game.cube_id))
+                else None,
+                "cube_image_uri": (str(_v) if (_v := meta.image_uri) is not None else None) if meta else None,
             }
         )
         for game in games
@@ -217,7 +216,7 @@ class SeatService(LobbyService):
         session = db.SessionLocal()
         try:
             snapshot = _extract_snapshot_status(session, game_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- broad boundary catch
             return None
         finally:
             session.close()
@@ -230,6 +229,7 @@ class SeatService(LobbyService):
         self,
         game_id: str,
         player_name: str,
+        *,
         is_player_connected: Callable[[str, str], bool] | None = None,
     ) -> bool:
         game = self._active_games.get(game_id)
@@ -244,7 +244,7 @@ class SeatService(LobbyService):
         session = db.SessionLocal()
         try:
             snapshot = _extract_snapshot_status(session, game_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- broad boundary catch
             return False
         finally:
             session.close()
@@ -254,10 +254,11 @@ class SeatService(LobbyService):
         return any(player.get("name") == player_name for player in players)
 
     def find_resumable_seats(self, seats: list[ResumableSeat], *, user_id: str | None = None) -> list[ResumableGame]:
-        """The seats a caller can still return to: those its browser holds tokens for, and those its account took.
+        """Return the seats a caller can still return to by browser token or account.
 
         One seat per game, the browser's first. Either proof closes a seat, so can_close follows the game's own rule.
-        Never restores a snapshot."""
+        Never restores a snapshot.
+        """
         session = db.SessionLocal()
         try:
             account_seats = self._account_seats(session, user_id) if user_id else set()
@@ -270,7 +271,7 @@ class SeatService(LobbyService):
             ]
             stored_game_ids = [seat.game_id for seat in seats if seat.game_id not in self._pending_games]
             stored_hashes = {
-                (cast(str, row.game_id), cast(str, row.player_name)): cast(str | None, row.seat_token_hash)
+                (str(row.game_id), str(row.player_name)): (str(_v) if (_v := row.seat_token_hash) is not None else None)
                 for row in session.query(GamePlayerRecord).filter(
                     GamePlayerRecord.game_id.in_(stored_game_ids),
                     GamePlayerRecord.is_puppet.is_(False),
@@ -278,7 +279,7 @@ class SeatService(LobbyService):
             }
             # json_extract keeps the snapshot's card registry out of Python; only the seats are parsed.
             snapshots = {
-                cast(str, row.game_id): row
+                str(row.game_id): row
                 for row in session.query(
                     ActiveGameSnapshot.game_id,
                     ActiveGameSnapshot.last_human_activity_at,
@@ -347,9 +348,9 @@ class SeatService(LobbyService):
         }
         # game_players has no index on user_id, so only games still in play are searched, by their id.
         game_ids = set(self._active_games.copy())
-        game_ids.update(cast(str, row.game_id) for row in session.query(ActiveGameSnapshot.game_id))
+        game_ids.update(str(row.game_id) for row in session.query(ActiveGameSnapshot.game_id))
         game_seats = {
-            (cast(str, row.game_id), cast(str, row.player_name))
+            (str(row.game_id), str(row.player_name))
             for row in session.query(GamePlayerRecord.game_id, GamePlayerRecord.player_name).filter(
                 GamePlayerRecord.game_id.in_(game_ids),
                 GamePlayerRecord.user_id == user_id,
@@ -370,7 +371,8 @@ class SeatService(LobbyService):
 
         The player id stays the same, so spectators and lobby state keep following the seat; the newest socket
         for it replaces the older one. Raises SeatClaimRefusedError when the game or seat is gone, or the caller
-        does not own the seat."""
+        does not own the seat.
+        """
         pending = self._pending_games.get(game_id)
         if pending is not None and not pending.is_started:
             return self._reclaim_lobby_seat(pending, player_name, seat_token=seat_token, user_id=user_id)
@@ -394,10 +396,10 @@ class SeatService(LobbyService):
                 )
                 .first()
             )
-            stored_hash = cast(str | None, record.seat_token_hash) if record else None
+            stored_hash = (str(_v) if (_v := record.seat_token_hash) is not None else None) if record else None
             refusal = seat_claim_refusal(
                 stored_hash=stored_hash,
-                owner_user_id=cast(str | None, record.user_id) if record else None,
+                owner_user_id=(str(_v) if (_v := record.user_id) is not None else None) if record else None,
                 seat_token=seat_token,
                 user_id=user_id,
             )
@@ -448,7 +450,8 @@ class SeatService(LobbyService):
 
         A lobby seat leaves the lobby. A started game is retired, so only a game with no other human can close:
         with others in it, every round would wait on the seat that left. Raises SeatClaimRefusedError when the
-        caller doesn't hold such a seat, and SeatCloseRefusedError when it can't end now."""
+        caller doesn't hold such a seat, and SeatCloseRefusedError when it can't end now.
+        """
         pending = self._pending_games.get(game_id)
         if pending is not None and not pending.is_started:
             return self._close_lobby_seat(pending, player_name, seat_token=seat_token, user_id=user_id)
@@ -474,8 +477,8 @@ class SeatService(LobbyService):
                 .first()
             )
             if not holds_seat(
-                stored_hash=cast(str | None, record.seat_token_hash) if record else None,
-                owner_user_id=cast(str | None, record.user_id) if record else None,
+                stored_hash=(str(_v) if (_v := record.seat_token_hash) is not None else None) if record else None,
+                owner_user_id=(str(_v) if (_v := record.user_id) is not None else None) if record else None,
                 seat_token=seat_token,
                 user_id=user_id,
             ):
@@ -487,7 +490,7 @@ class SeatService(LobbyService):
             self._retire_games(session, {game_id})
         finally:
             session.close()
-        self._cleanup_game(game_id)
+        self.cleanup_game(game_id)
         return player_id
 
     def _close_lobby_seat(self, pending: PendingGame, player_name: str, *, seat_token: str, user_id: str | None) -> str:

@@ -1,3 +1,5 @@
+"""Build-phase hand/sideboard/companion/basics management and ready checks."""
+
 from mtb.models.cards import Card
 from mtb.models.game import Game, Player
 from mtb.models.types import BuildSource
@@ -12,7 +14,7 @@ def _get_build_collection(player: Player, zone: BuildSource) -> list[Card]:
 
 
 def move_card(
-    player: Player, card: Card, source: BuildSource, destination: BuildSource, slot: int | None = None
+    player: Player, card: Card, *, source: BuildSource, destination: BuildSource, slot: int | None = None
 ) -> None:
     if source == destination:
         return
@@ -22,14 +24,17 @@ def move_card(
         and slot is not None
         and (not isinstance(slot, int) or isinstance(slot, bool) or not 0 <= slot < player.hand_size)
     ):
-        raise ValueError(f"No hand slot {slot}")
+        msg = f"No hand slot {slot}"
+        raise ValueError(msg)
 
     if source == "sideboard" and destination == "hand" and len(player.hand) >= player.hand_size:
-        raise ValueError(f"Hand is full ({player.hand_size})")
+        msg = f"Hand is full ({player.hand_size})"
+        raise ValueError(msg)
 
     source_collection = _get_build_collection(player, source)
     if card not in source_collection:
-        raise ValueError(f"Card not in player's {source}")
+        msg = f"Card not in player's {source}"
+        raise ValueError(msg)
 
     slots = player.slotted_hand()
     source_collection.remove(card)
@@ -52,20 +57,24 @@ def move_card(
 def swap_card(
     player: Player,
     card_a: Card,
+    *,
     source_a: BuildSource,
     card_b: Card,
     source_b: BuildSource,
 ) -> None:
     if source_a == source_b:
-        raise ValueError("Cannot swap cards within the same zone")
+        msg = "Cannot swap cards within the same zone"
+        raise ValueError(msg)
 
     collection_a = _get_build_collection(player, source_a)
     collection_b = _get_build_collection(player, source_b)
 
     if card_a not in collection_a:
-        raise ValueError(f"Card not in player's {source_a}")
+        msg = f"Card not in player's {source_a}"
+        raise ValueError(msg)
     if card_b not in collection_b:
-        raise ValueError(f"Card not in player's {source_b}")
+        msg = f"Card not in player's {source_b}"
+        raise ValueError(msg)
 
     idx_a = collection_a.index(card_a)
     idx_b = collection_b.index(card_b)
@@ -82,45 +91,59 @@ def swap_card(
         player.command_zone.clear()
 
 
-def set_basics(game: Game, player: Player, basics: list[str]) -> None:
+def set_basics(game: Game, player: Player, *, basics: list[str]) -> None:
     if player.phase != "build":
-        raise ValueError("Player is not in build phase")
+        msg = "Player is not in build phase"
+        raise ValueError(msg)
 
     if player.build_ready:
-        raise ValueError("Cannot change basic lands while ready")
+        msg = "Cannot change basic lands while ready"
+        raise ValueError(msg)
 
     if len(basics) > game.config.num_basics:
-        raise ValueError(f"Cannot choose more than {game.config.num_basics} basic lands")
+        msg = f"Cannot choose more than {game.config.num_basics} basic lands"
+        raise ValueError(msg)
 
     for basic in basics:
         if basic not in VALID_BASICS:
-            raise ValueError(f"Invalid basic land: {basic}")
+            msg = f"Invalid basic land: {basic}"
+            raise ValueError(msg)
 
     player.chosen_basics = list(basics)
+
+
+def _validate_ready_basics(game: Game, basics: list[str]) -> None:
+    if len(basics) != game.config.num_basics:
+        msg = f"Must choose exactly {game.config.num_basics} basic lands"
+        raise ValueError(msg)
+
+    for basic in basics:
+        if basic not in VALID_BASICS:
+            msg = f"Invalid basic land: {basic}"
+            raise ValueError(msg)
 
 
 def set_ready(
     game: Game,
     player: Player,
+    *,
     basics: list[str],
     play_draw_preference: str = "play",
     hand_order: list[str] | None = None,
 ) -> None:
     if player.phase != "build":
-        raise ValueError("Player is not in build phase")
+        msg = "Player is not in build phase"
+        raise ValueError(msg)
 
     if play_draw_preference not in ("play", "draw"):
-        raise ValueError(f"Invalid play/draw preference: {play_draw_preference}")
+        msg = f"Invalid play/draw preference: {play_draw_preference}"
+        raise ValueError(msg)
 
-    if len(basics) != game.config.num_basics:
-        raise ValueError(f"Must choose exactly {game.config.num_basics} basic lands")
-
-    for basic in basics:
-        if basic not in VALID_BASICS:
-            raise ValueError(f"Invalid basic land: {basic}")
+    _validate_ready_basics(game, basics)
 
     if len(player.hand) != player.hand_size:
-        raise ValueError(f"Hand must have exactly {player.hand_size} cards")
+        msg = f"Hand must have exactly {player.hand_size} cards"
+        raise ValueError(msg)
 
     if hand_order is not None:
         hand_ids = {c.id for c in player.hand}
@@ -136,7 +159,8 @@ def set_ready(
 
 def unready(player: Player) -> None:
     if player.phase != "build":
-        raise ValueError("Player is not in build phase")
+        msg = "Player is not in build phase"
+        raise ValueError(msg)
     player.build_ready = False
     player.play_draw_preference = None
 
@@ -174,13 +198,16 @@ def populate_hand(player: Player) -> None:
 
 def set_companion(player: Player, card: Card) -> None:
     if player.phase != "build":
-        raise ValueError("Player is not in build phase")
+        msg = "Player is not in build phase"
+        raise ValueError(msg)
 
     if not card.is_companion:
-        raise ValueError(f"{card.name} is not a companion")
+        msg = f"{card.name} is not a companion"
+        raise ValueError(msg)
 
     if card not in player.sideboard:
-        raise ValueError(f"{card.name} is not in player's sideboard")
+        msg = f"{card.name} is not in player's sideboard"
+        raise ValueError(msg)
 
     player.command_zone.clear()
     player.command_zone.append(card.model_copy())
@@ -188,23 +215,25 @@ def set_companion(player: Player, card: Card) -> None:
 
 def remove_companion(player: Player) -> None:
     if player.phase != "build":
-        raise ValueError("Player is not in build phase")
+        msg = "Player is not in build phase"
+        raise ValueError(msg)
 
     if not player.command_zone:
-        raise ValueError("No companion in command zone")
+        msg = "No companion in command zone"
+        raise ValueError(msg)
 
     player.command_zone.clear()
 
 
 __all__ = [
     "VALID_BASICS",
-    "move_card",
-    "swap_card",
-    "set_ready",
-    "unready",
     "all_ready",
-    "populate_hand",
     "apply_upgrade_to_card",
-    "set_companion",
+    "move_card",
+    "populate_hand",
     "remove_companion",
+    "set_companion",
+    "set_ready",
+    "swap_card",
+    "unready",
 ]

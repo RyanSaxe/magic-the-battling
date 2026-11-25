@@ -1,3 +1,5 @@
+"""Pydantic models for authentication requests and user responses."""
+
 import re
 
 from pydantic import BaseModel, field_validator
@@ -19,14 +21,17 @@ class RegisterRequest(BaseModel):
     def _validate_username(cls, v: str) -> str:
         v = v.strip()
         if not USERNAME_RE.match(v):
-            raise ValueError("Username must be 3-30 characters: letters, numbers, underscores only")
+            msg = "Username must be 3-30 characters: letters, numbers, underscores only"
+            raise ValueError(msg)
         return v
 
     @field_validator("password")
     @classmethod
     def _validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
+        min_password_length = 8
+        if len(v) < min_password_length:
+            msg = "Password must be at least 8 characters"
+            raise ValueError(msg)
         return v
 
     @field_validator("email")
@@ -34,7 +39,8 @@ class RegisterRequest(BaseModel):
     def _validate_email(cls, v: str) -> str:
         v = v.strip()
         if not v or "@" not in v:
-            raise ValueError("A valid email address is required")
+            msg = "A valid email address is required"
+            raise ValueError(msg)
         return v
 
 
@@ -67,8 +73,9 @@ class UserBattlerCreate(BaseModel):
             return cube_id_from_input(value)
         except ValueError as error:
             # A custom error keeps pydantic's "Value error, " prefix out of the message the player sees.
+            msg = "cube_link"
             raise PydanticCustomError(
-                "cube_link", "Enter a CubeCobra cube ID, or paste a link to the cube on CubeCobra."
+                msg, "Enter a CubeCobra cube ID, or paste a link to the cube on CubeCobra."
             ) from error
 
     @field_validator("play_mode", mode="before")

@@ -62,13 +62,14 @@ def decode_ws_message(raw: str | bytes) -> dict[str, Any]:
 def remaining_timeout(deadline: float) -> float:
     remaining = deadline - time.monotonic()
     if remaining <= 0:
-        raise TimeoutError("game exceeded timeout")
+        msg = "game exceeded timeout"
+        raise TimeoutError(msg)
     return remaining
 
 
 def retry_delay_sec(attempt: int, *, base_sec: float, max_sec: float) -> float:
     exp = min(max_sec, base_sec * (2**attempt))
-    return random.random() * exp
+    return random.random() * exp  # noqa: S311 -- non-cryptographic game RNG
 
 
 async def sleep_retry_or_timeout(
@@ -145,7 +146,8 @@ async def _post_with_retry(
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict):
-            raise GameFlowError(f"{label} response was not a JSON object")
+            msg = f"{label} response was not a JSON object"
+            raise GameFlowError(msg)
         return payload
 
 
@@ -245,7 +247,8 @@ async def request_spectate_with_retry(
         if status == "approved" and status_payload.get("session_id"):
             return request_id, str(status_payload["session_id"])
         if status in {"denied", "cancelled", "expired"}:
-            raise GameFlowError(f"spectate request ended with status={status}")
+            msg = f"spectate request ended with status={status}"
+            raise GameFlowError(msg)
         remaining_timeout(deadline)
         await asyncio.sleep(0.05)
 
@@ -267,7 +270,7 @@ async def connect_ws_with_retry(
                 open_timeout=min(30.0, remaining_timeout(deadline)),
                 close_timeout=5,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- broad boundary catch
             await sleep_retry_or_timeout(
                 deadline=deadline,
                 attempt=ws_attempt,

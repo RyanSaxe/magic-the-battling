@@ -3,18 +3,20 @@ import random
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 from conftest import setup_battle_ready
 
+from mtb.models.cards import Card
 from mtb.models.game import Game, Player, Puppet, StaticOpponent, create_game
 from mtb.phases import battle
 from server.services.game.view_builder import build_puppet_view
 
 
 class TestPairingProbabilities:
-    def test_get_pairing_probabilities_single_candidate(self):
+    def test_get_pairing_probabilities_single_candidate(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         setup_battle_ready(alice)
@@ -24,7 +26,7 @@ class TestPairingProbabilities:
 
         assert probs == {"Bob": 1.0}
 
-    def test_get_pairing_probabilities_three_candidates(self):
+    def test_get_pairing_probabilities_three_candidates(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie", "Diana"], num_players=4)
         alice, _bob, _charlie, _diana = game.players
         for p in game.players:
@@ -37,7 +39,7 @@ class TestPairingProbabilities:
         total = sum(probs.values())
         assert abs(total - 1.0) < 0.001
 
-    def test_get_pairing_probabilities_prior_opponent_weighted_down(self):
+    def test_get_pairing_probabilities_prior_opponent_weighted_down(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie", "Diana"], num_players=4)
         alice, bob, _charlie, _diana = game.players
         alice.last_opponent_name = "Bob"
@@ -49,7 +51,7 @@ class TestPairingProbabilities:
 
         assert probs == pytest.approx({"Bob": 0.1, "Charlie": 0.45, "Diana": 0.45})
 
-    def test_get_pairing_probabilities_works_across_phases(self):
+    def test_get_pairing_probabilities_works_across_phases(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         alice.phase = "battle"
@@ -59,20 +61,20 @@ class TestPairingProbabilities:
 
         assert probs == {"Bob": 1.0}
 
-    def test_get_pairing_probabilities_returns_empty_when_in_active_battle(self):
+    def test_get_pairing_probabilities_returns_empty_when_in_active_battle(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, _charlie = game.players
         for p in game.players:
             setup_battle_ready(p)
 
-        battle.start(game, alice, bob)
+        battle.start(game, alice, opponent=bob)
         probs = battle.get_pairing_probabilities(game, alice)
 
         assert probs == {}
 
 
 class TestUnifiedPairingCandidates:
-    def test_get_all_pairing_candidates_includes_live_players(self):
+    def test_get_all_pairing_candidates_includes_live_players(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, _bob, _charlie = game.players
         for p in game.players:
@@ -83,18 +85,18 @@ class TestUnifiedPairingCandidates:
         names = {c.name for c in candidates}
         assert names == {"Bob", "Charlie"}
 
-    def test_get_all_pairing_candidates_excludes_players_in_active_battle(self):
+    def test_get_all_pairing_candidates_excludes_players_in_active_battle(self) -> None:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
         for p in game.players:
             setup_battle_ready(p)
 
-        battle.start(game, bob, charlie)
+        battle.start(game, bob, opponent=charlie)
         candidates = battle.get_all_pairing_candidates(game, alice)
 
         assert len(candidates) == 0
 
-    def test_get_all_pairing_candidates_includes_fake_players(self, card_factory):
+    def test_get_all_pairing_candidates_includes_fake_players(self, card_factory: Callable[..., Card]) -> None:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
         setup_battle_ready(alice)
@@ -114,7 +116,7 @@ class TestUnifiedPairingCandidates:
         assert isinstance(candidates[0], StaticOpponent)
         assert candidates[0].name == "Bot1"
 
-    def test_get_all_pairing_candidates_includes_ghost(self):
+    def test_get_all_pairing_candidates_includes_ghost(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         setup_battle_ready(alice)
@@ -127,7 +129,7 @@ class TestUnifiedPairingCandidates:
         assert len(candidates) == 1
         assert candidates[0] is ghost
 
-    def test_get_all_pairing_candidates_excludes_self_as_ghost(self):
+    def test_get_all_pairing_candidates_excludes_self_as_ghost(self) -> None:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         alice.phase = "eliminated"
@@ -139,7 +141,7 @@ class TestUnifiedPairingCandidates:
 
         assert ghost not in candidates
 
-    def test_fake_player_snapshot_uses_stage_for_lookup(self, card_factory):
+    def test_fake_player_snapshot_uses_stage_for_lookup(self, card_factory: Callable[..., Card]) -> None:
         """Snapshots are keyed by stage and round, not hand_size."""
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
@@ -167,7 +169,7 @@ class TestUnifiedPairingCandidates:
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "later_card"
 
-    def test_fake_player_revealed_cards_includes_companion(self, card_factory):
+    def test_fake_player_revealed_cards_includes_companion(self, card_factory: Callable[..., Card]) -> None:
         """Fake player's revealed cards should include companion from command_zone."""
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
@@ -202,7 +204,7 @@ class TestUnifiedPairingCandidates:
 
 
 def _table_game(*, humans: int, puppets: int, ghost: str | None, history: bool) -> Game:
-    """A game whose next round seats ``humans`` players, ``puppets`` puppets and an optional ghost."""
+    """Build a game whose next round seats ``humans`` players, ``puppets`` puppets and an optional ghost."""
     game = create_game([f"H{i}" for i in range(humans)], num_players=humans)
     for player in game.players:
         setup_battle_ready(player)
@@ -228,7 +230,7 @@ def _table_game(*, humans: int, puppets: int, ghost: str | None, history: bool) 
     return game
 
 
-def _tables():
+def _tables() -> Iterator[object]:
     for live in range(2, 10):
         for humans in sorted({live, 1, (live + 1) // 2}):
             puppets = live - humans
@@ -240,7 +242,9 @@ def _tables():
 
 class TestRoundTable:
     @pytest.mark.parametrize(("humans", "puppets", "ghost", "history"), list(_tables()))
-    def test_every_player_sees_the_odds_the_guide_describes(self, humans, puppets, ghost, history):
+    def test_every_player_sees_the_odds_the_guide_describes(
+        self, humans: int, puppets: int, *, ghost: str | None, history: bool
+    ) -> None:
         game = _table_game(humans=humans, puppets=puppets, ghost=ghost, history=history)
         seats = battle.get_round_table(game).seats
 
@@ -261,11 +265,13 @@ class TestRoundTable:
                 assert list(odds.values()) == pytest.approx([1 / 3] * 3)
 
     @pytest.mark.parametrize(("humans", "puppets", "ghost", "history"), list(_tables()))
-    def test_simulated_rounds_draw_each_opponent_at_the_shown_odds(self, humans, puppets, ghost, history):
+    def test_simulated_rounds_draw_each_opponent_at_the_shown_odds(
+        self, humans: int, puppets: int, *, ghost: str | None, history: bool
+    ) -> None:
         game = _table_game(humans=humans, puppets=puppets, ghost=ghost, history=history)
         table = battle.get_round_table(game)
         rounds = 20_000
-        rng = random.Random(f"{humans}-{puppets}-{ghost}-{history}")
+        rng = random.Random(f"{humans}-{puppets}-{ghost}-{history}")  # noqa: S311 -- non-cryptographic game RNG
         faced: dict[str, Counter[str]] = {player.name: Counter() for player in game.players}
 
         for _ in range(rounds):
@@ -280,7 +286,7 @@ class TestRoundTable:
             for name, odd in odds.items():
                 assert faced[player.name][name] / rounds == pytest.approx(odd, abs=0.015)
 
-    def test_four_seats_with_one_repeat_pair_give_the_other_pair_ten_percent_too(self):
+    def test_four_seats_with_one_repeat_pair_give_the_other_pair_ten_percent_too(self) -> None:
         game = create_game(["A", "B", "C", "D"], num_players=4)
         a, b, c, _d = game.players
         for player in game.players:
@@ -290,7 +296,7 @@ class TestRoundTable:
         assert battle.get_pairing_probabilities(game, a) == pytest.approx({"B": 0.1, "C": 0.45, "D": 0.45})
         assert battle.get_pairing_probabilities(game, c) == pytest.approx({"D": 0.1, "A": 0.45, "B": 0.45})
 
-    def test_round_table_is_the_same_after_a_restart(self):
+    def test_round_table_is_the_same_after_a_restart(self) -> None:
         script = """
 from mtb.models.game import create_game
 from mtb.phases import battle
@@ -302,7 +308,7 @@ print(battle.get_round_table(game).pairings)
 """
         repo_root = Path(__file__).resolve().parents[1]
         tables = {
-            subprocess.run(
+            subprocess.run(  # noqa: S603 -- trusted local subprocess args
                 [sys.executable, "-c", script],
                 cwd=repo_root,
                 env={**os.environ, "PYTHONHASHSEED": hash_seed},

@@ -1,24 +1,29 @@
 import asyncio
 
+import pytest
+from sqlalchemy.orm import Session
+
 import server.db.database as db_module
 import server.services.game_manager as gm_module
 from server.db.models import ActiveGameSnapshot
+from server.services.game_manager import GameManager
 
 
-async def _started_game(game_manager, db) -> str:
+async def _started_game(game_manager: GameManager, db: Session) -> str:
     pending = game_manager.create_game("Alice", "pid-alice", cube_id="test", target_player_count=2)
-    game_manager.join_game(pending.join_code, "Bob", "pid-bob")
+    game_manager.join_game(pending.join_code, "Bob", player_id="pid-bob")
     for player_id in pending.player_ids:
-        game_manager.set_player_ready(pending.game_id, player_id, True)
+        game_manager.set_player_ready(pending.game_id, player_id, is_ready=True)
 
     async def no_broadcast() -> None:
         pass
 
-    await game_manager.start_lobby(pending.game_id, "pid-alice", db, on_change=no_broadcast)
+    await game_manager.start_lobby(pending.game_id, "pid-alice", db=db, on_change=no_broadcast)
     return pending.game_id
 
 
-def test_a_game_resumed_after_eviction_outlives_its_abandoned_cleanup(mock_cube_data, test_db):
+def test_a_game_resumed_after_eviction_outlives_its_abandoned_cleanup(mock_cube_data: None, test_db: None) -> None:
+    _ = (mock_cube_data, test_db)
     game_manager = gm_module.game_manager
 
     async def scenario() -> tuple[bool, bool]:
@@ -28,7 +33,7 @@ def test_a_game_resumed_after_eviction_outlives_its_abandoned_cleanup(mock_cube_
             game_manager.schedule_abandoned_cleanup(game_id, delay=0.2)
             game_manager.mark_game_dirty(game_id, human_activity=False)
             game_manager.persist_dirty_games()
-            game_manager._cleanup_game(game_id, preserve_snapshot=True)
+            game_manager.cleanup_game(game_id, preserve_snapshot=True)
 
             game_manager.reclaim_seat(game_id, "Alice", seat_token=None, user_id=None)
             await asyncio.sleep(0.4)
@@ -45,7 +50,8 @@ def test_a_game_resumed_after_eviction_outlives_its_abandoned_cleanup(mock_cube_
     assert snapshot_kept
 
 
-def test_the_scheduled_cleanup_still_removes_a_finished_game(mock_cube_data, test_db):
+def test_the_scheduled_cleanup_still_removes_a_finished_game(mock_cube_data: None, test_db: None) -> None:
+    _ = (mock_cube_data, test_db)
     game_manager = gm_module.game_manager
 
     async def scenario() -> bool:
@@ -61,7 +67,10 @@ def test_the_scheduled_cleanup_still_removes_a_finished_game(mock_cube_data, tes
     assert asyncio.run(scenario())
 
 
-def test_a_reconnect_after_game_over_keeps_the_post_game_cleanup(mock_cube_data, test_db, monkeypatch):
+def test_a_reconnect_after_game_over_keeps_the_post_game_cleanup(
+    mock_cube_data: None, test_db: None, *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ = (mock_cube_data, test_db)
     monkeypatch.setattr("server.services.game.round_service.POST_GAME_CLEANUP_SECONDS", 0.05)
     game_manager = gm_module.game_manager
 
@@ -71,7 +80,7 @@ def test_a_reconnect_after_game_over_keeps_the_post_game_cleanup(mock_cube_data,
             game_id = await _started_game(game_manager, db)
             game = game_manager.get_game(game_id)
             assert game is not None
-            game_manager.complete_game(game_id, game.players[0], db)
+            game_manager.complete_game(game_id, game.players[0], db=db)
             game_manager.cancel_abandoned_cleanup(game_id)
             await asyncio.sleep(0.2)
             return game_manager.get_game(game_id) is None
@@ -81,7 +90,10 @@ def test_a_reconnect_after_game_over_keeps_the_post_game_cleanup(mock_cube_data,
     assert asyncio.run(scenario())
 
 
-def test_a_finished_game_unloaded_before_its_cleanup_is_still_retired(mock_cube_data, test_db, monkeypatch):
+def test_a_finished_game_unloaded_before_its_cleanup_is_still_retired(
+    mock_cube_data: None, test_db: None, *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ = (mock_cube_data, test_db)
     monkeypatch.setattr("server.services.game.round_service.POST_GAME_CLEANUP_SECONDS", 0.05)
     game_manager = gm_module.game_manager
 
@@ -91,10 +103,10 @@ def test_a_finished_game_unloaded_before_its_cleanup_is_still_retired(mock_cube_
             game_id = await _started_game(game_manager, db)
             game = game_manager.get_game(game_id)
             assert game is not None
-            game_manager.complete_game(game_id, game.players[0], db)
+            game_manager.complete_game(game_id, game.players[0], db=db)
             game_manager.mark_game_dirty(game_id, human_activity=False)
             game_manager.persist_dirty_games()
-            game_manager._cleanup_game(game_id, preserve_snapshot=True)
+            game_manager.cleanup_game(game_id, preserve_snapshot=True)
             await asyncio.sleep(0.2)
             db.expire_all()
             return db.get(ActiveGameSnapshot, game_id) is None

@@ -9,6 +9,7 @@ already writes the new format:
 
 import json
 import random
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -40,8 +41,8 @@ def _new_game(player_names: list[str]) -> Game:
 def _ready_for_battle(game: Game) -> None:
     for player in game.players:
         for _ in range(game.config.starting_stage):
-            build.move_card(player, player.sideboard[0], "sideboard", "hand")
-        build.set_ready(game, player, BASICS, "play")
+            build.move_card(player, player.sideboard[0], source="sideboard", destination="hand")
+        build.set_ready(game, player, basics=BASICS, play_draw_preference="play")
         player.phase = "battle"
 
 
@@ -53,7 +54,7 @@ def battle_phase() -> Game:
     game = _new_game(["Alice", "Bob"])
     _ready_for_battle(game)
     alice, bob = game.players
-    battle.start(game, alice, bob)
+    battle.start(game, alice, opponent=bob)
     return game
 
 
@@ -61,12 +62,12 @@ def draft_phase() -> Game:
     game = battle_phase()
     alice, bob = game.players
     finished = game.active_battles[0]
-    battle.submit_result(finished, alice, alice.name)
-    battle.submit_result(finished, bob, alice.name)
+    battle.submit_result(finished, alice, winner_name=alice.name)
+    battle.submit_result(finished, bob, winner_name=alice.name)
     result = battle.end(game, finished)
     for player in game.players:
         player.phase = "reward"
-    reward.start(game, result.winner, result.loser)
+    reward.start(game, result.winner, loser=result.loser)
     for player in game.players:
         reward.end_for_player(game, player)
     draft.start(game)
@@ -90,7 +91,7 @@ def puppet_battle_phase() -> Game:
         source_player_history_id=1,
     )
     game.puppets.append(Puppet(name="Puppet", player_history_id=1, snapshots={"3_1": opponent}))
-    battle.start(game, alice, opponent)
+    battle.start(game, alice, opponent=opponent)
     return game
 
 
@@ -110,7 +111,7 @@ def main() -> None:
         # The card registry is built from a set, so sorting keeps its order the same on every run.
         snapshot = json.loads(make_game().snapshot_dump_json())
         path.write_text(json.dumps(snapshot, sort_keys=True) + "\n")
-        print(f"wrote {path}")
+        sys.stdout.write(f"wrote {path}\n")
 
 
 if __name__ == "__main__":

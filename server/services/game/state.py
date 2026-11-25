@@ -1,5 +1,4 @@
-"""The game manager's in-memory registry: live games, lobbies, player mappings, per-game action locks
-and start capacity. Every game service builds on this state and reads it through these lookups."""
+"""The game manager's in-memory registry: live games, lobbies, player mappings, per-game action locks."""
 
 import asyncio
 from collections.abc import AsyncGenerator, Callable, Collection
@@ -125,6 +124,9 @@ class GameManagerState:
     def loaded_games_count(self) -> int:
         return len(self._active_games)
 
+    def pending_games_count(self) -> int:
+        return len(self._pending_games)
+
     def hot_games_count(self) -> int:
         hot_cutoff = datetime.now(UTC) - timedelta(minutes=HOT_ACTION_WINDOW_MINUTES)
         hot = 0
@@ -156,7 +158,8 @@ class GameManagerState:
     @asynccontextmanager
     async def _acquire_game_start_slot(self) -> AsyncGenerator[None]:
         if self._game_start_waiters >= MAX_GAME_START_QUEUE:
-            raise GameStartQueueFullError("Server is starting many games. Please try again shortly.")
+            msg = "Server is starting many games. Please try again shortly."
+            raise GameStartQueueFullError(msg)
 
         self._game_start_waiters += 1
         acquired = False
@@ -244,7 +247,7 @@ class GameManagerState:
         return self._player_id_to_name.get(player_id)
 
     def _set_player_battler(self, pending: PendingGame, player_id: str, *, slot: PlayerBattler) -> None:
-        """The one way a constructed player's deck changes. A load it replaces is cancelled."""
+        """Replace a constructed player's deck state, cancelling any superseded load task."""
         previous = pending.player_battlers.get(player_id)
         if isinstance(previous, BattlerLoading) and previous.task is not _current_task():
             previous.task.cancel()
@@ -261,3 +264,64 @@ class GameManagerState:
         if not elos:
             return 1200.0
         return sum(elos) / len(elos)
+
+    @property
+    def active_games(self) -> dict[str, Game]:
+        return self._active_games
+
+    @property
+    def pending_games(self) -> dict[str, PendingGame]:
+        return self._pending_games
+
+    @property
+    def player_to_game(self) -> dict[str, str]:
+        return self._player_to_game
+
+    @property
+    def player_id_to_name(self) -> dict[str, str]:
+        return self._player_id_to_name
+
+    @property
+    def dirty_games(self) -> set[str]:
+        return self._dirty_games
+
+    @property
+    def last_human_activity(self) -> dict[str, datetime]:
+        return self._last_human_activity
+
+    def _cancel_pending_loading_tasks(self) -> None:
+        for pending in list(self._pending_games.values()):
+            if pending.loading_task is not None and not pending.loading_task.done():
+                pending.loading_task.cancel()
+            pending.loading_task = None
+            for player_battler in pending.player_battlers.values():
+                if isinstance(player_battler, BattlerLoading) and not player_battler.task.done():
+                    player_battler.task.cancel()
+
+    def clear_all_state(self) -> None:
+        if self._snapshot_task is not None and not self._snapshot_task.done():
+            self._snapshot_task.cancel()
+        self._snapshot_task = None
+        self._cancel_pending_loading_tasks()
+        for task_map in (
+            self._post_game_cleanup_tasks,
+            self._abandoned_cleanup_tasks,
+            self._pending_disconnect_tasks,
+            self._host_handoff_tasks,
+        ):
+            for task in list(task_map.values()):
+                if not task.done():
+                    task.cancel()
+            task_map.clear()
+        self._pending_games.clear()
+        self._active_games.clear()
+        self._player_to_game.clear()
+        self._player_id_to_name.clear()
+        self._join_code_to_game.clear()
+        self._spectate_requests.clear()
+        self._dirty_games.clear()
+        self._finished_games.clear()
+        self._last_human_activity.clear()
+        self._action_locks.clear()
+        self._game_starts_in_flight = 0
+        self._game_start_waiters = 0

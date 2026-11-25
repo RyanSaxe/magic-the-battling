@@ -1,13 +1,14 @@
-# ruff: noqa: PLC0415
+"""SQLAlchemy engine setup, session factory, and schema initialization."""
+
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, cast
 
-from sqlalchemy import ColumnElement, Index, create_engine, func, select, text
+from sqlalchemy import ColumnElement, Connection, Index, create_engine, func, select, text
 from sqlalchemy.orm import sessionmaker
 
+from mtb.utils import json_helpers
 from server.db.models import LOWERCASE_UNIQUE_USER_INDEXES, Base
 
 if db_path := os.getenv("DATABASE_PATH"):
@@ -23,12 +24,12 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def _get_columns(conn, table: str) -> set[str]:
+def _get_columns(conn: Connection, table: str) -> set[str]:
     result = conn.execute(text(f"PRAGMA table_info({table})"))
     return {row[1] for row in result}
 
 
-def _migrate(conn, table: str, column: str, col_type: str, default: str | None = None) -> None:
+def _migrate(conn: Connection, table: str, *, column: str, col_type: str, default: str | None = None) -> None:
     columns = _get_columns(conn, table)
     if column not in columns:
         ddl = f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
@@ -38,14 +39,14 @@ def _migrate(conn, table: str, column: str, col_type: str, default: str | None =
         conn.commit()
 
 
-def _migrate_rename_column(conn, table: str, old_col: str, new_col: str) -> None:
+def _migrate_rename_column(conn: Connection, table: str, *, old_col: str, new_col: str) -> None:
     columns = _get_columns(conn, table)
     if old_col in columns and new_col not in columns:
         conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {old_col} TO {new_col}"))
         conn.commit()
 
 
-def init_db():
+def init_db() -> None:
     _migrate_rename_column_pre_create()
     Base.metadata.create_all(bind=engine)
 
@@ -55,21 +56,21 @@ def init_db():
         conn.commit()
 
     with engine.connect() as conn:
-        _migrate(conn, "battle_snapshots", "poison", "INTEGER")
-        _migrate(conn, "player_game_history", "is_puppet", "BOOLEAN", "0")
-        _migrate(conn, "player_game_history", "source_history_id", "INTEGER")
-        _migrate(conn, "player_game_history", "poison_history_json", "TEXT")
-        _migrate(conn, "battle_snapshots", "play_draw_preference", "TEXT")
-        _migrate(conn, "games", "shared", "BOOLEAN", "0")
+        _migrate(conn, "battle_snapshots", column="poison", col_type="INTEGER")
+        _migrate(conn, "player_game_history", column="is_puppet", col_type="BOOLEAN", default="0")
+        _migrate(conn, "player_game_history", column="source_history_id", col_type="INTEGER")
+        _migrate(conn, "player_game_history", column="poison_history_json", col_type="TEXT")
+        _migrate(conn, "battle_snapshots", column="play_draw_preference", col_type="TEXT")
+        _migrate(conn, "games", column="shared", col_type="BOOLEAN", default="0")
 
-        _migrate(conn, "games", "cube_id", "TEXT")
-        _migrate(conn, "game_players", "user_id", "TEXT")
-        _migrate(conn, "game_players", "seat_token_hash", "TEXT")
-        _migrate(conn, "player_game_history", "user_id", "TEXT")
-        _migrate(conn, "player_game_history", "final_poison", "INTEGER")
-        _migrate(conn, "player_game_history", "final_treasures", "INTEGER")
-        _migrate(conn, "battle_snapshots", "opponent_name", "TEXT")
-        _migrate(conn, "battle_snapshots", "sudden_death_build", "INTEGER")
+        _migrate(conn, "games", column="cube_id", col_type="TEXT")
+        _migrate(conn, "game_players", column="user_id", col_type="TEXT")
+        _migrate(conn, "game_players", column="seat_token_hash", col_type="TEXT")
+        _migrate(conn, "player_game_history", column="user_id", col_type="TEXT")
+        _migrate(conn, "player_game_history", column="final_poison", col_type="INTEGER")
+        _migrate(conn, "player_game_history", column="final_treasures", col_type="INTEGER")
+        _migrate(conn, "battle_snapshots", column="opponent_name", col_type="TEXT")
+        _migrate(conn, "battle_snapshots", column="sudden_death_build", col_type="INTEGER")
 
     _add_lowercase_user_indexes()
     _backfill_game_cube_ids()
@@ -100,8 +101,10 @@ def _add_lowercase_user_indexes() -> None:
         conn.commit()
 
 
-def _count_case_clashes(conn, index: Index) -> int:
-    lowered = cast(ColumnElement[Any], index.expressions[0])
+def _count_case_clashes(conn: Connection, index: Index) -> int:
+    lowered = index.expressions[0]
+    if not isinstance(lowered, ColumnElement):
+        return 0
     clashing = select(lowered).group_by(lowered).having(func.count(lowered) > 1).subquery()
     return conn.execute(select(func.count()).select_from(clashing)).scalar_one()
 
@@ -135,10 +138,8 @@ def save_cube_metadata(cube_id: str) -> None:
     """Persist cube name and image from the CubeCobra JSON cache (no extra fetch if already cached)."""
     logger = logging.getLogger(__name__)
     try:
-        from mtb.utils.json_helpers import get_json
-
         url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
-        data = get_json(url)
+        data = json_helpers.get_json(url)
         name = data.get("name")
         image = data.get("image", {})
         image_uri = image.get("uri") if isinstance(image, dict) else None
@@ -151,7 +152,7 @@ def save_cube_metadata(cube_id: str) -> None:
                 {"cube_id": cube_id, "name": name, "image_uri": image_uri},
             )
             conn.commit()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- broad boundary catch
         logger.debug("Could not save cube metadata for %s", cube_id)
 
 
@@ -180,13 +181,12 @@ def _backfill_cube_metadata() -> None:
             return
 
         logger.info("Backfilling cube metadata for %d cube(s)", len(missing))
-        from mtb.utils.json_helpers import get_json
 
         count = 0
         for cube_id in missing:
             try:
                 url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
-                data = get_json(url)
+                data = json_helpers.get_json(url)
                 name = data.get("name")
                 image = data.get("image", {})
                 image_uri = image.get("uri") if isinstance(image, dict) else None
@@ -198,7 +198,7 @@ def _backfill_cube_metadata() -> None:
                     {"cube_id": cube_id, "name": name, "image_uri": image_uri},
                 )
                 count += 1
-            except Exception:
+            except Exception:  # noqa: BLE001 -- broad boundary catch
                 logger.warning("Failed to fetch metadata for cube %s", cube_id)
         conn.commit()
         if count:
@@ -208,5 +208,5 @@ def _backfill_cube_metadata() -> None:
 def _migrate_rename_column_pre_create() -> None:
     """Run column renames before SQLAlchemy creates tables, so existing DBs are migrated."""
     with engine.connect() as conn:
-        _migrate_rename_column(conn, "player_game_history", "is_bot", "is_puppet")
-        _migrate_rename_column(conn, "game_players", "is_bot", "is_puppet")
+        _migrate_rename_column(conn, "player_game_history", old_col="is_bot", new_col="is_puppet")
+        _migrate_rename_column(conn, "game_players", old_col="is_bot", new_col="is_puppet")

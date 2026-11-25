@@ -58,7 +58,7 @@ def _make_snapshot_json() -> str:
     return snapshot.model_dump_json()
 
 
-def test_snapshot_migration_dry_run_reports_old_rows_without_writing(tmp_path):
+def test_snapshot_migration_dry_run_reports_old_rows_without_writing(tmp_path: Path) -> None:
     db_path = tmp_path / "snapshots.db"
     _init_snapshot_tables(db_path)
 
@@ -95,7 +95,7 @@ def test_snapshot_migration_dry_run_reports_old_rows_without_writing(tmp_path):
     assert stored_snapshot_json == old_snapshot_json
 
 
-def test_snapshot_migration_apply_rewrites_old_rows_and_skips_current_rows(tmp_path):
+def test_snapshot_migration_apply_rewrites_old_rows_and_skips_current_rows(tmp_path: Path) -> None:
     db_path = tmp_path / "snapshots.db"
     _init_snapshot_tables(db_path)
 

@@ -1,3 +1,5 @@
+"""Pending spectate request queue, approval flow, and expiration tracking."""
+
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -35,9 +37,10 @@ class SpectateRequests:
 
     pending -> approved | denied | cancelled | expired, and approved -> watching when the spectator connects.
     Approved and watching requests last until their game is dropped. A pending request expires after `ttl`, and
-    a closed one is forgotten `ttl` after it closed, so the spectator still reads why it ended."""
+    a closed one is forgotten `ttl` after it closed, so the spectator still reads why it ended.
+    """
 
-    def __init__(self, *, ttl: timedelta, max_total: int, start_session: Callable[[str], SpectatorSession]):
+    def __init__(self, *, ttl: timedelta, max_total: int, start_session: Callable[[str], SpectatorSession]) -> None:
         self._ttl = ttl
         self._max_total = max_total
         self._start_session = start_session
@@ -49,7 +52,7 @@ class SpectateRequests:
     def get(self, request_id: str) -> SpectateRequest | None:
         return self._requests.get(request_id)
 
-    def create(self, game_id: str, target_player_name: str, spectator_name: str, *, approve: bool) -> SpectateRequest:
+    def create(self, game_id: str, target_player_name: str, *, spectator_name: str, approve: bool) -> SpectateRequest:
         if len(self._requests) >= self._max_total:
             msg = "Too many spectate requests queued"
             raise TooManySpectateRequestsError(msg)
@@ -70,13 +73,13 @@ class SpectateRequests:
         if allowed:
             self._approve(request)
         else:
-            self._close(request, "denied", datetime.now(UTC))
+            self._close(request, "denied", at=datetime.now(UTC))
         return True
 
     def cancel(self, request: SpectateRequest) -> bool:
         if request.status != "pending":
             return False
-        self._close(request, "cancelled", datetime.now(UTC))
+        self._close(request, "cancelled", at=datetime.now(UTC))
         return True
 
     def admit(self, request_id: str, *, session_id: str, game_id: str, target_player_name: str) -> bool:
@@ -94,7 +97,7 @@ class SpectateRequests:
         return True
 
     def pending_for(self, game_id: str, target_player_name: str) -> list[SpectateRequest]:
-        """The requests waiting on one player's answer, oldest first."""
+        """Return requests waiting on one player's answer, oldest first."""
         return [
             request
             for request in self._requests.values()
@@ -108,7 +111,7 @@ class SpectateRequests:
         cutoff = now - self._ttl
         expired = [r for r in self._requests.values() if r.status == "pending" and r.created_at < cutoff]
         for request in expired:
-            self._close(request, "expired", now)
+            self._close(request, "expired", at=now)
         forgotten = [
             request_id
             for request_id, request in self._requests.items()
@@ -133,6 +136,6 @@ class SpectateRequests:
         request.player_id = session.player_id
 
     @staticmethod
-    def _close(request: SpectateRequest, status: SpectateStatus, at: datetime) -> None:
+    def _close(request: SpectateRequest, status: SpectateStatus, *, at: datetime) -> None:
         request.status = status
         request.closed_at = at

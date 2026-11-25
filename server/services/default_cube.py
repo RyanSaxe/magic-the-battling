@@ -1,3 +1,5 @@
+"""Background preloading and caching of the default cube."""
+
 import logging
 import threading
 from time import perf_counter
@@ -18,7 +20,7 @@ def _load_default_cube() -> None:
     start = perf_counter()
     try:
         build_battler(DEFAULT_BATTLER_ID, DEFAULT_UPGRADES_ID)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- broad boundary catch
         logger.warning("Could not load the default cube at startup, so the first game will load it: %r", exc)
         return
     logger.info("Loaded the default cube at startup in %.1fs", perf_counter() - start)

@@ -46,6 +46,17 @@ repos:
         files: ^(pyproject\.toml|uv\.lock)$
         pass_filenames: false
 
+      - id: max-file-lines
+        name: max-file-lines
+        # Hard 1,000-line cap on Python source files (Wave 3 expands to all text files).
+        entry: >-
+          uv run python -c 'import pathlib, sys;
+          bad = [(p, n) for p in sys.argv[1:] if (n := sum(1 for _ in pathlib.Path(p).open("rb"))) > 1000];
+          [sys.stderr.write(f"{p}: {n} lines (limit 1000) - split this file along a domain boundary.\n") for p, n in bad];
+          sys.exit(1 if bad else 0)'
+        language: system
+        types: [python]
+
   # Web: oxfmt formats web files; ESLint and tsc stay until Wave 3 locks oxlint.
   - repo: local
     hooks:

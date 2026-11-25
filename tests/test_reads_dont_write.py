@@ -1,10 +1,14 @@
 """Verify read, view, status, share, and resumable paths never mutate game or manager state."""
 
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
+from httpx import Response
 
 import server.db.database as db
 import server.routers.ws as ws_module
@@ -26,14 +30,14 @@ FIXTURE_SNAPSHOTS = sorted((Path(__file__).parent / "fixtures" / "active_game_sn
 
 def _manager_in_memory_snapshot(manager: GameManager) -> dict[str, object]:
     return {
-        "pending_games": set(manager._pending_games.keys()),
-        "active_games": set(manager._active_games.keys()),
-        "player_to_game": dict(manager._player_to_game),
-        "player_id_to_name": dict(manager._player_id_to_name),
-        "dirty_games": set(manager._dirty_games),
-        "finished_games": set(manager._finished_games),
-        "last_human_activity": dict(manager._last_human_activity),
-        "action_locks": set(manager._action_locks.keys()),
+        "pending_games": set(manager.pending_games.keys()),
+        "active_games": set(manager.active_games.keys()),
+        "player_to_game": dict(manager.player_to_game),
+        "player_id_to_name": dict(manager.player_id_to_name),
+        "dirty_games": set(manager.dirty_games),
+        "finished_games": set(manager._finished_games),  # noqa: SLF001 -- internal state inspected by test
+        "last_human_activity": dict(manager.last_human_activity),
+        "action_locks": set(manager._action_locks.keys()),  # noqa: SLF001 -- internal state inspected by test
     }
 
 
@@ -80,9 +84,9 @@ def test_get_game_state_does_not_lazily_create_missing_battle_or_mutate_puppets(
     puppet = Puppet(name="Bot", player_history_id=1, poison=5, snapshots={"3_1": puppet_snap})
     game.puppets.append(puppet)
 
-    manager._active_games["g1"] = game
-    manager._player_to_game["pid_alice"] = "g1"
-    manager._player_id_to_name["pid_alice"] = "Alice"
+    manager.active_games["g1"] = game
+    manager.player_to_game["pid_alice"] = "g1"
+    manager.player_id_to_name["pid_alice"] = "Alice"
 
     before_json = game.snapshot_dump_json()
     before_manager = _manager_in_memory_snapshot(manager)
@@ -122,17 +126,17 @@ def test_pvp_face_down_view_and_puppet_pairing_reads_leave_game_byte_identical()
     )
     game.puppets.append(Puppet(name="Bot", player_history_id=7, poison=4, snapshots={"3_1": puppet_snap}))
 
-    active_battle = battle.start(game, alice, bob)
+    active_battle = battle.start(game, alice, opponent=bob)
     secret_card = bob.hand[0]
-    battle.move_zone(active_battle, bob, secret_card, "hand", "battlefield")
-    battle.update_card_state(active_battle, bob, "face_down", secret_card.id)
-    battle.move_zone(active_battle, bob, bob.hand[1], "hand", "library")
+    battle.move_zone(active_battle, bob, card=secret_card, from_zone="hand", to_zone="battlefield")
+    battle.update_card_state(active_battle, bob, action_type="face_down", card_id=secret_card.id)
+    battle.move_zone(active_battle, bob, card=bob.hand[1], from_zone="hand", to_zone="library")
 
-    manager._active_games["g1"] = game
-    manager._player_to_game["pid_alice"] = "g1"
-    manager._player_to_game["pid_bob"] = "g1"
-    manager._player_id_to_name["pid_alice"] = "Alice"
-    manager._player_id_to_name["pid_bob"] = "Bob"
+    manager.active_games["g1"] = game
+    manager.player_to_game["pid_alice"] = "g1"
+    manager.player_to_game["pid_bob"] = "g1"
+    manager.player_id_to_name["pid_alice"] = "Alice"
+    manager.player_id_to_name["pid_bob"] = "Bob"
 
     before_json = game.snapshot_dump_json()
     before_manager = _manager_in_memory_snapshot(manager)
@@ -148,7 +152,9 @@ def test_pvp_face_down_view_and_puppet_pairing_reads_leave_game_byte_identical()
     assert _manager_in_memory_snapshot(manager) == before_manager
 
 
-def test_http_read_routes_leave_active_game_byte_identical(client, game_with_players, start_lobby) -> None:
+def test_http_read_routes_leave_active_game_byte_identical(
+    client: TestClient, game_with_players: dict[str, Any], *, start_lobby: Callable[[str, str], Response]
+) -> None:
     game_id = game_with_players["game_id"]
     alice = game_with_players["alice"]
     bob = game_with_players["bob"]
@@ -196,7 +202,9 @@ def test_http_read_routes_leave_active_game_byte_identical(client, game_with_pla
     assert _manager_in_memory_snapshot(manager) == before_manager
 
 
-def test_status_resumable_and_can_rejoin_do_not_load_evicted_snapshot(client, game_with_players, start_lobby) -> None:
+def test_status_resumable_and_can_rejoin_do_not_load_evicted_snapshot(
+    client: TestClient, game_with_players: dict[str, Any], *, start_lobby: Callable[[str, str], Response]
+) -> None:
     game_id = game_with_players["game_id"]
     alice = game_with_players["alice"]
     assert start_lobby(game_id, alice["session_id"]).status_code == 200
@@ -204,7 +212,7 @@ def test_status_resumable_and_can_rejoin_do_not_load_evicted_snapshot(client, ga
     manager = ws_module.game_manager
     manager.mark_game_dirty(game_id)
     manager.persist_dirty_games()
-    manager._cleanup_game(game_id, preserve_snapshot=True)
+    manager.cleanup_game(game_id, preserve_snapshot=True)
 
     with db.SessionLocal() as session:
         row = session.get(ActiveGameSnapshot, game_id)
@@ -238,7 +246,8 @@ def test_status_resumable_and_can_rejoin_do_not_load_evicted_snapshot(client, ga
         assert row_after.state_json == snapshot_before
 
 
-def test_restore_all_snapshots_acquires_game_lock_for_recovery(test_db) -> None:
+def test_restore_all_snapshots_acquires_game_lock_for_recovery(test_db: None) -> None:
+    _ = test_db
     manager = GameManager()
     game = create_game(["Alice"], num_players=1)
     set_battler(game, _make_battler())
