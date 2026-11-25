@@ -1,3 +1,4 @@
+/** Fight sidebar lanes: opponent/self upgrades, life counters, and battle action buttons. */
 import { useRef, useState, type ReactNode } from "react";
 import type { BattleView, Card as CardType } from "../../types";
 import type { VoiceChatState } from "../../hooks/useVoiceChat";
@@ -27,6 +28,7 @@ interface BattleSidebarContentProps {
   topSectionHeight?: number | null;
   middleLaneHeight?: number | null;
   overlayTopInset?: number;
+  readOnly?: boolean;
   voiceChat?: {
     state: VoiceChatState;
     toggleSelfMute: () => void;
@@ -37,9 +39,11 @@ interface BattleSidebarContentProps {
 function LifeCounter({
   life,
   onChange,
+  readOnly = false,
 }: {
   life: number;
   onChange: (life: number) => void;
+  readOnly?: boolean;
 }): ReactNode {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(life.toString());
@@ -65,16 +69,28 @@ function LifeCounter({
     }
   };
 
+  const stepLife = (delta: number): void => {
+    if (!readOnly) onChange(life + delta);
+  };
+
+  const startEditing = (): void => {
+    if (readOnly) return;
+    setInputValue(life.toString());
+    setIsEditing(true);
+  };
+
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={() => onChange(life - 1)}
-        className="w-6 h-6 rounded text-white text-sm font-bold"
+        type="button"
+        disabled={readOnly}
+        onClick={() => stepLife(-1)}
+        className="w-6 h-6 rounded text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: "var(--chrome)" }}
       >
         -
       </button>
-      {isEditing ? (
+      {isEditing && !readOnly ? (
         <input
           ref={(el): void => {
             if (!el) {
@@ -95,19 +111,20 @@ function LifeCounter({
         />
       ) : (
         <button
-          onClick={() => {
-            setInputValue(life.toString());
-            setIsEditing(true);
-          }}
-          className="w-10 h-6 text-center text-white text-sm rounded"
+          type="button"
+          disabled={readOnly}
+          onClick={startEditing}
+          className="w-10 h-6 text-center text-white text-sm rounded disabled:cursor-default"
           style={{ background: "var(--chrome)" }}
         >
           {life}
         </button>
       )}
       <button
-        onClick={() => onChange(life + 1)}
-        className="w-6 h-6 rounded text-white text-sm font-bold"
+        type="button"
+        disabled={readOnly}
+        onClick={() => stepLife(1)}
+        className="w-6 h-6 rounded text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: "var(--chrome)" }}
       >
         +
@@ -180,16 +197,42 @@ function PlayerSection({
   );
 }
 
+function ActionButton({
+  label,
+  onClick,
+  disabled,
+  className = "",
+}: {
+  label: string;
+  onClick?: () => void;
+  disabled: boolean;
+  className?: string;
+}): ReactNode {
+  if (!onClick) return null;
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={`btn-game flex-1 px-3 py-1.5 text-xs rounded font-medium ${className}`}
+    >
+      {label}
+    </button>
+  );
+}
+
 function ActionButtonsRow({
   onCreateTreasure,
   onUntapAll,
   onPassTurn,
   passDisabled,
+  readOnly = false,
 }: {
   onCreateTreasure?: () => void;
   onUntapAll?: () => void;
   onPassTurn?: () => void;
   passDisabled: boolean;
+  readOnly?: boolean;
 }): ReactNode {
   if (!onCreateTreasure && !onUntapAll && !onPassTurn) {
     return null;
@@ -197,31 +240,18 @@ function ActionButtonsRow({
 
   return (
     <div className="flex gap-2">
-      {onCreateTreasure && (
-        <button
-          onClick={onCreateTreasure}
-          className="btn-game flex-1 px-3 py-1.5 text-xs rounded font-medium"
-        >
-          Treasure
-        </button>
-      )}
-      {onUntapAll && (
-        <button
-          onClick={onUntapAll}
-          className="btn-game flex-1 px-3 py-1.5 text-xs rounded font-medium"
-        >
-          Untap
-        </button>
-      )}
-      {onPassTurn && (
-        <button
-          onClick={onPassTurn}
-          disabled={passDisabled}
-          className="btn-game flex-1 px-3 py-1.5 text-xs rounded font-medium transition-colors"
-        >
-          Pass
-        </button>
-      )}
+      <ActionButton
+        label="Treasure"
+        onClick={onCreateTreasure}
+        disabled={readOnly}
+      />
+      <ActionButton label="Untap" onClick={onUntapAll} disabled={readOnly} />
+      <ActionButton
+        label="Pass"
+        onClick={onPassTurn}
+        disabled={readOnly || passDisabled}
+        className="transition-colors"
+      />
     </div>
   );
 }
@@ -237,6 +267,7 @@ function ControlsPanel({
   currentTurnName,
   voiceChat,
   showTopDivider,
+  readOnly = false,
 }: {
   opponentName: string;
   playerName: string;
@@ -248,6 +279,7 @@ function ControlsPanel({
   currentTurnName: string | null;
   voiceChat?: BattleSidebarContentProps["voiceChat"];
   showTopDivider: boolean;
+  readOnly?: boolean;
 }): ReactNode {
   return (
     <div
@@ -291,7 +323,11 @@ function ControlsPanel({
               )}
           </div>
           <div className="flex justify-center">
-            <LifeCounter life={opponentLife} onChange={onOpponentLifeChange} />
+            <LifeCounter
+              life={opponentLife}
+              onChange={onOpponentLifeChange}
+              readOnly={readOnly}
+            />
           </div>
         </div>
       </div>
@@ -308,7 +344,11 @@ function ControlsPanel({
       <div className="relative z-10 flex min-h-0 flex-col items-center justify-center gap-2 px-3 py-2">
         <div className="text-center">
           <div className="flex justify-center">
-            <LifeCounter life={yourLife} onChange={onYourLifeChange} />
+            <LifeCounter
+              life={yourLife}
+              onChange={onYourLifeChange}
+              readOnly={readOnly}
+            />
           </div>
           <div className="flex items-center justify-center gap-1.5 mt-1">
             <span className="text-xs text-[var(--ivory-muted)] uppercase truncate">
@@ -336,6 +376,7 @@ function OpponentUpgradeLane({
   onUntapAll,
   onPassTurn,
   isYourTurn,
+  readOnly = false,
 }: {
   header?: ReactNode;
   upgrades: CardType[];
@@ -344,6 +385,7 @@ function OpponentUpgradeLane({
   onUntapAll?: () => void;
   onPassTurn?: () => void;
   isYourTurn: boolean;
+  readOnly?: boolean;
 }): ReactNode {
   const hasActions =
     Boolean(canManipulateOpponent) &&
@@ -371,6 +413,7 @@ function OpponentUpgradeLane({
           onUntapAll={onUntapAll}
           onPassTurn={onPassTurn}
           passDisabled={isYourTurn}
+          readOnly={readOnly}
         />
       )}
     </div>
@@ -383,12 +426,14 @@ function SelfUpgradeLane({
   onUntapAll,
   onPassTurn,
   isYourTurn,
+  readOnly = false,
 }: {
   upgrades: CardType[];
   onCreateTreasure?: () => void;
   onUntapAll?: () => void;
   onPassTurn?: () => void;
   isYourTurn: boolean;
+  readOnly?: boolean;
 }): ReactNode {
   const hasActions = Boolean(onCreateTreasure || onUntapAll || onPassTurn);
   return (
@@ -405,6 +450,7 @@ function SelfUpgradeLane({
           onUntapAll={onUntapAll}
           onPassTurn={onPassTurn}
           passDisabled={!isYourTurn}
+          readOnly={readOnly}
         />
       )}
       <div className="min-h-0">
@@ -536,6 +582,7 @@ export function BattleSidebarContent({
   topSectionHeight = null,
   middleLaneHeight = null,
   overlayTopInset = 0,
+  readOnly = false,
   voiceChat,
 }: BattleSidebarContentProps): ReactNode {
   const { opponent_name, current_turn_name, opponent_zones } = currentBattle;
@@ -550,6 +597,7 @@ export function BattleSidebarContent({
       onUntapAll={onUntapOpponentAll}
       onPassTurn={onPassOpponentTurn}
       isYourTurn={isYourTurn}
+      readOnly={readOnly}
     />
   );
 
@@ -565,6 +613,7 @@ export function BattleSidebarContent({
       currentTurnName={current_turn_name}
       voiceChat={voiceChat}
       showTopDivider={middleLaneHeight !== null}
+      readOnly={readOnly}
     />
   );
 
@@ -575,6 +624,7 @@ export function BattleSidebarContent({
       onUntapAll={onUntapAll}
       onPassTurn={onPassTurn}
       isYourTurn={isYourTurn}
+      readOnly={readOnly}
     />
   );
 
