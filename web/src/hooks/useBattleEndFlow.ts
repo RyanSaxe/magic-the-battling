@@ -168,10 +168,16 @@ function allUpgradesAlreadyRevealed(
   });
 }
 
-function handleServerState(
+interface ObservedMeta {
+  phase: string | undefined;
+  mySubmission: string | undefined;
+  sameObservation: boolean;
+}
+
+function observeSnapshot(
   state: BattleEndFlowState,
   snapshot: BattleEndServerSnapshot,
-): BattleEndTransition {
+): ObservedMeta {
   const mySubmission =
     snapshot.selfPlayerName && snapshot.currentBattle
       ? snapshot.currentBattle.result_submissions[snapshot.selfPlayerName]
@@ -180,179 +186,270 @@ function handleServerState(
     state.lastObservedPhase === snapshot.phase &&
     state.lastObservedSubmission === mySubmission &&
     state.lastObservedConnected === snapshot.connected;
+  return { phase: snapshot.phase, mySubmission, sameObservation };
+}
 
-  if (!snapshot.connected) {
-    const nextStage: BattleEndStage =
-      state.stage.kind === "submitting" || state.stage.kind === "revealing"
-        ? IDLE_STAGE
-        : state.stage;
-    if (nextStage === state.stage && sameObservation) {
-      return { state, effects: [] };
-    }
-    return {
-      state: {
-        ...state,
-        stage: nextStage,
-        lastObservedPhase: snapshot.phase,
-        lastObservedSubmission: mySubmission,
-        lastObservedConnected: false,
-      },
-      effects: [],
-    };
+function handleDisconnectedSnapshot(
+  state: BattleEndFlowState,
+  observed: ObservedMeta,
+): BattleEndTransition {
+  const resets =
+    state.stage.kind === "submitting" || state.stage.kind === "revealing";
+  const nextStage: BattleEndStage = resets ? IDLE_STAGE : state.stage;
+  if (nextStage === state.stage && observed.sameObservation) {
+    return { state, effects: [] };
   }
+  return {
+    state: {
+      ...state,
+      stage: nextStage,
+      lastObservedPhase: observed.phase,
+      lastObservedSubmission: observed.mySubmission,
+      lastObservedConnected: false,
+    },
+    effects: [],
+  };
+}
 
-  const nextCachedBattle =
-    snapshot.phase === "battle" && snapshot.currentBattle
-      ? snapshot.currentBattle
-      : state.cachedBattle;
-
-  if (snapshot.phase !== "battle") {
-    const resolution = snapshot.battleResolution;
-    const resolutionId = resolution?.resolution_id ?? null;
-
-    if (
-      resolution &&
-      resolutionId &&
-      nextCachedBattle &&
-      !state.shownResolutionIds.has(resolutionId) &&
-      (state.stage.kind !== "showing_result" ||
-        state.stage.resolutionId !== resolutionId)
-    ) {
-      return {
-        state: {
-          ...state,
-          stage: {
-            kind: "showing_result",
-            resolutionId,
-            resolution,
-            battle: nextCachedBattle,
-          },
-          changingResult: false,
-          cachedBattle: nextCachedBattle,
-          shownResolutionIds: addToSet(state.shownResolutionIds, resolutionId),
-          lastObservedPhase: snapshot.phase,
-          lastObservedSubmission: mySubmission,
-          lastObservedConnected: true,
-        },
-        effects: [{ type: "close_overlays" }],
-      };
-    }
-
-    if (state.stage.kind === "showing_result") {
-      if (sameObservation && !state.changingResult) {
-        return { state, effects: [] };
-      }
-      return {
-        state: {
-          ...state,
-          changingResult: false,
-          lastObservedPhase: snapshot.phase,
-          lastObservedSubmission: mySubmission,
-          lastObservedConnected: true,
-        },
-        effects: [],
-      };
-    }
-
-    const nextStage: BattleEndStage =
-      state.stage.kind === "transitioning" &&
-      resolutionId === state.stage.resolutionId
-        ? state.stage
-        : state.stage.kind === "idle"
-          ? state.stage
-          : IDLE_STAGE;
-
-    if (
-      nextStage === state.stage &&
-      !state.changingResult &&
-      nextCachedBattle === state.cachedBattle &&
-      sameObservation
-    ) {
-      return { state, effects: [] };
-    }
-
-    return {
-      state: {
-        ...state,
-        stage: nextStage,
-        changingResult: false,
-        cachedBattle: nextCachedBattle,
-        lastObservedPhase: snapshot.phase,
-        lastObservedSubmission: mySubmission,
-        lastObservedConnected: true,
-      },
-      effects: [],
-    };
-  }
-
-  let nextStage = state.stage;
-  let nextShownReveals = state.shownRevealAnimationIds;
-  const effects: BattleEndEffect[] = [];
-
-  if (
-    nextStage.kind === "showing_result" ||
-    nextStage.kind === "transitioning"
-  ) {
-    nextStage = IDLE_STAGE;
-  }
-
-  if (nextStage.kind === "submitting" && !nextStage.confirmingReveal) {
-    const submissionAnswered =
-      mySubmission === nextStage.result ||
-      (mySubmission !== undefined &&
-        mySubmission !== state.lastObservedSubmission);
-    if (submissionAnswered) {
-      nextStage = IDLE_STAGE;
-    }
-  }
-
-  const pendingAnimations =
-    snapshot.currentBattle?.pending_reveal_animations ?? [];
-  const nextAnimation = findNextUnseenAnimation(
-    pendingAnimations,
-    nextShownReveals,
+function shouldShowResolution(
+  state: BattleEndFlowState,
+  resolutionId: string | null,
+  nextCachedBattle: BattleView | null,
+): boolean {
+  if (!resolutionId || !nextCachedBattle) return false;
+  if (state.shownResolutionIds.has(resolutionId)) return false;
+  return (
+    state.stage.kind !== "showing_result" ||
+    state.stage.resolutionId !== resolutionId
   );
+}
 
-  if (nextAnimation) {
-    if (nextStage.kind === "revealing" && nextStage.activeAnimation === null) {
-      nextShownReveals = addToSet(nextShownReveals, nextAnimation.animation_id);
-      nextStage = {
-        ...nextStage,
-        activeAnimation: nextAnimation,
-      };
-    } else if (nextStage.kind === "idle") {
-      nextShownReveals = addToSet(nextShownReveals, nextAnimation.animation_id);
-      nextStage = {
+function resolveNonBattleStage(
+  stage: BattleEndStage,
+  resolutionId: string | null,
+): BattleEndStage {
+  if (stage.kind === "transitioning" && resolutionId === stage.resolutionId) {
+    return stage;
+  }
+  if (stage.kind === "idle") return stage;
+  return IDLE_STAGE;
+}
+
+function handleShowingResultSnapshot(
+  state: BattleEndFlowState,
+  observed: ObservedMeta,
+): BattleEndTransition {
+  if (observed.sameObservation && !state.changingResult) {
+    return { state, effects: [] };
+  }
+  return {
+    state: {
+      ...state,
+      changingResult: false,
+      lastObservedPhase: observed.phase,
+      lastObservedSubmission: observed.mySubmission,
+      lastObservedConnected: true,
+    },
+    effects: [],
+  };
+}
+
+function startShowingResult(
+  state: BattleEndFlowState,
+  options: {
+    resolutionId: string;
+    resolution: BattleResolution;
+    battle: BattleView;
+    observed: ObservedMeta;
+  },
+): BattleEndTransition {
+  const { resolutionId, resolution, battle, observed } = options;
+  return {
+    state: {
+      ...state,
+      stage: {
+        kind: "showing_result",
+        resolutionId,
+        resolution,
+        battle,
+      },
+      changingResult: false,
+      cachedBattle: battle,
+      shownResolutionIds: addToSet(state.shownResolutionIds, resolutionId),
+      lastObservedPhase: observed.phase,
+      lastObservedSubmission: observed.mySubmission,
+      lastObservedConnected: true,
+    },
+    effects: [{ type: "close_overlays" }],
+  };
+}
+
+function findShowableResolution(
+  state: BattleEndFlowState,
+  snapshot: BattleEndServerSnapshot,
+): {
+  resolutionId: string;
+  resolution: BattleResolution;
+  battle: BattleView;
+} | null {
+  const resolution = snapshot.battleResolution;
+  const resolutionId = resolution?.resolution_id ?? null;
+  const battle = state.cachedBattle;
+  if (!resolution || !resolutionId || !battle) return null;
+  if (!shouldShowResolution(state, resolutionId, battle)) return null;
+  return { resolutionId, resolution, battle };
+}
+
+function handleNonBattleSnapshot(
+  state: BattleEndFlowState,
+  snapshot: BattleEndServerSnapshot,
+  observed: ObservedMeta,
+): BattleEndTransition {
+  const showable = findShowableResolution(state, snapshot);
+  if (showable) {
+    return startShowingResult(state, { ...showable, observed });
+  }
+
+  if (state.stage.kind === "showing_result") {
+    return handleShowingResultSnapshot(state, observed);
+  }
+
+  const resolutionId = snapshot.battleResolution?.resolution_id ?? null;
+  const nextStage = resolveNonBattleStage(state.stage, resolutionId);
+  if (
+    nextStage === state.stage &&
+    !state.changingResult &&
+    observed.sameObservation
+  ) {
+    return { state, effects: [] };
+  }
+  return {
+    state: {
+      ...state,
+      stage: nextStage,
+      changingResult: false,
+      lastObservedPhase: observed.phase,
+      lastObservedSubmission: observed.mySubmission,
+      lastObservedConnected: true,
+    },
+    effects: [],
+  };
+}
+
+function settleActiveBattleStage(
+  stage: BattleEndStage,
+  mySubmission: string | undefined,
+  lastObservedSubmission: string | undefined,
+): BattleEndStage {
+  if (stage.kind === "showing_result" || stage.kind === "transitioning") {
+    return IDLE_STAGE;
+  }
+  if (stage.kind === "submitting" && !stage.confirmingReveal) {
+    const answered =
+      mySubmission === stage.result ||
+      (mySubmission !== undefined && mySubmission !== lastObservedSubmission);
+    if (answered) return IDLE_STAGE;
+  }
+  return stage;
+}
+
+function applyNextRevealAnimation(
+  stage: BattleEndStage,
+  shownReveals: ReadonlySet<string>,
+  nextAnimation: RevealAnimation,
+): {
+  stage: BattleEndStage;
+  shownReveals: ReadonlySet<string>;
+  effects: BattleEndEffect[];
+} {
+  if (stage.kind === "revealing" && stage.activeAnimation === null) {
+    return {
+      stage: { ...stage, activeAnimation: nextAnimation },
+      shownReveals: addToSet(shownReveals, nextAnimation.animation_id),
+      effects: [],
+    };
+  }
+  if (stage.kind === "idle") {
+    return {
+      stage: {
         kind: "revealing",
         pendingSubmitResult: null,
         expectedUpgradeIds: [],
         activeAnimation: nextAnimation,
-      };
-    }
-  } else if (
-    nextStage.kind === "revealing" &&
-    nextStage.activeAnimation === null &&
-    nextStage.pendingSubmitResult !== null &&
-    allUpgradesAlreadyRevealed(
-      nextStage.expectedUpgradeIds,
-      snapshot.selfUpgrades,
-    )
-  ) {
-    const result = nextStage.pendingSubmitResult;
-    nextStage = {
-      kind: "submitting",
-      result,
-      confirmingReveal: false,
+      },
+      shownReveals: addToSet(shownReveals, nextAnimation.animation_id),
+      effects: [],
     };
-    effects.push({ type: "submit_result", result });
+  }
+  return { stage, shownReveals, effects: [] };
+}
+
+function advanceBattleReveals(
+  stage: BattleEndStage,
+  shownReveals: ReadonlySet<string>,
+  snapshot: BattleEndServerSnapshot,
+): {
+  stage: BattleEndStage;
+  shownReveals: ReadonlySet<string>;
+  effects: BattleEndEffect[];
+} {
+  const pendingAnimations =
+    snapshot.currentBattle?.pending_reveal_animations ?? [];
+  const nextAnimation = findNextUnseenAnimation(
+    pendingAnimations,
+    shownReveals,
+  );
+  if (nextAnimation) {
+    return applyNextRevealAnimation(stage, shownReveals, nextAnimation);
   }
 
   if (
-    nextStage === state.stage &&
+    stage.kind === "revealing" &&
+    stage.activeAnimation === null &&
+    stage.pendingSubmitResult !== null &&
+    allUpgradesAlreadyRevealed(stage.expectedUpgradeIds, snapshot.selfUpgrades)
+  ) {
+    const result = stage.pendingSubmitResult;
+    return {
+      stage: { kind: "submitting", result, confirmingReveal: false },
+      shownReveals,
+      effects: [{ type: "submit_result", result }],
+    };
+  }
+
+  return { stage, shownReveals, effects: [] };
+}
+
+function handleServerState(
+  state: BattleEndFlowState,
+  snapshot: BattleEndServerSnapshot,
+): BattleEndTransition {
+  const observed = observeSnapshot(state, snapshot);
+  if (!snapshot.connected) {
+    return handleDisconnectedSnapshot(state, observed);
+  }
+  if (snapshot.phase !== "battle") {
+    return handleNonBattleSnapshot(state, snapshot, observed);
+  }
+
+  const nextCachedBattle = snapshot.currentBattle ?? state.cachedBattle;
+  const settledStage = settleActiveBattleStage(
+    state.stage,
+    observed.mySubmission,
+    state.lastObservedSubmission,
+  );
+  const revealed = advanceBattleReveals(
+    settledStage,
+    state.shownRevealAnimationIds,
+    snapshot,
+  );
+
+  if (
+    revealed.stage === state.stage &&
     nextCachedBattle === state.cachedBattle &&
-    nextShownReveals === state.shownRevealAnimationIds &&
-    sameObservation &&
-    effects.length === 0
+    revealed.shownReveals === state.shownRevealAnimationIds &&
+    observed.sameObservation &&
+    revealed.effects.length === 0
   ) {
     return { state, effects: [] };
   }
@@ -360,238 +457,304 @@ function handleServerState(
   return {
     state: {
       ...state,
-      stage: nextStage,
+      stage: revealed.stage,
       cachedBattle: nextCachedBattle,
-      shownRevealAnimationIds: nextShownReveals,
-      lastObservedPhase: snapshot.phase,
-      lastObservedSubmission: mySubmission,
+      shownRevealAnimationIds: revealed.shownReveals,
+      lastObservedPhase: observed.phase,
+      lastObservedSubmission: observed.mySubmission,
       lastObservedConnected: true,
     },
-    effects,
+    effects: revealed.effects,
   };
+}
+
+function handleSubmitChosen(
+  state: BattleEndFlowState,
+  event: Extract<BattleEndEvent, { type: "submit_chosen" }>,
+): BattleEndTransition {
+  if (state.stage.kind !== "idle") return { state, effects: [] };
+  if (event.hasUnrevealedUpgrades) {
+    return {
+      state: {
+        ...state,
+        stage: {
+          kind: "submitting",
+          result: event.result,
+          confirmingReveal: true,
+        },
+        changingResult: false,
+      },
+      effects: [],
+    };
+  }
+  return {
+    state: {
+      ...state,
+      stage: {
+        kind: "submitting",
+        result: event.result,
+        confirmingReveal: false,
+      },
+      changingResult: false,
+    },
+    effects: [
+      { type: "close_overlays" },
+      { type: "submit_result", result: event.result },
+    ],
+  };
+}
+
+function handleConfirmRevealAndSubmit(
+  state: BattleEndFlowState,
+  upgradeIds: readonly string[],
+): BattleEndTransition {
+  if (state.stage.kind !== "submitting" || !state.stage.confirmingReveal) {
+    return { state, effects: [] };
+  }
+  if (upgradeIds.length === 0) {
+    return {
+      state: {
+        ...state,
+        stage: {
+          kind: "submitting",
+          result: state.stage.result,
+          confirmingReveal: false,
+        },
+      },
+      effects: [
+        { type: "submit_result", result: state.stage.result },
+        { type: "close_overlays" },
+      ],
+    };
+  }
+  return {
+    state: {
+      ...state,
+      stage: {
+        kind: "revealing",
+        pendingSubmitResult: state.stage.result,
+        expectedUpgradeIds: [...upgradeIds],
+        activeAnimation: null,
+      },
+    },
+    effects: [
+      { type: "reveal_upgrades", upgradeIds },
+      { type: "close_overlays" },
+    ],
+  };
+}
+
+function handleRevealAnimationCompleted(
+  state: BattleEndFlowState,
+  pendingAnimations: readonly RevealAnimation[],
+): BattleEndTransition {
+  if (state.stage.kind !== "revealing") return { state, effects: [] };
+  const nextAnimation = findNextUnseenAnimation(
+    pendingAnimations,
+    state.shownRevealAnimationIds,
+  );
+  if (nextAnimation) {
+    return {
+      state: {
+        ...state,
+        stage: { ...state.stage, activeAnimation: nextAnimation },
+        shownRevealAnimationIds: addToSet(
+          state.shownRevealAnimationIds,
+          nextAnimation.animation_id,
+        ),
+      },
+      effects: [],
+    };
+  }
+  if (state.stage.pendingSubmitResult !== null) {
+    const result = state.stage.pendingSubmitResult;
+    return {
+      state: {
+        ...state,
+        stage: { kind: "submitting", result, confirmingReveal: false },
+      },
+      effects: [{ type: "submit_result", result }],
+    };
+  }
+  return { state: { ...state, stage: IDLE_STAGE }, effects: [] };
+}
+
+function handleSkipRevealAndSubmit(
+  state: BattleEndFlowState,
+): BattleEndTransition {
+  if (state.stage.kind !== "submitting" || !state.stage.confirmingReveal) {
+    return { state, effects: [] };
+  }
+  return {
+    state: {
+      ...state,
+      stage: {
+        kind: "submitting",
+        result: state.stage.result,
+        confirmingReveal: false,
+      },
+    },
+    effects: [
+      { type: "submit_result", result: state.stage.result },
+      { type: "close_overlays" },
+    ],
+  };
+}
+
+function handleSubmissionFlowEvent(
+  state: BattleEndFlowState,
+  event: Extract<
+    BattleEndEvent,
+    {
+      type:
+        | "submit_chosen"
+        | "confirm_reveal_and_submit"
+        | "skip_reveal_and_submit"
+        | "cancel_reveal_choice"
+        | "cancel_reveal"
+        | "reveal_animation_completed";
+    }
+  >,
+): BattleEndTransition {
+  switch (event.type) {
+    case "submit_chosen":
+      return handleSubmitChosen(state, event);
+    case "confirm_reveal_and_submit":
+      return handleConfirmRevealAndSubmit(state, event.upgradeIds);
+    case "skip_reveal_and_submit":
+      return handleSkipRevealAndSubmit(state);
+    case "cancel_reveal_choice":
+      return state.stage.kind === "submitting" && state.stage.confirmingReveal
+        ? { state: { ...state, stage: IDLE_STAGE }, effects: [] }
+        : { state, effects: [] };
+    case "cancel_reveal":
+      return state.stage.kind === "revealing"
+        ? { state: { ...state, stage: IDLE_STAGE }, effects: [] }
+        : { state, effects: [] };
+    case "reveal_animation_completed":
+      return handleRevealAnimationCompleted(state, event.pendingAnimations);
+    default:
+      return { state, effects: [] };
+  }
+}
+
+function handleResolutionCompleted(
+  state: BattleEndFlowState,
+): BattleEndTransition {
+  if (state.stage.kind !== "showing_result") return { state, effects: [] };
+  return {
+    state: {
+      ...state,
+      stage: {
+        kind: "transitioning",
+        resolutionId: state.stage.resolutionId,
+      },
+      cachedBattle: null,
+    },
+    effects: [],
+  };
+}
+
+function handleChangingResultEvent(
+  state: BattleEndFlowState,
+  event: Extract<
+    BattleEndEvent,
+    { type: "start_changing_result" | "cancel_changing_result" }
+  >,
+): BattleEndTransition {
+  if (event.type === "start_changing_result") {
+    return state.stage.kind === "idle" && !state.changingResult
+      ? { state: { ...state, changingResult: true }, effects: [] }
+      : { state, effects: [] };
+  }
+  return state.changingResult
+    ? { state: { ...state, changingResult: false }, effects: [] }
+    : { state, effects: [] };
+}
+
+function handleResolutionFlowEvent(
+  state: BattleEndFlowState,
+  event: Extract<
+    BattleEndEvent,
+    {
+      type:
+        | "resolution_completed"
+        | "transition_settled"
+        | "server_error"
+        | "disconnected"
+        | "start_changing_result"
+        | "cancel_changing_result";
+    }
+  >,
+): BattleEndTransition {
+  if (
+    event.type === "start_changing_result" ||
+    event.type === "cancel_changing_result"
+  ) {
+    return handleChangingResultEvent(state, event);
+  }
+  if (event.type === "resolution_completed") {
+    return handleResolutionCompleted(state);
+  }
+  if (event.type === "transition_settled") {
+    return state.stage.kind === "transitioning"
+      ? { state: { ...state, stage: IDLE_STAGE }, effects: [] }
+      : { state, effects: [] };
+  }
+  if (event.type === "server_error") {
+    const resets =
+      state.stage.kind === "submitting" || state.stage.kind === "revealing";
+    return resets
+      ? { state: { ...state, stage: IDLE_STAGE }, effects: [] }
+      : { state, effects: [] };
+  }
+  return handleDisconnectedSnapshot(state, {
+    phase: state.lastObservedPhase,
+    mySubmission: state.lastObservedSubmission,
+    sameObservation: !state.lastObservedConnected,
+  });
+}
+
+function isSubmissionFlowEvent(event: BattleEndEvent): event is Extract<
+  BattleEndEvent,
+  {
+    type:
+      | "submit_chosen"
+      | "confirm_reveal_and_submit"
+      | "skip_reveal_and_submit"
+      | "cancel_reveal_choice"
+      | "cancel_reveal"
+      | "reveal_animation_completed";
+  }
+> {
+  return (
+    event.type === "submit_chosen" ||
+    event.type === "confirm_reveal_and_submit" ||
+    event.type === "skip_reveal_and_submit" ||
+    event.type === "cancel_reveal_choice" ||
+    event.type === "cancel_reveal" ||
+    event.type === "reveal_animation_completed"
+  );
 }
 
 export function transitionBattleEndFlow(
   state: BattleEndFlowState,
   event: BattleEndEvent,
 ): BattleEndTransition {
-  switch (event.type) {
-    case "submit_chosen": {
-      if (state.stage.kind !== "idle") return { state, effects: [] };
-      if (event.hasUnrevealedUpgrades) {
-        return {
-          state: {
-            ...state,
-            stage: {
-              kind: "submitting",
-              result: event.result,
-              confirmingReveal: true,
-            },
-            changingResult: false,
-          },
-          effects: [],
-        };
-      }
-      return {
-        state: {
-          ...state,
-          stage: {
-            kind: "submitting",
-            result: event.result,
-            confirmingReveal: false,
-          },
-          changingResult: false,
-        },
-        effects: [
-          { type: "close_overlays" },
-          { type: "submit_result", result: event.result },
-        ],
-      };
-    }
-
-    case "confirm_reveal_and_submit": {
-      if (state.stage.kind !== "submitting" || !state.stage.confirmingReveal) {
-        return { state, effects: [] };
-      }
-      if (event.upgradeIds.length === 0) {
-        return {
-          state: {
-            ...state,
-            stage: {
-              kind: "submitting",
-              result: state.stage.result,
-              confirmingReveal: false,
-            },
-          },
-          effects: [
-            { type: "submit_result", result: state.stage.result },
-            { type: "close_overlays" },
-          ],
-        };
-      }
-      return {
-        state: {
-          ...state,
-          stage: {
-            kind: "revealing",
-            pendingSubmitResult: state.stage.result,
-            expectedUpgradeIds: [...event.upgradeIds],
-            activeAnimation: null,
-          },
-        },
-        effects: [
-          { type: "reveal_upgrades", upgradeIds: event.upgradeIds },
-          { type: "close_overlays" },
-        ],
-      };
-    }
-
-    case "skip_reveal_and_submit": {
-      if (state.stage.kind !== "submitting" || !state.stage.confirmingReveal) {
-        return { state, effects: [] };
-      }
-      return {
-        state: {
-          ...state,
-          stage: {
-            kind: "submitting",
-            result: state.stage.result,
-            confirmingReveal: false,
-          },
-        },
-        effects: [
-          { type: "submit_result", result: state.stage.result },
-          { type: "close_overlays" },
-        ],
-      };
-    }
-
-    case "cancel_reveal_choice": {
-      if (state.stage.kind !== "submitting" || !state.stage.confirmingReveal) {
-        return { state, effects: [] };
-      }
-      return {
-        state: { ...state, stage: { kind: "idle" } },
-        effects: [],
-      };
-    }
-
-    case "cancel_reveal": {
-      if (state.stage.kind !== "revealing") return { state, effects: [] };
-      return {
-        state: { ...state, stage: { kind: "idle" } },
-        effects: [],
-      };
-    }
-
-    case "reveal_animation_completed": {
-      if (state.stage.kind !== "revealing") return { state, effects: [] };
-      const nextAnimation = findNextUnseenAnimation(
-        event.pendingAnimations,
-        state.shownRevealAnimationIds,
-      );
-      if (nextAnimation) {
-        return {
-          state: {
-            ...state,
-            stage: { ...state.stage, activeAnimation: nextAnimation },
-            shownRevealAnimationIds: addToSet(
-              state.shownRevealAnimationIds,
-              nextAnimation.animation_id,
-            ),
-          },
-          effects: [],
-        };
-      }
-      if (state.stage.pendingSubmitResult !== null) {
-        const result = state.stage.pendingSubmitResult;
-        return {
-          state: {
-            ...state,
-            stage: { kind: "submitting", result, confirmingReveal: false },
-          },
-          effects: [{ type: "submit_result", result }],
-        };
-      }
-      return {
-        state: { ...state, stage: { kind: "idle" } },
-        effects: [],
-      };
-    }
-
-    case "resolution_completed": {
-      if (state.stage.kind !== "showing_result") return { state, effects: [] };
-      return {
-        state: {
-          ...state,
-          stage: {
-            kind: "transitioning",
-            resolutionId: state.stage.resolutionId,
-          },
-          cachedBattle: null,
-        },
-        effects: [],
-      };
-    }
-
-    case "transition_settled": {
-      if (state.stage.kind !== "transitioning") return { state, effects: [] };
-      return {
-        state: { ...state, stage: { kind: "idle" } },
-        effects: [],
-      };
-    }
-
-    case "server_error": {
-      if (
-        state.stage.kind === "submitting" ||
-        state.stage.kind === "revealing"
-      ) {
-        return {
-          state: { ...state, stage: { kind: "idle" } },
-          effects: [],
-        };
-      }
-      return { state, effects: [] };
-    }
-
-    case "disconnected": {
-      if (
-        state.stage.kind === "submitting" ||
-        state.stage.kind === "revealing"
-      ) {
-        return {
-          state: {
-            ...state,
-            stage: { kind: "idle" },
-            lastObservedConnected: false,
-          },
-          effects: [],
-        };
-      }
-      if (!state.lastObservedConnected) return { state, effects: [] };
-      return {
-        state: { ...state, lastObservedConnected: false },
-        effects: [],
-      };
-    }
-
-    case "start_changing_result": {
-      if (state.stage.kind !== "idle" || state.changingResult) {
-        return { state, effects: [] };
-      }
-      return { state: { ...state, changingResult: true }, effects: [] };
-    }
-
-    case "cancel_changing_result": {
-      if (!state.changingResult) return { state, effects: [] };
-      return { state: { ...state, changingResult: false }, effects: [] };
-    }
-
-    case "server_state":
-      return handleServerState(state, event.snapshot);
+  if (event.type === "server_state") {
+    return handleServerState(state, event.snapshot);
   }
+  if (isSubmissionFlowEvent(event)) {
+    return handleSubmissionFlowEvent(state, event);
+  }
+  return handleResolutionFlowEvent(state, event);
 }
+
+const HOTKEY_BLOCKING_STAGES = new Set<BattleEndStage["kind"]>([
+  "submitting",
+  "revealing",
+  "showing_result",
+]);
 
 export function selectBattleEndView(
   state: BattleEndFlowState,
@@ -599,9 +762,11 @@ export function selectBattleEndView(
   const { stage } = state;
   const confirmingReveal =
     stage.kind === "submitting" && stage.confirmingReveal;
+  const isRevealingForSubmit =
+    stage.kind === "revealing" && stage.pendingSubmitResult !== null;
   const submitPending =
     (stage.kind === "submitting" && !stage.confirmingReveal) ||
-    (stage.kind === "revealing" && stage.pendingSubmitResult !== null) ||
+    isRevealingForSubmit ||
     stage.kind === "showing_result";
 
   return {
@@ -609,10 +774,7 @@ export function selectBattleEndView(
     changingResult: state.changingResult,
     confirmingReveal,
     submitPending,
-    blocksHotkeys:
-      stage.kind === "submitting" ||
-      stage.kind === "revealing" ||
-      stage.kind === "showing_result",
+    blocksHotkeys: HOTKEY_BLOCKING_STAGES.has(stage.kind),
     blocksGuides:
       confirmingReveal ||
       stage.kind === "revealing" ||
@@ -657,13 +819,28 @@ interface UseBattleEndFlowOptions extends BattleEndEffectHandlers {
   serverErrorNonce?: number;
 }
 
+export interface UseBattleEndFlowResult extends BattleEndFlowView {
+  state: BattleEndFlowState;
+  battleViewForDisplay: BattleView | null;
+  submitResult: (result: string, hasUnrevealedUpgrades: boolean) => void;
+  confirmRevealAndSubmit: (upgradeIds: readonly string[]) => void;
+  skipRevealAndSubmit: () => void;
+  cancelRevealChoice: () => void;
+  cancelReveal: () => void;
+  completeRevealAnimation: () => void;
+  completeResolution: () => void;
+  notifyServerError: () => void;
+  startChangingResult: () => void;
+  cancelChangingResult: () => void;
+}
+
 export function useBattleEndFlow({
   snapshot,
   serverErrorNonce = 0,
   onSubmitResult,
   onRevealUpgrade,
   onCloseOverlays,
-}: UseBattleEndFlowOptions) {
+}: UseBattleEndFlowOptions): UseBattleEndFlowResult {
   const [state, setState] = useState<BattleEndFlowState>(() =>
     createBattleEndFlowState({
       lastObservedPhase: snapshot.phase,
@@ -708,16 +885,16 @@ export function useBattleEndFlow({
   }
 
   useEffect(() => {
-    if (pendingEffects.length === 0) return;
+    if (pendingEffects.length === 0) return undefined;
     flushPendingEffects(pendingEffects);
     const frameId = requestAnimationFrame(() => {
       setPendingEffects([]);
     });
-    return () => cancelAnimationFrame(frameId);
+    return (): void => cancelAnimationFrame(frameId);
   }, [pendingEffects]);
 
   useEffect(() => {
-    if (state.stage.kind !== "transitioning") return;
+    if (state.stage.kind !== "transitioning") return undefined;
     const frameId = requestAnimationFrame(() => {
       setState(
         (current) =>
@@ -725,7 +902,7 @@ export function useBattleEndFlow({
             .state,
       );
     });
-    return () => cancelAnimationFrame(frameId);
+    return (): void => cancelAnimationFrame(frameId);
   }, [state.stage.kind]);
 
   const dispatchEvent = useCallback(

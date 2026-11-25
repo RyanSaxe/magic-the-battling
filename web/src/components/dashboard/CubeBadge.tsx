@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Tag, type TagTone } from "../common/Tag";
 
 /** What a cube card or page says it is: a saved Cube or Deck, a followed cube, or a community cube (Cube). */
@@ -18,7 +18,7 @@ export function CubeBadge({
   tone: CubeBadgeTone;
   children: ReactNode;
   className?: string;
-}) {
+}): ReactElement {
   return (
     <Tag tone={TONES[tone]} className={className}>
       {children}

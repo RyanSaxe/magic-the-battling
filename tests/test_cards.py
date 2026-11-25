@@ -1,9 +1,11 @@
+from collections.abc import Callable
+
 import pytest
 
-from mtb.models.cards import Battler, build_battler, validate_battler, validate_constructed_battler
+from mtb.models.cards import Battler, Card, build_battler, validate_battler, validate_constructed_battler
 
 
-def test_card_upgrade_links_target(card_factory):
+def test_card_upgrade_links_target(card_factory: Callable[..., Card]) -> None:
     base = card_factory("base", "Creature")
     upgrade = card_factory("upgrade", "Conspiracy")
 
@@ -12,26 +14,28 @@ def test_card_upgrade_links_target(card_factory):
     assert upgrade.upgrade_target is base
 
 
-def test_card_upgrade_rejects_non_conspiracy(card_factory):
+def test_card_upgrade_rejects_non_conspiracy(card_factory: Callable[..., Card]) -> None:
     base = card_factory("base", "Creature")
     non_upgrade = card_factory("non", "Artifact")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         base.upgrade(non_upgrade)
 
 
-def test_card_upgrade_rejects_already_linked_upgrade(card_factory):
+def test_card_upgrade_rejects_already_linked_upgrade(card_factory: Callable[..., Card]) -> None:
     base = card_factory("base", "Creature")
     other = card_factory("other", "Creature")
     upgrade = card_factory("upgrade", "Conspiracy")
 
     base.upgrade(upgrade)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         other.upgrade(upgrade)
 
 
-def test_build_battler_loads_upgrades_and_vanguards_from_separate_cubes(monkeypatch, card_factory):
+def test_build_battler_loads_upgrades_and_vanguards_from_separate_cubes(
+    monkeypatch: pytest.MonkeyPatch, card_factory: Callable[..., Card]
+) -> None:
     main_cards = [
         card_factory("main1", "creature"),
         card_factory("main2", "artifact"),
@@ -39,7 +43,7 @@ def test_build_battler_loads_upgrades_and_vanguards_from_separate_cubes(monkeypa
     upgrade_cards = [card_factory("upgrade1", "conspiracy")]
     vanguard_cards = [card_factory("vanguard1", "vanguard")]
 
-    def fake_get_cube_data(identifier: str):
+    def fake_get_cube_data(identifier: str) -> list[Card]:
         if identifier == "main_cube":
             return list(main_cards)
         if identifier == "upgrades_cube":
@@ -57,14 +61,16 @@ def test_build_battler_loads_upgrades_and_vanguards_from_separate_cubes(monkeypa
     assert battler.vanguards == vanguard_cards
 
 
-def test_build_battler_preserves_original_cards(monkeypatch, card_factory):
+def test_build_battler_preserves_original_cards(
+    monkeypatch: pytest.MonkeyPatch, card_factory: Callable[..., Card]
+) -> None:
     main_cards = [
         card_factory("main1", "creature"),
         card_factory("main2", "artifact"),
     ]
     upgrade_cards = [card_factory("upgrade1", "conspiracy")]
 
-    def fake_get_cube_data(identifier: str):
+    def fake_get_cube_data(identifier: str) -> list[Card]:
         if identifier == "main_cube":
             return list(main_cards)
         if identifier == "upgrades_cube":
@@ -85,13 +91,16 @@ def test_build_battler_preserves_original_cards(monkeypatch, card_factory):
     assert len(battler.original_upgrades) == 1
 
 
-def test_build_battler_rejects_source_conspiracies_and_vanguards(monkeypatch, card_factory):
+def test_build_battler_rejects_source_conspiracies_and_vanguards(
+    monkeypatch: pytest.MonkeyPatch, card_factory: Callable[..., Card]
+) -> None:
     cards = [
         card_factory("upgrade1", "conspiracy"),
         card_factory("vanguard1", "vanguard"),
     ]
 
-    def fake_get_cube_data(identifier: str):
+    def fake_get_cube_data(identifier: str) -> list[Card]:
+        _ = identifier
         return list(cards)
 
     monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
@@ -100,21 +109,21 @@ def test_build_battler_rejects_source_conspiracies_and_vanguards(monkeypatch, ca
         build_battler()
 
 
-def test_build_battler_raises_when_cube_is_empty(monkeypatch):
-    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", lambda identifier: [])
+def test_build_battler_raises_when_cube_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", lambda _identifier: [])
 
     with pytest.raises(ValueError, match="has no playable cards"):
         build_battler()
 
 
-def test_validate_constructed_battler_requires_100_cards(card_factory):
+def test_validate_constructed_battler_requires_100_cards(card_factory: Callable[..., Card]) -> None:
     battler = Battler(cards=[card_factory(f"c{i}") for i in range(99)], upgrades=[], vanguards=[], source_id="short")
 
     with pytest.raises(ValueError, match="has 99 playable cards"):
         validate_constructed_battler(battler)
 
 
-def test_validate_constructed_battler_requires_singleton(card_factory):
+def test_validate_constructed_battler_requires_singleton(card_factory: Callable[..., Card]) -> None:
     cards = [card_factory(f"c{i}") for i in range(99)]
     cards.append(card_factory("c0"))
     battler = Battler(cards=cards, upgrades=[], vanguards=[], source_id="duplicates")
@@ -123,7 +132,7 @@ def test_validate_constructed_battler_requires_singleton(card_factory):
         validate_constructed_battler(battler)
 
 
-def test_validate_constructed_battler_rejects_banned_keywords(card_factory):
+def test_validate_constructed_battler_rejects_banned_keywords(card_factory: Callable[..., Card]) -> None:
     cards = [card_factory(f"c{i}") for i in range(99)]
     cards.append(card_factory("toxic-card", keywords=["Toxic"]))
     battler = Battler(cards=cards, upgrades=[], vanguards=[], source_id="toxic")
@@ -132,7 +141,7 @@ def test_validate_constructed_battler_rejects_banned_keywords(card_factory):
         validate_constructed_battler(battler)
 
 
-def test_validate_constructed_battler_rejects_banned_names(card_factory):
+def test_validate_constructed_battler_rejects_banned_names(card_factory: Callable[..., Card]) -> None:
     cards = [card_factory(f"c{i}") for i in range(99)]
     cards.append(card_factory("Thassa's Oracle"))
     battler = Battler(cards=cards, upgrades=[], vanguards=[], source_id="oracle")
@@ -141,7 +150,7 @@ def test_validate_constructed_battler_rejects_banned_names(card_factory):
         validate_constructed_battler(battler)
 
 
-def test_validate_limited_battler_rejects_shared_banned_names(card_factory):
+def test_validate_limited_battler_rejects_shared_banned_names(card_factory: Callable[..., Card]) -> None:
     cards = [card_factory(f"c{i}") for i in range(99)]
     cards.append(card_factory("Unexpected Potential"))
     battler = Battler(cards=cards, upgrades=[], vanguards=[], source_id="limited-ban")

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type ReactElement } from "react";
 import {
   bestFit,
   MIN_CARD_WIDTH,
@@ -34,7 +34,7 @@ interface DndPanelProps {
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 };
 
-function contentBoxSize(node: HTMLElement) {
+function contentBoxSize(node: HTMLElement): { width: number; height: number } {
   const cs = getComputedStyle(node);
   return {
     width:
@@ -46,6 +46,80 @@ function contentBoxSize(node: HTMLElement) {
       parseFloat(cs.paddingTop) -
       parseFloat(cs.paddingBottom),
   };
+}
+
+interface DndPanelContentProps {
+  zone?: ZoneName;
+  zoneOwner?: ZoneOwner;
+  validFromZones?: ZoneName[];
+  steppedAside: boolean;
+  isBattleTone: boolean;
+  count: number;
+  title: string;
+  battleGridStyle: React.CSSProperties;
+  panelChildren: React.ReactNode;
+}
+
+function DndPanelContent({
+  zone,
+  zoneOwner,
+  validFromZones,
+  steppedAside,
+  isBattleTone,
+  count,
+  title,
+  battleGridStyle,
+  panelChildren,
+}: DndPanelContentProps): ReactElement {
+  if (zone) {
+    let zoneBody: React.ReactNode = panelChildren;
+    if (count === 0) {
+      zoneBody = (
+        <p className="h-full flex items-center justify-center text-sm text-[var(--ivory-muted)]">
+          {title} is empty
+        </p>
+      );
+    } else if (isBattleTone) {
+      zoneBody = (
+        <div
+          className="grid gap-1.5 justify-center content-start min-h-full"
+          style={battleGridStyle}
+        >
+          {panelChildren}
+        </div>
+      );
+    }
+    return (
+      <DroppableZone
+        zone={zone}
+        zoneOwner={zoneOwner}
+        validFromZones={validFromZones}
+        idPrefix="panel"
+        disabled={steppedAside}
+        // The zone's border sits in the padding, so the cards get all the room they were sized for.
+        className={`w-full h-full shrink-0 box-content ${isBattleTone ? "overflow-auto" : "flex flex-wrap gap-1.5 justify-center content-center"}`}
+      >
+        {zoneBody}
+      </DroppableZone>
+    );
+  }
+
+  if (isBattleTone) {
+    return (
+      <div
+        className="grid gap-1.5 justify-center content-start w-full h-full overflow-auto"
+        style={battleGridStyle}
+      >
+        {panelChildren}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5 justify-center content-center">
+      {panelChildren}
+    </div>
+  );
 }
 
 /** A zone's cards in a side panel, sized to fit it, and a drop target for that zone. */
@@ -61,7 +135,7 @@ export function DndPanel({
   tone = "default",
   headerActions,
   onEmptyClick,
-}: DndPanelProps) {
+}: DndPanelProps): ReactElement {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS);
   const observerRef = useRef<ResizeObserver | null>(null);
   const isBattleTone = tone === "battle";
@@ -81,10 +155,17 @@ export function DndPanel({
 
       if (!node) return;
 
-      const measure = (w: number, h: number) => {
+      const measure = (w: number, h: number): void => {
         const next = isBattleTone
           ? resolveBattlePanelLayout(count, w, h)
-          : bestFit(count, w, h, PANEL_GAP, PANEL_MAX_WIDTH, MIN_CARD_WIDTH);
+          : bestFit({
+              count,
+              availWidth: w,
+              availHeight: h,
+              gap: PANEL_GAP,
+              maxWidth: PANEL_MAX_WIDTH,
+              minWidth: MIN_CARD_WIDTH,
+            });
         setDims((prev) =>
           prev.width === next.width &&
           prev.height === next.height &&
@@ -125,53 +206,32 @@ export function DndPanel({
       steppedAside={steppedAside}
     >
       <div
+        role="presentation"
         ref={bodyRef}
         className="flex-1 min-h-0 p-2 flex items-center justify-center"
         onClick={
           onEmptyClick &&
-          ((event) => {
-            const target = event.target as HTMLElement;
-            if (!target.closest(".card, button")) onEmptyClick();
+          ((event): void => {
+            if (
+              event.target instanceof Element &&
+              !event.target.closest(".card, button")
+            ) {
+              onEmptyClick();
+            }
           })
         }
       >
-        {zone ? (
-          <DroppableZone
-            zone={zone}
-            zoneOwner={zoneOwner}
-            validFromZones={validFromZones}
-            idPrefix="panel"
-            disabled={steppedAside}
-            // The zone's border sits in the padding, so the cards get all the room they were sized for.
-            className={`w-full h-full shrink-0 box-content ${isBattleTone ? "overflow-auto" : "flex flex-wrap gap-1.5 justify-center content-center"}`}
-          >
-            {count === 0 ? (
-              <p className="h-full flex items-center justify-center text-sm text-[var(--ivory-muted)]">
-                {title} is empty
-              </p>
-            ) : isBattleTone ? (
-              <div
-                className="grid gap-1.5 justify-center content-start min-h-full"
-                style={battleGridStyle}
-              >
-                {panelChildren}
-              </div>
-            ) : (
-              panelChildren
-            )}
-          </DroppableZone>
-        ) : isBattleTone ? (
-          <div
-            className="grid gap-1.5 justify-center content-start w-full h-full overflow-auto"
-            style={battleGridStyle}
-          >
-            {panelChildren}
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-1.5 justify-center content-center">
-            {panelChildren}
-          </div>
-        )}
+        <DndPanelContent
+          zone={zone}
+          zoneOwner={zoneOwner}
+          validFromZones={validFromZones}
+          steppedAside={steppedAside}
+          isBattleTone={isBattleTone}
+          count={count}
+          title={title}
+          battleGridStyle={battleGridStyle}
+          panelChildren={panelChildren}
+        />
       </div>
     </SidePanel>
   );

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Card as CardType } from "../../types";
 import { Card } from "../card";
 
@@ -33,7 +34,7 @@ export function UpgradeStack({
   dimensions,
   onClick,
   selected,
-}: UpgradeStackProps) {
+}: UpgradeStackProps): ReactNode {
   const target = upgrade.upgrade_target;
 
   if (!target) {
@@ -64,13 +65,17 @@ export function UpgradeStack({
     <div
       className="relative"
       style={{ width: container.width, height: container.height }}
-      onClick={onClick}
     >
       <div className="absolute top-0 left-0">
-        <Card card={target} dimensions={subDims} />
+        <Card card={target} dimensions={subDims} onClick={onClick} />
       </div>
       <div className="absolute" style={{ bottom: 0, right: 0 }}>
-        <Card card={upgrade} dimensions={subDims} selected={selected} />
+        <Card
+          card={upgrade}
+          dimensions={subDims}
+          selected={selected}
+          onClick={onClick}
+        />
       </div>
     </div>
   );

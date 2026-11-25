@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactElement } from "react";
 import { useThreePhaseOverlay } from "../../hooks/ui/useOverlayAnimations";
 import { Card } from "../card";
 import type { Card as CardType } from "../../types";
@@ -19,7 +19,7 @@ export function BuildUpgradeOverlay({
   upgrade,
   target,
   onComplete,
-}: BuildUpgradeOverlayProps) {
+}: BuildUpgradeOverlayProps): ReactElement {
   const phase = useThreePhaseOverlay(BUILD_OVERLAY_TIMINGS, onComplete);
 
   const dims = useMemo(() => {

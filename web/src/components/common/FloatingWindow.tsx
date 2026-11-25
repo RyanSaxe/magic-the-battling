@@ -3,6 +3,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type ReactElement,
   type ReactNode,
   type Ref,
 } from "react";
@@ -36,7 +37,7 @@ function WindowControl({
   label: string;
   title: string;
   onClick: () => void;
-}) {
+}): ReactElement {
   return (
     <button
       type="button"
@@ -61,7 +62,7 @@ function WindowControl({
   );
 }
 
-function DragGrip() {
+function DragGrip(): ReactElement {
   return (
     <svg
       viewBox="0 0 6 10"
@@ -74,6 +75,86 @@ function DragGrip() {
         [1, 5].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1" />),
       )}
     </svg>
+  );
+}
+
+function resolveDragCursorClass(draggable: boolean, dragging: boolean): string {
+  if (!draggable) return "";
+  return dragging ? "cursor-grabbing" : "cursor-grab";
+}
+
+interface FloatingWindowTitleBarProps {
+  name: string;
+  title: string;
+  badge?: string;
+  collapsed: boolean;
+  draggable: boolean;
+  dragging: boolean;
+  onDragStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onMinimize: () => void;
+  onRestore: () => void;
+  onReset?: () => void;
+  onCloseClick: () => void;
+}
+
+function FloatingWindowTitleBar({
+  name,
+  title,
+  badge,
+  collapsed,
+  draggable,
+  dragging,
+  onDragStart,
+  onMinimize,
+  onRestore,
+  onReset,
+  onCloseClick,
+}: FloatingWindowTitleBarProps): ReactElement {
+  return (
+    <div
+      className={`floating-window-bar ${resolveDragCursorClass(draggable, dragging)}`}
+      onPointerDown={onDragStart}
+      style={{ touchAction: draggable ? "none" : undefined }}
+    >
+      {draggable && <DragGrip />}
+      <span className="floating-window-title">{title}</span>
+      {badge && (
+        <Tag tone="gold" small>
+          {badge}
+        </Tag>
+      )}
+      <div className="ml-auto flex items-center gap-1.5">
+        {collapsed ? (
+          <WindowControl
+            icon="restore"
+            label={`Open ${name}`}
+            title="Open"
+            onClick={onRestore}
+          />
+        ) : (
+          <WindowControl
+            icon="minimize"
+            label={`Minimize ${name}`}
+            title="Minimize"
+            onClick={onMinimize}
+          />
+        )}
+        {onReset && !collapsed && (
+          <WindowControl
+            icon="reset"
+            label={`Reset ${name} window`}
+            title="Reset"
+            onClick={onReset}
+          />
+        )}
+        <WindowControl
+          icon="close"
+          label={`Close ${name}`}
+          title="Close"
+          onClick={onCloseClick}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -129,70 +210,44 @@ export function FloatingWindow({
   style,
   ref,
   children,
-}: FloatingWindowProps) {
+}: FloatingWindowProps): ReactElement {
   const [closing, setClosing] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [openSize, setOpenSize] = useState<{ width: number; height: number }>();
 
-  const minimize = () => {
+  const minimize = (): void => {
     const content = contentRef.current;
-    if (content)
+    if (content) {
       setOpenSize({ width: content.offsetWidth, height: content.offsetHeight });
+    }
     onMinimize();
   };
 
   useTimeout(onClose, closing ? CLOSE_FADE_MS : null);
 
+  const windowClass = [
+    "floating-window modal-chrome",
+    instant ? "floating-window--instant" : "",
+    closing ? "floating-window--closing" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      ref={ref}
-      className={`floating-window modal-chrome${instant ? " floating-window--instant" : ""}${closing ? " floating-window--closing" : ""}`}
-      style={style}
-    >
-      <div
-        className={`floating-window-bar ${draggable ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""}`}
-        onPointerDown={onDragStart}
-        style={{ touchAction: draggable ? "none" : undefined }}
-      >
-        {draggable && <DragGrip />}
-        <span className="floating-window-title">{title}</span>
-        {badge && (
-          <Tag tone="gold" small>
-            {badge}
-          </Tag>
-        )}
-        <div className="ml-auto flex items-center gap-1.5">
-          {collapsed ? (
-            <WindowControl
-              icon="restore"
-              label={`Open ${name}`}
-              title="Open"
-              onClick={onRestore}
-            />
-          ) : (
-            <WindowControl
-              icon="minimize"
-              label={`Minimize ${name}`}
-              title="Minimize"
-              onClick={minimize}
-            />
-          )}
-          {onReset && !collapsed && (
-            <WindowControl
-              icon="reset"
-              label={`Reset ${name} window`}
-              title="Reset"
-              onClick={onReset}
-            />
-          )}
-          <WindowControl
-            icon="close"
-            label={`Close ${name}`}
-            title="Close"
-            onClick={() => setClosing(true)}
-          />
-        </div>
-      </div>
+    <div ref={ref} className={windowClass} style={style}>
+      <FloatingWindowTitleBar
+        name={name}
+        title={title}
+        badge={badge}
+        collapsed={collapsed}
+        draggable={draggable}
+        dragging={dragging}
+        onDragStart={onDragStart}
+        onMinimize={minimize}
+        onRestore={onRestore}
+        onReset={onReset}
+        onCloseClick={() => setClosing(true)}
+      />
       {collapsed && (
         <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
           <span className="text-[0.58rem] uppercase tracking-[0.12em] text-[var(--ivory-muted)]">

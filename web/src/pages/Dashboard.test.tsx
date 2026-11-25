@@ -15,46 +15,89 @@ import { Dashboard } from "./Dashboard";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
 vi.mock("../api/client", () => ({
   createBattler: vi.fn(),
   getBattlers: vi.fn(),
-  getFollowing: async () => ({ following: [], has_more: false }),
-  getMyGames: async () => ({ games: [], total_games: 0, total_wins: 0 }),
+  getFollowing: async (): Promise<{
+    following: never[];
+    has_more: boolean;
+  }> => ({ following: [], has_more: false }),
+  getMyGames: async (): Promise<{
+    games: never[];
+    total_games: number;
+    total_wins: number;
+  }> => ({ games: [], total_games: 0, total_wins: 0 }),
 }));
-vi.mock("../contexts", () => ({ useToast: () => ({ addToast: () => {} }) }));
+vi.mock("../contexts", () => ({
+  useToast: (): { addToast: () => void } => ({ addToast: (): void => {} }),
+}));
 vi.mock("../contexts/authState", () => ({
-  useAuth: () => ({ user: { username: "tester" }, loading: false }),
+  useAuth: (): { user: { username: string }; loading: boolean } => ({
+    user: { username: "tester" },
+    loading: false,
+  }),
 }));
-vi.mock("../hooks/useResumableGames", () => ({ useResumableGames: () => [] }));
+vi.mock("../hooks/useResumableGames", () => ({
+  useResumableGames: (): never[] => [],
+}));
 
 afterEach(cleanup);
 
-const preset = (id: number) =>
-  ({
-    id,
-    cube_id: `cube-${id}`,
-    display_name: `Preset ${id}`,
-    play_mode: "limited",
-    puppet_count: 3,
-  }) as UserBattler;
+const preset = (id: number): UserBattler => ({
+  id,
+  cube_id: `cube-${id}`,
+  display_name: `Preset ${id}`,
+  use_upgrades: false,
+  use_vanguards: false,
+  play_mode: "limited",
+  puppet_count: 3,
+  target_player_count: 4,
+  auto_approve_spectators: false,
+  guided_mode_default: false,
+  position: id,
+  created_at: "2026-11-21T00:00:00",
+  game_count: 0,
+  human_player_count: 0,
+  my_game_count: 0,
+  my_win_count: 0,
+  my_average_placement: null,
+  my_last_played: null,
+});
 
-function held() {
-  let release = () => {};
+function noop(): void {}
+
+interface DeferredGate {
+  release: () => Promise<void>;
+  released: Promise<void>;
+}
+
+function held(): DeferredGate {
+  let release: () => void = noop;
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
-  return { release: () => act(async () => release()), released };
+  return {
+    release: (): Promise<void> =>
+      act(async () => {
+        release();
+      }),
+    released,
+  };
 }
 
-function submitNewPreset(cubeId: string) {
+function submitNewPreset(cubeId: string): void {
   fireEvent.click(screen.getByText("+ Add Cube / Deck"));
   const dialog = screen.getByRole("dialog");
   fireEvent.change(within(dialog).getAllByRole("textbox")[0], {
@@ -64,7 +107,7 @@ function submitNewPreset(cubeId: string) {
   fireEvent.click(screen.getByLabelText("Close Add Cube / Deck"));
 }
 
-function visiblePresetTitles() {
+function visiblePresetTitles(): string[] {
   return [...document.querySelectorAll("h3")]
     .map((title) => title.textContent)
     .filter((title) => title?.startsWith("Preset "));

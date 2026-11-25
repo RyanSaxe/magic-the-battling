@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type ReactElement } from "react";
 import { TEXT_INPUT } from "./styles";
 
 /** A menu's own field for a custom value. */
@@ -16,8 +16,9 @@ export function MenuPrompt({
   numeric?: boolean;
   onSubmit: (value: string) => void;
   onCancel: () => void;
-}) {
+}): ReactElement {
   const [value, setValue] = useState("");
+  const focusedRef = useRef(false);
   const trimmed = value.trim();
   const valid = numeric ? parseInt(trimmed, 10) > 0 : trimmed !== "";
 
@@ -31,6 +32,12 @@ export function MenuPrompt({
       }}
     >
       <input
+        ref={(el): void => {
+          if (el && !focusedRef.current) {
+            focusedRef.current = true;
+            el.focus();
+          }
+        }}
         type="text"
         inputMode={numeric ? "numeric" : undefined}
         value={value}
@@ -44,7 +51,6 @@ export function MenuPrompt({
         aria-label={label}
         placeholder={placeholder}
         className={`${TEXT_INPUT} min-w-0`}
-        autoFocus
       />
       <button
         type="submit"

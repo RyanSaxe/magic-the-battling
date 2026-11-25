@@ -1,6 +1,9 @@
 import { useCallback } from "react";
-import { useWebSocket } from "./useWebSocket";
-import type { VoiceSignalPayload } from "./useWebSocket";
+import {
+  useWebSocket,
+  type UseWebSocketOptions,
+  type UseWebSocketResult,
+} from "./useWebSocket";
 import type {
   CardDestination,
   BuildSource,
@@ -8,20 +11,76 @@ import type {
   CardStateAction,
 } from "../types";
 import type { ZoneOwner } from "../dnd/types";
-import type { AppError } from "../utils/appError";
 
-interface SpectatorConfig {
-  spectatePlayer: string;
-  requestId: string;
+export interface BuildMoveParams {
+  cardId: string;
+  source: BuildSource;
+  destination: BuildSource;
+  slot?: number;
 }
 
-export function useGame(
-  gameId: string | null,
-  sessionId: string | null,
-  spectatorConfig?: SpectatorConfig | null,
-  onServerError?: (error: AppError) => void,
-  onVoiceSignal?: (payload: VoiceSignalPayload) => void,
-) {
+export interface BuildSwapParams {
+  cardAId: string;
+  sourceA: BuildSource;
+  cardBId: string;
+  sourceB: BuildSource;
+}
+
+export interface BattleMoveParams {
+  cardId: string;
+  fromZone: ZoneName;
+  toZone: ZoneName;
+  fromOwner: ZoneOwner;
+  toOwner: ZoneOwner;
+}
+
+export interface GameActions {
+  startGame: () => void;
+  setReady: (isReady: boolean) => void;
+  submitBattler: (battlerId: string) => void;
+  addPuppet: () => void;
+  removePuppet: () => void;
+  setTargetPlayerCount: (targetPlayerCount: number) => void;
+  kickPlayer: (targetPlayerId: string) => void;
+  draftSwap: (
+    packCardId: string,
+    playerCardId: string,
+    destination: CardDestination,
+  ) => void;
+  draftRoll: () => void;
+  draftDone: () => void;
+  buildMove: (move: BuildMoveParams) => void;
+  buildSwap: (swap: BuildSwapParams) => void;
+  buildSetBasics: (basics: string[]) => void;
+  buildReady: (
+    basics: string[],
+    playDrawPreference: "play" | "draw",
+    handOrder?: string[],
+  ) => void;
+  buildUnready: () => void;
+  buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void;
+  buildSetCompanion: (cardId: string) => void;
+  buildRemoveCompanion: () => void;
+  battleMove: (move: BattleMoveParams) => void;
+  battleRevealUpgrade: (upgradeId: string) => void;
+  battleSubmitResult: (result: string) => void;
+  battleUpdateCardState: (
+    actionType: CardStateAction,
+    cardId: string,
+    data?: Record<string, unknown>,
+  ) => void;
+  battleUpdateLife: (target: "you" | "opponent", life: number) => void;
+  battlePassTurn: () => void;
+  rewardApplyUpgrade: (upgradeId: string, targetCardId: string) => void;
+  rewardDone: (upgradeId?: string) => void;
+  spectateResponse: (requestId: string, allowed: boolean) => void;
+}
+
+export interface UseGameResult extends UseWebSocketResult {
+  actions: GameActions;
+}
+
+export function useGame(options: UseWebSocketOptions): UseGameResult {
   const {
     status,
     isConnected,
@@ -31,13 +90,7 @@ export function useGame(
     spectateRequests,
     serverNotice,
     connectionError,
-  } = useWebSocket(
-    gameId,
-    sessionId,
-    spectatorConfig,
-    onServerError,
-    onVoiceSignal,
-  );
+  } = useWebSocket(options);
 
   const startGame = useCallback(() => {
     send("start_game");
@@ -81,24 +134,14 @@ export function useGame(
   }, [send]);
 
   const buildMove = useCallback(
-    (
-      cardId: string,
-      source: BuildSource,
-      destination: BuildSource,
-      slot?: number,
-    ) => {
+    ({ cardId, source, destination, slot }: BuildMoveParams) => {
       send("build_move", { card_id: cardId, source, destination, slot });
     },
     [send],
   );
 
   const buildSwap = useCallback(
-    (
-      cardAId: string,
-      sourceA: BuildSource,
-      cardBId: string,
-      sourceB: BuildSource,
-    ) => {
+    ({ cardAId, sourceA, cardBId, sourceB }: BuildSwapParams) => {
       send("build_swap", {
         card_a_id: cardAId,
         source_a: sourceA,
@@ -157,13 +200,7 @@ export function useGame(
   }, [send]);
 
   const battleMove = useCallback(
-    (
-      cardId: string,
-      fromZone: ZoneName,
-      toZone: ZoneName,
-      fromOwner: ZoneOwner,
-      toOwner: ZoneOwner,
-    ) => {
+    ({ cardId, fromZone, toZone, fromOwner, toOwner }: BattleMoveParams) => {
       send("battle_move", {
         card_id: cardId,
         from_zone: fromZone,

@@ -1,10 +1,8 @@
-"""Round orchestration: starting each round's fights, applying what mtb.phases.round_resolution decides
-after a fight or a round, and recording battle snapshots, exits and final placements."""
+"""Round orchestration: starting each round's fights, applying what mtb.phases.round_resolution decides."""
 
 import json
 import logging
 from datetime import UTC, datetime
-from typing import cast
 
 from sqlalchemy.orm import Session
 
@@ -51,7 +49,7 @@ POST_GAME_CLEANUP_SECONDS = 300.0
 def _start_round_battles(game: Game) -> set[str]:
     paired_bot_names: set[str] = set()
     for player, opponent in battle.get_round_table(game).draw_battles():
-        battle.start(game, player, opponent)
+        battle.start(game, player, opponent=opponent)
         if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
             for fp in game.puppets:
                 if fp.player_history_id == opponent.source_player_history_id:
@@ -61,7 +59,7 @@ def _start_round_battles(game: Game) -> set[str]:
 
 
 class RoundService(SnapshotStore):
-    def complete_game(self, game_id: str, winner: Player | None, db: Session | None = None) -> None:
+    def complete_game(self, game_id: str, winner: Player | None, *, db: Session | None = None) -> None:
         """Complete a game - set phases, persist final state, schedule cleanup."""
         game = self._active_games.get(game_id)
         if not game:
@@ -77,9 +75,9 @@ class RoundService(SnapshotStore):
         if db is not None:
             game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
             if game_record:
-                game_record.ended_at = datetime.now(UTC)  # ty: ignore[invalid-assignment]
+                game_record.ended_at = datetime.now(UTC)
                 if winner:
-                    game_record.winner_player_id = winner.name  # ty: ignore[invalid-assignment]
+                    game_record.winner_player_id = winner.name
                 db.commit()
 
             self._persist_final_placements(db, game_id, game=game)
@@ -121,7 +119,7 @@ class RoundService(SnapshotStore):
         for participant in outcome.eliminated:
             self._persist_exit(db, game_id, game=game, participant=participant)
         if outcome.status == "game_over":
-            self.complete_game(game_id or "", outcome.winner, db)
+            self.complete_game(game_id or "", outcome.winner, db=db)
             return "game_over"
         if outcome.check_round_start and outcome.status is None:
             self._start_round_if_ready(game, game_id, db=db)
@@ -137,10 +135,10 @@ class RoundService(SnapshotStore):
             .first()
         )
         if history:
-            history.final_placement = participant.placement  # ty: ignore[invalid-assignment]
-            history.final_poison = participant.poison  # ty: ignore[invalid-assignment]
+            history.final_placement = participant.placement
+            history.final_poison = participant.poison
             # Puppets replay builds from a past game, so they have no treasures of their own.
-            history.final_treasures = participant.treasures if isinstance(participant, Player) else None  # ty: ignore[invalid-assignment]
+            history.final_treasures = participant.treasures if isinstance(participant, Player) else None
         return history is not None
 
     def _record_snapshot(
@@ -185,8 +183,8 @@ class RoundService(SnapshotStore):
             db.add(history)
             db.flush()
         elif stage > history.max_stage or (stage == history.max_stage and player.round > history.max_round):
-            history.max_stage = stage  # ty: ignore[invalid-assignment]
-            history.max_round = player.round  # ty: ignore[invalid-assignment]
+            history.max_stage = stage
+            history.max_round = player.round
 
         snapshot_data = BattleSnapshotData(
             hand=[c.model_copy() for c in player.hand],
@@ -262,13 +260,13 @@ class RoundService(SnapshotStore):
             db.add(history)
             db.flush()
         elif stage > history.max_stage or (stage == history.max_stage and round_num > history.max_round):
-            history.max_stage = stage  # ty: ignore[invalid-assignment]
-            history.max_round = round_num  # ty: ignore[invalid-assignment]
+            history.max_stage = stage
+            history.max_round = round_num
 
-        raw = cast(str, history.poison_history_json) if history.poison_history_json else ""
+        raw = str(history.poison_history_json) if history.poison_history_json else ""
         poison_map: dict[str, int] = json.loads(raw) if raw else {}
         poison_map[f"{stage}_{round_num}"] = fp.poison
-        history.poison_history_json = json.dumps(poison_map)  # ty: ignore[invalid-assignment]
+        history.poison_history_json = json.dumps(poison_map)
         db.commit()
 
     def _return_eliminated_player_cards(self, game: Game) -> None:
@@ -328,7 +326,13 @@ class RoundService(SnapshotStore):
                 self._record_bot_poison(db, game_id, fp=fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
 
         paired_bot_names = _start_round_battles(game)
-        battle.resolve_unpaired_bot_battles(game, paired_bot_names, stage, round_num, game.config.num_rounds_per_stage)
+        battle.resolve_unpaired_bot_battles(
+            game,
+            paired_bot_names,
+            stage=stage,
+            round_num=round_num,
+            num_rounds_per_stage=game.config.num_rounds_per_stage,
+        )
         self._record_opponents(db, snapshots_by_player, battles=game.active_battles)
 
     def _record_opponents(
@@ -339,7 +343,7 @@ class RoundService(SnapshotStore):
         for b in battles:
             for name, opponent_name in ((b.player.name, b.opponent.name), (b.opponent.name, b.player.name)):
                 if name in snapshots_by_player:
-                    snapshots_by_player[name].opponent_name = opponent_name  # ty: ignore[invalid-assignment]
+                    snapshots_by_player[name].opponent_name = opponent_name
         db.commit()
 
     def _end_battle(
@@ -348,6 +352,6 @@ class RoundService(SnapshotStore):
         outcome = resolve_battle(game, b)
         return self._apply_resolution_outcome(game, outcome, game_id=game_id, db=db)
 
-    def _check_sudden_death_ready(self, game: Game, game_id: str | None, *, db: Session | None) -> str | None:
+    def check_sudden_death_ready(self, game: Game, game_id: str | None, *, db: Session | None) -> str | None:
         outcome = resolve_end_of_round(game)
         return self._apply_resolution_outcome(game, outcome, game_id=game_id, db=db)

@@ -58,8 +58,9 @@ export function buildPanelHotkeys(options: {
   // Actions can open over a minimized Guide, so it takes Escape first.
   if (options.closeMenu) return { escape: options.closeMenu };
   if (options.guideOpen) return { "?": options.closeGuide };
-  if (options.closeUpgrades)
+  if (options.closeUpgrades) {
     return { [options.closeUpgrades.key]: options.closeUpgrades.close };
+  }
   if (options.gameplayHotkeysDisabled) return {};
   return { "?": options.openGuide };
 }
@@ -72,7 +73,7 @@ export function buildCardMoveHotkeys(options: {
   const { hoveredCard, moveCard, clearHoveredCard } = options;
   const map: HotkeyMap = {};
   for (const [key, toZone] of Object.entries(MOVE_HOTKEY_ZONES)) {
-    map[key] = () => {
+    map[key] = (): void => {
       if (toZone === hoveredCard.zone) return;
       moveCard(hoveredCard, toZone);
       // The moved card unmounts without a mouseleave, so the pointer's next

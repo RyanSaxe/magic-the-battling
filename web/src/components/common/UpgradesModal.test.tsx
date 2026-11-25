@@ -10,20 +10,40 @@ import { UpgradesModal } from "./UpgradesModal";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  });
 });
 
-const upgrade = {
-  id: "upgrade",
-  name: "Upgrade",
-  upgrade_target: null,
-} as Card;
-const target = { id: "target", name: "Target", upgrade_target: null } as Card;
+function makeCard(id: string, name: string): Card {
+  return {
+    id,
+    name,
+    image_url: "",
+    flip_image_url: null,
+    png_url: null,
+    flip_png_url: null,
+    type_line: "",
+    tokens: [],
+    elo: null,
+    upgrade_target: null,
+    oracle_text: null,
+    colors: [],
+    cmc: 0,
+  };
+}
+
+const upgrade: Card = makeCard("upgrade", "Upgrade");
+const target: Card = makeCard("target", "Target");
 
 describe("upgradeModalFlow", () => {
   it("closes the modal before applying the upgrade", () => {
@@ -93,9 +113,9 @@ describe("UpgradesModal keyboard interactions", () => {
     vi.stubGlobal(
       "ResizeObserver",
       class {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
       },
     );
   });

@@ -1,8 +1,5 @@
-import { usePanelHoldsEnter } from "../hooks/usePanelHoldsEnter";
-
-export { usePanelHoldsEnter };
-
-const PRESSED_BY_ENTER = "button:not([disabled]), a[href], summary";
+const PRESSED_BY_ENTER =
+  'button:not([disabled]), a[href], summary, [role="button"]:not([aria-disabled="true"])';
 const ENDS_PHASE = "[data-ends-phase]";
 
 // :focus-visible matches a clicked button as soon as any key is down, so the outline a player saw is the one from
@@ -13,7 +10,7 @@ let openPanels = 0;
 let skipsNextEnter = false;
 let skipsThisEnter = false;
 
-function readOutline() {
+function readOutline(): Element | null {
   const focused = document.activeElement;
   return focused?.matches(":focus-visible") ? focused : null;
 }
@@ -60,14 +57,16 @@ export function enterPressesControl(
     e.key !== "Enter" ||
     !(control instanceof Element) ||
     control !== outlinedBeforeKey
-  )
+  ) {
     return false;
+  }
   // A pill that shows on hover can keep focus unseen, and its outline with it.
   if (
     !control.matches(PRESSED_BY_ENTER) ||
     getComputedStyle(control).opacity === "0"
-  )
+  ) {
     return false;
+  }
   return (
     usable.length === 0 || usable.some((element) => element?.contains(control))
   );

@@ -88,8 +88,9 @@ export function parseShareRoundValue(
   const suddenDeathBuild =
     suddenDeathPart === undefined ? null : Number(suddenDeathPart);
   if (!Number.isInteger(stage) || !Number.isInteger(round)) return null;
-  if (suddenDeathBuild !== null && !Number.isInteger(suddenDeathBuild))
+  if (suddenDeathBuild !== null && !Number.isInteger(suddenDeathBuild)) {
     return null;
+  }
 
   return { stage, round, sudden_death_build: suddenDeathBuild };
 }
@@ -155,11 +156,13 @@ function getSharePlacementForRound(
   if (
     player.final_placement === null ||
     (data.in_progress && player.final_treasures === null)
-  )
+  ) {
     return 0;
+  }
 
-  if (getRoundTiming(player, selectedRound) === "after")
+  if (getRoundTiming(player, selectedRound) === "after") {
     return player.final_placement;
+  }
   return endedOnLatestRound(data, player, selectedRound)
     ? player.final_placement
     : 0;
@@ -233,6 +236,82 @@ export function getSharePlayerRowBadge(
   return player.name === selectedPlayer ? "viewing" : "alive";
 }
 
+interface SharePlayerViewOverrides {
+  treasures: number;
+  poison: number;
+  placement: number;
+}
+
+function buildSnapshotMetrics(snapshot: SharePlayerSnapshot | null): {
+  round: number;
+  stage: number;
+  handCount: number;
+  sideboardCount: number;
+  upgrades: Card[];
+  vanguard: Card | null;
+  chosenBasics: string[];
+  commandZone: Card[];
+} {
+  if (!snapshot) {
+    return {
+      round: 0,
+      stage: 0,
+      handCount: 0,
+      sideboardCount: 0,
+      upgrades: [],
+      vanguard: null,
+      chosenBasics: [],
+      commandZone: [],
+    };
+  }
+  return {
+    round: snapshot.round,
+    stage: snapshot.stage,
+    handCount: snapshot.hand.length,
+    sideboardCount: snapshot.sideboard.length,
+    upgrades: getShareUpgrades(snapshot),
+    vanguard: snapshot.vanguard,
+    chosenBasics: snapshot.basic_lands,
+    commandZone: snapshot.command_zone,
+  };
+}
+
+function buildSharePlayerView(
+  player: SharePlayerData,
+  snapshot: SharePlayerSnapshot | null,
+  overrides: SharePlayerViewOverrides,
+): PlayerView {
+  const metrics = buildSnapshotMetrics(snapshot);
+  return {
+    name: player.name,
+    treasures: overrides.treasures,
+    poison: overrides.poison,
+    phase: "game_over",
+    round: metrics.round,
+    stage: metrics.stage,
+    vanquishers: 0,
+    is_ghost: false,
+    is_puppet: player.is_puppet,
+    time_of_death: null,
+    hand_count: metrics.handCount,
+    sideboard_count: metrics.sideboardCount,
+    hand_size: metrics.handCount,
+    is_stage_increasing: false,
+    upgrades: metrics.upgrades,
+    vanguard: metrics.vanguard,
+    chosen_basics: metrics.chosenBasics,
+    most_recently_revealed_cards: [],
+    last_result: null,
+    pairing_probability: null,
+    is_most_recent_ghost: false,
+    full_sideboard: [],
+    command_zone: metrics.commandZone,
+    placement: overrides.placement,
+    in_sudden_death: false,
+    build_ready: false,
+  };
+}
+
 export function buildSharePlayerViews(
   data: ShareGameResponse | null,
   selectedRound: string,
@@ -240,40 +319,17 @@ export function buildSharePlayerViews(
   if (!data) return [];
 
   return data.players.map((player) => {
-    const snapshot = getSharePlayerSnapshotForRound(player, selectedRound);
-    const latestSnapshot = getLatestShareSnapshot(player);
-    const displaySnapshot = snapshot ?? latestSnapshot;
+    const displaySnapshot =
+      getSharePlayerSnapshotForRound(player, selectedRound) ??
+      getLatestShareSnapshot(player);
     const finalState = getShareFinalStateForRound(data, player, selectedRound);
 
-    return {
-      name: player.name,
+    return buildSharePlayerView(player, displaySnapshot, {
       treasures: finalState?.treasures ?? displaySnapshot?.treasures ?? 0,
       poison:
         finalState?.poison ?? displaySnapshot?.poison ?? player.final_poison,
-      phase: "game_over",
-      round: displaySnapshot?.round ?? 0,
-      stage: displaySnapshot?.stage ?? 0,
-      vanquishers: 0,
-      is_ghost: false,
-      is_puppet: player.is_puppet,
-      time_of_death: null,
-      hand_count: displaySnapshot?.hand.length ?? 0,
-      sideboard_count: displaySnapshot?.sideboard.length ?? 0,
-      hand_size: displaySnapshot?.hand.length ?? 0,
-      is_stage_increasing: false,
-      upgrades: displaySnapshot ? getShareUpgrades(displaySnapshot) : [],
-      vanguard: displaySnapshot?.vanguard ?? null,
-      chosen_basics: displaySnapshot?.basic_lands ?? [],
-      most_recently_revealed_cards: [],
-      last_result: null,
-      pairing_probability: null,
-      is_most_recent_ghost: false,
-      full_sideboard: [],
-      command_zone: displaySnapshot?.command_zone ?? [],
       placement: getSharePlacementForRound(data, player, selectedRound),
-      in_sudden_death: false,
-      build_ready: false,
-    };
+    });
   });
 }
 
@@ -288,32 +344,11 @@ export function buildGameSummaryData(
   const lastSnap = target.snapshots[target.snapshots.length - 1];
 
   const selfPlayer: SelfPlayerView = {
-    name: target.name,
-    treasures: lastSnap.treasures,
-    poison: target.final_poison,
-    phase: "game_over",
-    round: lastSnap.round,
-    stage: lastSnap.stage,
-    vanquishers: 0,
-    is_ghost: false,
-    is_puppet: target.is_puppet,
-    time_of_death: null,
-    hand_count: lastSnap.hand.length,
-    sideboard_count: lastSnap.sideboard.length,
-    hand_size: lastSnap.hand.length,
-    is_stage_increasing: false,
-    upgrades: getShareUpgrades(lastSnap),
-    vanguard: lastSnap.vanguard,
-    chosen_basics: lastSnap.basic_lands,
-    most_recently_revealed_cards: [],
-    last_result: null,
-    pairing_probability: null,
-    is_most_recent_ghost: false,
-    full_sideboard: [],
-    command_zone: lastSnap.command_zone,
-    placement: target.final_placement ?? 0,
-    in_sudden_death: false,
-    build_ready: false,
+    ...buildSharePlayerView(target, lastSnap, {
+      treasures: lastSnap.treasures,
+      poison: target.final_poison,
+      placement: target.final_placement ?? 0,
+    }),
     hand: lastSnap.hand,
     hand_slots: lastSnap.hand.map((c) => c.id),
     sideboard: lastSnap.sideboard,
@@ -335,35 +370,12 @@ export function buildGameSummaryData(
   };
 
   const players: PlayerView[] = data.players.map((p) => {
-    const snap = p.snapshots[p.snapshots.length - 1];
-    return {
-      name: p.name,
+    const snap = p.snapshots[p.snapshots.length - 1] ?? null;
+    return buildSharePlayerView(p, snap, {
       treasures: p.final_treasures ?? snap?.treasures ?? 0,
       poison: p.final_poison,
-      phase: "game_over",
-      round: snap?.round ?? 0,
-      stage: snap?.stage ?? 0,
-      vanquishers: 0,
-      is_ghost: false,
-      is_puppet: p.is_puppet,
-      time_of_death: null,
-      hand_count: snap?.hand.length ?? 0,
-      sideboard_count: snap?.sideboard.length ?? 0,
-      hand_size: snap?.hand.length ?? 0,
-      is_stage_increasing: false,
-      upgrades: snap ? getShareUpgrades(snap) : [],
-      vanguard: snap?.vanguard ?? null,
-      chosen_basics: snap?.basic_lands ?? [],
-      most_recently_revealed_cards: [],
-      last_result: null,
-      pairing_probability: null,
-      is_most_recent_ghost: false,
-      full_sideboard: [],
-      command_zone: snap?.command_zone ?? [],
       placement: p.final_placement ?? 0,
-      in_sudden_death: false,
-      build_ready: false,
-    };
+    });
   });
 
   return { selfPlayer, players };

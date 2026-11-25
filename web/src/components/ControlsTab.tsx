@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { DOCS } from "../docs";
 import { DocRenderer } from "./DocRenderer";
 import { PHASE_HOTKEYS } from "../constants/hotkeys";
 import { HotkeyRow } from "./HotkeyRow";
 
-export function ControlsTab({ phase }: { phase: string }) {
+export function ControlsTab({ phase }: { phase: string }): ReactNode {
   const doc = DOCS.find((d) => d.parsed.meta.phase === phase);
   const controlsMarkdown = doc?.parsed.sections["controls"];
   const hotkeys = PHASE_HOTKEYS[phase] ?? [];

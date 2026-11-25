@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { afterEach, expect, it } from "vitest";
 import { FloatingWindow } from "./FloatingWindow";
 
-function Guide() {
+function Guide(): ReactElement {
   const [collapsed, setCollapsed] = useState(false);
   return (
     <FloatingWindow
@@ -27,7 +27,7 @@ function Guide() {
   );
 }
 
-function Sections() {
+function Sections(): ReactElement {
   const [section, setSection] = useState("Overview");
   return <button onClick={() => setSection("Fight")}>Reading {section}</button>;
 }

@@ -8,19 +8,26 @@ import {
   type HoveredBattleCard,
 } from "./gameHotkeys";
 
+interface PanelState {
+  guideOpen: boolean;
+  menuOpen: boolean;
+  upgradesOpen: boolean;
+  otherModalOpen: boolean;
+}
+
 function createPanels(initial: {
   guideOpen?: boolean;
   menuOpen?: boolean;
   upgradesOpen?: boolean;
   otherModalOpen?: boolean;
-}) {
-  const panels = {
+}): { panels: PanelState; press: (key: string) => void } {
+  const panels: PanelState = {
     guideOpen: initial.guideOpen ?? false,
     menuOpen: initial.menuOpen ?? false,
     upgradesOpen: initial.upgradesOpen ?? false,
     otherModalOpen: initial.otherModalOpen ?? false,
   };
-  const press = (key: string) => {
+  const press = (key: string): void => {
     const hotkeys = buildPanelHotkeys({
       guideOpen: panels.guideOpen,
       gameplayHotkeysDisabled:
@@ -35,14 +42,14 @@ function createPanels(initial: {
         panels.guideOpen = false;
       },
       closeMenu: panels.menuOpen
-        ? () => {
+        ? (): void => {
             panels.menuOpen = false;
           }
         : null,
       closeUpgrades: panels.upgradesOpen
         ? {
             key: "u",
-            close: () => {
+            close: (): void => {
               panels.upgradesOpen = false;
             },
           }
@@ -97,19 +104,39 @@ describe("buildPanelHotkeys", () => {
   });
 });
 
-function createBattle(zones: Partial<Record<ZoneName, string[]>>) {
-  const battle = {
-    zones: { ...zones } as Partial<Record<ZoneName, string[]>>,
-    hoveredCard: null as HoveredBattleCard | null,
+const ALL_ZONE_NAMES: readonly ZoneName[] = [
+  "battlefield",
+  "graveyard",
+  "exile",
+  "hand",
+  "sideboard",
+  "upgrades",
+  "command_zone",
+  "library",
+];
+
+interface BattleFixture {
+  zones: Partial<Record<ZoneName, string[]>>;
+  hoveredCard: HoveredBattleCard | null;
+}
+
+function createBattle(zones: Partial<Record<ZoneName, string[]>>): {
+  battle: BattleFixture;
+  hover: (id: string) => void;
+  press: (key: string) => void;
+} {
+  const battle: BattleFixture = {
+    zones: { ...zones },
+    hoveredCard: null,
   };
-  const hover = (id: string) => {
-    const zone = (Object.keys(battle.zones) as ZoneName[]).find((name) =>
+  const hover = (id: string): void => {
+    const zone = ALL_ZONE_NAMES.find((name) =>
       battle.zones[name]?.includes(id),
     );
     if (!zone) throw new Error(`card ${id} is not in any zone`);
     battle.hoveredCard = { id, zone, owner: "player" };
   };
-  const press = (key: string) => {
+  const press = (key: string): void => {
     if (!battle.hoveredCard) return;
     const hotkeys = buildCardMoveHotkeys({
       hoveredCard: battle.hoveredCard,
@@ -180,9 +207,26 @@ describe("buildCardMoveHotkeys", () => {
   });
 });
 
+function stubCard(id: string): Card {
+  return {
+    id,
+    name: id,
+    image_url: "",
+    flip_image_url: null,
+    png_url: null,
+    flip_png_url: null,
+    type_line: "",
+    tokens: [],
+    elo: null,
+    upgrade_target: null,
+    oracle_text: null,
+    colors: [],
+    cmc: 0,
+  };
+}
+
 function zonesWith(cards: Partial<Record<ZoneName, string[]>>): Zones {
-  const zone = (name: ZoneName) =>
-    (cards[name] ?? []).map((id) => ({ id }) as Card);
+  const zone = (name: ZoneName): Card[] => (cards[name] ?? []).map(stubCard);
   return {
     battlefield: zone("battlefield"),
     graveyard: zone("graveyard"),

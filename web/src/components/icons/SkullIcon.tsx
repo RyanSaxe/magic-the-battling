@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 interface SkullIconProps {
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -9,7 +11,10 @@ const sizes = {
   lg: 32,
 };
 
-export function SkullIcon({ size = "md", className = "" }: SkullIconProps) {
+export function SkullIcon({
+  size = "md",
+  className = "",
+}: SkullIconProps): ReactElement {
   const px = sizes[size];
   return (
     <svg

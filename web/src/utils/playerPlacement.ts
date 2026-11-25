@@ -24,7 +24,9 @@ export function suddenDeathDecidesGame(players: PlayerView[]): boolean {
 }
 
 export function getSidebarPlayerOrder(players: PlayerView[]): PlayerView[] {
-  return [...players].sort(comparePlayersForSidebar);
+  const ordered = [...players];
+  ordered.sort(comparePlayersForSidebar);
+  return ordered;
 }
 
 /** Alive, fighting on as the Ghost (the most recently eliminated player), or out of the game. */

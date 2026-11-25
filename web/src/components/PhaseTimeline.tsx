@@ -1,4 +1,4 @@
-import { useRef, useCallback, useContext } from "react";
+import { type ReactNode, useRef, useCallback, useContext } from "react";
 import { getTimelinePhases, type Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
@@ -6,7 +6,7 @@ import { GuideStateContext } from "../guided/guideState";
 import { useContentOverflows } from "../hooks/useContentOverflows";
 import { usePhaseTimelineSync } from "../hooks/ui/usePhaseTimelineSync";
 
-const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
+const PHASES = new Set<string>(["draft", "build", "battle", "reward"]);
 
 const PHASE_TIMELINE_LABELS: Record<Phase, string> = {
   draft: "draft",
@@ -55,32 +55,194 @@ interface PhaseTimelineProps {
 }
 
 function isGamePhase(phase: string): phase is Phase {
-  return PHASES.includes(phase as Phase);
+  return PHASES.has(phase);
 }
 
-export function PhaseTimeline({
+function getStepLabel(options: {
+  phase: Phase;
+  currentPhase: Phase | EndState;
+  isEndReward: boolean;
+  endsInWinner: boolean;
+  title?: string;
+}): string {
+  if (options.isEndReward) {
+    if (options.title !== undefined) return options.title;
+    return isGamePhase(options.currentPhase)
+      ? PHASE_TIMELINE_LABELS[options.phase]
+      : END_STATE_LABELS[options.currentPhase];
+  }
+  if (options.endsInWinner && options.phase === "reward") {
+    return "winner";
+  }
+  return PHASE_TIMELINE_LABELS[options.phase];
+}
+
+function getStepButtonClassName(options: {
+  phase: Phase;
+  isHighlighted: boolean;
+  isCompleted: boolean;
+  isUpcoming: boolean;
+}): string {
+  const activeClass = options.isHighlighted
+    ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 max-lg:ring-inset ${PHASE_ACTIVE_STYLE[options.phase]}`
+    : "phase-step-idle";
+  const completedClass =
+    options.isCompleted && !options.isHighlighted
+      ? "text-[var(--ivory-faint)] line-through decoration-[var(--gold-border-opaque)]"
+      : "";
+  const upcomingClass = options.isUpcoming ? "text-[var(--ivory-faint)]" : "";
+  return `phase-step text-xs sm:text-sm font-medium capitalize transition-colors ${activeClass} ${completedClass} ${upcomingClass}`;
+}
+
+interface TimelineStepProps {
+  phase: Phase;
+  index: number;
+  currentIndex: number;
+  currentPhase: Phase | EndState;
+  isEnd: boolean;
+  endsInWinner: boolean;
+  welcomeGuideActive: boolean;
+  nextStage: number;
+  nextRound: number;
+  title?: string;
+  buttonRef: (node: HTMLButtonElement | null) => void;
+  stepRef: (node: HTMLDivElement | null) => void;
+  onPhaseClick: (phase: Phase) => void;
+}
+
+function TimelineStep({
+  phase,
+  index,
+  currentIndex,
   currentPhase,
-  stage,
-  round,
+  isEnd,
+  endsInWinner,
+  welcomeGuideActive,
   nextStage,
   nextRound,
-  inSuddenDeath = false,
-  suddenDeathDecidesGame = false,
-  useUpgrades = true,
-  autoOpenPhase = null,
-  autoOpenDurationMs = GUIDED_POPOVER_AUTO_CLOSE_MS,
-  onAutoOpenHandled,
-  onOpenRules,
-  onStepClick,
   title,
-}: PhaseTimelineProps) {
+  buttonRef,
+  stepRef,
+  onPhaseClick,
+}: TimelineStepProps): ReactNode {
+  const isEndReward = isEnd && phase === "reward";
+  const isHighlighted = (!isEnd && index === currentIndex) || isEndReward;
+  const label = getStepLabel({
+    phase,
+    currentPhase,
+    isEndReward,
+    endsInWinner,
+    title,
+  });
+  const className = getStepButtonClassName({
+    phase,
+    isHighlighted,
+    isCompleted: index < currentIndex,
+    isUpcoming: !isEnd && index > currentIndex,
+  });
+
+  const phaseButton = (
+    <button
+      ref={buttonRef}
+      disabled={welcomeGuideActive || isEnd}
+      onClick={() => onPhaseClick(phase)}
+      data-guide-target={`timeline-phase-${phase}`}
+      className={className}
+    >
+      {label}
+    </button>
+  );
+
+  if (phase === "reward") {
+    return (
+      <div ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+        <span className={STEP_ARROW}>→</span>
+        <div
+          className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+          data-guide-target="timeline-next-stage-round"
+        >
+          {phaseButton}
+          {!isEnd && !endsInWinner && (
+            <span className="max-[400px]:hidden text-xs sm:text-sm text-[var(--ivory-faint)]">
+              to{" "}
+              <span className="font-mono">
+                {nextStage}-{nextRound}
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+      <span className={STEP_ARROW}>→</span>
+      {phaseButton}
+    </div>
+  );
+}
+
+function resolveTimelineState(props: PhaseTimelineProps): {
+  activeGamePhase: Phase | null;
+  isEnd: boolean;
+  timelinePhases: Phase[];
+  endsInWinner: boolean;
+  currentIndex: number;
+  useUpgrades: boolean;
+  autoOpenPhase: Phase | null;
+  autoOpenDurationMs: number;
+} {
+  const activeGamePhase = isGamePhase(props.currentPhase)
+    ? props.currentPhase
+    : null;
+  const isEnd = activeGamePhase === null;
+  const inSuddenDeath = Boolean(props.inSuddenDeath);
+  const suddenDeathDecidesGame = Boolean(props.suddenDeathDecidesGame);
+  const timelinePhases = getTimelinePhases(inSuddenDeath && !isEnd);
+  return {
+    activeGamePhase,
+    isEnd,
+    timelinePhases,
+    endsInWinner: inSuddenDeath && suddenDeathDecidesGame && !isEnd,
+    currentIndex: activeGamePhase
+      ? timelinePhases.indexOf(activeGamePhase)
+      : timelinePhases.length,
+    useUpgrades: props.useUpgrades ?? true,
+    autoOpenPhase: props.autoOpenPhase ?? null,
+    autoOpenDurationMs:
+      props.autoOpenDurationMs ?? GUIDED_POPOVER_AUTO_CLOSE_MS,
+  };
+}
+
+export function PhaseTimeline(props: PhaseTimelineProps): ReactNode {
+  const {
+    currentPhase,
+    stage,
+    round,
+    nextStage,
+    nextRound,
+    onAutoOpenHandled,
+    onOpenRules,
+    onStepClick,
+    title,
+  } = props;
+  const {
+    activeGamePhase,
+    isEnd,
+    timelinePhases,
+    endsInWinner,
+    currentIndex,
+    useUpgrades,
+    autoOpenPhase,
+    autoOpenDurationMs,
+  } = resolveTimelineState(props);
   const guideState = useContext(GuideStateContext);
   const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
   const stepsRowRef = useRef<HTMLDivElement | null>(null);
   const stepsRef = useRef<HTMLDivElement | null>(null);
   const stepsOverflow = useContentOverflows(stepsRowRef, stepsRef);
 
-  const activeGamePhase = isGamePhase(currentPhase) ? currentPhase : null;
   const {
     popoverPhase,
     popoverAnchorRect,
@@ -136,10 +298,6 @@ export function PhaseTimeline({
     onOpenRules?.(phase ? { docId: phase, tab: "controls" } : undefined);
   }, [closePopoverImmediately, onOpenRules, popoverPhase]);
 
-  const isEnd = !isGamePhase(currentPhase);
-  const timelinePhases = getTimelinePhases(inSuddenDeath && !isEnd);
-  const endsInWinner = inSuddenDeath && suddenDeathDecidesGame && !isEnd;
-
   return (
     <>
       {/* Below lg the top zone's label can sit under the current step, so the row rises 2px and the step's ring
@@ -159,73 +317,24 @@ export function PhaseTimeline({
             {stage}-{round}
           </span>
 
-          {timelinePhases.map((phase, index) => {
-            const currentIndex = isEnd
-              ? timelinePhases.length
-              : timelinePhases.indexOf(currentPhase as Phase);
-            const isActive = !isEnd && index === currentIndex;
-            const isCompleted = index < currentIndex;
-            const isUpcoming = !isEnd && index > currentIndex;
-            const isEndReward = isEnd && phase === "reward";
-            const phaseButton = (
-              <button
-                ref={bindPhaseButtonRef(phase)}
-                disabled={welcomeGuideActive || isEnd}
-                onClick={() => handlePhaseClick(phase)}
-                data-guide-target={`timeline-phase-${phase}`}
-                className={`phase-step text-xs sm:text-sm font-medium capitalize transition-colors
-                  ${isActive || isEndReward ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 max-lg:ring-inset ${PHASE_ACTIVE_STYLE[phase]}` : "phase-step-idle"}
-                  ${isCompleted && !isEndReward ? "text-[var(--ivory-faint)] line-through decoration-[var(--gold-border-opaque)]" : ""}
-                  ${isUpcoming ? "text-[var(--ivory-faint)]" : ""}
-                `}
-              >
-                {isEndReward
-                  ? (title ?? END_STATE_LABELS[currentPhase as EndState])
-                  : endsInWinner && phase === "reward"
-                    ? "winner"
-                    : PHASE_TIMELINE_LABELS[phase]}
-              </button>
-            );
-
-            const stepRef = bindPhaseStepRef(phase);
-
-            if (phase === "reward") {
-              return (
-                <div
-                  key={phase}
-                  ref={stepRef}
-                  className="flex items-center gap-1 sm:gap-1.5"
-                >
-                  <span className={STEP_ARROW}>→</span>
-                  <div
-                    className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
-                    data-guide-target="timeline-next-stage-round"
-                  >
-                    {phaseButton}
-                    {!isEnd && !endsInWinner && (
-                      <span className="max-[400px]:hidden text-xs sm:text-sm text-[var(--ivory-faint)]">
-                        to{" "}
-                        <span className="font-mono">
-                          {nextStage}-{nextRound}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div
-                key={phase}
-                ref={stepRef}
-                className="flex items-center gap-1 sm:gap-1.5"
-              >
-                <span className={STEP_ARROW}>→</span>
-                {phaseButton}
-              </div>
-            );
-          })}
+          {timelinePhases.map((phase, index) => (
+            <TimelineStep
+              key={phase}
+              phase={phase}
+              index={index}
+              currentIndex={currentIndex}
+              currentPhase={currentPhase}
+              isEnd={isEnd}
+              endsInWinner={endsInWinner}
+              welcomeGuideActive={welcomeGuideActive}
+              nextStage={nextStage}
+              nextRound={nextRound}
+              title={title}
+              buttonRef={bindPhaseButtonRef(phase)}
+              stepRef={bindPhaseStepRef(phase)}
+              onPhaseClick={handlePhaseClick}
+            />
+          ))}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { winsLabel } from "../../utils/accountFormat";
 import { SurfaceCard } from "../common/SurfaceCard";
@@ -7,7 +7,11 @@ import { LINK } from "../common/styles";
 
 const SECTION_META_TYPE = "text-[12px] leading-5";
 
-export function SectionTitle({ children }: { children: ReactNode }) {
+export function SectionTitle({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement {
   return (
     <h2 className={`${SECTION_TITLE_TYPE} text-amber-200/80`}>{children}</h2>
   );
@@ -19,7 +23,7 @@ export function SectionLink({
 }: {
   to: string;
   children: ReactNode;
-}) {
+}): ReactElement {
   return (
     <Link
       to={to}
@@ -37,7 +41,7 @@ export function SectionCounts({
 }: {
   children: ReactNode;
   className?: string;
-}) {
+}): ReactElement {
   return (
     <div
       className={`${SECTION_META_TYPE} tabular-nums text-[var(--ivory-muted)] ${className ?? ""}`}
@@ -57,7 +61,7 @@ export function Count({
   /** What the number counts, starting with the space after it. */
   children: ReactNode;
   className?: string;
-}) {
+}): ReactElement {
   return (
     <span className={className}>
       <strong className="text-[var(--ivory)]">{value}</strong>
@@ -66,7 +70,13 @@ export function Count({
   );
 }
 
-export function WinsCount({ wins, games }: { wins: number; games: number }) {
+export function WinsCount({
+  wins,
+  games,
+}: {
+  wins: number;
+  games: number;
+}): ReactElement {
   return <span className="text-amber-300">{winsLabel(wins, games)}</span>;
 }
 
@@ -81,7 +91,7 @@ export function NoticeTile({
   action?: { label: string; onClick: () => void };
   className?: string;
   style?: CSSProperties;
-}) {
+}): ReactElement {
   return (
     <SurfaceCard
       layout="tile"
@@ -111,7 +121,7 @@ export function Breadcrumb({
   to: string;
   label: string;
   current: string;
-}) {
+}): ReactElement {
   return (
     <nav
       aria-label="Breadcrumb"
@@ -126,7 +136,7 @@ export function Breadcrumb({
   );
 }
 
-export function PlayIcon() {
+export function PlayIcon(): ReactElement {
   return (
     <svg
       width="13"

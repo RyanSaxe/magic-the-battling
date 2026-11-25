@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import random
 import secrets
 import time
@@ -77,10 +78,8 @@ async def _run_spectator_listener(
         )
     finally:
         ready_event.set()
-        try:
+        with contextlib.suppress(Exception):
             await ws.close()
-        except Exception:
-            pass
 
 
 async def _consume_spectator_stream(
@@ -218,7 +217,7 @@ async def run_one_game(
             ws=ws,
             deadline=deadline,
             result=result,
-            rng=random.Random(cfg.seed + game_index),
+            rng=random.Random(cfg.seed + game_index),  # noqa: S311 -- non-cryptographic game RNG
             ws_action_jitter_ms=cfg.ws_action_jitter_ms,
             action_clock=action_clock,
         )
@@ -237,7 +236,7 @@ async def run_one_game(
         state = await play_until_terminal(ctx, state)
         await _stop_spectators(spectator_tasks, stop_spectators)
         record_terminal_state(result, state)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- broad boundary catch
         result.error = _format_game_exception(exc)
     finally:
         stop_spectators.set()
@@ -248,10 +247,8 @@ async def run_one_game(
             await asyncio.gather(*spectator_tasks, return_exceptions=True)
         result.duration_sec = time.perf_counter() - game_started_at
         if ws is not None:
-            try:
+            with contextlib.suppress(Exception):
                 await ws.close()
-            except Exception:
-                pass
     return result
 
 
@@ -271,7 +268,7 @@ async def _run_table_player(
         ws=ws,
         deadline=deadline,
         result=player_result,
-        rng=random.Random(cfg.seed + (table_index * 100) + player_index),
+        rng=random.Random(cfg.seed + (table_index * 100) + player_index),  # noqa: S311 -- non-cryptographic game RNG
         ws_action_jitter_ms=cfg.ws_action_jitter_ms,
         action_clock=action_clock,
     )
@@ -399,7 +396,7 @@ async def run_one_multiplayer_table(
         player_results = await asyncio.gather(*player_tasks)
         await _stop_spectators(spectator_tasks, stop_spectators)
         _merge_table_player_results(table_result, list(player_results))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- broad boundary catch
         table_result.error = _format_game_exception(exc)
     finally:
         stop_spectators.set()
@@ -439,37 +436,32 @@ async def run_one_idle_hot_game(
         ws=ws,
         deadline=deadline,
         result=GameResult(index=hot_index, game_id=game_id),
-        rng=random.Random((cfg.seed * 17) + hot_index),
+        rng=random.Random((cfg.seed * 17) + hot_index),  # noqa: S311 -- non-cryptographic game RNG
         ws_action_jitter_ms=cfg.ws_action_jitter_ms,
     )
 
     try:
         state = await enter_game_from_lobby(ctx)
     except Exception:
-        try:
+        with contextlib.suppress(Exception):
             await ws.close()
-        except Exception:
-            pass
         raise
 
     self_player = state.get("self_player") or {}
     phase = str(self_player.get("phase") or "")
     if phase in {"winner", "game_over", "eliminated"}:
-        try:
+        with contextlib.suppress(Exception):
             await ws.close()
-        except Exception:
-            pass
-        raise GameFlowError(f"idle hot game reached terminal phase immediately: {phase}")
+        msg = f"idle hot game reached terminal phase immediately: {phase}"
+        raise GameFlowError(msg)
 
     return IdleHotGame(game_id=game_id, session_id=session_id, ws=ws, phase=phase or None)
 
 
 async def close_idle_hot_games(games: list[IdleHotGame]) -> None:
     async def _close_one(game: IdleHotGame) -> None:
-        try:
+        with contextlib.suppress(Exception):
             await game.ws.close()
-        except Exception:
-            pass
 
     if not games:
         return

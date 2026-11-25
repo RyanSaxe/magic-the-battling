@@ -6,7 +6,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ResumableSeat } from "../hooks/useResumableGames";
@@ -18,7 +18,9 @@ vi.mock("../api/client", () => ({
   closeSeat,
   rejoinGame: vi.fn(),
 }));
-vi.mock("../contexts", () => ({ useToast: () => ({ addToast: () => {} }) }));
+vi.mock("../contexts", () => ({
+  useToast: (): { addToast: () => void } => ({ addToast: (): void => {} }),
+}));
 
 afterEach(() => {
   cleanup();
@@ -45,7 +47,7 @@ function seat(id: string, name: string): ResumableSeat {
   };
 }
 
-function Harness({ initial }: { initial: ResumableSeat[] }) {
+function Harness({ initial }: { initial: ResumableSeat[] }): ReactNode {
   const [seats, setSeats] = useState(initial);
   const [showAll, setShowAll] = useState(false);
   const [closing, setClosing] = useState<ResumableSeat | null>(null);

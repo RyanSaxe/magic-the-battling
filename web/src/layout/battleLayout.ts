@@ -52,13 +52,21 @@ function emptyRowCard(rowH: number, maxWidth: number): BattleCardDimensions {
   return { width, height: cardHeight(width) };
 }
 
-function fitBattlefieldRow(
-  count: number,
-  rowH: number,
-  availableWidth: number,
-  gap: number,
-  maxWidth: number,
-): BattleCardDimensions {
+interface BattleRowFitOptions {
+  count: number;
+  rowH: number;
+  availableWidth: number;
+  gap: number;
+  maxWidth: number;
+}
+
+function fitBattlefieldRow({
+  count,
+  rowH,
+  availableWidth,
+  gap,
+  maxWidth,
+}: BattleRowFitOptions): BattleCardDimensions {
   if (count <= 0) return emptyRowCard(rowH, maxWidth);
   const fit = fitCards({
     count,
@@ -72,13 +80,13 @@ function fitBattlefieldRow(
   return { width: fit.width, height: fit.height };
 }
 
-function fitBattleHandRow(
-  count: number,
-  rowH: number,
-  availableWidth: number,
-  gap: number,
-  maxWidth: number,
-): BattleCardDimensions & { gap: number } {
+function fitBattleHandRow({
+  count,
+  rowH,
+  availableWidth,
+  gap,
+  maxWidth,
+}: BattleRowFitOptions): BattleCardDimensions & { gap: number } {
   if (count <= 0) return { ...emptyRowCard(rowH, maxWidth), gap };
   const fit = fitCards({
     count,
@@ -165,20 +173,27 @@ export function computeBattleZones(
   const handAvailW = boardW - HAND_ROW_PADDING;
   const bfAvailW = boardW - BATTLEFIELD_INSET;
 
-  const playerHand = fitBattleHandRow(
-    config.playerHandCount,
+  const handBase = {
     rowH,
-    handAvailW,
-    config.handGap,
-    config.handMaxWidth,
-  );
-  const opponentHand = fitBattleHandRow(
-    config.opponentHandCount,
+    availableWidth: handAvailW,
+    gap: config.handGap,
+    maxWidth: config.handMaxWidth,
+  };
+  const bfBase = {
     rowH,
-    handAvailW,
-    config.handGap,
-    config.handMaxWidth,
-  );
+    availableWidth: bfAvailW,
+    gap: config.battlefieldGap,
+    maxWidth: config.battlefieldMaxWidth,
+  };
+
+  const playerHand = fitBattleHandRow({
+    ...handBase,
+    count: config.playerHandCount,
+  });
+  const opponentHand = fitBattleHandRow({
+    ...handBase,
+    count: config.opponentHandCount,
+  });
 
   return {
     rowHeight: rowH,
@@ -186,34 +201,22 @@ export function computeBattleZones(
     opponentHandGap: opponentHand.gap,
     playerHand: { width: playerHand.width, height: playerHand.height },
     opponentHand: { width: opponentHand.width, height: opponentHand.height },
-    playerLands: fitBattlefieldRow(
-      config.playerLandCount,
-      rowH,
-      bfAvailW,
-      config.battlefieldGap,
-      config.battlefieldMaxWidth,
-    ),
-    playerNonlands: fitBattlefieldRow(
-      config.playerNonlandCount,
-      rowH,
-      bfAvailW,
-      config.battlefieldGap,
-      config.battlefieldMaxWidth,
-    ),
-    opponentLands: fitBattlefieldRow(
-      config.opponentLandCount,
-      rowH,
-      bfAvailW,
-      config.battlefieldGap,
-      config.battlefieldMaxWidth,
-    ),
-    opponentNonlands: fitBattlefieldRow(
-      config.opponentNonlandCount,
-      rowH,
-      bfAvailW,
-      config.battlefieldGap,
-      config.battlefieldMaxWidth,
-    ),
+    playerLands: fitBattlefieldRow({
+      ...bfBase,
+      count: config.playerLandCount,
+    }),
+    playerNonlands: fitBattlefieldRow({
+      ...bfBase,
+      count: config.playerNonlandCount,
+    }),
+    opponentLands: fitBattlefieldRow({
+      ...bfBase,
+      count: config.opponentLandCount,
+    }),
+    opponentNonlands: fitBattlefieldRow({
+      ...bfBase,
+      count: config.opponentNonlandCount,
+    }),
   };
 }
 

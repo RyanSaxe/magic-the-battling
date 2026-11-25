@@ -1,7 +1,14 @@
 /**
  * Shared-game loading for ShareGame and image-readiness tracking for SummaryEmbed.
  */
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 import { getShareGame } from "../../api/client";
 import type { ShareGameResponse, SharePlayerSnapshot } from "../../types";
 import { type AppError, unknownToAppError } from "../../utils/appError";
@@ -12,7 +19,20 @@ function getLatestRoundValue(rounds: SharePlayerSnapshot[]): string {
   return latest ? getShareRoundValue(latest) : "";
 }
 
-export function useShareGameData(gameId?: string, playerName?: string) {
+export interface ShareGameDataResult {
+  data: ShareGameResponse | null;
+  error: AppError | null;
+  loading: boolean;
+  selectedRound: string;
+  setSelectedRound: Dispatch<SetStateAction<string>>;
+  selectedPlayer: string;
+  setSelectedPlayer: Dispatch<SetStateAction<string>>;
+}
+
+export function useShareGameData(
+  gameId?: string,
+  playerName?: string,
+): ShareGameDataResult {
   const [data, setData] = useState<ShareGameResponse | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +40,7 @@ export function useShareGameData(gameId?: string, playerName?: string) {
   const [selectedPlayer, setSelectedPlayer] = useState("");
 
   useEffect(() => {
-    if (!gameId || !playerName) return;
+    if (!gameId || !playerName) return undefined;
     let cancelled = false;
 
     getShareGame(gameId, playerName).then(
@@ -45,7 +65,7 @@ export function useShareGameData(gameId?: string, playerName?: string) {
       },
     );
 
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [gameId, playerName]);
@@ -61,13 +81,19 @@ export function useShareGameData(gameId?: string, playerName?: string) {
   };
 }
 
-export function useSummaryEmbed(gameId?: string, playerName?: string) {
+export function useSummaryEmbed(
+  gameId?: string,
+  playerName?: string,
+): {
+  data: ShareGameResponse | null;
+  containerRef: RefObject<HTMLDivElement | null>;
+} {
   const [data, setData] = useState<ShareGameResponse | null>(null);
   const [error, setError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!gameId || !playerName) return;
+    if (!gameId || !playerName) return undefined;
     let cancelled = false;
     getShareGame(gameId, playerName)
       .then((res) => {
@@ -76,29 +102,29 @@ export function useSummaryEmbed(gameId?: string, playerName?: string) {
       .catch(() => {
         if (!cancelled) setError(true);
       });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [gameId, playerName]);
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     if (error) {
       el.setAttribute("data-embed-ready", "true");
-      return;
+      return undefined;
     }
-    if (!data) return;
+    if (!data) return undefined;
 
     const images = Array.from(el.querySelectorAll("img"));
     if (images.length === 0) {
       el.setAttribute("data-embed-ready", "true");
-      return;
+      return undefined;
     }
 
     let loaded = 0;
     const total = images.length;
-    const onDone = () => {
+    const onDone = (): void => {
       loaded += 1;
       if (loaded >= total) {
         el.setAttribute("data-embed-ready", "true");
@@ -116,7 +142,7 @@ export function useSummaryEmbed(gameId?: string, playerName?: string) {
       }
     }
 
-    return () => {
+    return (): void => {
       for (const img of pendingImages) {
         img.removeEventListener("load", onDone);
         img.removeEventListener("error", onDone);

@@ -7,7 +7,7 @@ import { acquireEnterPanelHold } from "../utils/enterKey";
 
 export function usePanelHoldsEnter(open = true): void {
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     return acquireEnterPanelHold();
   }, [open]);
 }

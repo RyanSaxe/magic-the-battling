@@ -1,6 +1,5 @@
 import asyncio
 from pathlib import Path
-from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -50,61 +49,81 @@ _HTML_WITH_STATIC_OG = """\
 
 
 class TestBuildOgHtml:
-    def test_image_url_is_absolute(self):
+    def test_image_url_is_absolute(self) -> None:
         html = _build_og_html(
             "<html><head></head></html>",
             "game123",
-            "Alice",
-            _make_share_data(),
-            "https://example.com",
+            player_name="Alice",
+            share_data=_make_share_data(),
+            base_url="https://example.com",
         )
         assert 'content="https://example.com/game/game123/share/Alice/preview.png"' in html
 
-    def test_image_url_uses_provided_base(self):
+    def test_image_url_uses_provided_base(self) -> None:
         html = _build_og_html(
             "<html><head></head></html>",
             "g1",
-            "Bob",
-            _make_share_data("Bob", 2),
-            "http://localhost:8000",
+            player_name="Bob",
+            share_data=_make_share_data("Bob", 2),
+            base_url="http://localhost:8000",
         )
         assert 'content="http://localhost:8000/game/g1/share/Bob/preview.png"' in html
 
-    def test_static_og_tags_stripped(self):
-        html = _build_og_html(_HTML_WITH_STATIC_OG, "g1", "Alice", _make_share_data(), "https://example.com")
+    def test_static_og_tags_stripped(self) -> None:
+        html = _build_og_html(
+            _HTML_WITH_STATIC_OG,
+            "g1",
+            player_name="Alice",
+            share_data=_make_share_data(),
+            base_url="https://example.com",
+        )
         assert "og-image.png" not in html
         assert 'content="Pitfight"' not in html
         assert "A Magic: The Gathering format" not in html
         assert 'content="https://www.cruciblemtg.com/"' not in html
 
-    def test_dynamic_tags_present_after_stripping(self):
-        html = _build_og_html(_HTML_WITH_STATIC_OG, "g1", "Alice", _make_share_data(), "https://example.com")
+    def test_dynamic_tags_present_after_stripping(self) -> None:
+        html = _build_og_html(
+            _HTML_WITH_STATIC_OG,
+            "g1",
+            player_name="Alice",
+            share_data=_make_share_data(),
+            base_url="https://example.com",
+        )
         assert 'og:image" content="https://example.com/game/g1/share/Alice/preview.png"' in html
         assert "1st Place" in html
         assert html.count('property="og:image"') == 1
 
-    def test_og_url_points_to_share_page(self):
-        html = _build_og_html(_HTML_WITH_STATIC_OG, "g1", "Alice", _make_share_data(), "https://example.com")
+    def test_og_url_points_to_share_page(self) -> None:
+        html = _build_og_html(
+            _HTML_WITH_STATIC_OG,
+            "g1",
+            player_name="Alice",
+            share_data=_make_share_data(),
+            base_url="https://example.com",
+        )
         assert 'og:url" content="https://example.com/game/g1/share/Alice"' in html
 
-    def test_html_escaping_in_player_name(self):
+    def test_html_escaping_in_player_name(self) -> None:
         html = _build_og_html(
             "<html><head></head></html>",
             "g1",
-            'Al"ice<script>',
-            _make_share_data('Al"ice<script>', 1),
-            "https://example.com",
+            player_name='Al"ice<script>',
+            share_data=_make_share_data('Al"ice<script>', 1),
+            base_url="https://example.com",
         )
         assert 'Al"ice' not in html
         assert "Al&quot;ice&lt;script&gt;" in html
         assert "Al%22ice%3Cscript%3E" in html  # URL-encoded in og:url/og:image
 
-    def test_non_og_meta_tags_preserved(self):
+    def test_non_og_meta_tags_preserved(self) -> None:
         source = (
             '<html><head><meta name="description" content="Keep me" />'
             '<meta property="og:title" content="Remove" /></head></html>'
         )
-        html = _build_og_html(source, "g1", "A", _make_share_data("A", 1), "https://x.com")
+        html = _build_og_html(
+            source, "g1", player_name="A", share_data=_make_share_data("A", 1), base_url="https://x.com"
+        )
         assert 'content="Keep me"' in html
         assert 'content="Remove"' not in html
 
@@ -112,12 +131,15 @@ class TestBuildOgHtml:
 class TestSiteLinkPreview:
     @pytest.mark.parametrize("host", ["dev.pitfight.test", "pitfight.test"])
     @pytest.mark.parametrize("path", ["/game/missing/share/Alice", "/game/not.an.id/share/Al%20Smith?spectate=true"])
-    def test_a_link_names_the_site_and_page_it_was_posted_from(self, client, monkeypatch, host, path):
+    def test_a_link_names_the_site_and_page_it_was_posted_from(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch, *, host: str, path: str
+    ) -> None:
         # CI's pytest job has no web build, so serve the page the build starts from.
+        _ = client
         source = Path(__file__).parent.parent / "web" / "index.html"
         monkeypatch.setattr(share_preview_module, "INDEX_HTML", source)
         # scripts/start_server.sh trusts the proxy's headers, so Fly's https reaches the tags.
-        proxied = TestClient(cast(Any, ProxyHeadersMiddleware(cast(Any, app), trusted_hosts="*")))
+        proxied = TestClient(ProxyHeadersMiddleware(app, trusted_hosts="*"))  # ty: ignore[invalid-argument-type]
 
         html = proxied.get(path, headers={"Host": host, "X-Forwarded-Proto": "https"}).text
 
@@ -126,7 +148,7 @@ class TestSiteLinkPreview:
         assert f'<meta property="og:image" content="{image}" />' in html
         assert f'<meta name="twitter:image" content="{image}" />' in html
 
-    def test_a_link_cannot_break_out_of_its_tag(self, client, monkeypatch):
+    def test_a_link_cannot_break_out_of_its_tag(self, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
         source = Path(__file__).parent.parent / "web" / "index.html"
         monkeypatch.setattr(share_preview_module, "INDEX_HTML", source)
 
@@ -154,13 +176,13 @@ class _FakePage:
     def __init__(self, png: bytes = b"png_data") -> None:
         self._png = png
 
-    async def goto(self, _url: str, **_kwargs: Any) -> None:
+    async def goto(self, _url: str, **_kwargs: object) -> None:
         pass
 
-    async def wait_for_selector(self, _selector: str, **_kwargs: Any) -> None:
+    async def wait_for_selector(self, _selector: str, **_kwargs: object) -> None:
         pass
 
-    async def screenshot(self, **_kwargs: Any) -> bytes:
+    async def screenshot(self, **_kwargs: object) -> bytes:
         return self._png
 
 
@@ -180,7 +202,7 @@ class _FakeBrowser:
         self._error = error
         self._png = png
 
-    async def new_context(self, **_kwargs: Any) -> _FakeContext:
+    async def new_context(self, **_kwargs: object) -> _FakeContext:
         if self._error is not None:
             raise self._error
         return _FakeContext(_FakePage(self._png))
@@ -193,7 +215,7 @@ class _FakeChromium:
     def __init__(self, browser: _FakeBrowser) -> None:
         self._browser = browser
 
-    async def launch(self, **_kwargs: Any) -> _FakeBrowser:
+    async def launch(self, **_kwargs: object) -> _FakeBrowser:
         return self._browser
 
 
@@ -214,11 +236,11 @@ class _FakePlaywrightStarter:
 
 
 class TestPreviewServiceRestart:
-    def test_restart_on_target_closed_error(self, monkeypatch):
+    def test_restart_on_target_closed_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         service = PreviewService()
         target_closed = PlaywrightError("Browser.new_context: Target page, context or browser has been closed")
-        service._browser = cast(Any, _FakeBrowser(error=target_closed))
-        service._playwright = cast(Any, _FakePlaywright())
+        service._browser = _FakeBrowser(error=target_closed)  # ty: ignore[invalid-assignment]  # noqa: SLF001 -- internal state inspected by test
+        service._playwright = _FakePlaywright()  # ty: ignore[invalid-assignment]  # noqa: SLF001 -- internal state inspected by test
 
         restarted = _FakePlaywright(_FakeBrowser(png=b"png_data"))
         monkeypatch.setattr("server.services.preview.async_playwright", lambda: _FakePlaywrightStarter(restarted))
@@ -227,18 +249,21 @@ class TestPreviewServiceRestart:
 
         assert result == b"png_data"
 
-    def test_non_target_closed_error_propagates(self):
+    def test_non_target_closed_error_propagates(self) -> None:
         service = PreviewService()
         other_error = PlaywrightError("Some other Playwright error")
-        service._browser = cast(Any, _FakeBrowser(error=other_error))
-        service._playwright = cast(Any, _FakePlaywright())
+        service._browser = _FakeBrowser(error=other_error)  # ty: ignore[invalid-assignment]  # noqa: SLF001 -- internal state inspected by test
+        service._playwright = _FakePlaywright()  # ty: ignore[invalid-assignment]  # noqa: SLF001 -- internal state inspected by test
 
         with pytest.raises(PlaywrightError, match="Some other Playwright error"):
             asyncio.run(service.screenshot("http://example.com/embed", "cache_key_456"))
 
 
 class TestPreviewRateLimit:
-    def test_behind_fly_forged_forwarded_for_addresses_share_one_limit(self, client, monkeypatch):
+    def test_behind_fly_forged_forwarded_for_addresses_share_one_limit(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _ = client
         monkeypatch.setattr(share_preview_module, "BEHIND_FLY_PROXY", True)
         monkeypatch.setattr(
             share_preview_module,
@@ -247,7 +272,7 @@ class TestPreviewRateLimit:
         )
         # scripts/start_server.sh runs uvicorn with --proxy-headers --forwarded-allow-ips "*".
         # uvicorn and Starlette type ASGI apps differently, hence the casts.
-        proxied = TestClient(cast(Any, ProxyHeadersMiddleware(cast(Any, app), trusted_hosts="*")))
+        proxied = TestClient(ProxyHeadersMiddleware(app, trusted_hosts="*"))  # ty: ignore[invalid-argument-type]
 
         statuses = [
             proxied.get(
@@ -260,7 +285,7 @@ class TestPreviewRateLimit:
         assert statuses[:RATE_LIMIT_MAX] == [404] * RATE_LIMIT_MAX
         assert statuses[RATE_LIMIT_MAX] == 429
 
-    def test_limiter_forgets_clients_idle_for_a_whole_window(self):
+    def test_limiter_forgets_clients_idle_for_a_whole_window(self) -> None:
         now = 0.0
         limiter = SlidingWindowRateLimiter(window_seconds=60, max_requests=1, clock=lambda: now)
 

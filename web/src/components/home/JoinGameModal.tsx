@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useId, useRef, useState, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/authState";
 import { useAsyncAction } from "../../hooks/useAsyncResource";
@@ -17,9 +17,12 @@ interface JoinGameModalProps {
 
 type JoinFieldError = { field: "name" | "code"; message: string };
 
-export function JoinGameModal({ onClose }: JoinGameModalProps) {
+export function JoinGameModal({ onClose }: JoinGameModalProps): ReactElement {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const nameId = useId();
+  const codeId = useId();
+  const focusedRef = useRef(false);
 
   const [manualName, setManualName] = useState(
     () => getRememberedGuestName() ?? "",
@@ -35,7 +38,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
         try {
           const lobbyPath = await joinLobbyByCode(code, name);
           if (!user) rememberGuestName(name);
-          navigate(lobbyPath);
+          void navigate(lobbyPath);
         } catch (err) {
           const appError = unknownToAppError(
             err,
@@ -52,7 +55,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
     ),
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = (): void => {
     const name = playerName.trim();
     const code = joinCode.trim();
     if (!name) {
@@ -70,8 +73,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
     <Dialog title="Join Game" onClose={onClose}>
       <div className="space-y-3">
         <div>
-          <label className={FIELD_LABEL}>Your Name</label>
+          <label htmlFor={nameId} className={FIELD_LABEL}>
+            Your Name
+          </label>
           <input
+            id={nameId}
             type="text"
             value={playerName}
             onChange={(e) => {
@@ -81,7 +87,12 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
             disabled={!!user}
             className={`${TEXT_INPUT} disabled:opacity-50`}
             placeholder="Enter your name"
-            autoFocus={!user}
+            ref={(el): void => {
+              if (el && !user && !focusedRef.current) {
+                focusedRef.current = true;
+                el.focus();
+              }
+            }}
           />
           {error?.field === "name" && (
             <p role="alert" className={FIELD_ERROR}>
@@ -91,8 +102,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
         </div>
 
         <div>
-          <label className={FIELD_LABEL}>Join Code</label>
+          <label htmlFor={codeId} className={FIELD_LABEL}>
+            Join Code
+          </label>
           <input
+            id={codeId}
             type="text"
             value={joinCode}
             onChange={(e) => {

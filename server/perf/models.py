@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import random
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    import random
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 DEFAULT_BACKEND_PORT = 8000

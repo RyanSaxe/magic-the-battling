@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ComponentProps, ReactElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { gameBootstrap } from "../../../e2e/gameStates";
@@ -9,15 +10,19 @@ import { BuildPhase } from "./Build";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = () =>
-    ({
-      matches: false,
-      addEventListener() {},
-      removeEventListener() {},
-    }) as unknown as MediaQueryList;
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
-function buildActions() {
+function buildActions(): ComponentProps<typeof BuildPhase>["actions"] {
   return {
     buildMove: vi.fn(),
     buildSwap: vi.fn(),
@@ -30,14 +35,23 @@ function buildActions() {
   };
 }
 
+function zoneLayoutStyles(root: HTMLElement): (string | null)[] {
+  return Array.from(
+    root.querySelectorAll(
+      '.zone-hand, .zone-battlefield, .zone-sideboard, [style*="grid-template-columns"]',
+    ),
+    (element) => element.getAttribute("style"),
+  );
+}
+
 beforeEach(() => {
   installMemoryLocalStorage();
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
     },
   );
 });
@@ -66,9 +80,12 @@ it("shows a pill reached with the keyboard, and not one that kept focus from a c
   // jsdom can't tell how focus arrived, so say whether the browser would show a ring.
   const matches = pill.matches.bind(pill);
   let ring = false;
-  pill.matches = (selector: string) =>
-    selector === ":focus-visible" ? ring : matches(selector);
-  const hidden = () => pill.classList.contains("opacity-0");
+  Object.defineProperty(pill, "matches", {
+    configurable: true,
+    value: (selector: string): boolean =>
+      selector === ":focus-visible" ? ring : matches(selector),
+  });
+  const hidden = (): boolean => pill.classList.contains("opacity-0");
 
   fireEvent.focusIn(pill);
   expect(hidden()).toBe(true);
@@ -109,7 +126,7 @@ it("keeps the sizes Build opened at while the hand fills and after coming back",
     },
   };
   const actions = buildActions();
-  const board = (gameState: GameState) => (
+  const board = (gameState: GameState): ReactElement => (
     <BuildPhase
       gameState={gameState}
       actions={actions}
@@ -117,21 +134,14 @@ it("keeps the sizes Build opened at while the hand fills and after coming back",
       onBasicsChange={vi.fn()}
     />
   );
-  const sizes = (root: HTMLElement) =>
-    Array.from(
-      root.querySelectorAll(
-        '.zone-hand, .zone-battlefield, .zone-sideboard, [style*="grid-template-columns"]',
-      ),
-      (element) => element.getAttribute("style"),
-    );
 
   const building = render(board(opened));
-  const atOpen = sizes(building.container);
+  const atOpen = zoneLayoutStyles(building.container);
   expect(atOpen.join()).toContain("grid-template-columns");
 
   building.rerender(board(handFull));
-  expect(sizes(building.container)).toEqual(atOpen);
+  expect(zoneLayoutStyles(building.container)).toEqual(atOpen);
 
   building.unmount();
-  expect(sizes(render(board(handFull)).container)).toEqual(atOpen);
+  expect(zoneLayoutStyles(render(board(handFull)).container)).toEqual(atOpen);
 });

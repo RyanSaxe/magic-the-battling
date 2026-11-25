@@ -1,3 +1,5 @@
+"""Literal types and helpers for phases, zones, and play modes."""
+
 from typing import Literal
 
 Phase = Literal["draft", "build", "battle", "reward", "awaiting_elimination", "eliminated", "winner", "game_over"]
@@ -29,4 +31,5 @@ def normalize_play_mode(value: str | None) -> PlayMode:
         return "limited"
     if value == "constructed":
         return "constructed"
-    raise ValueError(f"Unknown play mode: {value}")
+    msg = f"Unknown play mode: {value}"
+    raise ValueError(msg)

@@ -48,14 +48,17 @@ function distributeInnerHeights(totalInner: number, count: number): number[] {
 }
 
 function makeFrame(
-  outerWidth: number,
-  outerHeight: number,
-  sectionPadH: number,
-  sectionPadV: number,
+  outer: { width: number; height: number },
+  pad: Pick<SectionPadding, "sectionPadH" | "sectionPadV">,
 ): ZoneFrame {
-  const innerWidth = Math.max(0, outerWidth - 2 * sectionPadH);
-  const innerHeight = Math.max(0, outerHeight - sectionPadV);
-  return { outerWidth, outerHeight, innerWidth, innerHeight };
+  const innerWidth = Math.max(0, outer.width - 2 * pad.sectionPadH);
+  const innerHeight = Math.max(0, outer.height - pad.sectionPadV);
+  return {
+    outerWidth: outer.width,
+    outerHeight: outer.height,
+    innerWidth,
+    innerHeight,
+  };
 }
 
 interface BandDimensions {
@@ -65,13 +68,14 @@ interface BandDimensions {
   rightOuterW: number;
 }
 
-function computeVerticalBands(
-  availH: number,
-  hasTop: boolean,
-  hasBottom: boolean,
-  sectionGap: number,
-  topFraction: number,
-): { topOuterH: number; bottomOuterH: number } {
+function computeVerticalBands(args: {
+  availH: number;
+  hasTop: boolean;
+  hasBottom: boolean;
+  sectionGap: number;
+  topFraction: number;
+}): { topOuterH: number; bottomOuterH: number } {
+  const { availH, hasTop, hasBottom, sectionGap, topFraction } = args;
   if (hasTop && hasBottom) {
     const usableH = availH - sectionGap;
     const topOuterH = Math.round(usableH * topFraction);
@@ -83,14 +87,22 @@ function computeVerticalBands(
   };
 }
 
-function computeHorizontalBands(
-  availW: number,
-  hasBL: boolean,
-  hasBR: boolean,
-  sectionGap: number,
-  minBottomRightOuterWidth: number,
-  leftFraction: number,
-): { leftOuterW: number; rightOuterW: number } {
+function computeHorizontalBands(args: {
+  availW: number;
+  hasBL: boolean;
+  hasBR: boolean;
+  sectionGap: number;
+  minBottomRightOuterWidth: number;
+  leftFraction: number;
+}): { leftOuterW: number; rightOuterW: number } {
+  const {
+    availW,
+    hasBL,
+    hasBR,
+    sectionGap,
+    minBottomRightOuterWidth,
+    leftFraction,
+  } = args;
   if (!hasBR) return { leftOuterW: availW, rightOuterW: 0 };
   const lrGap = hasBL ? sectionGap : 0;
   const minRightOuterW = Math.min(
@@ -105,49 +117,49 @@ function computeHorizontalBands(
   return { leftOuterW, rightOuterW: availW - leftOuterW - lrGap };
 }
 
-function computeBandDimensions(
-  availW: number,
-  availH: number,
-  hasTop: boolean,
-  hasBL: boolean,
-  hasBR: boolean,
-  sectionGap: number,
-  minBottomRightOuterWidth: number,
-  resolved: Required<ZoneConstraints>,
-): BandDimensions {
-  const vertical = computeVerticalBands(
-    availH,
-    hasTop,
-    hasBL || hasBR,
-    sectionGap,
-    resolved.topFraction,
-  );
-  const horizontal = computeHorizontalBands(
-    availW,
-    hasBL,
-    hasBR,
-    sectionGap,
-    minBottomRightOuterWidth,
-    resolved.leftFraction,
-  );
+function computeBandDimensions(args: {
+  availW: number;
+  availH: number;
+  hasTop: boolean;
+  hasBL: boolean;
+  hasBR: boolean;
+  sectionGap: number;
+  minBottomRightOuterWidth: number;
+  resolved: Required<ZoneConstraints>;
+}): BandDimensions {
+  const vertical = computeVerticalBands({
+    availH: args.availH,
+    hasTop: args.hasTop,
+    hasBottom: args.hasBL || args.hasBR,
+    sectionGap: args.sectionGap,
+    topFraction: args.resolved.topFraction,
+  });
+  const horizontal = computeHorizontalBands({
+    availW: args.availW,
+    hasBL: args.hasBL,
+    hasBR: args.hasBR,
+    sectionGap: args.sectionGap,
+    minBottomRightOuterWidth: args.minBottomRightOuterWidth,
+    leftFraction: args.resolved.leftFraction,
+  });
   return { ...vertical, ...horizontal };
 }
 
-function assignBottomLeftFrames(
-  frames: ZoneFrameResult,
-  blIds: string[],
-  leftOuterW: number,
-  bottomOuterH: number,
-  bottomLeftSplit: number,
-  pad: SectionPadding,
-): void {
+function assignBottomLeftFrames(args: {
+  frames: ZoneFrameResult;
+  blIds: string[];
+  leftOuterW: number;
+  bottomOuterH: number;
+  bottomLeftSplit: number;
+  pad: SectionPadding;
+}): void {
+  const { frames, blIds, leftOuterW, bottomOuterH, bottomLeftSplit, pad } =
+    args;
   if (blIds.length === 0) return;
   if (blIds.length === 1) {
     frames[blIds[0]] = makeFrame(
-      leftOuterW,
-      bottomOuterH,
-      pad.sectionPadH,
-      pad.sectionPadV,
+      { width: leftOuterW, height: bottomOuterH },
+      pad,
     );
     return;
   }
@@ -162,10 +174,8 @@ function assignBottomLeftFrames(
     Math.min(totalInnerH, Math.round(totalInnerH * bottomLeftSplit)),
   );
   frames[blIds[0]] = makeFrame(
-    leftOuterW,
-    firstInnerH + pad.sectionPadV,
-    pad.sectionPadH,
-    pad.sectionPadV,
+    { width: leftOuterW, height: firstInnerH + pad.sectionPadV },
+    pad,
   );
 
   const remainingIds = blIds.slice(1);
@@ -175,20 +185,25 @@ function assignBottomLeftFrames(
   );
   remainingIds.forEach((id, index) => {
     frames[id] = makeFrame(
-      leftOuterW,
-      distributed[index] + pad.sectionPadV,
-      pad.sectionPadH,
-      pad.sectionPadV,
+      { width: leftOuterW, height: distributed[index] + pad.sectionPadV },
+      pad,
     );
   });
 }
 
-export function computeConstrainedFrames(
-  containerW: number,
-  containerH: number,
-  config: CardLayoutConfig,
-  constraints: ZoneConstraints,
-): ZoneFrameResult {
+export interface ConstrainedLayoutOptions {
+  containerW: number;
+  containerH: number;
+  config: CardLayoutConfig;
+  constraints: ZoneConstraints;
+}
+
+export function computeConstrainedFrames({
+  containerW,
+  containerH,
+  config,
+  constraints,
+}: ConstrainedLayoutOptions): ZoneFrameResult {
   const pad = readSectionPadding(config);
   const frames = makeDefaultFrames(Object.keys(config.zones));
   const availW = containerW - pad.padding;
@@ -198,58 +213,53 @@ export function computeConstrainedFrames(
   const { topIds, blIds, brIds } = getActiveZoneIds(config);
   if (topIds.length + blIds.length + brIds.length === 0) return frames;
 
-  const resolved = resolveConstraints(
+  const resolved = resolveConstraints({
     containerW,
     containerH,
     config,
     constraints,
-  );
-  const bands = computeBandDimensions(
+  });
+  const bands = computeBandDimensions({
     availW,
     availH,
-    topIds.length > 0,
-    blIds.length > 0,
-    brIds.length > 0,
-    pad.sectionGap,
-    config.minBottomRightOuterWidth ?? 0,
+    hasTop: topIds.length > 0,
+    hasBL: blIds.length > 0,
+    hasBR: brIds.length > 0,
+    sectionGap: pad.sectionGap,
+    minBottomRightOuterWidth: config.minBottomRightOuterWidth ?? 0,
     resolved,
-  );
+  });
 
   for (const id of topIds) {
-    frames[id] = makeFrame(
-      availW,
-      bands.topOuterH,
-      pad.sectionPadH,
-      pad.sectionPadV,
-    );
+    frames[id] = makeFrame({ width: availW, height: bands.topOuterH }, pad);
   }
-  assignBottomLeftFrames(
+  assignBottomLeftFrames({
     frames,
     blIds,
-    bands.leftOuterW,
-    bands.bottomOuterH,
-    resolved.bottomLeftSplit,
+    leftOuterW: bands.leftOuterW,
+    bottomOuterH: bands.bottomOuterH,
+    bottomLeftSplit: resolved.bottomLeftSplit,
     pad,
-  );
+  });
   for (const id of brIds) {
     frames[id] = makeFrame(
-      bands.rightOuterW,
-      bands.bottomOuterH,
-      pad.sectionPadH,
-      pad.sectionPadV,
+      { width: bands.rightOuterW, height: bands.bottomOuterH },
+      pad,
     );
   }
 
   return frames;
 }
 
-function fitZoneInFrame(
-  spec: ZoneSpec,
-  frame: ZoneFrame,
-  minCardWidth: number,
-  globalMaxCardWidth: number,
-  pass2MaxCardWidth: number,
-): ZoneDims {
+function fitZoneInFrame(args: {
+  spec: ZoneSpec;
+  frame: ZoneFrame;
+  minCardWidth: number;
+  globalMaxCardWidth: number;
+  pass2MaxCardWidth: number;
+}): ZoneDims {
+  const { spec, frame, minCardWidth, globalMaxCardWidth, pass2MaxCardWidth } =
+    args;
   if (spec.count <= 0) return DEFAULT_ZONE_DIMS;
   // Pass 2 cap: never shrink below pass 1's per-zone allocation, but apply a
   // sanity ceiling to prevent absurd card sizes on large screens.
@@ -274,12 +284,12 @@ function fitZoneInFrame(
   };
 }
 
-export function computeConstrainedLayoutState(
-  containerW: number,
-  containerH: number,
-  config: CardLayoutConfig,
-  constraints: ZoneConstraints,
-): ConstrainedLayoutState {
+export function computeConstrainedLayoutState({
+  containerW,
+  containerH,
+  config,
+  constraints,
+}: ConstrainedLayoutOptions): ConstrainedLayoutState {
   const minCardWidth = config.minCardWidth ?? 1;
   const maxCardWidth = config.maxCardWidth ?? 200;
   const pass2MaxCardWidth =
@@ -287,45 +297,37 @@ export function computeConstrainedLayoutState(
 
   const zoneIds = Object.keys(config.zones);
   const dims = makeDefaultDims(zoneIds);
-  const resolved = resolveConstraints(
+  const resolved = resolveConstraints({
     containerW,
     containerH,
     config,
     constraints,
-  );
-  const frames = computeConstrainedFrames(
+  });
+  const frames = computeConstrainedFrames({
     containerW,
     containerH,
     config,
-    resolved,
-  );
+    constraints: resolved,
+  });
 
   for (const id of zoneIds) {
     const frame = frames[id];
     if (!frame || frame.innerWidth <= 0 || frame.innerHeight <= 0) continue;
-    dims[id] = fitZoneInFrame(
-      config.zones[id],
+    dims[id] = fitZoneInFrame({
+      spec: config.zones[id],
       frame,
       minCardWidth,
-      maxCardWidth,
+      globalMaxCardWidth: maxCardWidth,
       pass2MaxCardWidth,
-    );
+    });
   }
 
   return { dims, frames, constraints: resolved };
 }
 
 export function computeConstrainedLayout(
-  containerW: number,
-  containerH: number,
-  config: CardLayoutConfig,
-  constraints: ZoneConstraints,
+  options: ConstrainedLayoutOptions,
 ): CardLayoutResult {
-  const state = computeConstrainedLayoutState(
-    containerW,
-    containerH,
-    config,
-    constraints,
-  );
+  const state = computeConstrainedLayoutState(options);
   return state.dims;
 }

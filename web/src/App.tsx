@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ServerStatusBanner } from "./components/common/ServerStatusBanner";
@@ -18,7 +19,7 @@ import { BattlerView } from "./pages/BattlerView";
 import { CubeView } from "./pages/CubeView";
 import { NotFound } from "./pages/NotFound";
 
-function App() {
+function App(): ReactElement {
   return (
     <ErrorBoundary>
       <ToastProvider>

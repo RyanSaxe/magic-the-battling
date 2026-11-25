@@ -18,10 +18,11 @@ beforeEach(() => {
       this.focus();
     },
   );
-  document.execCommand = () => {
+  document.execCommand = (): boolean => {
     const field = document.activeElement;
-    if (copyWorks && field instanceof HTMLTextAreaElement)
+    if (copyWorks && field instanceof HTMLTextAreaElement) {
       copied.push(field.value);
+    }
     return copyWorks;
   };
 });
@@ -32,12 +33,14 @@ afterEach(() => {
   Reflect.deleteProperty(document, "execCommand");
 });
 
-async function tapCopyLink() {
+async function tapCopyLink(): Promise<void> {
   render(
     <ShareModal url={SHARE_URL} shareText="4th place" onClose={vi.fn()} />,
   );
   // Safari leaves nothing focused when a button is tapped.
-  (document.activeElement as HTMLElement).blur();
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
   fireEvent.click(screen.getByRole("button", { name: "Copy Link" }));
   await new Promise((resolve) => setTimeout(resolve));
 }

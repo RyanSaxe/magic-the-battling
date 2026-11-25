@@ -1,10 +1,17 @@
+"""_WsSender payload compression and egress accounting."""
+
 import asyncio
 import gzip
 import json
 import logging
 import os
+from typing import Any, Protocol
 
-from fastapi import WebSocket
+
+class _WsSender(Protocol):
+    async def send_bytes(self, data: bytes, /) -> None: ...
+    async def send_json(self, data: dict[str, Any], /) -> None: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -14,13 +21,13 @@ WS_COMPRESSION_ENABLED = os.environ.get("MTB_COMPRESS_WS", "1") == "1"
 class _PhaseStats:
     __slots__ = ("bytes", "msgs")
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.bytes = 0
         self.msgs = 0
 
 
 class RoundEgressTracker:
-    def __init__(self):
+    def __init__(self) -> None:
         self._data: dict[tuple[str, str], dict[str, _PhaseStats]] = {}
 
     def _ensure_key(self, key: tuple[str, str]) -> dict[str, _PhaseStats]:
@@ -28,14 +35,14 @@ class RoundEgressTracker:
             self._data[key] = {p: _PhaseStats() for p in ("draft", "build", "battle", "spectate")}
         return self._data[key]
 
-    def record(self, game_id: str, player_name: str, phase: str, raw_bytes: int, *, spectator: bool = False):
+    def record(self, game_id: str, player_name: str, *, phase: str, raw_bytes: int, spectator: bool = False) -> None:
         bucket = self._ensure_key((game_id, player_name))
         target = "spectate" if spectator else phase
         if target in bucket:
             bucket[target].bytes += raw_bytes
             bucket[target].msgs += 1
 
-    def flush(self, game_id: str, player_name: str, stage: int, round_num: int):
+    def flush(self, game_id: str, player_name: str, *, stage: int, round_num: int) -> None:
         key = (game_id, player_name)
         data = self._data.pop(key, None)
         if not data:
@@ -61,7 +68,7 @@ class RoundEgressTracker:
 round_egress_tracker = RoundEgressTracker()
 
 
-async def send_ws(ws: WebSocket, message: dict, *, spectator: bool = False) -> None:
+async def send_ws(ws: _WsSender, message: dict, *, spectator: bool = False) -> None:
     raw = json.dumps(message).encode()
     raw_size = len(raw)
     if WS_COMPRESSION_ENABLED:
@@ -81,8 +88,8 @@ async def send_ws(ws: WebSocket, message: dict, *, spectator: bool = False) -> N
             round_egress_tracker.flush(
                 game_id,
                 player_name,
-                self_player.get("stage", 0),
-                self_player.get("round", 0),
+                stage=self_player.get("stage", 0),
+                round_num=self_player.get("round", 0),
             )
         else:
-            round_egress_tracker.record(game_id, player_name, phase, raw_size, spectator=spectator)
+            round_egress_tracker.record(game_id, player_name, phase=phase, raw_bytes=raw_size, spectator=spectator)

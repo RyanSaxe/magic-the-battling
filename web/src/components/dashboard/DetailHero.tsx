@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { SurfaceCard } from "../common/SurfaceCard";
 import { CubeBadge, type CubeBadgeTone } from "./CubeBadge";
@@ -13,6 +13,7 @@ export interface HeroStat {
 }
 
 export interface HeroAction {
+  id?: string;
   label: string;
   onClick: () => void;
   disabled?: boolean;
@@ -46,7 +47,7 @@ export function DetailHero({
   play,
   stats,
   caption,
-}: DetailHeroProps) {
+}: DetailHeroProps): ReactElement {
   return (
     <SurfaceCard
       as="section"
@@ -77,10 +78,13 @@ export function DetailHero({
             )}
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 [&>*]:flex-auto md:[&>*]:flex-none">
-            {actions.map((action, index) => (
-              // Keyed by place, since a toggle's label changes and it should stay the same button.
+            {actions.map((action) => (
+              // Keyed stably across toggle label changes so it stays the same button.
               <button
-                key={index}
+                key={
+                  action.id ??
+                  (action.pressed === undefined ? action.label : "toggle")
+                }
                 type="button"
                 onClick={action.onClick}
                 disabled={action.disabled}
@@ -133,7 +137,10 @@ const HERO_LINK = `${LINK} transition-colors`;
 export function HeroLink({
   children,
   ...target
-}: { children: ReactNode } & ({ to: string } | { href: string })) {
+}: { children: ReactNode } & (
+  | { to: string }
+  | { href: string }
+)): ReactElement {
   if ("to" in target) {
     return (
       <Link to={target.to} className={HERO_LINK}>

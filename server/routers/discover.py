@@ -1,5 +1,8 @@
-# ruff: noqa: B008
+"""Discoverable public games and lobby listing routes."""
+
 import logging
+from collections.abc import Generator
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import distinct, func, or_
@@ -13,7 +16,7 @@ from server.services.auth import get_optional_user
 logger = logging.getLogger(__name__)
 
 
-def _get_db():
+def _get_db() -> Generator[Session]:
     db = database.SessionLocal()
     try:
         yield db
@@ -29,12 +32,13 @@ PAGE_SIZE = 20
 
 @router.get("")
 def browse_cubes(
-    offset: int = Query(default=0, ge=0),
-    q: str = Query(default="", max_length=100),
-    current_user: User | None = Depends(get_optional_user),
-    db: Session = Depends(_get_db),
-):
-    """The most played cubes, or with q, those whose name or CubeCobra id contains it."""
+    *,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    q: Annotated[str, Query(max_length=100)] = "",
+    current_user: Annotated[User | None, Depends(get_optional_user)],
+    db: Annotated[Session, Depends(_get_db)],
+) -> dict[str, object]:
+    """List the most played cubes, optionally filtered by name or CubeCobra ID."""
     base = (
         db.query(
             GameRecord.cube_id,

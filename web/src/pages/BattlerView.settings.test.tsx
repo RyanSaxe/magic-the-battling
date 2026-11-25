@@ -13,12 +13,16 @@ import { BattlerView } from "./BattlerView";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
 const preset = vi.hoisted(() => ({
@@ -33,10 +37,17 @@ const preset = vi.hoisted(() => ({
 const deleteBattler = vi.hoisted(() => vi.fn(async () => {}));
 
 vi.mock("../api/client", () => ({
-  getBattler: async () => preset,
-  getBattlerGames: async () => ({ games: [], has_more: false, total_games: 0 }),
+  getBattler: async (): Promise<typeof preset> => preset,
+  getBattlerGames: async (): Promise<{
+    games: never[];
+    has_more: boolean;
+    total_games: number;
+  }> => ({ games: [], has_more: false, total_games: 0 }),
   // Like the server, a null leaves a field as it was.
-  updateBattler: async (_id: number, updates: Partial<UserBattler>) => ({
+  updateBattler: async (
+    _id: number,
+    updates: Partial<UserBattler>,
+  ): Promise<Record<string, unknown>> => ({
     ...preset,
     ...Object.fromEntries(
       Object.entries(updates).filter(([, value]) => value !== null),
@@ -44,9 +55,14 @@ vi.mock("../api/client", () => ({
   }),
   deleteBattler,
 }));
-vi.mock("../contexts", () => ({ useToast: () => ({ addToast: () => {} }) }));
+vi.mock("../contexts", () => ({
+  useToast: (): { addToast: () => void } => ({ addToast: (): void => {} }),
+}));
 vi.mock("../contexts/authState", () => ({
-  useAuth: () => ({ user: { username: "tester" }, loading: false }),
+  useAuth: (): { user: { username: string }; loading: boolean } => ({
+    user: { username: "tester" },
+    loading: false,
+  }),
 }));
 
 afterEach(() => {

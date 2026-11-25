@@ -91,12 +91,13 @@ function hasTopFillWithTwoBottomPrimary(ctx: LayoutContext): boolean {
   );
 }
 
-function evaluateVariantBudget(
-  ctx: LayoutContext,
-  budget: ColumnVariantBudget,
-  tracker: ReturnType<typeof createTracker>,
-  topFillPair: boolean,
-): CardLayoutResult | null {
+function evaluateVariantBudget(args: {
+  ctx: LayoutContext;
+  budget: ColumnVariantBudget;
+  tracker: ReturnType<typeof createTracker>;
+  topFillPair: boolean;
+}): CardLayoutResult | null {
+  const { ctx, budget, tracker, topFillPair } = args;
   if (ctx.allPrimary.length === 0 && ctx.fillBL.length > 0) {
     return solveFillOnlyBottomLeft(ctx, budget);
   }
@@ -131,7 +132,12 @@ export function computePhaseLayout(
   for (const brCols of getBottomRightColVariants(ctx)) {
     const budget = resolveColumnBudget(ctx, brCols);
     if (!budget) continue;
-    const immediate = evaluateVariantBudget(ctx, budget, tracker, topFillPair);
+    const immediate = evaluateVariantBudget({
+      ctx,
+      budget,
+      tracker,
+      topFillPair,
+    });
     if (immediate) return immediate;
   }
 

@@ -18,12 +18,16 @@ import { Play } from "./Play";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
 const toasts: string[] = [];
@@ -49,23 +53,28 @@ vi.mock("../api/client", () => ({
   })),
 }));
 vi.mock("../contexts", () => ({
-  useToast: () => ({ addToast: (message: string) => toasts.push(message) }),
+  useToast: (): { addToast: (message: string) => number } => ({
+    addToast: (message: string): number => toasts.push(message),
+  }),
 }));
 vi.mock("../contexts/authState", () => ({
-  useAuth: () => ({ user: null, loading: false }),
+  useAuth: (): { user: null; loading: boolean } => ({
+    user: null,
+    loading: false,
+  }),
 }));
 vi.mock("../utils/prefetchName", () => ({
-  getLegendaryName: async () => "Tester",
-  prefetchLegendaryName: () => {},
+  getLegendaryName: async (): Promise<string> => "Tester",
+  prefetchLegendaryName: (): void => {},
 }));
 
-async function settle() {
+async function settle(): Promise<void> {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
   });
 }
 
-async function renderPlay() {
+async function renderPlay(): Promise<void> {
   render(
     <MemoryRouter>
       <Play />
@@ -74,7 +83,10 @@ async function renderPlay() {
   await settle();
 }
 
-async function startGoldfishUntilTheStartIsSent() {
+async function startGoldfishUntilTheStartIsSent(): Promise<{
+  socket: FakeWebSocket;
+  lobby: Record<string, unknown>;
+}> {
   await renderPlay();
   await act(async () =>
     screen.getByRole("button", { name: "Start Game" }).click(),
@@ -172,28 +184,28 @@ describe("Play: cancelling or leaving a pending start", () => {
   const { catalog, state } = gameBootstrap({ phase: "build", counts: {} });
 
   it.each([
-    [
-      "Goldfish",
-      null,
-      "Start Game",
-      {
+    {
+      name: "Goldfish",
+      mode: null,
+      start: "Start Game",
+      completed: {
         type: "game_bootstrap",
         payload: { catalog, state: { ...state, game_id: "game" } },
       },
-    ],
-    [
-      "Play with Friends",
-      "Play with Friends",
-      "Create Lobby",
-      {
+    },
+    {
+      name: "Play with Friends",
+      mode: "Play with Friends",
+      start: "Create Lobby",
+      completed: {
         type: "lobby_state",
         payload: { game_id: "game", players: [], cube_loading_status: "ready" },
       },
-    ],
+    },
   ])(
-    "%s gives up a start left by Home, and keeps one that completes",
-    async (_, mode, start, completed) => {
-      const startFromPlay = async () => {
+    "$name gives up a start left by Home, and keeps one that completes",
+    async ({ mode, start, completed }) => {
+      const startFromPlay = async (): Promise<void> => {
         vi.mocked(createGame).mockResolvedValueOnce({
           game_id: "game",
           join_code: "ABC123",
@@ -243,11 +255,11 @@ describe("Play: setup info tooltips", () => {
     fireEvent.click(info);
 
     const tapTarget = document.querySelector(".board-backdrop");
-    expect(tapTarget).not.toBeNull();
-    fireEvent.pointerDown(tapTarget!);
+    if (!tapTarget) throw new Error("expected .board-backdrop");
+    fireEvent.pointerDown(tapTarget);
     expect(info.getAttribute("aria-expanded")).toBe("true");
 
-    fireEvent.click(tapTarget!);
+    fireEvent.click(tapTarget);
     expect(info.getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -255,9 +267,9 @@ describe("Play: setup info tooltips", () => {
     await renderPlay();
     fireEvent.click(screen.getByRole("button", { name: "Change settings" }));
 
-    const toggle = screen.getByRole("switch", {
+    const toggle = screen.getByRole<HTMLInputElement>("switch", {
       name: "Upgrades",
-    }) as HTMLInputElement;
+    });
     expect(toggle.checked).toBe(true);
 
     const info = screen.getByRole("button", { name: "What upgrades are" });
@@ -407,7 +419,10 @@ describe("Play: starting a Goldfish game", () => {
 
   it("starts with the fewer opponents picked when puppet data is short", async () => {
     await renderPlay();
-    const serveLobby = async (gameId: string, puppetCount: number) => {
+    const serveLobby = async (
+      gameId: string,
+      puppetCount: number,
+    ): Promise<FakeWebSocket> => {
       const socket = FakeWebSocket.latest();
       act(() => {
         socket.serverOpen();
@@ -450,7 +465,7 @@ describe("Play: starting a Goldfish game", () => {
 
   it("gives up the seat of a failed start, and keeps one that moved", async () => {
     await renderPlay();
-    const start = async () => {
+    const start = async (): Promise<FakeWebSocket> => {
       await act(async () =>
         screen.getByRole("button", { name: "Start Game" }).click(),
       );

@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 export function CardGrid({
   columns,
   cardWidth,
@@ -6,7 +8,7 @@ export function CardGrid({
   columns: number;
   cardWidth: number;
   children: React.ReactNode;
-}) {
+}): ReactElement {
   return (
     <div
       style={{

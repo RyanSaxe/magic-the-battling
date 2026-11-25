@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import type { SpectateRequest } from "../hooks/useWebSocket";
-import { usePanelHoldsEnter } from "../utils/enterKey";
+import { usePanelHoldsEnter } from "../hooks/usePanelHoldsEnter";
 import { DIALOG_BACKDROP } from "./common/styles";
 import { SurfaceCard } from "./common/SurfaceCard";
 
@@ -9,7 +10,7 @@ export function SpectateRequestModal({
 }: {
   request: SpectateRequest;
   onRespond: (requestId: string, allowed: boolean) => void;
-}) {
+}): ReactNode {
   usePanelHoldsEnter();
   // A spectator is waiting on this answer, so it sits above the guide and any menu or card preview.
   return (

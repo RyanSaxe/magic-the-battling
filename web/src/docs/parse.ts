@@ -37,7 +37,7 @@ export function parseDoc(raw: string): ParsedDoc {
   let activeHeading: string | null = null;
   let activeLines: string[] = [];
 
-  const flushSection = () => {
+  const flushSection = (): void => {
     if (!activeHeading) {
       return;
     }

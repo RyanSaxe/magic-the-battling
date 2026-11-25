@@ -1,3 +1,5 @@
+"""Active game snapshot schema migration helpers."""
+
 from __future__ import annotations
 
 import json
@@ -110,7 +112,7 @@ def _migrate_active_game_snapshots(conn: sqlite3.Connection, *, apply: bool) -> 
         try:
             game = restore_game_from_snapshot(raw_json)
             new_json = raw_json if _is_current_wrapped_payload(raw_json) else game.snapshot_dump_json()
-        except Exception:
+        except Exception:  # noqa: BLE001 -- broad boundary catch
             result.failed += 1
             continue
 
@@ -145,7 +147,7 @@ def _migrate_battle_snapshots(conn: sqlite3.Connection, *, apply: bool) -> Table
         try:
             snapshot_data = restore_snapshot_data(raw_json)
             new_json = slim_snapshot_dump(snapshot_data)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- broad boundary catch
             result.failed += 1
             continue
 

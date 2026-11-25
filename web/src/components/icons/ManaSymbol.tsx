@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { SCRYFALL_SYMBOLS } from "../../constants/assets";
 
 interface ManaSymbolProps {
@@ -16,7 +17,7 @@ export function ManaSymbol({
   symbol,
   size = "md",
   className = "",
-}: ManaSymbolProps) {
+}: ManaSymbolProps): ReactElement {
   const px = sizes[size];
   return (
     <img

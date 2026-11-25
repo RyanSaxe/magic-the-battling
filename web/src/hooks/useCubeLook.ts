@@ -16,17 +16,18 @@ export function useCubeLook(cubeId: string | null): CubeLook | null {
   );
 
   useEffect(() => {
-    if (!cubeId) return;
+    if (!cubeId) return undefined;
     let cancelled = false;
-    const show = (name: string | null, imageUri: string | null) => {
-      if (!cancelled)
+    const show = (name: string | null, imageUri: string | null): void => {
+      if (!cancelled) {
         setFound({ cubeId, look: { name: name ?? cubeId, imageUri } });
+      }
     };
     getCubeSummary(cubeId).then(
       (cube) => show(cube.cube_name, cube.cube_image_uri),
       () => show(null, null),
     );
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [cubeId]);

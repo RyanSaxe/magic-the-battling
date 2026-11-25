@@ -14,19 +14,30 @@ import { DashboardGames } from "./DashboardGames";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
-vi.mock("../contexts", () => ({ useToast: () => ({ addToast: () => {} }) }));
+vi.mock("../contexts", () => ({
+  useToast: (): { addToast: () => void } => ({ addToast: (): void => {} }),
+}));
 // One user for every render, since the pages search again when the user changes.
 vi.mock("../contexts/authState", () => {
   const user = { username: "tester" };
-  return { useAuth: () => ({ user, loading: false }) };
+  return {
+    useAuth: (): { user: { username: string }; loading: boolean } => ({
+      user,
+      loading: false,
+    }),
+  };
 });
 
 afterEach(() => {
@@ -46,12 +57,35 @@ const EMPTY_PAGE = {
   total_wins: 0,
 };
 
-it.each<[string, ComponentType, string, string]>([
-  ["Discover", DashboardDiscover, "Search cubes", "/api/discover"],
-  ["Games", DashboardGames, "Search games", "/api/battlers/my-games"],
+function advanceSearchTimer(ms: number): Promise<void> {
+  return act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+interface SearchPageCase {
+  name: string;
+  Page: ComponentType;
+  label: string;
+  path: string;
+}
+
+it.each<SearchPageCase>([
+  {
+    name: "Discover",
+    Page: DashboardDiscover,
+    label: "Search cubes",
+    path: "/api/discover",
+  },
+  {
+    name: "Games",
+    Page: DashboardGames,
+    label: "Search games",
+    path: "/api/battlers/my-games",
+  },
 ])(
-  "%s sends what was typed once typing stops",
-  async (_, Page, label, path) => {
+  "$name sends what was typed once typing stops",
+  async ({ Page, label, path }) => {
     vi.useFakeTimers();
     const searches: string[] = [];
     vi.stubGlobal("fetch", async (input: string) => {
@@ -59,22 +93,20 @@ it.each<[string, ComponentType, string, string]>([
       if (url.pathname === path) searches.push(url.searchParams.get("q") ?? "");
       return new Response(JSON.stringify(EMPTY_PAGE));
     });
-    const wait = (ms: number) =>
-      act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
     render(
       <MemoryRouter>
         <Page />
       </MemoryRouter>,
     );
-    await wait(0);
+    await advanceSearchTimer(0);
 
     const box = screen.getByLabelText(label);
     fireEvent.change(box, { target: { value: "pau" } });
-    await wait(SEARCH_DELAY_MS - 1);
+    await advanceSearchTimer(SEARCH_DELAY_MS - 1);
     fireEvent.change(box, { target: { value: "pauper " } });
-    await wait(SEARCH_DELAY_MS - 1);
+    await advanceSearchTimer(SEARCH_DELAY_MS - 1);
     expect(searches).toEqual([""]);
-    await wait(1);
+    await advanceSearchTimer(1);
     expect(searches).toEqual(["", "pauper"]);
   },
 );

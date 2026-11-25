@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi, type Mock } from "vitest";
 import type { Card } from "../types";
 import { ActionMenu } from "./ActionMenu";
 import { CardActionMenu } from "./card/CardActionMenu";
@@ -11,12 +11,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const card = {
+const noop = (): void => {};
+
+const card: Card = {
   id: "card",
   name: "Wurmcoil Engine",
-  tokens: [],
+  image_url: "",
   flip_image_url: null,
-} as unknown as Card;
+  png_url: null,
+  flip_png_url: null,
+  type_line: "Artifact Creature",
+  tokens: [],
+  elo: null,
+  upgrade_target: null,
+  oracle_text: null,
+  colors: [],
+  cmc: 6,
+};
 const zones = {
   battlefield: [card],
   library: [],
@@ -26,13 +37,13 @@ const zones = {
   attachments: {},
 };
 
-function withoutPromptBox() {
+function withoutPromptBox(): Mock<() => null> {
   const promptBox = vi.fn(() => null);
   vi.stubGlobal("prompt", promptBox);
   return promptBox;
 }
 
-function typeInMenu(value: string, action: string) {
+function typeInMenu(value: string, action: string): void {
   fireEvent.change(screen.getByRole("textbox"), { target: { value } });
   fireEvent.click(screen.getByRole("button", { name: action }));
 }
@@ -69,7 +80,7 @@ it("adds a custom counter from a field in a card's menu", () => {
 it("rolls a custom die from a field in the Actions menu", () => {
   const promptBox = withoutPromptBox();
   const onRollDie = vi.fn();
-  const props = {
+  const props: ComponentProps<typeof ActionMenu> = {
     selectedCard: null,
     battle: {
       your_zones: zones,
@@ -80,9 +91,21 @@ it("rolls a custom die from a field in the Actions menu", () => {
     playerName: "Alice",
     sideboardCount: 0,
     opponentSideboardCount: 0,
+    onAction: noop,
+    onMove: noop,
+    onUntapAll: noop,
+    onUntapOpponentAll: noop,
+    onShowSideboard: noop,
+    onShowOpponentSideboard: noop,
+    onCreateTreasure: noop,
+    onDrawLibrary: noop,
+    onShuffleLibrary: noop,
+    onDrawOpponentLibrary: noop,
+    onShuffleOpponentLibrary: noop,
+    onPassTurn: noop,
     onRollDie,
-    onClose: () => {},
-  } as unknown as ComponentProps<typeof ActionMenu>;
+    onClose: noop,
+  };
   render(<ActionMenu {...props} />);
   fireEvent.click(screen.getByRole("button", { name: /Roll a Die/ }));
   fireEvent.click(screen.getByRole("button", { name: "Custom…" }));

@@ -35,19 +35,21 @@ export function useFirstLoad<T>(
   });
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || attempt < 0) return undefined;
     let cancelled = false;
     load().then(
       (value) => {
-        if (!cancelled)
+        if (!cancelled) {
           setRun((run) => ({ ...run, state: { status: "loaded", value } }));
+        }
       },
       () => {
-        if (!cancelled)
+        if (!cancelled) {
           setRun((run) => ({ ...run, state: { status: "failed" } }));
+        }
       },
     );
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [load, enabled, attempt]);
@@ -57,7 +59,7 @@ export function useFirstLoad<T>(
       ...run,
       state: typeof next === "function" ? next(run.state) : next,
     }));
-  const updateOrReload = (change: (value: T) => T) =>
+  const updateOrReload = (change: (value: T) => T): void =>
     setRun((run) =>
       run.state.status === "loaded"
         ? {
@@ -66,7 +68,7 @@ export function useFirstLoad<T>(
           }
         : restarted(run),
     );
-  const retry = () => setRun(restarted);
+  const retry = (): void => setRun(restarted);
 
   return { state, update, updateOrReload, retry };
 }

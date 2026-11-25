@@ -1,3 +1,5 @@
+"""SQLite LIKE escaping and search query helpers."""
+
 from sqlalchemy import ColumnElement, TextClause, text
 from sqlalchemy.orm import QueryableAttribute
 
@@ -5,14 +7,16 @@ LIKE_ESCAPE = "\\"
 
 
 def like_pattern(search: str) -> str:
-    """A LIKE pattern for text containing the search, in which % and _ match only themselves."""
+    """Build a LIKE pattern for text containing the search, escaping % and _."""
     escaped = (
         search.replace(LIKE_ESCAPE, LIKE_ESCAPE * 2).replace("%", f"{LIKE_ESCAPE}%").replace("_", f"{LIKE_ESCAPE}_")
     )
     return f"%{escaped}%"
 
 
-def contains_text(column: ColumnElement[str] | QueryableAttribute[str], search: str) -> ColumnElement[bool]:
+def contains_text(
+    column: ColumnElement[str] | QueryableAttribute[str] | QueryableAttribute[str | None], search: str
+) -> ColumnElement[bool]:
     """Whether the column contains the search, ignoring case."""
     return column.ilike(like_pattern(search), escape=LIKE_ESCAPE)
 
@@ -48,6 +52,8 @@ EXISTS (
 
 
 def card_in_players_fights(search: str) -> TextClause:
-    """Whether a card containing the search was in the player's hand, basic lands or applied upgrades in any
-    recorded fight of the player_game_history row the query is on."""
+    """Whether a card containing the search was in the player's hand, basic lands or applied upgrades in any.
+
+    recorded fight of the player_game_history row the query is on.
+    """
     return text(_CARD_IN_PLAYERS_FIGHTS).bindparams(card_pattern=like_pattern(search))

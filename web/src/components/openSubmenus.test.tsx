@@ -8,13 +8,22 @@ import { CardActionMenu } from "./card/CardActionMenu";
 
 afterEach(cleanup);
 
-const noop = () => {};
-const card = {
+const noop = (): void => {};
+const card: Card = {
   id: "card",
   name: "Wurmcoil Engine",
-  tokens: [],
+  image_url: "",
   flip_image_url: null,
-} as unknown as Card;
+  png_url: null,
+  flip_png_url: null,
+  type_line: "Artifact Creature",
+  tokens: [],
+  elo: null,
+  upgrade_target: null,
+  oracle_text: null,
+  colors: [],
+  cmc: 6,
+};
 const zones = {
   battlefield: [card],
   library: [],
@@ -24,8 +33,8 @@ const zones = {
   attachments: {},
 };
 
-function openActions() {
-  const props = {
+function openActions(): void {
+  const props: ComponentProps<typeof ActionMenu> = {
     selectedCard: { card, zone: "battlefield", owner: "player" },
     battle: {
       your_zones: zones,
@@ -36,12 +45,25 @@ function openActions() {
     playerName: "Alice",
     sideboardCount: 0,
     opponentSideboardCount: 0,
+    onAction: noop,
+    onMove: noop,
+    onUntapAll: noop,
+    onUntapOpponentAll: noop,
+    onShowSideboard: noop,
+    onShowOpponentSideboard: noop,
+    onCreateTreasure: noop,
+    onDrawLibrary: noop,
+    onShuffleLibrary: noop,
+    onDrawOpponentLibrary: noop,
+    onShuffleOpponentLibrary: noop,
+    onPassTurn: noop,
+    onRollDie: noop,
     onClose: noop,
-  } as unknown as ComponentProps<typeof ActionMenu>;
+  };
   render(<ActionMenu {...props} />);
 }
 
-function openCardMenu() {
+function openCardMenu(): void {
   render(
     <CardActionMenu
       card={card}

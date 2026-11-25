@@ -2,7 +2,7 @@
 
 import json
 import random
-from typing import Any, cast
+from typing import Any
 
 from sqlalchemy import true as sql_true
 from sqlalchemy.orm import Session, joinedload
@@ -33,12 +33,17 @@ def _history_config(db: Session, history: PlayerGameHistory) -> dict[str, Any] |
 def _config_matches(
     config: dict[str, Any], *, play_mode: PlayMode, use_upgrades: bool | None, use_vanguards: bool | None
 ) -> bool:
-    saved_play_mode = normalize_play_mode(cast(str | None, config.get("play_mode")))
+    raw_mode = config.get("play_mode")
+    saved_play_mode = normalize_play_mode(str(raw_mode) if raw_mode is not None else None)
     if saved_play_mode != play_mode:
         return False
     if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
         return False
     return use_vanguards is None or config.get("use_vanguards") == use_vanguards
+
+
+_MIN_PUPPET_STAGE = 3
+_MIN_PUPPET_MAX_STAGE = 6
 
 
 class PuppetLoader(GameManagerState):
@@ -62,7 +67,7 @@ class PuppetLoader(GameManagerState):
         return len(set(lower)) == 1
 
     def _has_triple_same_basic(self, history: PlayerGameHistory) -> bool:
-        first_snapshot = next((s for s in history.snapshots if s.stage == 3 and s.round == 1), None)
+        first_snapshot = next((s for s in history.snapshots if s.stage == _MIN_PUPPET_STAGE and s.round == 1), None)
         # Can't verify without the first snapshot, skip to be safe
         if not first_snapshot:
             return True
@@ -70,7 +75,7 @@ class PuppetLoader(GameManagerState):
         return len(set(basics)) == 1
 
     def _is_usable_history(self, history: PlayerGameHistory) -> bool:
-        has_starting_stage = any(s.stage == 3 for s in history.snapshots)
+        has_starting_stage = any(s.stage == _MIN_PUPPET_STAGE for s in history.snapshots)
         return (
             has_starting_stage
             and not self._is_suspicious_name(str(history.player_name or ""))
@@ -95,7 +100,7 @@ class PuppetLoader(GameManagerState):
             .options(joinedload(PlayerGameHistory.snapshots))
             .filter(
                 PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else sql_true(),
-                PlayerGameHistory.max_stage >= 6,
+                PlayerGameHistory.max_stage >= _MIN_PUPPET_MAX_STAGE,
                 PlayerGameHistory.is_puppet.is_(False),
             )
         )
@@ -121,8 +126,8 @@ class PuppetLoader(GameManagerState):
         elo_range = 200
 
         if target_elo:
-            same_cube = [h for h in same_cube if abs(cast(float, h.battler_elo) - target_elo) <= elo_range]
-            other_cube = [h for h in other_cube if abs(cast(float, h.battler_elo) - target_elo) <= elo_range]
+            same_cube = [h for h in same_cube if abs(float(h.battler_elo) - target_elo) <= elo_range]
+            other_cube = [h for h in other_cube if abs(float(h.battler_elo) - target_elo) <= elo_range]
 
         random.shuffle(same_cube)
         random.shuffle(other_cube)
@@ -134,9 +139,10 @@ class PuppetLoader(GameManagerState):
         return result
 
     def _load_fake_player(self, db: Session, history: PlayerGameHistory, *, existing_names: set[str]) -> Puppet:
+        _ = db
         snapshots_dict: dict[str, StaticOpponent] = {}
-        player_name = cast(str, history.player_name)
-        history_id = cast(int, history.id)
+        player_name = str(history.player_name)
+        history_id = int(history.id)
 
         bot_name = self._ensure_unique_name(player_name, existing_names)
 
@@ -146,7 +152,7 @@ class PuppetLoader(GameManagerState):
                 continue
             key = f"{snapshot.stage}_{snapshot.round}"
             snapshot_data = restore_snapshot_data(snapshot.full_state_json)
-            static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id)
+            static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id=history_id)
             snapshots_dict[key] = static_opp
 
         return Puppet(

@@ -23,7 +23,11 @@ function actionWord(seat: ResumableSeat): string {
   return seat.kind === "game" ? "Resume" : "Return";
 }
 
-function closeWords(seat: ResumableSeat) {
+function closeWords(seat: ResumableSeat): {
+  title: string;
+  warning: string;
+  confirm: string;
+} {
   return seat.kind === "game"
     ? {
         title: "Close this game?",
@@ -37,7 +41,7 @@ function closeWords(seat: ResumableSeat) {
       };
 }
 
-function SeatArt({ seat }: { seat: ResumableSeat }) {
+function SeatArt({ seat }: { seat: ResumableSeat }): ReactNode {
   return (
     <span className="resume-art">
       {seat.cubeImageUri && <CubeArt src={seat.cubeImageUri} />}
@@ -45,7 +49,7 @@ function SeatArt({ seat }: { seat: ResumableSeat }) {
   );
 }
 
-function StageColumn({ seat }: { seat: ResumableSeat }) {
+function StageColumn({ seat }: { seat: ResumableSeat }): ReactNode {
   return (
     <span className="resume-stage">
       {seat.kind === "lobby" ? (
@@ -68,7 +72,7 @@ function SeatFact({
 }: {
   className?: string;
   children: ReactNode;
-}) {
+}): ReactNode {
   return (
     <span className={className}>
       {" · "}
@@ -77,7 +81,7 @@ function SeatFact({
   );
 }
 
-function SinceFact({ seat }: { seat: ResumableSeat }) {
+function SinceFact({ seat }: { seat: ResumableSeat }): ReactNode {
   if (!seat.lastActiveAt) return null;
   return (
     <SeatFact className="resume-since">
@@ -93,7 +97,7 @@ function SeatSummary({
 }: {
   seat: ResumableSeat;
   children: ReactNode;
-}) {
+}): ReactNode {
   return (
     <span className="resume-summary">
       <span className="resume-title">{seatTitle(seat)}</span>
@@ -105,7 +109,7 @@ function SeatSummary({
   );
 }
 
-function ResumeSeatSummary({ seat }: { seat: ResumableSeat }) {
+function ResumeSeatSummary({ seat }: { seat: ResumableSeat }): ReactNode {
   const inLobby = seat.kind === "lobby";
   return (
     <SeatSummary seat={seat}>
@@ -123,7 +127,7 @@ function ResumeSeatSummary({ seat }: { seat: ResumableSeat }) {
   );
 }
 
-function ResumeButton({ seat }: { seat: ResumableSeat }) {
+function ResumeButton({ seat }: { seat: ResumableSeat }): ReactNode {
   const resume = useResumeSeat();
   return (
     <button
@@ -150,7 +154,7 @@ function ResumeRow({
   seat: ResumableSeat;
   hasCloseColumn: boolean;
   onClose: (seat: ResumableSeat) => void;
-}) {
+}): ReactNode {
   return (
     <li
       className={`resume-row ${seatTitle(seat).length > ONE_LINE_TITLE ? "is-long" : ""}`}
@@ -179,7 +183,7 @@ export function ResumeBoardRow({
 }: {
   seat: ResumableSeat;
   onClose: (seat: ResumableSeat) => void;
-}) {
+}): ReactNode {
   const resume = useResumeSeat();
   return (
     <li
@@ -217,13 +221,13 @@ export function CloseSeatDialog({
   seat: ResumableSeat;
   onKeep: () => void;
   onClosed: () => void;
-}) {
+}): ReactNode {
   const [closing, setClosing] = useState(false);
   const [failure, setFailure] = useState<AppError | null>(null);
   const words = closeWords(seat);
   const refused = failure?.status === 409;
 
-  const close = async () => {
+  const close = async (): Promise<void> => {
     setClosing(true);
     try {
       await endSeat(
@@ -260,12 +264,9 @@ export function CloseSeatDialog({
           )}
         </SeatSummary>
       </div>
-      <p
-        role="status"
-        className="mt-4 text-sm leading-relaxed text-[var(--ivory-muted)]"
-      >
+      <output className="mt-4 block text-sm leading-relaxed text-[var(--ivory-muted)]">
         {failure?.message ?? words.warning}
-      </p>
+      </output>
       <div className={`mt-5 grid gap-2 ${refused ? "" : "grid-cols-2"}`}>
         <button
           type="button"
@@ -277,7 +278,9 @@ export function CloseSeatDialog({
         {!refused && (
           <button
             type="button"
-            onClick={close}
+            onClick={() => {
+              void close();
+            }}
             disabled={closing}
             className="btn btn-secondary btn-destructive px-2! whitespace-nowrap"
           >
@@ -304,7 +307,7 @@ export function ResumeShelf({
   reserveSpace?: boolean;
   onCloseSeat: (seat: ResumableSeat) => void;
   onShowAll: () => void;
-}) {
+}): ReactNode {
   const first = seats[0];
   const shelf = first ? (
     <section aria-label="In progress" className="resume-shelf home-shelf">
@@ -341,7 +344,7 @@ export function ResumeGamesDialog({
   seats: ResumableSeat[];
   onClose: () => void;
   onCloseSeat: (seat: ResumableSeat) => void;
-}) {
+}): ReactNode {
   useAutoCloseOnEmpty(seats.length === 0, onClose);
   if (seats.length === 0) return null;
   const hasCloseColumn = seats.some((seat) => seat.canClose);

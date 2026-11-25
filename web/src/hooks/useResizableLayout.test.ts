@@ -26,9 +26,9 @@ describe("measureFromPlacement", () => {
       },
       containerWidth: 1000,
     });
-    expect(result).not.toBeNull();
-    expect(result!.topFraction).toBeCloseTo(200 / 800);
-    expect(result!.leftFraction).toBe(0.7); // no bottomRight → default
+    if (!result) throw new Error("Expected measurement");
+    expect(result.topFraction).toBeCloseTo(200 / 800);
+    expect(result.leftFraction).toBe(0.7); // no bottomRight → default
   });
 
   it("derives bottomLeftSplit when bottomLeft has primary + fill", () => {
@@ -46,10 +46,10 @@ describe("measureFromPlacement", () => {
       },
       containerWidth: 1400,
     });
-    expect(result).not.toBeNull();
+    if (!result) throw new Error("Expected measurement");
     const bfInner = 200 - PADDING_V;
     const sbInner = 400 - PADDING_V;
-    expect(result!.bottomLeftSplit).toBeCloseTo(bfInner / (bfInner + sbInner));
+    expect(result.bottomLeftSplit).toBeCloseTo(bfInner / (bfInner + sbInner));
   });
 
   it("derives leftFraction from primary BL width vs total bottom width when bottomRight present", () => {
@@ -73,9 +73,9 @@ describe("measureFromPlacement", () => {
       },
       containerWidth: 1400,
     });
-    expect(result).not.toBeNull();
+    if (!result) throw new Error("Expected measurement");
     const totalBottomWidth = 1100 + 200 + ZONE_LAYOUT_PADDING.sectionGap;
-    expect(result!.leftFraction).toBeCloseTo(
+    expect(result.leftFraction).toBeCloseTo(
       1100 / (totalBottomWidth - ZONE_LAYOUT_PADDING.sectionGap),
     );
   });
@@ -99,10 +99,10 @@ describe("measureFromPlacement", () => {
       },
       containerWidth: 1400,
     });
-    expect(result).not.toBeNull();
+    if (!result) throw new Error("Expected measurement");
     // usableHeight = top (200) + max(BL=200, BR=500) = 700
-    expect(result!.usableHeight).toBe(700);
-    expect(result!.topFraction).toBeCloseTo(200 / 700);
+    expect(result.usableHeight).toBe(700);
+    expect(result.topFraction).toBeCloseTo(200 / 700);
   });
 
   it("falls back to containerWidth for usableWidth when no bottom zones rendered", () => {
@@ -115,9 +115,9 @@ describe("measureFromPlacement", () => {
       },
       containerWidth: 1234,
     });
-    expect(result).not.toBeNull();
+    if (!result) throw new Error("Expected measurement");
     // totalBottomWidth = 0, so falls back to containerWidth
-    expect(result!.usableWidth).toBe(1234);
+    expect(result.usableWidth).toBe(1234);
   });
 
   it("ignores zones with count=0", () => {
@@ -141,8 +141,8 @@ describe("measureFromPlacement", () => {
       },
       containerWidth: 1000,
     });
-    expect(result).not.toBeNull();
-    expect(result!.bottomLeftSplit).toBe(0.5); // no fill (sideboard ignored), default
-    expect(result!.leftFraction).toBe(0.7); // no BR (commandZone ignored), default
+    if (!result) throw new Error("Expected measurement");
+    expect(result.bottomLeftSplit).toBe(0.5); // no fill (sideboard ignored), default
+    expect(result.leftFraction).toBe(0.7); // no BR (commandZone ignored), default
   });
 });

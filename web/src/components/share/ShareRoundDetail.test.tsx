@@ -1,23 +1,34 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Card, SharePlayerSnapshot } from "../../types";
+import type { Card, SharePlayerData, SharePlayerSnapshot } from "../../types";
 import { CardPreviewContext } from "../card/CardPreviewContext";
 import { PageFrame } from "../common/PageFrame";
 import { ShareRoundDetail } from "./ShareRoundDetail";
 
-// utils/inputMode reads matchMedia when it is imported, and jsdom has neither it nor ResizeObserver.
-vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+function createMediaQueryList(query: string): MediaQueryList {
+  return {
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  };
+}
+
+// utils/inputMode reads matchMedia when it is imported, and jsdom has neither it nor ResizeObserver.
+vi.hoisted(() => {
+  window.matchMedia = (query: string): MediaQueryList =>
+    createMediaQueryList(query);
   window.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
   };
 });
 
@@ -25,11 +36,29 @@ function makeCard(id: string, upgradeTarget: Card | null = null): Card {
   return {
     id,
     name: id,
+    image_url: "",
+    flip_image_url: null,
+    png_url: null,
+    flip_png_url: null,
     type_line: "Creature",
     tokens: [],
-    flip_image_url: null,
+    elo: null,
     upgrade_target: upgradeTarget,
-  } as unknown as Card;
+    oracle_text: null,
+    colors: [],
+    cmc: 0,
+  };
+}
+
+function makePreviewContextValue(
+  setPreviewCard: (card: Card | null, appliedUpgrades?: Card[]) => void,
+): { setPreviewCard: (card: Card | null, appliedUpgrades?: Card[]) => void } {
+  return { setPreviewCard };
+}
+
+function magnify(name: string): void {
+  fireEvent.click(screen.getByAltText(name));
+  fireEvent.click(screen.getByTitle("Preview card"));
 }
 
 afterEach(cleanup);
@@ -55,7 +84,7 @@ function makeSnapshot(
   };
 }
 
-function makePlayer(snapshot: SharePlayerSnapshot) {
+function makePlayer(snapshot: SharePlayerSnapshot): SharePlayerData {
   return {
     name: "Puppet",
     final_placement: 1,
@@ -94,8 +123,9 @@ it("magnifies an upgrade after a tap on either of its cards, or on one not appli
     upgrades: [applied, unapplied],
   };
   const setPreviewCard = vi.fn();
+  const previewContextValue = makePreviewContextValue(setPreviewCard);
   render(
-    <CardPreviewContext.Provider value={{ setPreviewCard }}>
+    <CardPreviewContext.Provider value={previewContextValue}>
       <ShareRoundDetail
         player={makePlayer(snapshot)}
         snapshot={snapshot}
@@ -104,10 +134,6 @@ it("magnifies an upgrade after a tap on either of its cards, or on one not appli
     </CardPreviewContext.Provider>,
   );
 
-  const magnify = (name: string) => {
-    fireEvent.click(screen.getByAltText(name));
-    fireEvent.click(screen.getByTitle("Preview card"));
-  };
   magnify("Battlegate Mimic");
   expect(setPreviewCard).toHaveBeenLastCalledWith(target, [applied]);
   magnify("Brago’s Favor");

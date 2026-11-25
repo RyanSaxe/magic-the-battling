@@ -1,10 +1,10 @@
+"""Per-socket ordered outgoing object send queue with backpressure detection."""
+
 import asyncio
 import logging
 from collections import Counter
 from collections.abc import Callable, Coroutine
 from typing import Any
-
-from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -17,28 +17,29 @@ Write = Callable[[], Coroutine[Any, Any, None]]
 class OutgoingWrites:
     """Write to each socket in order and in the background, so a slow socket holds up only itself."""
 
-    def __init__(self):
-        self._last_write: dict[WebSocket, asyncio.Task[None]] = {}
-        self._unsent: Counter[WebSocket] = Counter()
+    def __init__(self) -> None:
+        self._last_write: dict[object, asyncio.Task[None]] = {}
+        self._unsent: Counter[object] = Counter()
 
-    def add(self, websocket: WebSocket, write: Write, on_failure: Callable[[], None] | None = None) -> asyncio.Task:
+    def add(self, websocket: object, write: Write, *, on_failure: Callable[[], None] | None = None) -> asyncio.Task:
         previous = self._last_write.get(websocket)
         self._unsent[websocket] += 1
-        task = asyncio.create_task(self._write_after(previous, websocket, write, on_failure))
+        task = asyncio.create_task(self._write_after(previous, websocket, write=write, on_failure=on_failure))
         self._last_write[websocket] = task
         return task
 
-    def has_fallen_behind(self, websocket: WebSocket) -> bool:
+    def has_fallen_behind(self, websocket: object) -> bool:
         return self._unsent.get(websocket, 0) >= MAX_UNSENT_WRITES
 
-    async def wait_until_sent(self, websocket: WebSocket) -> None:
+    async def wait_until_sent(self, websocket: object) -> None:
         if last := self._last_write.get(websocket):
             await asyncio.wait({last})
 
     async def _write_after(
         self,
         previous: asyncio.Task[None] | None,
-        websocket: WebSocket,
+        websocket: object,
+        *,
         write: Write,
         on_failure: Callable[[], None] | None,
     ) -> None:

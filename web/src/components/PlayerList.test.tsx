@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { PlayerView } from "../types";
 import { PlayerRow } from "./PlayerList";
 
@@ -39,7 +39,7 @@ function player(overrides: Partial<PlayerView>): PlayerView {
 function renderCard(
   shown: PlayerView,
   { micToggle }: { micToggle?: React.ReactNode } = {},
-) {
+): { onClick: Mock } {
   const onClick = vi.fn();
   const players = [player({ name: "Alice" }), shown];
   render(

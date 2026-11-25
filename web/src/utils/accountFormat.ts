@@ -64,10 +64,11 @@ export function winsLabel(wins: number, games: number): string {
 
 /** "In progress · Stage 2, Round 4" or "Lobby waiting · Code ABCD". */
 export function resumeHeadline(seat: ResumableSeat): string {
-  if (seat.kind === "lobby")
+  if (seat.kind === "lobby") {
     return seat.joinCode
       ? `Lobby waiting · Code ${seat.joinCode}`
       : "Lobby waiting";
+  }
   return seat.stage !== null && seat.round !== null
     ? `In progress · Stage ${seat.stage}, Round ${seat.round}`
     : "In progress";

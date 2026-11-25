@@ -51,11 +51,28 @@ function initialSeatState(
     : { kind: "none" };
 }
 
+export interface UseGameSeatResult {
+  seat: SeatState;
+  claim: (playerName?: string) => Promise<void>;
+  adopt: (grant: SeatGrant, playerName: string, joinCode?: string) => void;
+  connectionOpened: (sessionId: string) => void;
+  connectionEnded: (sessionId: string, error: AppError) => void;
+  takeBack: () => void;
+}
+
+function claimFailureSeat(err: unknown, playerName?: string): SeatState {
+  const error = unknownToAppError(err, "rejoin-game", "Failed to reconnect");
+  const notOurs =
+    error.code === "SEAT_CLAIM_REQUIRED" || error.code === "NOT_AUTHENTICATED";
+  if (!notOurs) return { kind: "lost", error };
+  return playerName ? { kind: "none", refused: error } : { kind: "none" };
+}
+
 /** With claimAutomatically false (a tab opened only to watch), the tab claims its seat only when asked. */
 export function useGameSeat(
   gameId: string,
   { claimAutomatically = true }: { claimAutomatically?: boolean } = {},
-) {
+): UseGameSeatResult {
   const [stored, setStored] = useState(() => ({
     gameId,
     seat: initialSeatState(gameId, claimAutomatically),
@@ -96,19 +113,7 @@ export function useGameSeat(
         rememberPlayerForGame(gameId, name, { seatToken: granted.seat_token });
         setSeat({ kind: "held", session });
       } catch (err) {
-        const error = unknownToAppError(
-          err,
-          "rejoin-game",
-          "Failed to reconnect",
-        );
-        const notOurs =
-          error.code === "SEAT_CLAIM_REQUIRED" ||
-          error.code === "NOT_AUTHENTICATED";
-        if (!notOurs) setSeat({ kind: "lost", error });
-        else
-          setSeat(
-            playerName ? { kind: "none", refused: error } : { kind: "none" },
-          );
+        setSeat(claimFailureSeat(err, playerName));
       } finally {
         claimInFlight.current = null;
       }
@@ -123,7 +128,7 @@ export function useGameSeat(
   }, [seat.kind, gameId, claim]);
 
   useEffect(() => {
-    if (seat.kind !== "held") return;
+    if (seat.kind !== "held") return undefined;
     return onSeatsForgotten((gameIds) => {
       if (!gameIds.includes(gameId)) return;
       clearTabSession(gameId);

@@ -37,9 +37,9 @@ export function useResumableGames(
   } | null>(null);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading) return undefined;
     const seats = listReclaimableSeats(SEATS_TO_CHECK);
-    if (seats.length === 0 && !userId) return;
+    if (seats.length === 0 && !userId) return undefined;
     let cancelled = false;
     const joinCodes = new Map(
       seats.map((seat) => [seat.gameId, seat.joinCode]),
@@ -77,7 +77,7 @@ export function useResumableGames(
       .catch(() => {
         // The resume card is a shortcut; when the check fails the page simply shows none.
       });
-    return () => {
+    return (): void => {
       cancelled = true;
     };
   }, [limit, loading, userId]);

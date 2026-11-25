@@ -94,8 +94,7 @@ export function useSavedLayout(
 
   // Storage is read when the phase, round or band changes, or after this hook writes, not on every render.
   const resolution: PersistedConstraintResolution = useMemo(() => {
-    void revision;
-    return scopeKey && band
+    return revision >= 0 && scopeKey && band
       ? resolveConstraintHistory(loadEntries(scopeKey, band), stage, round)
       : {
           constraints: null,

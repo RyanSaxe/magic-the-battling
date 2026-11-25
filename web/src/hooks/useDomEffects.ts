@@ -10,6 +10,9 @@ import {
   useLayoutEffect,
   type RefObject,
 } from "react";
+import { useDepsVersion } from "./useAsyncResource";
+
+const EMPTY_DEPS: readonly unknown[] = [];
 
 interface ListenerOptions {
   enabled?: boolean;
@@ -28,11 +31,12 @@ export function useWindowEvent<K extends keyof WindowEventMap>(
   const onEvent = useEffectEvent(handler);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
     const listenerOptions: AddEventListenerOptions =
       passive === undefined ? { capture } : { capture, passive };
     window.addEventListener(type, onEvent, listenerOptions);
-    return () => window.removeEventListener(type, onEvent, listenerOptions);
+    return (): void =>
+      window.removeEventListener(type, onEvent, listenerOptions);
   }, [type, enabled, capture, passive]);
 }
 
@@ -47,11 +51,12 @@ export function useDocumentEvent<K extends keyof DocumentEventMap>(
   const onEvent = useEffectEvent(handler);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
     const listenerOptions: AddEventListenerOptions =
       passive === undefined ? { capture } : { capture, passive };
     document.addEventListener(type, onEvent, listenerOptions);
-    return () => document.removeEventListener(type, onEvent, listenerOptions);
+    return (): void =>
+      document.removeEventListener(type, onEvent, listenerOptions);
   }, [type, enabled, capture, passive]);
 }
 
@@ -72,14 +77,15 @@ export function useEscapeKey(
   });
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
     if (target === "document") {
       document.addEventListener("keydown", handleEscape, capture);
-      return () =>
+      return (): void =>
         document.removeEventListener("keydown", handleEscape, capture);
     }
     window.addEventListener("keydown", handleEscape, capture);
-    return () => window.removeEventListener("keydown", handleEscape, capture);
+    return (): void =>
+      window.removeEventListener("keydown", handleEscape, capture);
   }, [enabled, capture, target]);
 }
 
@@ -87,11 +93,11 @@ export function useViewportSync(onSync: () => void, enabled = true): void {
   const handleSync = useEffectEvent(onSync);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
     window.addEventListener("resize", handleSync);
     window.visualViewport?.addEventListener("resize", handleSync);
     window.visualViewport?.addEventListener("scroll", handleSync);
-    return () => {
+    return (): void => {
       window.removeEventListener("resize", handleSync);
       window.visualViewport?.removeEventListener("resize", handleSync);
       window.visualViewport?.removeEventListener("scroll", handleSync);
@@ -99,46 +105,49 @@ export function useViewportSync(onSync: () => void, enabled = true): void {
   }, [enabled]);
 }
 
+export interface ObserveOptions {
+  enabled?: boolean;
+  deps?: readonly unknown[];
+}
+
 export function useResizeObserver(
   ref: RefObject<HTMLElement | null>,
   onMeasure: (node: HTMLElement) => void,
-  enabled = true,
-  deps: readonly unknown[] = [],
+  options: ObserveOptions = {},
 ): void {
+  const { enabled = true, deps = EMPTY_DEPS } = options;
   const measure = useEffectEvent(onMeasure);
+  const depsVersion = useDepsVersion(deps);
 
   useLayoutEffect(() => {
-    if (!enabled) return;
+    if (!enabled || depsVersion < 0) return undefined;
     const node = ref.current;
-    if (!node) return;
+    if (!node) return undefined;
 
     measure(node);
 
-    if (typeof ResizeObserver === "undefined") return;
+    if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(() => measure(node));
     observer.observe(node);
-    return () => observer.disconnect();
-    // Callers pass layout-affecting triggers via `deps`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ref, enabled, ...deps]);
+    return (): void => observer.disconnect();
+  }, [ref, enabled, depsVersion]);
 }
 
 export function useLayoutMeasure(
   ref: RefObject<HTMLElement | null>,
   onMeasure: (node: HTMLElement) => void,
-  deps: readonly unknown[],
-  enabled = true,
+  options: ObserveOptions = {},
 ): void {
+  const { enabled = true, deps = EMPTY_DEPS } = options;
   const measure = useEffectEvent(onMeasure);
+  const depsVersion = useDepsVersion(deps);
 
   useLayoutEffect(() => {
-    if (!enabled) return;
+    if (!enabled || depsVersion < 0) return;
     const node = ref.current;
     if (!node) return;
     measure(node);
-    // Callers pass geometry dependencies via `deps`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ref, enabled, ...deps]);
+  }, [ref, enabled, depsVersion]);
 }
 
 export function useInterval(
@@ -148,9 +157,9 @@ export function useInterval(
   const onTick = useEffectEvent(callback);
 
   useEffect(() => {
-    if (delayMs === null) return;
+    if (delayMs === null) return undefined;
     const id = window.setInterval(() => onTick(), delayMs);
-    return () => window.clearInterval(id);
+    return (): void => window.clearInterval(id);
   }, [delayMs]);
 }
 
@@ -162,20 +171,23 @@ export function useTimeout(
   const onFire = useEffectEvent(callback);
 
   useEffect(() => {
-    if (delayMs === null) return;
-    const id = window.setTimeout(() => onFire(), delayMs);
-    return () => window.clearTimeout(id);
+    const activeKey = resetKey;
+    if (delayMs === null) return undefined;
+    const id = window.setTimeout(() => {
+      if (Object.is(activeKey, resetKey)) onFire();
+    }, delayMs);
+    return (): void => window.clearTimeout(id);
   }, [delayMs, resetKey]);
 }
 
 export function useBodyDragCursor(active: boolean, cursor = "grabbing"): void {
   useEffect(() => {
-    if (!active) return;
+    if (!active) return undefined;
     const previousUserSelect = document.body.style.userSelect;
     const previousCursor = document.body.style.cursor;
     document.body.style.userSelect = "none";
     document.body.style.cursor = cursor;
-    return () => {
+    return (): void => {
       document.body.style.userSelect = previousUserSelect;
       document.body.style.cursor = previousCursor;
     };

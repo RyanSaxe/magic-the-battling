@@ -1,8 +1,18 @@
-import { useState, useCallback, type ReactNode } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import type { Card } from "../types";
 import { ContextStripContext } from "./contextStripState";
 
-export function ContextStripProvider({ children }: { children: ReactNode }) {
+export function ContextStripProvider({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement {
   const [previewCard, setPreviewCardState] = useState<Card | null>(null);
   const [previewAppliedUpgrades, setPreviewAppliedUpgrades] = useState<Card[]>(
     [],
@@ -23,13 +33,16 @@ export function ContextStripProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const value = useMemo(
+    () => ({
+      state: { previewCard, previewAppliedUpgrades, previewCounters },
+      setPreviewCard,
+    }),
+    [previewCard, previewAppliedUpgrades, previewCounters, setPreviewCard],
+  );
+
   return (
-    <ContextStripContext.Provider
-      value={{
-        state: { previewCard, previewAppliedUpgrades, previewCounters },
-        setPreviewCard,
-      }}
-    >
+    <ContextStripContext.Provider value={value}>
       {children}
     </ContextStripContext.Provider>
   );

@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 interface GuideOverlayProps {
   clipPath: string;
   allowInteraction: boolean;
@@ -14,7 +16,7 @@ export function GuideOverlay({
   overlayTransition,
   overlayAnimation,
   clipPathTransition,
-}: GuideOverlayProps) {
+}: GuideOverlayProps): ReactElement {
   return (
     <div
       className="absolute inset-0"

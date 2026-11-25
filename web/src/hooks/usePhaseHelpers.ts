@@ -53,7 +53,7 @@ export function useBuildPhaseSync({
   hasUserInteracted,
   onHandSlotsChange,
   onHydrateBasics,
-}: UseBuildPhaseSyncOptions) {
+}: UseBuildPhaseSyncOptions): { tryQueueSideboardToHandMove: () => boolean } {
   const pendingHandAddsRef = useRef(0);
   const pendingTimeoutRef = useRef<number | null>(null);
 
@@ -77,10 +77,12 @@ export function useBuildPhaseSync({
   }, []);
 
   useEffect(() => {
-    clearPendingHandAdds();
+    if (handLength >= 0 && sideboardLength >= 0) {
+      clearPendingHandAdds();
+    }
   }, [handLength, sideboardLength, clearPendingHandAdds]);
 
-  useEffect(() => () => clearPendingHandAdds(), [clearPendingHandAdds]);
+  useEffect(() => (): void => clearPendingHandAdds(), [clearPendingHandAdds]);
 
   useEffect(() => {
     if (

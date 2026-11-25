@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+/** Interactive Build-phase basic land slot with an accessible land picker popover. */
+import { useState, useRef, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { useDocumentEvent, useEscapeKey } from "../../hooks/useDomEffects";
 import { BasicLandCard } from "./BasicLandCard";
@@ -7,7 +8,7 @@ import { CardSlot } from "./CardSlot";
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from "../../constants/assets";
 import { CARD_ASPECT_RATIO } from "../../hooks/cardSizeUtils";
 import { POPOVER_CHROME } from "./styles";
-import { usePanelHoldsEnter } from "../../utils/enterKey";
+import { usePanelHoldsEnter } from "../../hooks/usePanelHoldsEnter";
 
 const VIEWPORT_MARGIN = 8;
 const POPOVER_PADDING = 8; // p-2
@@ -28,7 +29,7 @@ export function BasicLandSlot({
   dimensions,
   onPick,
   isMobile = false,
-}: BasicLandSlotProps) {
+}: BasicLandSlotProps): ReactElement {
   const [open, setOpen] = useState(false);
   usePanelHoldsEnter(open);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -49,8 +50,9 @@ export function BasicLandSlot({
         triggerRef.current?.contains(target) ||
         popoverRef.current?.contains(target) ||
         backdropRef.current?.contains(target)
-      )
+      ) {
         return;
+      }
       setOpen(false);
     },
     { enabled: open },
@@ -66,7 +68,7 @@ export function BasicLandSlot({
     { enabled: open, capture: true },
   );
 
-  const handleOpen = () => {
+  const handleOpen = (): void => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const vw = window.innerWidth;
@@ -113,16 +115,24 @@ export function BasicLandSlot({
   };
 
   const emptyLabel = isMobile ? "+\nLand" : "Click to pick basic land";
+  const triggerLabel = selected ? `Basic land: ${selected}` : "Pick basic land";
 
   return (
     <div ref={triggerRef}>
-      <div onClick={handleOpen} className="cursor-pointer">
+      <button
+        type="button"
+        onClick={handleOpen}
+        aria-label={triggerLabel}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="cursor-pointer border-0 bg-transparent p-0 text-left block focus-visible:outline-2 focus-visible:outline-[var(--color-gold)] focus-visible:outline-offset-[-2px] rounded-[var(--card-border-radius)]"
+      >
         {selected ? (
           <BasicLandCard name={selected} dimensions={dimensions} />
         ) : (
           <CardSlot label={emptyLabel} dimensions={dimensions} />
         )}
-      </div>
+      </button>
       {open && <BoardBackdrop ref={backdropRef} onTap={() => setOpen(false)} />}
       {open &&
         createPortal(
@@ -143,7 +153,7 @@ export function BasicLandSlot({
                 >
                   <img
                     src={BASIC_LAND_IMAGES[name]}
-                    alt={name}
+                    alt=""
                     className="object-cover"
                     style={{
                       width: landSize.w,

@@ -1,5 +1,6 @@
+"""Read-only shareable game timeline and summary builder."""
+
 import json
-from typing import cast
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -28,7 +29,7 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
                 treasures=snapshot_data.treasures,
                 poison=poison,
                 vanguard=snapshot_data.vanguard,
-                sudden_death_build=cast(int | None, snap.sudden_death_build),
+                sudden_death_build=(int(_v) if (_v := snap.sudden_death_build) is not None else None),
             )
         )
     return snapshots
@@ -94,9 +95,9 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
 
 
 def _add_puppet_sudden_death_fights(
-    snapshots: list[SharePlayerSnapshot], puppet_name: str, histories: list[PlayerGameHistory]
+    snapshots: list[SharePlayerSnapshot], puppet_name: str, *, histories: list[PlayerGameHistory]
 ) -> list[SharePlayerSnapshot]:
-    """Adds an entry for each Sudden Death a puppet fought, from the builds its human opponent saved.
+    """Add an entry for each Sudden Death a puppet fought, from the builds its human opponent saved.
 
     A puppet never rebuilds, so it fights each Sudden Death with its build of that round, at the poison
     both fighters were reset to.
@@ -125,25 +126,29 @@ def _final_treasures(history: PlayerGameHistory, snapshots: list[SharePlayerSnap
     if history.is_puppet:
         # Puppets replay builds from a past game, so battles never change their treasures.
         return snapshots[-1].treasures if snapshots else 0
-    return cast(int, history.final_treasures)
+    return history.final_treasures if history.final_treasures is not None else 0
 
 
-def _build_share_player(history: PlayerGameHistory, histories: list[PlayerGameHistory], db: Session) -> SharePlayerData:
+def _build_share_player(
+    history: PlayerGameHistory, histories: list[PlayerGameHistory], *, db: Session
+) -> SharePlayerData:
     is_puppet = bool(history.is_puppet)
     snapshots = (
-        _add_puppet_sudden_death_fights(_build_puppet_snapshots(history, db), str(history.player_name), histories)
+        _add_puppet_sudden_death_fights(
+            _build_puppet_snapshots(history, db), str(history.player_name), histories=histories
+        )
         if is_puppet
         else _build_human_snapshots(history)
     )
 
     if history.final_poison is not None:
-        final_poison = cast(int, history.final_poison)
+        final_poison = int(history.final_poison)
     else:
         final_poison = snapshots[-1].poison if snapshots else 0
 
     return SharePlayerData(
         name=str(history.player_name),
-        final_placement=cast(int, history.final_placement) if history.final_placement is not None else None,
+        final_placement=int(history.final_placement) if history.final_placement is not None else None,
         final_poison=final_poison,
         final_treasures=_final_treasures(history, snapshots),
         is_puppet=is_puppet,
@@ -190,7 +195,7 @@ def _sharer_mid_game(sharer: SharePlayerData, last_round: ShareRound | None) -> 
 
 
 def _other_player_mid_game(
-    player: SharePlayerData, sharer_rounds: set[ShareRound], sharer_last_round: ShareRound | None
+    player: SharePlayerData, sharer_rounds: set[ShareRound], *, sharer_last_round: ShareRound | None
 ) -> SharePlayerData:
     snapshots = [_poison_and_treasures_only(s) for s in player.snapshots if _round_of(s) in sharer_rounds]
     out_by_sharers_last_round = (
@@ -212,12 +217,12 @@ def _mid_game_players(players: list[SharePlayerData], sharer_name: str) -> list[
     return [
         _sharer_mid_game(player, sharer_last_round)
         if player is sharer
-        else _other_player_mid_game(player, sharer_rounds, sharer_last_round)
+        else _other_player_mid_game(player, sharer_rounds, sharer_last_round=sharer_last_round)
         for player in players
     ]
 
 
-def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameResponse:
+def build_share_data(db: Session, game_id: str, *, player_name: str) -> ShareGameResponse:
     """Build a player's share page; while the game runs, only a player who is out can share it.
 
     Mid-game the page lists only the sharer's rounds. The sharer's run is shown in full apart from
@@ -226,7 +231,7 @@ def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameRe
     """
     game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
     if not game_record:
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
     use_upgrades = config.get("use_upgrades", True)
@@ -242,15 +247,15 @@ def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameRe
     # GameRecord.shared only records that someone generated a share link or preview; it never gates access.
     in_progress = game_record.ended_at is None
     if in_progress and (sharer_history is None or sharer_history.final_placement is None):
-        raise api_error(404, ErrorCode.GAME_IN_PROGRESS, "This game is still being played")
+        raise api_error(404, ErrorCode.GAME_IN_PROGRESS, detail="This game is still being played")
 
     if not histories:
-        raise api_error(404, ErrorCode.SHARE_DATA_NOT_FOUND, "No player data found for this game")
+        raise api_error(404, ErrorCode.SHARE_DATA_NOT_FOUND, detail="No player data found for this game")
 
     if sharer_history is None:
-        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in this game")
+        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, detail="Player not found in this game")
 
-    players = [_build_share_player(history, histories, db) for history in histories]
+    players = [_build_share_player(history, histories, db=db) for history in histories]
     if in_progress:
         players = _mid_game_players(players, player_name)
 

@@ -102,169 +102,178 @@ interface UseGuidedWalkthroughOptions {
   onVisibleGuideStepChange?: (step: VisibleGuideStep | null) => void;
 }
 
-export function useGuidedWalkthrough({
-  rootRef,
-  walkthroughRef,
-  measureCardRef,
-  request,
-  context,
-  stepIndex,
-  requestActive,
-  dismissedImmediately = false,
-  onClose,
-  onAdvanceStep,
-  onBackStep,
-  onVisibleGuideStepChange,
-}: UseGuidedWalkthroughOptions) {
-  const [reducedMotion] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
+export interface UseGuidedWalkthroughResult {
+  state: WalkthroughState<WalkthroughDisplayState>;
+  guide: ReturnType<typeof buildGuideDefinition> | null;
+  step: GuideStepDefinition | null;
+  animPhase: ReturnType<typeof getWalkthroughAnimPhase>;
+  displayState: WalkthroughDisplayState | null;
+  pendingState: WalkthroughDisplayState | null;
+  reducedMotion: boolean;
+  takesTaps: boolean;
+  isCurrentStepDisplayed: boolean;
+}
 
-  const [machineState, setMachineState] = useState<
-    WalkthroughState<WalkthroughDisplayState>
-  >(() =>
-    requestActive && request
-      ? { kind: "awaiting_layout", requestNonce: request.nonce }
-      : { kind: "hidden" },
-  );
-  const [lastSyncedLayout, setLastSyncedLayout] = useState<{
-    stepKey: string;
-    layout: NonNullable<ReturnType<typeof useGuidePositioning>> | null;
-  }>({ stepKey: "", layout: null });
+function evalSelector(
+  value:
+    | string
+    | ((ctx: GuidedWalkthroughContext) => string | undefined)
+    | undefined,
+  context: GuidedWalkthroughContext,
+): string | undefined {
+  return typeof value === "function" ? value(context) : value;
+}
 
-  const guide = useMemo(
-    () => (request ? buildGuideDefinition(request.guideId, context) : null),
-    [context, request],
-  );
-  const step = guide?.steps[stepIndex] ?? null;
-  const stepKey = request ? `${request.nonce}:${step?.id ?? stepIndex}` : "";
+function evalTargetId(
+  value:
+    | GuideStepDefinition["targetId"]
+    | ((ctx: GuidedWalkthroughContext) => GuideStepDefinition["targetId"])
+    | undefined,
+  context: GuidedWalkthroughContext,
+): GuideStepDefinition["targetId"] {
+  return typeof value === "function" ? value(context) : value;
+}
 
-  const resolvedTargetSelector = useMemo(() => {
-    if (!step?.targetSelector) return undefined;
-    return typeof step.targetSelector === "function"
-      ? step.targetSelector(context)
-      : step.targetSelector;
-  }, [context, step]);
-
-  const resolvedPositionTargetId = useMemo(() => {
-    if (!step?.positionTargetId) return undefined;
-    return typeof step.positionTargetId === "function"
-      ? step.positionTargetId(context)
-      : step.positionTargetId;
-  }, [context, step]);
-
-  const resolvedPositionTargetSelector = useMemo(() => {
-    if (!step?.positionTargetSelector) return undefined;
-    return typeof step.positionTargetSelector === "function"
-      ? step.positionTargetSelector(context)
-      : step.positionTargetSelector;
-  }, [context, step]);
-
-  const resolvedWaitForLayoutTargetId = useMemo(() => {
-    if (!step?.waitForLayoutTargetId) return undefined;
-    return typeof step.waitForLayoutTargetId === "function"
-      ? step.waitForLayoutTargetId(context)
-      : step.waitForLayoutTargetId;
-  }, [context, step]);
-
-  const resolvedWaitForLayoutTargetSelector = useMemo(() => {
-    if (!step?.waitForLayoutTargetSelector) return undefined;
-    return typeof step.waitForLayoutTargetSelector === "function"
-      ? step.waitForLayoutTargetSelector(context)
-      : step.waitForLayoutTargetSelector;
-  }, [context, step]);
-
-  const layout = useGuidePositioning(
-    rootRef,
-    measureCardRef,
-    step?.targetId,
-    resolvedTargetSelector,
-    resolvedPositionTargetId,
-    resolvedPositionTargetSelector,
-    resolvedWaitForLayoutTargetId,
-    resolvedWaitForLayoutTargetSelector,
-    step?.placement ?? "bottom",
-    step?.spotlightPadding,
-    stepKey,
-  );
-
-  // Apply request lifecycle and measured layout transitions synchronously during render.
-  let nextState = machineState;
-  if (dismissedImmediately && !requestActive) {
-    nextState = reduceWalkthrough(nextState, { type: "dismiss_immediately" });
-  } else {
-    nextState = reduceWalkthrough(nextState, {
-      type: "request_changed",
-      requestNonce: request?.nonce ?? null,
-      requestActive,
-      reducedMotion,
-    });
+function resolveStepTargets(
+  step: GuideStepDefinition | null,
+  context: GuidedWalkthroughContext,
+): {
+  targetSelector: string | undefined;
+  positionTargetId: GuideStepDefinition["targetId"];
+  positionTargetSelector: string | undefined;
+  waitForLayoutTargetId: GuideStepDefinition["targetId"];
+  waitForLayoutTargetSelector: string | undefined;
+} {
+  if (!step) {
+    return {
+      targetSelector: undefined,
+      positionTargetId: undefined,
+      positionTargetSelector: undefined,
+      waitForLayoutTargetId: undefined,
+      waitForLayoutTargetSelector: undefined,
+    };
   }
+  return {
+    targetSelector: evalSelector(step.targetSelector, context),
+    positionTargetId: evalTargetId(step.positionTargetId, context),
+    positionTargetSelector: evalSelector(step.positionTargetSelector, context),
+    waitForLayoutTargetId: evalTargetId(step.waitForLayoutTargetId, context),
+    waitForLayoutTargetSelector: evalSelector(
+      step.waitForLayoutTargetSelector,
+      context,
+    ),
+  };
+}
 
-  const layoutChanged =
-    layout !== null &&
-    (lastSyncedLayout.layout !== layout ||
-      lastSyncedLayout.stepKey !== stepKey);
+function syncWalkthroughState(
+  machineState: WalkthroughState<WalkthroughDisplayState>,
+  options: {
+    dismissedImmediately: boolean;
+    request: GuideRequest | null;
+    requestActive: boolean;
+    reducedMotion: boolean;
+    layout: ReturnType<typeof useGuidePositioning>;
+    layoutChanged: boolean;
+    guide: ReturnType<typeof buildGuideDefinition> | null;
+    step: GuideStepDefinition | null;
+    stepIndex: number;
+    stepKey: string;
+  },
+): WalkthroughState<WalkthroughDisplayState> {
+  let nextState =
+    options.dismissedImmediately && !options.requestActive
+      ? reduceWalkthrough(machineState, { type: "dismiss_immediately" })
+      : reduceWalkthrough(machineState, {
+          type: "request_changed",
+          requestNonce: options.request?.nonce ?? null,
+          requestActive: options.requestActive,
+          reducedMotion: options.reducedMotion,
+        });
 
   if (
-    layout &&
-    step &&
-    guide &&
-    (layoutChanged || nextState.kind === "awaiting_layout")
+    options.layout &&
+    options.step &&
+    options.guide &&
+    (options.layoutChanged || nextState.kind === "awaiting_layout")
   ) {
     nextState = reduceWalkthrough(nextState, {
       type: "layout_measured",
       display: {
-        guideLabel: guide.label,
-        layout,
-        showSkipAll: guide.showSkipAll === true,
-        step,
-        stepIndex,
-        stepKey,
-        totalSteps: guide.steps.length,
+        guideLabel: options.guide.label,
+        layout: options.layout,
+        showSkipAll: options.guide.showSkipAll === true,
+        step: options.step,
+        stepIndex: options.stepIndex,
+        stepKey: options.stepKey,
+        totalSteps: options.guide.steps.length,
       },
-      stepKey,
+      stepKey: options.stepKey,
       displayStepKey: (display) => display.stepKey,
-      reducedMotion,
+      reducedMotion: options.reducedMotion,
     });
   }
 
-  if (nextState !== machineState) {
-    setMachineState(nextState);
-  }
-  if (layoutChanged) {
-    setLastSyncedLayout({ stepKey, layout });
-  }
+  return nextState;
+}
 
-  const timerMs = getWalkthroughTimerMs(nextState, reducedMotion);
-  useEffect(() => {
-    if (timerMs === null) return;
-    const timeoutId = window.setTimeout(() => {
-      setMachineState((current) =>
-        reduceWalkthrough(current, {
-          type: "timer_elapsed",
-          computeMorphMs: (from, to) =>
-            computeMorphDuration(
-              spotlightDistance(from.layout.spotlight, to.layout.spotlight),
-            ),
-        }),
-      );
-    }, timerMs);
-    return () => window.clearTimeout(timeoutId);
-  }, [nextState.kind, timerMs]);
-
-  const displayState = getWalkthroughDisplay(nextState);
-  const pendingState = getWalkthroughPending(nextState);
-  const animPhase = getWalkthroughAnimPhase(nextState);
-  const takesTaps = isWalkthroughBlockingTaps(nextState, requestActive);
-  const isCurrentStepDisplayed = isWalkthroughStepInteractive(
-    nextState,
-    requestActive,
-    stepKey,
-    (display) => display.stepKey,
+function isHandledWalkthroughKey(key: string, stepIndex: number): boolean {
+  return (
+    key === "Escape" ||
+    key === "ArrowRight" ||
+    key === "Enter" ||
+    (key === "ArrowLeft" && stepIndex > 0)
   );
+}
+
+function initialWalkthroughState(
+  request: GuideRequest | null,
+  requestActive: boolean,
+): WalkthroughState<WalkthroughDisplayState> {
+  return requestActive && request
+    ? { kind: "awaiting_layout", requestNonce: request.nonce }
+    : { kind: "hidden" };
+}
+
+function useWalkthroughDomEffects(options: {
+  rootRef: RefObject<HTMLElement | null>;
+  walkthroughRef: RefObject<HTMLDivElement | null>;
+  request: GuideRequest | null;
+  requestActive: boolean;
+  guide: ReturnType<typeof buildGuideDefinition> | null;
+  step: GuideStepDefinition | null;
+  stepIndex: number;
+  stepKey: string;
+  targetSelector: string | undefined;
+  currentPhase: GuidedWalkthroughContext["currentPhase"];
+  nextStateKind: WalkthroughState<WalkthroughDisplayState>["kind"];
+  displayStepKey: string | undefined;
+  takesTaps: boolean;
+  isCurrentStepDisplayed: boolean;
+  onClose: (guideId: GuidedGuideId) => void;
+  onAdvanceStep: () => void;
+  onBackStep: () => void;
+  onVisibleGuideStepChange?: (step: VisibleGuideStep | null) => void;
+}): void {
+  const {
+    rootRef,
+    walkthroughRef,
+    request,
+    requestActive,
+    guide,
+    step,
+    stepIndex,
+    stepKey,
+    targetSelector,
+    currentPhase,
+    nextStateKind,
+    displayStepKey,
+    takesTaps,
+    isCurrentStepDisplayed,
+    onClose,
+    onAdvanceStep,
+    onBackStep,
+    onVisibleGuideStepChange,
+  } = options;
 
   const handlePhaseMismatch = useEffectEvent((guideId: GuidedGuideId) => {
     onClose(guideId);
@@ -275,25 +284,25 @@ export function useGuidedWalkthrough({
       requestActive &&
       request &&
       guide?.phase &&
-      context.currentPhase &&
-      context.currentPhase !== guide.phase
+      currentPhase &&
+      currentPhase !== guide.phase
     ) {
       handlePhaseMismatch(request.guideId);
     }
-  }, [context.currentPhase, guide?.phase, request, requestActive]);
+  }, [currentPhase, guide?.phase, request, requestActive]);
 
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    const handled =
-      event.key === "Escape" ||
-      event.key === "ArrowRight" ||
-      event.key === "Enter" ||
-      (event.key === "ArrowLeft" && stepIndex > 0);
-
-    if (!handled || !isCurrentStepDisplayed || !request) return;
+    if (
+      !isHandledWalkthroughKey(event.key, stepIndex) ||
+      !isCurrentStepDisplayed ||
+      !request
+    ) {
+      return;
+    }
     const root = rootRef.current;
     const usableTarget =
       root && step?.allowTargetInteraction
-        ? resolveTarget(root, step.targetId, resolvedTargetSelector)
+        ? resolveTarget(root, step.targetId, targetSelector)
         : null;
     if (enterPressesControl(event, walkthroughRef.current, usableTarget)) {
       // A dialog can be open under the guide, and its Enter would confirm.
@@ -307,27 +316,28 @@ export function useGuidedWalkthrough({
 
     if (event.key === "Escape") {
       onClose(request.guideId);
-    } else if (event.key === "ArrowRight" || event.key === "Enter") {
-      onAdvanceStep();
-    } else if (event.key === "ArrowLeft" && stepIndex > 0) {
+    } else if (event.key === "ArrowLeft") {
       onBackStep();
+    } else {
+      onAdvanceStep();
     }
   });
 
   useEffect(() => {
-    if (nextState.kind === "hidden") return;
+    if (nextStateKind === "hidden") return undefined;
     window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [nextState.kind]);
+    return (): void =>
+      window.removeEventListener("keydown", handleKeyDown, true);
+  }, [nextStateKind]);
 
-  // Keep background inert while active; immediately release inert once fading or hidden.
-  useLayoutEffect(() => {
+  // Keep background inert while active; useEffect ensures ancestor rootRef is attached on first mount.
+  useEffect(() => {
     const root = rootRef.current;
     const walkthrough = walkthroughRef.current;
-    if (!takesTaps || !root || !walkthrough) return;
+    if (!takesTaps || !root || !walkthrough) return undefined;
     const target =
-      displayState?.stepKey === stepKey && step?.allowTargetInteraction
-        ? resolveTarget(root, step.targetId, resolvedTargetSelector)
+      displayStepKey === stepKey && step?.allowTargetInteraction
+        ? resolveTarget(root, step.targetId, targetSelector)
         : null;
     return makeInertExcept(
       root,
@@ -335,9 +345,12 @@ export function useGuidedWalkthrough({
     );
   });
 
-  const visibleGuideId =
-    requestActive && request && step ? request.guideId : null;
-  const visibleStepId = requestActive && request && step ? step.id : null;
+  const visibleStep =
+    requestActive && request && step
+      ? { guideId: request.guideId, stepId: step.id }
+      : null;
+  const visibleGuideId = visibleStep?.guideId ?? null;
+  const visibleStepId = visibleStep?.stepId ?? null;
   const notifyVisibleStep = useEffectEvent(
     (visible: VisibleGuideStep | null) => {
       onVisibleGuideStepChange?.(visible);
@@ -353,11 +366,181 @@ export function useGuidedWalkthrough({
   }, [visibleGuideId, visibleStepId]);
 
   useEffect(
-    () => () => {
+    () => (): void => {
       notifyVisibleStep(null);
     },
     [],
   );
+}
+
+function readReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+function buildStepKey(
+  request: GuideRequest | null,
+  step: GuideStepDefinition | null,
+  stepIndex: number,
+): string {
+  return request ? `${request.nonce}:${step?.id ?? stepIndex}` : "";
+}
+
+function hasLayoutChanged(
+  layout: ReturnType<typeof useGuidePositioning>,
+  lastSynced: {
+    stepKey: string;
+    layout: NonNullable<ReturnType<typeof useGuidePositioning>> | null;
+  },
+  stepKey: string,
+): boolean {
+  return (
+    layout !== null &&
+    (lastSynced.layout !== layout || lastSynced.stepKey !== stepKey)
+  );
+}
+
+function useWalkthroughTimer(
+  nextState: WalkthroughState<WalkthroughDisplayState>,
+  reducedMotion: boolean,
+  setMachineState: React.Dispatch<
+    React.SetStateAction<WalkthroughState<WalkthroughDisplayState>>
+  >,
+): void {
+  const timerMs = getWalkthroughTimerMs(nextState, reducedMotion);
+  useEffect(() => {
+    if (timerMs === null || nextState.kind === "hidden") return undefined;
+    const timeoutId = window.setTimeout(() => {
+      setMachineState((current) =>
+        reduceWalkthrough(current, {
+          type: "timer_elapsed",
+          computeMorphMs: (from, to) =>
+            computeMorphDuration(
+              spotlightDistance(from.layout.spotlight, to.layout.spotlight),
+            ),
+        }),
+      );
+    }, timerMs);
+    return (): void => window.clearTimeout(timeoutId);
+  }, [nextState.kind, setMachineState, timerMs]);
+}
+
+function getStepPositioningArgs(step: GuideStepDefinition | null): {
+  targetId: GuideStepDefinition["targetId"];
+  placement: NonNullable<GuideStepDefinition["placement"]>;
+  spotlightPadding: number | undefined;
+} {
+  return {
+    targetId: step?.targetId,
+    placement: step?.placement ?? "bottom",
+    spotlightPadding: step?.spotlightPadding,
+  };
+}
+
+export function useGuidedWalkthrough({
+  rootRef,
+  walkthroughRef,
+  measureCardRef,
+  request,
+  context,
+  stepIndex,
+  requestActive,
+  dismissedImmediately = false,
+  onClose,
+  onAdvanceStep,
+  onBackStep,
+  onVisibleGuideStepChange,
+}: UseGuidedWalkthroughOptions): UseGuidedWalkthroughResult {
+  const [reducedMotion] = useState(readReducedMotion);
+
+  const [machineState, setMachineState] = useState(() =>
+    initialWalkthroughState(request, requestActive),
+  );
+  const [lastSyncedLayout, setLastSyncedLayout] = useState<{
+    stepKey: string;
+    layout: NonNullable<ReturnType<typeof useGuidePositioning>> | null;
+  }>({ stepKey: "", layout: null });
+
+  const guide = useMemo(
+    () => (request ? buildGuideDefinition(request.guideId, context) : null),
+    [context, request],
+  );
+  const step = guide ? (guide.steps[stepIndex] ?? null) : null;
+  const stepKey = buildStepKey(request, step, stepIndex);
+  const targets = useMemo(
+    () => resolveStepTargets(step, context),
+    [context, step],
+  );
+  const posArgs = getStepPositioningArgs(step);
+
+  const layout = useGuidePositioning({
+    rootRef,
+    cardRef: measureCardRef,
+    targetId: posArgs.targetId,
+    targetSelector: targets.targetSelector,
+    positionTargetId: targets.positionTargetId,
+    positionTargetSelector: targets.positionTargetSelector,
+    waitForLayoutTargetId: targets.waitForLayoutTargetId,
+    waitForLayoutTargetSelector: targets.waitForLayoutTargetSelector,
+    placement: posArgs.placement,
+    spotlightPadding: posArgs.spotlightPadding,
+    stepKey,
+  });
+
+  const layoutChanged = hasLayoutChanged(layout, lastSyncedLayout, stepKey);
+
+  // Apply request lifecycle and measured layout transitions synchronously during render.
+  const nextState = syncWalkthroughState(machineState, {
+    dismissedImmediately,
+    request,
+    requestActive,
+    reducedMotion,
+    layout,
+    layoutChanged,
+    guide,
+    step,
+    stepIndex,
+    stepKey,
+  });
+
+  if (nextState !== machineState) setMachineState(nextState);
+  if (layoutChanged && layout) setLastSyncedLayout({ stepKey, layout });
+
+  useWalkthroughTimer(nextState, reducedMotion, setMachineState);
+
+  const displayState = getWalkthroughDisplay(nextState);
+  const pendingState = getWalkthroughPending(nextState);
+  const animPhase = getWalkthroughAnimPhase(nextState);
+  const takesTaps = isWalkthroughBlockingTaps(nextState, requestActive);
+  const isCurrentStepDisplayed = isWalkthroughStepInteractive({
+    state: nextState,
+    requestActive,
+    stepKey,
+    displayStepKey: (display) => display.stepKey,
+  });
+
+  useWalkthroughDomEffects({
+    rootRef,
+    walkthroughRef,
+    request,
+    requestActive,
+    guide,
+    step,
+    stepIndex,
+    stepKey,
+    targetSelector: targets.targetSelector,
+    currentPhase: context.currentPhase,
+    nextStateKind: nextState.kind,
+    displayStepKey: displayState?.stepKey,
+    takesTaps,
+    isCurrentStepDisplayed,
+    onClose,
+    onAdvanceStep,
+    onBackStep,
+    onVisibleGuideStepChange,
+  });
 
   return {
     state: nextState,
@@ -390,7 +573,7 @@ export function useGuideSidebarSync({
   setSidebarOpen,
   scouting,
   setScouting,
-}: UseGuideSidebarSyncOptions) {
+}: UseGuideSidebarSyncOptions): void {
   const sidebarRestoreRef = useRef<{
     sidebarOpen: boolean;
     revealedPlayerName: string | null;
@@ -451,21 +634,18 @@ export function useGuideSidebarSync({
         };
       }
 
-      if (context.isMobile) {
-        if (desired.openOnMobile === true && !sidebarOpen) {
-          setSidebarOpen(true);
-        }
-        if (desired.openOnMobile === false && sidebarOpen) {
-          setSidebarOpen(false);
-        }
-      }
       if (
-        desired.playerName !== undefined &&
-        (scoutedPlayerName !== desired.playerName ||
-          (desired.detailTab !== undefined &&
-            scoutingTab !== desired.detailTab))
+        context.isMobile &&
+        desired.openOnMobile !== undefined &&
+        desired.openOnMobile !== sidebarOpen
       ) {
-        setScouting(desired.playerName, desired.detailTab ?? scoutingTab);
+        setSidebarOpen(desired.openOnMobile);
+      }
+
+      if (desired.playerName === undefined) return;
+      const nextTab = desired.detailTab ?? scoutingTab;
+      if (scoutedPlayerName !== desired.playerName || scoutingTab !== nextTab) {
+        setScouting(desired.playerName, nextTab);
       }
     },
   );
@@ -479,7 +659,7 @@ export function useGuideSidebarSync({
   }, [guideRequest, resolvedSidebarState]);
 
   useLayoutEffect(
-    () => () => {
+    () => (): void => {
       restoreSidebarState();
     },
     [],

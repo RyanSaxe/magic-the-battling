@@ -46,7 +46,7 @@ function getPersistedMute(): boolean {
   return sessionStorage.getItem(MUTE_STORAGE_KEY) === "true";
 }
 
-function setPersistedMute(muted: boolean) {
+function setPersistedMute(muted: boolean): void {
   sessionStorage.setItem(MUTE_STORAGE_KEY, muted ? "true" : "false");
 }
 
@@ -56,7 +56,7 @@ function getPersistedMutedPeers(): Set<string> {
   );
 }
 
-function setPersistedMutedPeers(peers: Set<string>) {
+function setPersistedMutedPeers(peers: Set<string>): void {
   sessionStorage.setItem(MUTED_PEERS_STORAGE_KEY, JSON.stringify([...peers]));
 }
 
@@ -72,10 +72,10 @@ function getSharedAudioContext(): AudioContext {
   return sharedAudioContext;
 }
 
-function releaseSharedAudioContext() {
+function releaseSharedAudioContext(): void {
   sharedAudioContextRefCount--;
   if (sharedAudioContextRefCount <= 0) {
-    sharedAudioContext?.close();
+    void sharedAudioContext?.close();
     sharedAudioContext = null;
     sharedAudioContextRefCount = 0;
   }
@@ -102,7 +102,7 @@ function createAudioLevelDetector(
   let smoothed = 0;
   let rafId = 0;
 
-  const tick = () => {
+  const tick = (): void => {
     rafId = requestAnimationFrame(tick);
     analyser.getByteFrequencyData(data);
     let sum = 0;
@@ -117,7 +117,7 @@ function createAudioLevelDetector(
   rafId = requestAnimationFrame(tick);
 
   return {
-    stop() {
+    stop(): void {
       cancelAnimationFrame(rafId);
       source.disconnect();
       releaseSharedAudioContext();
@@ -141,7 +141,7 @@ class MicrophoneRequest {
   private status: "unasked" | "asking" | "refused" = "unasked";
   private reply: MicrophoneReply | null = null;
 
-  ask(reply: MicrophoneReply) {
+  ask(reply: MicrophoneReply): void {
     if (this.status === "refused") return;
     this.reply = reply;
     if (this.status === "asking") return;
@@ -165,11 +165,11 @@ class MicrophoneRequest {
       );
   }
 
-  withdraw() {
+  withdraw(): void {
     this.reply = null;
   }
 
-  forgetRefusal() {
+  forgetRefusal(): void {
     if (this.status === "refused") this.status = "unasked";
   }
 }
@@ -238,11 +238,14 @@ class VoiceSessionController {
 
   getSnapshot = (): VoiceChatState => this.snapshot;
 
-  attach(host: SessionHostCallbacks) {
+  attach(host: SessionHostCallbacks): void {
     this.host = host;
   }
 
-  syncTargets(selfPlayerName: string | null, peerNames: readonly string[]) {
+  syncTargets(
+    selfPlayerName: string | null,
+    peerNames: readonly string[],
+  ): void {
     if (
       this.selfPlayerName !== null &&
       selfPlayerName !== null &&
@@ -285,7 +288,7 @@ class VoiceSessionController {
     });
   }
 
-  handleSignal(payload: VoiceSignalPayload) {
+  handleSignal(payload: VoiceSignalPayload): void {
     const peer = this.peers.get(payload.from_player);
     if (peer) {
       peer.enqueueSignal(payload);
@@ -300,7 +303,7 @@ class VoiceSessionController {
 
   toggleSelfMute(
     send: (action: string, payload: Record<string, unknown>) => void,
-  ) {
+  ): void {
     const stream = this.localStream;
     if (!stream) return;
     const track = stream.getAudioTracks()[0];
@@ -328,7 +331,7 @@ class VoiceSessionController {
     }
   }
 
-  togglePeerMute(peerName: string) {
+  togglePeerMute(peerName: string): void {
     const muted = !this.snapshot.mutedPeers.has(peerName);
     const nextMuted = updateSetMembership(
       this.snapshot.mutedPeers,
@@ -340,13 +343,13 @@ class VoiceSessionController {
     this.publish({ ...this.snapshot, mutedPeers: nextMuted });
   }
 
-  dispose() {
+  dispose(): void {
     this.host = null;
     this.microphone.withdraw();
     this.teardownSession(false);
   }
 
-  private handleMicrophoneGranted(stream: MediaStream) {
+  private handleMicrophoneGranted(stream: MediaStream): void {
     if (!this.selfPlayerName || this.desiredPeers.length === 0) {
       stream.getTracks().forEach((track) => track.stop());
       return;
@@ -361,7 +364,7 @@ class VoiceSessionController {
     this.reconcilePeers(this.selfPlayerName, stream);
   }
 
-  private reconcilePeers(selfPlayerName: string, stream: MediaStream) {
+  private reconcilePeers(selfPlayerName: string, stream: MediaStream): void {
     const desired = new Set(this.desiredPeers);
 
     for (const [name, peer] of this.peers) {
@@ -370,13 +373,13 @@ class VoiceSessionController {
 
     for (const name of desired) {
       if (this.peers.has(name)) continue;
-      const peer = new PeerConnectionController(
-        name,
+      const peer = new PeerConnectionController({
+        peerName: name,
         selfPlayerName,
-        stream,
-        this.snapshot.mutedPeers.has(name),
-        this.createPeerCallbacks(),
-      );
+        localStream: stream,
+        peerMuted: this.snapshot.mutedPeers.has(name),
+        callbacks: this.createPeerCallbacks(),
+      });
       this.peers.set(name, peer);
       const buffered = this.pendingSignals.get(name) ?? [];
       this.pendingSignals.delete(name);
@@ -386,7 +389,7 @@ class VoiceSessionController {
     this.refreshPeerSnapshot();
   }
 
-  private parkAllPeers() {
+  private parkAllPeers(): void {
     for (const peer of this.peers.values()) {
       peer.setActive(false);
     }
@@ -406,7 +409,7 @@ class VoiceSessionController {
     });
   }
 
-  private teardownSession(resetAvailability: boolean) {
+  private teardownSession(resetAvailability: boolean): void {
     for (const peer of this.peers.values()) {
       peer.close();
     }
@@ -440,7 +443,7 @@ class VoiceSessionController {
     });
   }
 
-  private startSelfSpeakingDetection(stream: MediaStream) {
+  private startSelfSpeakingDetection(stream: MediaStream): void {
     this.selfDetector?.stop();
     this.selfDetector = createAudioLevelDetector(stream, (level, speaking) => {
       const track = this.localStream?.getAudioTracks()[0];
@@ -461,21 +464,21 @@ class VoiceSessionController {
 
   private createPeerCallbacks(): PeerCallbacks {
     return {
-      sendSignal: (peerName, signalType, data) => {
+      sendSignal: (peerName, signalType, data): void => {
         this.host?.send("voice_signal", {
           signal_type: signalType,
           data,
           target_player: peerName,
         });
       },
-      isSelfMuted: () => {
+      isSelfMuted: (): boolean => {
         const track = this.localStream?.getAudioTracks()[0];
         return Boolean(track && !track.enabled);
       },
-      onPeerStateChange: () => {
+      onPeerStateChange: (): void => {
         this.refreshPeerSnapshot();
       },
-      onAudioLevel: (peerName, level, speaking) => {
+      onAudioLevel: (peerName, level, speaking): void => {
         audioLevels[peerName] = level;
         const nextSpeaking = updateSetMembership(
           this.snapshot.speakingPeers,
@@ -486,10 +489,10 @@ class VoiceSessionController {
           this.publish({ ...this.snapshot, speakingPeers: nextSpeaking });
         }
       },
-      onClearAudioLevel: (peerName) => {
+      onClearAudioLevel: (peerName): void => {
         delete audioLevels[peerName];
       },
-      onRemoteMuteChange: (peerName, muted) => {
+      onRemoteMuteChange: (peerName, muted): void => {
         const nextRemoteMuted = updateSetMembership(
           this.snapshot.remoteMutedPeers,
           peerName,
@@ -499,14 +502,14 @@ class VoiceSessionController {
           this.publish({ ...this.snapshot, remoteMutedPeers: nextRemoteMuted });
         }
       },
-      onRetriesExhausted: (peerName) => {
+      onRetriesExhausted: (peerName): void => {
         this.host?.onRetriesExhausted(peerName);
       },
       createAudioDetector: createAudioLevelDetector,
     };
   }
 
-  private refreshPeerSnapshot() {
+  private refreshPeerSnapshot(): void {
     const nextPeers: VoicePeer[] = [];
     for (const peer of this.peers.values()) {
       if (peer.isActive()) {
@@ -520,12 +523,12 @@ class VoiceSessionController {
     this.publish({ ...this.snapshot, peers: nextPeers });
   }
 
-  private updateAvailability(isAvailable: boolean) {
+  private updateAvailability(isAvailable: boolean): void {
     if (this.snapshot.isAvailable === isAvailable) return;
     this.publish({ ...this.snapshot, isAvailable });
   }
 
-  private publish(next: VoiceChatState) {
+  private publish(next: VoiceChatState): void {
     this.snapshot = next;
     for (const listener of this.listeners) {
       listener();
@@ -533,14 +536,23 @@ class VoiceSessionController {
   }
 }
 
-export function useVoiceChat(
-  send: (action: string, payload: Record<string, unknown>) => void,
-  peerNames: string[],
-  selfPlayerName: string | null,
-  voiceSignalRef: RefObject<((payload: VoiceSignalPayload) => void) | null>,
-  onPermissionDenied?: () => void,
-  onRetriesExhausted?: (peerName: string) => void,
-): {
+export interface UseVoiceChatOptions {
+  send: (action: string, payload: Record<string, unknown>) => void;
+  peerNames: string[];
+  selfPlayerName: string | null;
+  voiceSignalRef: RefObject<((payload: VoiceSignalPayload) => void) | null>;
+  onPermissionDenied?: () => void;
+  onRetriesExhausted?: (peerName: string) => void;
+}
+
+export function useVoiceChat({
+  send,
+  peerNames,
+  selfPlayerName,
+  voiceSignalRef,
+  onPermissionDenied,
+  onRetriesExhausted,
+}: UseVoiceChatOptions): {
   state: VoiceChatState;
   toggleSelfMute: () => void;
   togglePeerMute: (peerName: string) => void;
@@ -569,8 +581,9 @@ export function useVoiceChat(
       onPermissionDenied: () => onMicDenied(),
       onRetriesExhausted: (peerName) => onPeerExhausted(peerName),
     });
-    voiceSignalRef.current = (payload) => controller.handleSignal(payload);
-    return () => {
+    voiceSignalRef.current = (payload): void =>
+      controller.handleSignal(payload);
+    return (): void => {
       voiceSignalRef.current = null;
       controller.dispose();
     };

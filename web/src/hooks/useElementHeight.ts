@@ -28,7 +28,7 @@ export function useElementHeight(): [React.RefCallback<HTMLElement>, number] {
   }, []);
 
   useEffect(() => {
-    return () => observerRef.current?.disconnect();
+    return (): void => observerRef.current?.disconnect();
   }, []);
 
   return [refCallback, height];

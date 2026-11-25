@@ -3,6 +3,7 @@ import {
   useRef,
   useState,
   type FormEventHandler,
+  type ReactElement,
   type ReactNode,
 } from "react";
 import {
@@ -31,7 +32,7 @@ export function Dialog({
   onClose: () => void;
   onSubmit?: FormEventHandler<HTMLFormElement>;
   children: ReactNode;
-}) {
+}): ReactElement {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -73,6 +74,7 @@ export function Dialog({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
       <div
+        role="presentation"
         className={`absolute inset-0 ${DIALOG_BACKDROP}`}
         onClick={onClose}
       />

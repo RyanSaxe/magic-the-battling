@@ -1,11 +1,13 @@
+from collections.abc import Callable
+
 import pytest
 
-from mtb.models.cards import Battler
+from mtb.models.cards import Battler, Card
 from mtb.models.game import Config, DraftState, Puppet, StaticOpponent, create_game, set_battler
 from mtb.phases import draft, reward
 
 
-def test_is_stage_increasing():
+def test_is_stage_increasing() -> None:
     game = create_game(["Alice"], num_players=1)
     game.config.num_rounds_per_stage = 3
     player = game.players[0]
@@ -20,7 +22,7 @@ def test_is_stage_increasing():
     assert reward.is_stage_increasing(player)
 
 
-def test_count_applied_upgrades(card_factory, upgrade_factory):
+def test_count_applied_upgrades(card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
 
@@ -46,7 +48,7 @@ def test_count_applied_upgrades(card_factory, upgrade_factory):
     assert reward.count_applied_upgrades(player) == 2
 
 
-def test_apply_poison(card_factory, upgrade_factory):
+def test_apply_poison(card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]) -> None:
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
 
@@ -62,7 +64,7 @@ def test_apply_poison(card_factory, upgrade_factory):
     assert bob.poison == 2
 
 
-def test_award_random_card(card_factory):
+def test_award_random_card(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     cards = [card_factory(f"c{i}") for i in range(5)]
     game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
@@ -77,7 +79,9 @@ def test_award_random_card(card_factory):
 
 
 @pytest.mark.parametrize("play_mode", ["limited", "constructed"])
-def test_loot_is_drawn_from_every_undealt_card_the_player_could_get(card_factory, play_mode):
+def test_loot_is_drawn_from_every_undealt_card_the_player_could_get(
+    card_factory: Callable[..., Card], play_mode: str
+) -> None:
     cards = [card_factory(f"c{i}") for i in range(17)]
     loose, undealt, dealt, riley_undealt = cards[:2], cards[2:7], cards[7:12], cards[12:]
     drawn = set()
@@ -102,7 +106,7 @@ def test_loot_is_drawn_from_every_undealt_card_the_player_could_get(card_factory
     assert drawn == {card.id for card in [*loose, *undealt]}
 
 
-def test_second_to_finish_gets_a_card_when_every_undealt_card_is_packed(card_factory):
+def test_second_to_finish_gets_a_card_when_every_undealt_card_is_packed(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Riley", "Sam"], num_players=2)
     riley, sam = game.players
     pools = 2 * game.config.starting_pool_size
@@ -110,11 +114,11 @@ def test_second_to_finish_gets_a_card_when_every_undealt_card_is_packed(card_fac
     set_battler(game, Battler(cards=cards.copy(), upgrades=[], vanguards=[]))
     riley.phase = sam.phase = "reward"
 
-    reward.start_rewards_single(game, riley, sam.name, won=True, poison_dealt=1, poison_taken=0)
+    reward.start_rewards_single(game, riley, opponent_name=sam.name, won=True, poison_dealt=1, poison_taken=0)
     reward.end_for_player(game, riley)
     draft.start(game)
     riley_pack = draft.deal_pack_to_player(game, riley).copy()
-    reward.start_rewards_single(game, sam, riley.name, won=False, poison_dealt=0, poison_taken=1)
+    reward.start_rewards_single(game, sam, opponent_name=riley.name, won=False, poison_dealt=0, poison_taken=1)
 
     assert sam.last_battle_result is not None
     assert sam.last_battle_result.card_gained in sam.sideboard
@@ -127,29 +131,29 @@ def test_second_to_finish_gets_a_card_when_every_undealt_card_is_packed(card_fac
     assert sorted(card.id for card in [*game.battler.cards, *held, *packed]) == sorted(card.id for card in cards)
 
 
-def test_pick_upgrade(upgrade_factory):
+def test_pick_upgrade(upgrade_factory: Callable[[str], Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     upgrade = upgrade_factory("power_boost")
     game.available_upgrades = [upgrade]
     player = game.players[0]
 
-    reward.pick_upgrade(game, player, upgrade)
+    reward.pick_upgrade(game, player, upgrade=upgrade)
 
     assert len(player.upgrades) == 1
     assert player.upgrades[0].name == "power_boost"
     assert player.upgrades[0] is not upgrade
 
 
-def test_pick_upgrade_not_available_raises(upgrade_factory):
+def test_pick_upgrade_not_available_raises(upgrade_factory: Callable[[str], Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.available_upgrades = [upgrade_factory("u1")]
     player = game.players[0]
 
-    with pytest.raises(ValueError):
-        reward.pick_upgrade(game, player, upgrade_factory("u2"))
+    with pytest.raises(ValueError, match=r".+"):
+        reward.pick_upgrade(game, player, upgrade=upgrade_factory("u2"))
 
 
-def test_apply_upgrade_to_card(card_factory, upgrade_factory):
+def test_apply_upgrade_to_card(card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     upgrade = upgrade_factory("power")
@@ -157,13 +161,15 @@ def test_apply_upgrade_to_card(card_factory, upgrade_factory):
     player.upgrades = [upgrade]
     player.hand = [target]
 
-    reward.apply_upgrade_to_card(player, upgrade, target)
+    reward.apply_upgrade_to_card(player, upgrade, target=target)
 
     assert upgrade.upgrade_target is target
     assert upgrade.is_revealed is False
 
 
-def test_hidden_applied_upgrades_do_not_count_until_revealed(card_factory, upgrade_factory):
+def test_hidden_applied_upgrades_do_not_count_until_revealed(
+    card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]
+) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     upgrade = upgrade_factory("power")
@@ -171,7 +177,7 @@ def test_hidden_applied_upgrades_do_not_count_until_revealed(card_factory, upgra
     player.hand = [target]
     player.upgrades = [upgrade]
 
-    reward.apply_upgrade_to_card(player, upgrade, target)
+    reward.apply_upgrade_to_card(player, upgrade, target=target)
 
     assert reward.count_applied_upgrades(player) == 0
 
@@ -180,18 +186,20 @@ def test_hidden_applied_upgrades_do_not_count_until_revealed(card_factory, upgra
     assert reward.count_applied_upgrades(player) == 1
 
 
-def test_apply_upgrade_to_card_already_applied_raises(card_factory, upgrade_factory):
+def test_apply_upgrade_to_card_already_applied_raises(
+    card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]
+) -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     upgrade = upgrade_factory("power")
     upgrade.upgrade_target = card_factory("old_target")
     player.upgrades = [upgrade]
 
-    with pytest.raises(ValueError):
-        reward.apply_upgrade_to_card(player, upgrade, card_factory("new_target"))
+    with pytest.raises(ValueError, match=r".+"):
+        reward.apply_upgrade_to_card(player, upgrade, target=card_factory("new_target"))
 
 
-def test_start_reward_standard(card_factory):
+def test_start_reward_standard(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(10)]
     game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
@@ -203,7 +211,7 @@ def test_start_reward_standard(card_factory):
     alice.treasures = 2
     bob.treasures = 1
 
-    reward.start(game, alice, bob)
+    reward.start(game, alice, loser=bob)
 
     assert alice.treasures == 3
     assert bob.treasures == 2
@@ -212,7 +220,7 @@ def test_start_reward_standard(card_factory):
     assert len(bob.sideboard) == 1
 
 
-def test_start_reward_stage_increase_gives_vanquisher(card_factory):
+def test_start_reward_stage_increase_gives_vanquisher(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice", "Bob"], num_players=2)
     game.config.num_rounds_per_stage = 3
     game.battler = Battler(cards=[card_factory("c1")], upgrades=[], vanguards=[])
@@ -222,7 +230,7 @@ def test_start_reward_stage_increase_gives_vanquisher(card_factory):
     alice.round = 3
     bob.round = 3
 
-    reward.start(game, alice, bob)
+    reward.start(game, alice, loser=bob)
 
     assert alice.vanquishers == 1
     assert bob.vanquishers == 1
@@ -230,7 +238,7 @@ def test_start_reward_stage_increase_gives_vanquisher(card_factory):
     assert len(bob.sideboard) == 0
 
 
-def test_end_reward_for_player_standard():
+def test_end_reward_for_player_standard() -> None:
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     player.phase = "reward"
@@ -242,7 +250,7 @@ def test_end_reward_for_player_standard():
     assert player.phase == "draft"
 
 
-def test_end_reward_for_player_stage_increase(upgrade_factory):
+def test_end_reward_for_player_stage_increase(upgrade_factory: Callable[[str], Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.config.num_rounds_per_stage = 3
     upgrade = upgrade_factory("power")
@@ -252,14 +260,14 @@ def test_end_reward_for_player_stage_increase(upgrade_factory):
     player.round = 3
     player.stage = 1
 
-    reward.end_for_player(game, player, upgrade)
+    reward.end_for_player(game, player, upgrade_choice=upgrade)
 
     assert player.round == 1
     assert player.stage == 2
     assert len(player.upgrades) == 1
 
 
-def test_end_reward_for_player_stage_increase_missing_choice_raises(upgrade_factory):
+def test_end_reward_for_player_stage_increase_missing_choice_raises(upgrade_factory: Callable[[str], Card]) -> None:
     game = create_game(["Alice"], num_players=1)
     game.config.num_rounds_per_stage = 3
     game.available_upgrades = [upgrade_factory("u1")]
@@ -267,11 +275,13 @@ def test_end_reward_for_player_stage_increase_missing_choice_raises(upgrade_fact
     player.phase = "reward"
     player.round = 3
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         reward.end_for_player(game, player)
 
 
-def test_start_reward_draw_applies_poison_to_both(card_factory, upgrade_factory):
+def test_start_reward_draw_applies_poison_to_both(
+    card_factory: Callable[..., Card], upgrade_factory: Callable[[str], Card]
+) -> None:
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(10)]
     game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
@@ -289,7 +299,7 @@ def test_start_reward_draw_applies_poison_to_both(card_factory, upgrade_factory)
     u1.upgrade_target = target
     alice.upgrades = [u1]
 
-    reward.start(game, alice, bob, is_draw=True)
+    reward.start(game, alice, loser=bob, is_draw=True)
 
     assert alice.poison == 1
     assert bob.poison == 2
@@ -299,7 +309,7 @@ def test_start_reward_draw_applies_poison_to_both(card_factory, upgrade_factory)
     assert len(bob.sideboard) == 1
 
 
-def test_end_reward_for_player_stage_increase_no_upgrade_when_disabled():
+def test_end_reward_for_player_stage_increase_no_upgrade_when_disabled() -> None:
     """When use_upgrades=False, stage can increase without picking an upgrade."""
     game = create_game(["Alice"], num_players=1)
     game.config.num_rounds_per_stage = 3
@@ -316,7 +326,7 @@ def test_end_reward_for_player_stage_increase_no_upgrade_when_disabled():
     assert len(player.upgrades) == 0
 
 
-def test_fibonacci_damage_formula():
+def test_fibonacci_damage_formula() -> None:
     """Test fibonacci damage calculation: fib(hand_size - 2)."""
     game = create_game(["Alice", "Bob"], num_players=2)
     game.config.use_upgrades = False
@@ -349,7 +359,7 @@ def test_fibonacci_damage_formula():
     assert bob.poison == 5
 
 
-def test_static_opponent_deals_fibonacci_damage_without_upgrades(card_factory):
+def test_static_opponent_deals_fibonacci_damage_without_upgrades(card_factory: Callable[..., Card]) -> None:
     game = create_game(["Alice", "Bob"], num_players=2)
     game.config.use_upgrades = False
     alice, bob = game.players
@@ -357,14 +367,16 @@ def test_static_opponent_deals_fibonacci_damage_without_upgrades(card_factory):
     bob.hand = [card_factory(f"c{i}") for i in range(bob.hand_size)]
     ghost = StaticOpponent.from_player(bob)
 
-    reward.apply_poison_static(game, alice, ghost, player_won=False, is_draw=False)
+    reward.apply_poison_static(game, alice, opponent=ghost, player_won=False, is_draw=False)
 
     assert alice.poison == 3
 
 
-def test_vs_static_rewards_given_when_sudden_death_triggers_for_bots(card_factory):
-    """Non-lethal player should receive vanquisher/treasure rewards even when
-    sudden death is triggered by multiple bots hitting lethal simultaneously."""
+def test_vs_static_rewards_given_when_sudden_death_triggers_for_bots(card_factory: Callable[..., Card]) -> None:
+    """Non-lethal player should receive vanquisher/treasure rewards even when.
+
+    sudden death is triggered by multiple bots hitting lethal simultaneously.
+    """
     game = create_game(["Alice"], num_players=1)
     game.config.num_rounds_per_stage = 3
     game.battler = Battler(cards=[card_factory("c1")], upgrades=[], vanguards=[])
@@ -383,7 +395,7 @@ def test_vs_static_rewards_given_when_sudden_death_triggers_for_bots(card_factor
     opponent = StaticOpponent(name="Bot1", hand=[], source_player_history_id=1)
 
     reward.start_vs_static_rewards_only(
-        game, player, opponent, player_won=True, is_draw=False, poison_dealt=1, poison_taken=0
+        game, player, opponent=opponent, player_won=True, is_draw=False, poison_dealt=1, poison_taken=0
     )
 
     assert player.vanquishers == 3

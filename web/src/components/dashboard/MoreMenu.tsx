@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactElement } from "react";
 import {
   useDocumentEvent,
   useEscapeKey,
@@ -17,8 +17,11 @@ export interface MoreMenuItem {
 /** The part of the screen a scrolling ancestor shows, or the window when nothing scrolls. */
 function visibleArea(element: HTMLElement): { top: number; bottom: number } {
   for (let node = element.parentElement; node; node = node.parentElement) {
-    if (["auto", "scroll", "hidden"].includes(getComputedStyle(node).overflowY))
+    if (
+      ["auto", "scroll", "hidden"].includes(getComputedStyle(node).overflowY)
+    ) {
       return node.getBoundingClientRect();
+    }
   }
   return { top: 0, bottom: window.innerHeight };
 }
@@ -30,7 +33,7 @@ export function MoreMenu({
 }: {
   label: string;
   items: MoreMenuItem[];
-}) {
+}): ReactElement {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -53,8 +56,7 @@ export function MoreMenu({
         menu.style.marginBottom = "0.25rem";
       }
     },
-    [],
-    open,
+    { enabled: open },
   );
 
   useDocumentEvent(
@@ -75,11 +77,14 @@ export function MoreMenu({
   useEscapeKey(() => setOpen(false), { enabled: open, target: "document" });
 
   return (
-    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+    <div ref={ref} className="relative">
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -100,7 +105,8 @@ export function MoreMenu({
               type="button"
               role="menuitem"
               disabled={item.disabled}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 // Return focus to the staying trigger before the menu unmounts, so any dialog opened next knows where to return focus.
                 triggerRef.current?.focus();
                 setOpen(false);

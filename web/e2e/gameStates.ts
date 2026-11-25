@@ -170,9 +170,9 @@ const IDS_BY_KIND: Record<CardKind, string[]> = {
 function cards(
   prefix: string,
   count: number,
-  kind: CardKind = "spell",
-  offset = 0,
+  options: { kind?: CardKind; offset?: number } = {},
 ): CardRef[] {
+  const { kind = "spell", offset = 0 } = options;
   const ids = IDS_BY_KIND[kind];
   return Array.from({ length: count }, (_, index) => ({
     id: `${prefix}-${index}`,
@@ -263,14 +263,17 @@ function battleView(counts: Counts): CompactBattleView {
   const yours = emptyZones();
   yours.hand = cards("battle-hand", counts.hand ?? 0);
   yours.battlefield = [
-    ...cards("your-land", counts.lands ?? 0, "land"),
+    ...cards("your-land", counts.lands ?? 0, { kind: "land" }),
     ...cards("your-creature", counts.nonlands ?? 0),
   ];
   yours.library = cards("your-library", 20);
   const theirs = emptyZones();
   theirs.battlefield = [
-    ...cards("their-land", counts.lands ?? 0, "land", 1),
-    ...cards("their-creature", counts.nonlands ?? 0, "spell", 7),
+    ...cards("their-land", counts.lands ?? 0, { kind: "land", offset: 1 }),
+    ...cards("their-creature", counts.nonlands ?? 0, {
+      kind: "spell",
+      offset: 7,
+    }),
   ];
   theirs.library = cards("their-library", 20);
   return {
@@ -297,20 +300,25 @@ function battleView(counts: Counts): CompactBattleView {
 export function gameBootstrap({ phase, counts }: ScreenState): GameBootstrap {
   const handSize = counts.handSize ?? 4;
   const hand = cards("hand", Math.min(counts.hand ?? 0, handSize));
-  const sideboard = cards("pool", counts.sideboard ?? 0, "spell", 3);
+  const sideboard = cards("pool", counts.sideboard ?? 0, {
+    kind: "spell",
+    offset: 3,
+  });
   const self: CompactSelfPlayerView = {
     ...playerView(PLAYER_NAME, phase, {
       hand_size: handSize,
       hand_count: hand.length,
       sideboard_count: sideboard.length,
-      upgrades: cards("upgrade", counts.upgrades ?? 0, "upgrade"),
+      upgrades: cards("upgrade", counts.upgrades ?? 0, { kind: "upgrade" }),
     }),
     hand,
     hand_slots: Array.from({ length: handSize }, (_, i) => hand[i]?.id ?? null),
     sideboard,
     command_zone: [],
     current_pack:
-      phase === "draft" ? cards("pack", counts.pack ?? 0, "spell", 9) : null,
+      phase === "draft"
+        ? cards("pack", counts.pack ?? 0, { kind: "spell", offset: 9 })
+        : null,
     last_battle_result:
       phase === "reward"
         ? {
@@ -320,7 +328,7 @@ export function gameBootstrap({ phase, counts }: ScreenState): GameBootstrap {
             poison_dealt: 2,
             poison_taken: 0,
             treasures_gained: 1,
-            card_gained: cards("gained", 1, "spell", 5)[0],
+            card_gained: cards("gained", 1, { kind: "spell", offset: 5 })[0],
             vanquisher_gained: false,
             pre_battle_treasures: 1,
           }

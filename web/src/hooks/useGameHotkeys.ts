@@ -25,7 +25,7 @@ import {
   canUseBattleFaceDownAction,
   canUseBattleFlipAction,
 } from "../utils/battleInteraction";
-import { usePanelHoldsEnter } from "../utils/enterKey";
+import { usePanelHoldsEnter } from "./usePanelHoldsEnter";
 import type {
   GameSurfaceKind,
   PanelZone,
@@ -70,13 +70,13 @@ interface UseGameHotkeysOptions {
   handleBattleResultSubmit: (result: string) => void;
   handleContinue: () => void;
   startChangingResult: () => void;
-  moveBattleCard: (
-    cardId: string,
-    fromZone: ZoneName,
-    toZone: ZoneName,
-    fromOwner: ZoneOwner,
-    toOwner: ZoneOwner,
-  ) => void;
+  moveBattleCard: (move: {
+    cardId: string;
+    fromZone: ZoneName;
+    toZone: ZoneName;
+    fromOwner: ZoneOwner;
+    toOwner: ZoneOwner;
+  }) => void;
   actions: {
     draftRoll: () => void;
     buildUnready: () => void;
@@ -103,43 +103,199 @@ function untapPlayerBattlefield(
   }
 }
 
+function findHoveredBattleCard(
+  hoveredCard: HoveredBattleCard,
+  battle: NonNullable<GameState["current_battle"]>,
+): { isFaceDown: boolean; hasFlip: boolean } {
+  const ownerZones =
+    hoveredCard.owner === "player" ? battle.your_zones : battle.opponent_zones;
+  const isFaceDown =
+    ownerZones.face_down_card_ids?.includes(hoveredCard.id) ?? false;
+  const card = ownerZones[hoveredCard.zone]?.find(
+    (candidate) => candidate.id === hoveredCard.id,
+  );
+  return { isFaceDown, hasFlip: Boolean(card?.flip_image_url) };
+}
+
 function handleFlipOrFaceDownHotkey(
   hoveredCard: HoveredBattleCard,
   battle: NonNullable<GameState["current_battle"]>,
   battleUpdateCardState: UseGameHotkeysOptions["actions"]["battleUpdateCardState"],
 ): void {
-  const ownerZones =
-    hoveredCard.owner === "player" ? battle.your_zones : battle.opponent_zones;
-  const isFaceDown = ownerZones.face_down_card_ids?.includes(hoveredCard.id);
-  const card = ownerZones[hoveredCard.zone]?.find(
-    (candidate) => candidate.id === hoveredCard.id,
+  const { isFaceDown, hasFlip } = findHoveredBattleCard(hoveredCard, battle);
+  const canFaceDown = canUseBattleFaceDownAction(
+    hoveredCard.owner,
+    battle.can_manipulate_opponent,
   );
-
-  if (
-    !canUseBattleFaceDownAction(
-      hoveredCard.owner,
-      battle.can_manipulate_opponent,
-    )
-  ) {
-    if (
+  if (!canFaceDown) {
+    const canFlip =
+      hasFlip &&
       canUseBattleFlipAction(
         hoveredCard.owner,
-        !!isFaceDown,
+        isFaceDown,
         battle.can_manipulate_opponent,
-      ) &&
-      card?.flip_image_url
-    ) {
-      battleUpdateCardState("flip", hoveredCard.id);
+      );
+    if (canFlip) battleUpdateCardState("flip", hoveredCard.id);
+    return;
+  }
+  battleUpdateCardState(
+    !isFaceDown && hasFlip ? "flip" : "face_down",
+    hoveredCard.id,
+  );
+}
+
+function addDraftHotkeys(
+  map: Record<string, () => void>,
+  options: UseGameHotkeysOptions,
+  hasUpgrades: boolean,
+): void {
+  map["r"] = (): void => {
+    if (options.canRoll) options.actions.draftRoll();
+  };
+  map["Enter"] = options.handleGoToBuild;
+  map["u"] = (): void => {
+    if (hasUpgrades) options.openUpgradesModal(undefined, "view");
+  };
+}
+
+function addBuildHotkeys(
+  map: Record<string, () => void>,
+  options: UseGameHotkeysOptions,
+  sp: GameState["self_player"],
+): void {
+  const basicsComplete = options.selectedBasics.filter(Boolean).length === 3;
+  const canReady = basicsComplete && sp.hand.length === sp.hand_size;
+
+  if (options.showSubmitHandPopover) {
+    if (canReady) {
+      map["p"] = (): void => options.handleBuildReadySubmit("play");
+      map["d"] = (): void => options.handleBuildReadySubmit("draw");
     }
+    map["Enter"] = (): void => options.closeSurface("submitHand");
+  } else {
+    map["Enter"] = (): void => {
+      if (sp.build_ready) {
+        options.actions.buildUnready();
+      } else if (canReady && !options.buildReadyPending) {
+        options.toggleBuildSubmitPopover();
+      }
+    };
+  }
+
+  const { hoveredCard } = options;
+  if (hoveredCard && sp.upgrades.some((u) => !u.upgrade_target)) {
+    map["u"] = (): void => options.openUpgradesModal(hoveredCard.id);
+  } else {
+    map["u"] = (): void => {
+      if (sp.upgrades.length > 0) options.openUpgradesModal(undefined, "view");
+    };
+  }
+}
+
+function addHoveredBattleCardHotkeys(
+  map: Record<string, () => void>,
+  options: UseGameHotkeysOptions,
+  cb: NonNullable<GameState["current_battle"]>,
+): void {
+  const { hoveredCard, actions, moveBattleCard, clearHoveredCard } = options;
+  if (!hoveredCard) return;
+  const ownerZones =
+    hoveredCard.owner === "player" ? cb.your_zones : cb.opponent_zones;
+  map["t"] = (): void => {
+    if (hoveredCard.zone === "battlefield") {
+      const tapped = ownerZones.tapped_card_ids?.includes(hoveredCard.id);
+      actions.battleUpdateCardState(tapped ? "untap" : "tap", hoveredCard.id);
+    }
+  };
+  map["f"] = (): void =>
+    handleFlipOrFaceDownHotkey(hoveredCard, cb, actions.battleUpdateCardState);
+  Object.assign(
+    map,
+    buildCardMoveHotkeys({
+      hoveredCard,
+      moveCard: (card, toZone) =>
+        moveBattleCard({
+          cardId: card.id,
+          fromZone: card.zone,
+          toZone,
+          fromOwner: card.owner,
+          toOwner: card.owner,
+        }),
+      clearHoveredCard,
+    }),
+  );
+}
+
+function addBattleHotkeys(
+  map: Record<string, () => void>,
+  options: UseGameHotkeysOptions,
+  gameState: GameState,
+): void {
+  const { self_player: sp, current_battle: cb } = gameState;
+  if (!cb) return;
+
+  if (options.showSubmitResultPopover) {
+    map["w"] = (): void => options.handleBattleResultSubmit(sp.name);
+    map["d"] = (): void => options.handleBattleResultSubmit("draw");
+    map["l"] = (): void => options.handleBattleResultSubmit(cb.opponent_name);
+    map["Enter"] = (): void => options.closeSurface("submitResult");
     return;
   }
 
-  if (isFaceDown) {
-    battleUpdateCardState("face_down", hoveredCard.id);
-  } else if (card?.flip_image_url) {
-    battleUpdateCardState("flip", hoveredCard.id);
+  map["u"] = (): void =>
+    untapPlayerBattlefield(cb, options.actions.battleUpdateCardState);
+  map["p"] = (): void => options.actions.battlePassTurn();
+  if (options.hoveredCard) {
+    addHoveredBattleCardHotkeys(map, options, cb);
   } else {
-    battleUpdateCardState("face_down", hoveredCard.id);
+    map["t"] = (): void =>
+      options.actions.battleUpdateCardState("create_treasure", "", {});
+    map["g"] = (): void => options.toggleZonePanel("graveyard", "player");
+    map["e"] = (): void => options.toggleZonePanel("exile", "player");
+    map["s"] = (): void => options.toggleZonePanel("sideboard", "player");
+  }
+  map["Enter"] = (): void => {
+    const mySubmission = cb.result_submissions[sp.name];
+    if (mySubmission && !options.changingResult) {
+      options.startChangingResult();
+    } else {
+      options.toggleBattleSubmitPopover();
+    }
+  };
+  map["v"] = (): void => {
+    if (sp.upgrades.length > 0) options.openUpgradesModal(undefined, "view");
+  };
+}
+
+function addGameplayHotkeys(
+  map: Record<string, () => void>,
+  options: UseGameHotkeysOptions,
+  gameState: GameState,
+): void {
+  const { self_player: sp } = gameState;
+  const phase = sp.phase;
+
+  if (!options.usesOverlaySidebar && phase !== "battle") {
+    options.sidebarPlayers.slice(0, 8).forEach((player, index) => {
+      map[String(index + 1)] = (): void =>
+        options.setScouting(player.name, "seen");
+    });
+  }
+
+  if (phase === "draft") {
+    addDraftHotkeys(map, options, sp.upgrades.length > 0);
+  } else if (phase === "build") {
+    addBuildHotkeys(map, options, sp);
+  } else if (phase === "battle") {
+    addBattleHotkeys(map, options, gameState);
+  } else if (phase === "reward") {
+    map["Enter"] = (): void => {
+      const needsUpgrade =
+        sp.is_stage_increasing && gameState.available_upgrades.length > 0;
+      if (!needsUpgrade || Boolean(options.selectedUpgradeId)) {
+        options.handleContinue();
+      }
+    };
   }
 }
 
@@ -147,38 +303,16 @@ export function useGameHotkeys(options: UseGameHotkeysOptions): void {
   const {
     gameState,
     isSpectator,
-    usesOverlaySidebar,
-    sidebarPlayers,
-    selectedBasics,
-    selectedUpgradeId,
-    hoveredCard,
-    clearHoveredCard,
     visibleGuideStep,
     guideOpen,
     hasRulesPanel,
     showUpgradesModal,
     actionMenuOpen,
-    showSubmitHandPopover,
-    showSubmitResultPopover,
-    buildReadyPending,
     confirmingReveal,
-    changingResult,
     modalOpen,
     canRoll,
     openRulesPanel,
     closeSurface,
-    openUpgradesModal,
-    setScouting,
-    toggleBuildSubmitPopover,
-    toggleBattleSubmitPopover,
-    toggleZonePanel,
-    handleGoToBuild,
-    handleBuildReadySubmit,
-    handleBattleResultSubmit,
-    handleContinue,
-    startChangingResult,
-    moveBattleCard,
-    actions,
   } = options;
 
   const selfPhase = gameState?.self_player.phase;
@@ -204,131 +338,17 @@ export function useGameHotkeys(options: UseGameHotkeysOptions): void {
       );
     },
     closeGuide: () => closeSurface("guide"),
-    closeMenu: actionMenuOpen ? () => closeSurface("actions") : null,
+    closeMenu: actionMenuOpen ? (): void => closeSurface("actions") : null,
     closeUpgrades: showUpgradesModal
       ? {
           key: selfPhase === "battle" ? "v" : "u",
-          close: () => closeSurface("upgrades"),
+          close: (): void => closeSurface("upgrades"),
         }
       : null,
   });
 
   if (gameState && !isSpectator && !gameplayHotkeysDisabled) {
-    const { self_player: sp, current_battle: cb } = gameState;
-    const phase = sp.phase;
-
-    if (!usesOverlaySidebar && phase !== "battle") {
-      sidebarPlayers.slice(0, 8).forEach((player, index) => {
-        map[String(index + 1)] = () => setScouting(player.name, "seen");
-      });
-    }
-
-    if (phase === "draft") {
-      map["r"] = () => {
-        if (canRoll) actions.draftRoll();
-      };
-      map["Enter"] = handleGoToBuild;
-      map["u"] = () => {
-        if (sp.upgrades.length > 0) openUpgradesModal(undefined, "view");
-      };
-    } else if (phase === "build") {
-      const basicsComplete = selectedBasics.filter(Boolean).length === 3;
-      const handFull = sp.hand.length === sp.hand_size;
-      const canReady = basicsComplete && handFull;
-
-      if (showSubmitHandPopover) {
-        if (canReady) {
-          map["p"] = () => handleBuildReadySubmit("play");
-          map["d"] = () => handleBuildReadySubmit("draw");
-        }
-        map["Enter"] = () => closeSurface("submitHand");
-      } else {
-        map["Enter"] = () => {
-          if (sp.build_ready) {
-            actions.buildUnready();
-          } else if (canReady && !buildReadyPending) {
-            toggleBuildSubmitPopover();
-          }
-        };
-      }
-      if (hoveredCard && sp.upgrades.some((u) => !u.upgrade_target)) {
-        map["u"] = () => openUpgradesModal(hoveredCard.id);
-      } else {
-        map["u"] = () => {
-          if (sp.upgrades.length > 0) openUpgradesModal(undefined, "view");
-        };
-      }
-    } else if (phase === "battle" && cb) {
-      if (showSubmitResultPopover) {
-        map["w"] = () => handleBattleResultSubmit(sp.name);
-        map["d"] = () => handleBattleResultSubmit("draw");
-        map["l"] = () => handleBattleResultSubmit(cb.opponent_name);
-        map["Enter"] = () => closeSurface("submitResult");
-      } else {
-        map["u"] = () =>
-          untapPlayerBattlefield(cb, actions.battleUpdateCardState);
-        map["p"] = () => actions.battlePassTurn();
-        if (hoveredCard) {
-          const ownerZones =
-            hoveredCard.owner === "player" ? cb.your_zones : cb.opponent_zones;
-          map["t"] = () => {
-            if (hoveredCard.zone === "battlefield") {
-              const tapped = ownerZones.tapped_card_ids?.includes(
-                hoveredCard.id,
-              );
-              actions.battleUpdateCardState(
-                tapped ? "untap" : "tap",
-                hoveredCard.id,
-              );
-            }
-          };
-          map["f"] = () =>
-            handleFlipOrFaceDownHotkey(
-              hoveredCard,
-              cb,
-              actions.battleUpdateCardState,
-            );
-          const moveHotkeys = buildCardMoveHotkeys({
-            hoveredCard,
-            moveCard: (card, toZone) =>
-              moveBattleCard(
-                card.id,
-                card.zone,
-                toZone,
-                card.owner,
-                card.owner,
-              ),
-            clearHoveredCard,
-          });
-          Object.assign(map, moveHotkeys);
-        } else {
-          map["t"] = () =>
-            actions.battleUpdateCardState("create_treasure", "", {});
-          map["g"] = () => toggleZonePanel("graveyard", "player");
-          map["e"] = () => toggleZonePanel("exile", "player");
-          map["s"] = () => toggleZonePanel("sideboard", "player");
-        }
-        map["Enter"] = () => {
-          const mySubmission = cb.result_submissions[sp.name];
-          if (mySubmission && !changingResult) {
-            startChangingResult();
-          } else {
-            toggleBattleSubmitPopover();
-          }
-        };
-        map["v"] = () => {
-          if (sp.upgrades.length > 0) openUpgradesModal(undefined, "view");
-        };
-      }
-    } else if (phase === "reward") {
-      map["Enter"] = () => {
-        const needsUpgrade =
-          sp.is_stage_increasing && gameState.available_upgrades.length > 0;
-        if (!needsUpgrade || !!selectedUpgradeId) {
-          handleContinue();
-        }
-      };
-    }
+    addGameplayHotkeys(map, options, gameState);
   }
 
   useHotkeys(map);

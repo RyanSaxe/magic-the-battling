@@ -1,6 +1,18 @@
+import type { ReactElement } from "react";
 import type { Card as CardType, ZoneName } from "../../types";
 import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
+
+const DEFAULT_VALID_FROM_ZONES: ZoneName[] = [
+  "hand",
+  "battlefield",
+  "graveyard",
+  "exile",
+  "library",
+  "sideboard",
+  "command_zone",
+];
+const EMPTY_STRING_SET: Set<string> = new Set();
 
 interface HandZoneProps {
   cards: CardType[];
@@ -20,6 +32,22 @@ interface HandZoneProps {
   gap?: number;
 }
 
+function getHandCardStyle(options: {
+  gap?: number;
+  index: number;
+  total: number;
+  selected: boolean;
+}): React.CSSProperties {
+  if (options.gap === undefined || options.gap >= 0) return {};
+  const zIndex = options.selected
+    ? options.total + 1
+    : options.total - options.index;
+  return {
+    ...(options.index > 0 ? { marginLeft: options.gap } : undefined),
+    zIndex,
+  };
+}
+
 export function HandZone({
   cards,
   selectedCardId,
@@ -27,25 +55,17 @@ export function HandZone({
   onCardHover,
   onCardHoverEnd,
   onCardContextMenu,
-  validFromZones = [
-    "hand",
-    "battlefield",
-    "graveyard",
-    "exile",
-    "library",
-    "sideboard",
-    "command_zone",
-  ],
+  validFromZones = DEFAULT_VALID_FROM_ZONES,
   draggable = true,
   zone = "hand",
-  upgradedCardIds = new Set(),
+  upgradedCardIds = EMPTY_STRING_SET,
   upgradesByCardId,
   hiddenUpgradesByCardId,
   onRevealHiddenUpgrades,
   cardDimensions,
   gap,
-}: HandZoneProps) {
-  const zoneStyle = gap !== undefined ? { gap: Math.max(0, gap) } : undefined;
+}: HandZoneProps): ReactElement {
+  const zoneStyle = gap === undefined ? undefined : { gap: Math.max(0, gap) };
 
   return (
     <DroppableZone
@@ -55,40 +75,39 @@ export function HandZone({
       style={zoneStyle}
     >
       {cards.map((card, i) => {
-        const isOverlapping = gap !== undefined && gap < 0;
-        const zIndex = isOverlapping
-          ? card.id === selectedCardId
-            ? cards.length + 1
-            : cards.length - i
-          : undefined;
+        const selected = card.id === selectedCardId;
+        const hiddenUpgradeCount =
+          hiddenUpgradesByCardId?.get(card.id)?.length ?? 0;
         return (
           <DraggableCard
             key={card.id}
             card={card}
             zone={zone}
             dimensions={cardDimensions}
-            selected={card.id === selectedCardId}
+            selected={selected}
             onClick={() => onCardClick?.(card)}
             onContextMenu={
-              onCardContextMenu ? (e) => onCardContextMenu(e, card) : undefined
+              onCardContextMenu
+                ? (e): void => onCardContextMenu(e, card)
+                : undefined
             }
             disabled={!draggable}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
-            hiddenUpgradeCount={
-              (hiddenUpgradesByCardId?.get(card.id) ?? []).length
-            }
+            hiddenUpgradeCount={hiddenUpgradeCount}
             onRevealHiddenUpgrades={
               onRevealHiddenUpgrades
-                ? () => onRevealHiddenUpgrades(card.id)
+                ? (): void => onRevealHiddenUpgrades(card.id)
                 : undefined
             }
             onCardHover={onCardHover}
             onCardHoverEnd={onCardHoverEnd}
-            style={{
-              ...(isOverlapping && i > 0 ? { marginLeft: gap } : undefined),
-              ...(zIndex !== undefined ? { zIndex } : undefined),
-            }}
+            style={getHandCardStyle({
+              gap,
+              index: i,
+              total: cards.length,
+              selected,
+            })}
           />
         );
       })}

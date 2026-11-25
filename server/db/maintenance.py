@@ -1,10 +1,15 @@
+"""Idempotent database maintenance and schema migration steps run on deploy."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from server.db.preset_id_migration import presets_reuse_ids, rebuild_presets_table
 from server.db.snapshot_migration import SnapshotMigrationResult, backup_db, migrate_snapshot_storage
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(slots=True)

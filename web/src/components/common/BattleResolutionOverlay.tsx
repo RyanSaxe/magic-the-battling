@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { Card } from "../card";
 import { PoisonCard } from "./PoisonCard";
 import type { BattleResolution, BattleView } from "../../types";
@@ -15,7 +15,7 @@ interface BattleResolutionOverlayProps {
 
 type CSSVarsStyle = CSSProperties & Record<`--${string}`, string>;
 
-function SkullIcon() {
+function SkullIcon(): ReactElement {
   return (
     <svg viewBox="0 0 64 64" aria-hidden className="h-[60%] w-[60%]">
       <path
@@ -30,7 +30,7 @@ export function BattleResolutionOverlay({
   battle,
   resolution,
   onComplete,
-}: BattleResolutionOverlayProps) {
+}: BattleResolutionOverlayProps): ReactElement {
   const {
     counts,
     focusedOwners,
@@ -121,7 +121,7 @@ export function BattleResolutionOverlay({
       })}
 
       {activeSource &&
-        (() => {
+        ((): ReactElement => {
           const sourceStyle: CSSVarsStyle = {
             left: activeSource.stageRect.left,
             top: activeSource.stageRect.top,

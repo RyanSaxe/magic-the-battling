@@ -67,11 +67,14 @@ const CONTINUATION_MS = 1500;
 
 function buildCardLookup(battle: BattleView): Map<string, CardLookupEntry> {
   const lookup = new Map<string, CardLookupEntry>();
-  const addCards = (cards: CardType[], owner: OverlayOwner) => {
+  const addCards = (cards: CardType[], owner: OverlayOwner): void => {
     cards.forEach((card) => lookup.set(card.id, { card, owner }));
   };
 
-  const addZones = (owner: OverlayOwner, zones: BattleView["your_zones"]) => {
+  const addZones = (
+    owner: OverlayOwner,
+    zones: BattleView["your_zones"],
+  ): void => {
     addCards(zones.hand, owner);
     addCards(zones.battlefield, owner);
     addCards(zones.graveyard, owner);
@@ -217,23 +220,173 @@ export function useThreePhaseOverlay(
   const handleComplete = useEffectEvent(onComplete);
 
   useEffect(() => {
-    let timerId: number | null = window.setTimeout(() => {
-      setPhase("glow");
-      timerId = window.setTimeout(() => {
-        setPhase("fade");
-        timerId = window.setTimeout(() => {
-          timerId = null;
-          handleComplete();
-        }, fadeMs);
-      }, glowMs);
-    }, showMs);
+    const timers = [
+      window.setTimeout(() => setPhase("glow"), showMs),
+      window.setTimeout(() => setPhase("fade"), showMs + glowMs),
+      window.setTimeout(() => handleComplete(), showMs + glowMs + fadeMs),
+    ];
 
-    return () => {
-      if (timerId !== null) window.clearTimeout(timerId);
+    return (): void => {
+      for (const id of timers) window.clearTimeout(id);
     };
   }, [showMs, glowMs, fadeMs]);
 
   return phase;
+}
+
+export interface BattleResolutionAnimationState {
+  counts: { player: number; opponent: number };
+  focusedOwners: OverlayOwner[];
+  incrementOwners: OverlayOwner[];
+  lethalOwners: OverlayOwner[];
+  deadOwners: OverlayOwner[];
+  settlingOwners: OverlayOwner[];
+  activeSource: ActiveSourceState | null;
+  activeBeam: { from: Point; to: Point } | null;
+  showContinuation: boolean;
+}
+
+interface AnimationDriver {
+  isCancelled: () => boolean;
+  wait: (ms: number) => Promise<void>;
+  applyIncrement: (owner: OverlayOwner, nextValue: number) => void;
+  setIncrementOwners: (owners: OverlayOwner[]) => void;
+  setActiveSource: React.Dispatch<
+    React.SetStateAction<ActiveSourceState | null>
+  >;
+  setActiveBeam: (beam: { from: Point; to: Point } | null) => void;
+}
+
+function resolveBeamEnd(targetOwner: OverlayOwner): Point {
+  const targetRect = rectForSelector(`[data-poison-owner="${targetOwner}"]`);
+  if (targetRect) return centerOfRect(targetRect);
+  return {
+    x:
+      targetOwner === "player"
+        ? window.innerWidth * 0.72
+        : window.innerWidth * 0.78,
+    y:
+      targetOwner === "player"
+        ? window.innerHeight * 0.68
+        : window.innerHeight * 0.24,
+  };
+}
+
+async function runSingleBeam(
+  driver: AnimationDriver,
+  beam: { from: Point; to: Point; targetOwner: OverlayOwner },
+  currentCounts: Record<OverlayOwner, number>,
+): Promise<boolean> {
+  driver.setActiveBeam({ from: beam.from, to: beam.to });
+  await driver.wait(BEAM_TRAVEL_MS);
+  if (driver.isCancelled()) return false;
+
+  currentCounts[beam.targetOwner] += 1;
+  driver.applyIncrement(beam.targetOwner, currentCounts[beam.targetOwner]);
+  driver.setIncrementOwners([beam.targetOwner]);
+
+  await driver.wait(BEAM_SETTLE_MS);
+  if (driver.isCancelled()) return false;
+
+  driver.setActiveBeam(null);
+  driver.setIncrementOwners([]);
+  return true;
+}
+
+async function runBeamsSequentially(
+  driver: AnimationDriver,
+  options: {
+    from: Point;
+    to: Point;
+    targetOwner: OverlayOwner;
+    remaining: number;
+  },
+  currentCounts: Record<OverlayOwner, number>,
+): Promise<boolean> {
+  if (options.remaining <= 0) return true;
+  const ok = await runSingleBeam(driver, options, currentCounts);
+  if (!ok) return false;
+  if (options.remaining > 1) {
+    await driver.wait(BEAM_PAUSE_MS);
+    if (driver.isCancelled()) return false;
+  }
+  return runBeamsSequentially(
+    driver,
+    { ...options, remaining: options.remaining - 1 },
+    currentCounts,
+  );
+}
+
+async function runUpgradeGroup(
+  driver: AnimationDriver,
+  group: BeamGroup,
+  context: {
+    cardLookup: Map<string, CardLookupEntry>;
+    currentCounts: Record<OverlayOwner, number>;
+  },
+): Promise<boolean> {
+  const lookup = context.cardLookup.get(group.sourceCardId) ?? null;
+  if (!lookup) return true;
+
+  const sourceRect = rectForSelector(selectorForCard(group.sourceCardId));
+  const stageRect = buildStageRect(lookup.owner);
+  const { enterX, enterY, enterScale } = buildEntryTransform(
+    lookup.owner,
+    stageRect,
+    sourceRect,
+  );
+
+  driver.setActiveSource({
+    card: lookup.card,
+    owner: lookup.owner,
+    stageRect,
+    enterX,
+    enterY,
+    enterScale,
+    isExiting: false,
+  });
+
+  await driver.wait(SOURCE_MOVE_MS);
+  if (driver.isCancelled()) return false;
+
+  const beamsOk = await runBeamsSequentially(
+    driver,
+    {
+      from: centerOfRect(stageRect),
+      to: resolveBeamEnd(group.targetOwner),
+      targetOwner: group.targetOwner,
+      remaining: group.beamCount,
+    },
+    context.currentCounts,
+  );
+  if (!beamsOk) return false;
+
+  driver.setActiveSource((current) =>
+    current && current.card.id === group.sourceCardId
+      ? { ...current, isExiting: true }
+      : current,
+  );
+
+  await driver.wait(GROUP_EXIT_MS);
+  if (driver.isCancelled()) return false;
+  driver.setActiveSource(null);
+  await driver.wait(120);
+  return !driver.isCancelled();
+}
+
+async function runUpgradeGroupsSequentially(
+  driver: AnimationDriver,
+  groups: readonly BeamGroup[],
+  context: {
+    cardLookup: Map<string, CardLookupEntry>;
+    currentCounts: Record<OverlayOwner, number>;
+  },
+): Promise<boolean> {
+  if (groups.length === 0) return true;
+  const [head, ...rest] = groups;
+  const ok = await runUpgradeGroup(driver, head, context);
+  if (!ok) return false;
+  return runUpgradeGroupsSequentially(driver, rest, context);
 }
 
 export function useBattleResolutionAnimation({
@@ -244,7 +397,7 @@ export function useBattleResolutionAnimation({
   battle: BattleView;
   resolution: BattleResolution;
   onComplete: () => void;
-}) {
+}): BattleResolutionAnimationState {
   const [counts, setCounts] = useState({
     player: resolution.your_side.starting_poison,
     opponent: resolution.opponent_side.starting_poison,
@@ -288,7 +441,7 @@ export function useBattleResolutionAnimation({
       continueSuddenDeath,
     } = readInitialInput();
 
-    const wait = (ms: number) =>
+    const wait = (ms: number): Promise<void> =>
       new Promise<void>((resolve) => {
         activeTimer = window.setTimeout(() => {
           activeTimer = null;
@@ -296,7 +449,7 @@ export function useBattleResolutionAnimation({
         }, ms);
       });
 
-    const applyIncrement = (owner: OverlayOwner, nextValue: number) => {
+    const applyIncrement = (owner: OverlayOwner, nextValue: number): void => {
       setCounts((current) => ({
         ...current,
         [owner]: nextValue,
@@ -306,136 +459,34 @@ export function useBattleResolutionAnimation({
       }
     };
 
-    const run = async () => {
-      await wait(160);
-      if (cancelled) return;
+    const driver: AnimationDriver = {
+      isCancelled: () => cancelled,
+      wait,
+      applyIncrement,
+      setIncrementOwners,
+      setActiveSource,
+      setActiveBeam,
+    };
 
-      const damagedOwners = (["player", "opponent"] as const).filter(
-        (owner) => initialSides[owner].took_damage,
-      );
+    const runBaseDamage = async (
+      baseOwners: OverlayOwner[],
+    ): Promise<boolean> => {
+      if (baseOwners.length === 0) return true;
+      baseOwners.forEach((owner) => {
+        applyIncrement(owner, initialSides[owner].starting_poison + 1);
+      });
+      setIncrementOwners(baseOwners);
+      await wait(COUNTER_TICK_MS);
+      if (cancelled) return false;
+      setIncrementOwners([]);
+      await wait(BASE_SETTLE_MS);
+      return !cancelled;
+    };
 
-      if (damagedOwners.length === 0) {
-        await wait(220);
-        if (!cancelled) handleComplete();
-        return;
-      }
-
-      setFocusedOwners(damagedOwners);
-      await wait(360);
-      if (cancelled) return;
-
-      const baseOwners = (["player", "opponent"] as const).filter(
-        (owner) =>
-          initialSides[owner].events[0]?.event_type === "base_increment",
-      );
-
-      if (baseOwners.length > 0) {
-        baseOwners.forEach((owner) => {
-          applyIncrement(owner, initialSides[owner].starting_poison + 1);
-        });
-        setIncrementOwners(baseOwners);
-        await wait(COUNTER_TICK_MS);
-        if (cancelled) return;
-        setIncrementOwners([]);
-        await wait(BASE_SETTLE_MS);
-        if (cancelled) return;
-      }
-
-      const playerGroups = groupUpgradeEvents(
-        initialSides.player.events,
-        "player",
-      );
-      const opponentGroups = groupUpgradeEvents(
-        initialSides.opponent.events,
-        "opponent",
-      );
-      const groups = interleave(playerGroups, opponentGroups);
-
-      const currentCounts = {
-        player:
-          initialSides.player.starting_poison +
-          (baseOwners.includes("player") ? 1 : 0),
-        opponent:
-          initialSides.opponent.starting_poison +
-          (baseOwners.includes("opponent") ? 1 : 0),
-      };
-
-      for (const group of groups) {
-        const lookup = initialCardLookup.get(group.sourceCardId) ?? null;
-        if (!lookup) continue;
-
-        const sourceRect = rectForSelector(selectorForCard(group.sourceCardId));
-        const stageRect = buildStageRect(lookup.owner);
-        const { enterX, enterY, enterScale } = buildEntryTransform(
-          lookup.owner,
-          stageRect,
-          sourceRect,
-        );
-
-        setActiveSource({
-          card: lookup.card,
-          owner: lookup.owner,
-          stageRect,
-          enterX,
-          enterY,
-          enterScale,
-          isExiting: false,
-        });
-
-        await wait(SOURCE_MOVE_MS);
-        if (cancelled) return;
-
-        const targetRect = rectForSelector(
-          `[data-poison-owner="${group.targetOwner}"]`,
-        );
-        const beamStart = centerOfRect(stageRect);
-        const beamEnd = targetRect
-          ? centerOfRect(targetRect)
-          : {
-              x:
-                group.targetOwner === "player"
-                  ? window.innerWidth * 0.72
-                  : window.innerWidth * 0.78,
-              y:
-                group.targetOwner === "player"
-                  ? window.innerHeight * 0.68
-                  : window.innerHeight * 0.24,
-            };
-
-        for (let beamIndex = 0; beamIndex < group.beamCount; beamIndex += 1) {
-          setActiveBeam({ from: beamStart, to: beamEnd });
-          await wait(BEAM_TRAVEL_MS);
-          if (cancelled) return;
-
-          currentCounts[group.targetOwner] += 1;
-          applyIncrement(group.targetOwner, currentCounts[group.targetOwner]);
-          setIncrementOwners([group.targetOwner]);
-
-          await wait(BEAM_SETTLE_MS);
-          if (cancelled) return;
-
-          setActiveBeam(null);
-          setIncrementOwners([]);
-
-          if (beamIndex < group.beamCount - 1) {
-            await wait(BEAM_PAUSE_MS);
-            if (cancelled) return;
-          }
-        }
-
-        setActiveSource((current) =>
-          current && current.card.id === group.sourceCardId
-            ? { ...current, isExiting: true }
-            : current,
-        );
-
-        await wait(GROUP_EXIT_MS);
-        if (cancelled) return;
-        setActiveSource(null);
-        await wait(120);
-        if (cancelled) return;
-      }
-
+    const runOutro = async (
+      damagedOwners: OverlayOwner[],
+      currentCounts: Record<OverlayOwner, number>,
+    ): Promise<void> => {
       const deathTargets = (["player", "opponent"] as const).filter(
         (owner) =>
           initialSides[owner].show_death_animation &&
@@ -465,9 +516,54 @@ export function useBattleResolutionAnimation({
       handleComplete();
     };
 
+    const run = async (): Promise<void> => {
+      await wait(160);
+      if (cancelled) return;
+
+      const damagedOwners = (["player", "opponent"] as const).filter(
+        (owner) => initialSides[owner].took_damage,
+      );
+      if (damagedOwners.length === 0) {
+        await wait(220);
+        if (!cancelled) handleComplete();
+        return;
+      }
+
+      setFocusedOwners(damagedOwners);
+      await wait(360);
+      if (cancelled) return;
+
+      const baseOwners = (["player", "opponent"] as const).filter(
+        (owner) =>
+          initialSides[owner].events[0]?.event_type === "base_increment",
+      );
+      if (!(await runBaseDamage(baseOwners))) return;
+
+      const groups = interleave(
+        groupUpgradeEvents(initialSides.player.events, "player"),
+        groupUpgradeEvents(initialSides.opponent.events, "opponent"),
+      );
+      const currentCounts: Record<OverlayOwner, number> = {
+        player:
+          initialSides.player.starting_poison +
+          (baseOwners.includes("player") ? 1 : 0),
+        opponent:
+          initialSides.opponent.starting_poison +
+          (baseOwners.includes("opponent") ? 1 : 0),
+      };
+
+      const groupsOk = await runUpgradeGroupsSequentially(driver, groups, {
+        cardLookup: initialCardLookup,
+        currentCounts,
+      });
+      if (!groupsOk) return;
+
+      await runOutro(damagedOwners, currentCounts);
+    };
+
     void run();
 
-    return () => {
+    return (): void => {
       cancelled = true;
       if (activeTimer !== null) window.clearTimeout(activeTimer);
     };
@@ -489,7 +585,7 @@ export function useBattleResolutionAnimation({
 export function useHintCycler(
   count: number,
   timings: { cycleMs: number; fadeOutMs: number; swapPauseMs: number },
-) {
+): { index: number; visible: boolean; prev: () => void; next: () => void } {
   const { cycleMs, fadeOutMs, swapPauseMs } = timings;
   const [index, setIndex] = useState(() => Math.floor(Math.random() * count));
   const [visible, setVisible] = useState(true);
@@ -536,6 +632,7 @@ export function useHintCycler(
   });
 
   useEffect(() => {
+    if (count <= 0 || index < 0) return undefined;
     clearCycleTimer();
     cycleRef.current = window.setTimeout(() => {
       cycleRef.current = null;
@@ -545,7 +642,7 @@ export function useHintCycler(
   }, [clearCycleTimer, count, cycleMs, index]);
 
   useEffect(() => {
-    return () => {
+    return (): void => {
       clearCycleTimer();
       clearTransitionTimers();
     };
@@ -567,16 +664,16 @@ export function useHintCycler(
 export function useAnimatedPresence(
   open: boolean,
   ref: RefObject<HTMLElement | null>,
-) {
+): { present: boolean; finishExit: () => void } {
   const [present, setPresent] = useState(open);
   if (open && !present) setPresent(true);
 
   useEffect(() => {
-    if (open || !present) return;
+    if (open || !present) return undefined;
     const frame = requestAnimationFrame(() => {
       if (!ref.current?.getAnimations().length) setPresent(false);
     });
-    return () => cancelAnimationFrame(frame);
+    return (): void => cancelAnimationFrame(frame);
   }, [open, present, ref]);
 
   const finishExit = useCallback(() => setPresent(false), []);

@@ -413,8 +413,8 @@ interface FakeDisplay {
   x: number;
 }
 
-const stepKeyOf = (display: FakeDisplay) => display.stepKey;
-const morphMsOf = (from: FakeDisplay, to: FakeDisplay) =>
+const stepKeyOf = (display: FakeDisplay): string => display.stepKey;
+const morphMsOf = (from: FakeDisplay, to: FakeDisplay): number =>
   Math.abs(to.x - from.x) < 20 ? 0 : 300;
 
 describe("reduceWalkthrough", () => {
@@ -445,9 +445,14 @@ describe("reduceWalkthrough", () => {
       computeMorphMs: morphMsOf,
     });
     expect(state.kind).toBe("idle");
-    expect(isWalkthroughStepInteractive(state, true, "1:a", stepKeyOf)).toBe(
-      true,
-    );
+    expect(
+      isWalkthroughStepInteractive({
+        state,
+        requestActive: true,
+        stepKey: "1:a",
+        displayStepKey: stepKeyOf,
+      }),
+    ).toBe(true);
 
     // Advancing to a new step triggers exit_tooltip -> morph_spot -> enter_tooltip -> idle.
     state = reduceWalkthrough(state, {
@@ -481,9 +486,14 @@ describe("reduceWalkthrough", () => {
       computeMorphMs: morphMsOf,
     });
     expect(state.kind).toBe("idle");
-    expect(isWalkthroughStepInteractive(state, true, "1:b", stepKeyOf)).toBe(
-      true,
-    );
+    expect(
+      isWalkthroughStepInteractive({
+        state,
+        requestActive: true,
+        stepKey: "1:b",
+        displayStepKey: stepKeyOf,
+      }),
+    ).toBe(true);
 
     // Closing the request starts fade-out (`exiting`) which is IMMEDIATELY non-blocking for taps.
     state = reduceWalkthrough(state, {

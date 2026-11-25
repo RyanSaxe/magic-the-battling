@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import type { ReactElement, Ref } from "react";
 
 /** The walnut ✕ that closes a panel or a dialog. */
 export function CloseButton({
@@ -11,7 +11,7 @@ export function CloseButton({
   onClick: () => void;
   className?: string;
   ref?: Ref<HTMLButtonElement>;
-}) {
+}): ReactElement {
   return (
     <button
       ref={ref}

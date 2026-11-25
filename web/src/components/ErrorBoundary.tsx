@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
       // This sits outside the router, so the header has no Home button. Go Home loads the home page afresh instead.
       return (

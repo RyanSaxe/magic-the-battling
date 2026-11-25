@@ -5,8 +5,31 @@ import { QuickGuide } from "./QuickGuide";
 
 vi.hoisted(() => {
   // inputMode reads matchMedia as it's imported, and jsdom has none.
-  window.matchMedia = () => ({ matches: false }) as MediaQueryList;
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener(): void {},
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent(): boolean {
+      return false;
+    },
+  });
 });
+
+function requireElement(selector: string): Element {
+  const el = document.querySelector(selector);
+  if (!el) {
+    throw new Error(`Expected element matching ${selector}`);
+  }
+  return el;
+}
+
+function currentGuideSection(): string {
+  return requireElement('[aria-current="page"]').textContent;
+}
 
 afterEach(() => {
   cleanup();
@@ -34,28 +57,26 @@ it("scrolls to the heading a link points to on another tab", async () => {
   fireEvent.click(screen.getAllByText("treasures", { selector: "button" })[0]);
 
   await vi.waitFor(() =>
-    expect(document.querySelector(".guide-book-page")!.scrollTop).toBe(300),
+    expect(requireElement(".guide-book-page").scrollTop).toBe(300),
   );
 });
 
 it("turns to a section from the contents or the next section link, each at its top", () => {
   render(<QuickGuide />);
-  const page = () => document.querySelector(".guide-book-page")!;
-  const contents = () => document.querySelector(".guide-book-switch")!;
-  const current = () =>
-    document.querySelector('[aria-current="page"]')!.textContent;
 
-  page().scrollTop = 200;
-  fireEvent.click(contents());
+  requireElement(".guide-book-page").scrollTop = 200;
+  fireEvent.click(requireElement(".guide-book-switch"));
   fireEvent.click(
     screen.getByText("Game Pieces", { selector: ".guide-book-item" }),
   );
-  expect(current()).toBe("Game Pieces");
-  expect(contents().getAttribute("aria-expanded")).toBe("false");
-  expect(page().scrollTop).toBe(0);
+  expect(currentGuideSection()).toBe("Game Pieces");
+  expect(
+    requireElement(".guide-book-switch").getAttribute("aria-expanded"),
+  ).toBe("false");
+  expect(requireElement(".guide-book-page").scrollTop).toBe(0);
 
-  page().scrollTop = 200;
-  fireEvent.click(document.querySelector(".guide-book-next")!);
-  expect(current()).toBe("Draft Phase");
-  expect(page().scrollTop).toBe(0);
+  requireElement(".guide-book-page").scrollTop = 200;
+  fireEvent.click(requireElement(".guide-book-next"));
+  expect(currentGuideSection()).toBe("Draft Phase");
+  expect(requireElement(".guide-book-page").scrollTop).toBe(0);
 });

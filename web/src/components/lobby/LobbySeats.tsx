@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import type { useVoiceChat } from "../../hooks/useVoiceChat";
 import type { LobbyPlayer, LobbyState } from "../../types";
 import { CrossIcon } from "../icons/CrossIcon";
@@ -6,6 +6,7 @@ import { Spinner } from "../icons/Spinner";
 import { MicToggle } from "../sidebar/MicToggle";
 
 type VoiceChat = ReturnType<typeof useVoiceChat>;
+type SeatListStyle = CSSProperties & { "--seat-columns"?: number };
 
 // A longer name steps down in size, so eight seats still fit without scrolling.
 const LONG_NAME = 22;
@@ -31,7 +32,7 @@ function Seat({
   status: ReactNode;
   children?: ReactNode;
   isSelf?: boolean;
-}) {
+}): ReactElement {
   return (
     <li className={`seat seat-taken ${isSelf ? "is-self" : ""}`}>
       <span className="seat-text">
@@ -53,7 +54,7 @@ function PlayerStatus({
 }: {
   player: LobbyPlayer;
   isSelf: boolean;
-}) {
+}): ReactElement {
   const details = [
     isSelf && "You",
     player.is_host && "Host",
@@ -84,7 +85,7 @@ function PlayerMic({
   player: LobbyPlayer;
   isSelf: boolean;
   voiceChat: VoiceChat;
-}) {
+}): ReactElement | null {
   const { state } = voiceChat;
   if (isSelf) {
     if (state.peers.length === 0) return null;
@@ -117,7 +118,7 @@ function PuppetStatus({
 }: {
   index: number;
   available: number | null;
-}) {
+}): ReactElement {
   if (available === null) {
     return (
       <>
@@ -126,8 +127,9 @@ function PuppetStatus({
       </>
     );
   }
-  if (index >= available)
+  if (index >= available) {
     return <span className="text-[var(--loss-text)]">No data</span>;
+  }
   return <span className="seat-ready">Ready</span>;
 }
 
@@ -150,7 +152,7 @@ export function LobbySeats({
   voiceChat: VoiceChat;
   actions: SeatActions;
   onPuppetHelp: () => void;
-}) {
+}): ReactElement {
   const {
     players,
     puppet_count: puppets,
@@ -158,6 +160,7 @@ export function LobbySeats({
     available_puppet_count: available,
   } = lobby;
   const canAddPuppet = isHost && available !== null && puppets < available;
+  const seatStyle: SeatListStyle = { "--seat-columns": seatColumns(seats) };
 
   const puppetHelp = (
     <button
@@ -176,7 +179,7 @@ export function LobbySeats({
   return (
     <ul
       className={`lobby-seats ${compact ? "is-compact" : ""}`}
-      style={{ "--seat-columns": seatColumns(seats) } as CSSProperties}
+      style={seatStyle}
     >
       {players.map((player) => {
         const isSelf = player.player_id === selfId;

@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
-import argparse
+from typing import TYPE_CHECKING
 
 from scripts.fly_report.fly_client import run_remote_python
 
+if TYPE_CHECKING:
+    import argparse
+
 
 def build_remote_db_script(hours: int, db_path: str) -> str:
-    return f"""
+    script = """
 import json
 import sqlite3
 from datetime import datetime, UTC
 
-hours = {hours}
-db_path = {db_path!r}
-window = f"-{{hours}} hours"
+hours = __HOURS__
+db_path = __DB_PATH__
+window = f"-{hours} hours"
 conn = sqlite3.connect(db_path)
 conn.row_factory = sqlite3.Row
 cur = conn.cursor()
@@ -178,6 +181,7 @@ print("JSON_START")
 print(json.dumps(report, sort_keys=True))
 print("JSON_END")
 """
+    return script.replace("__HOURS__", str(hours)).replace("__DB_PATH__", repr(db_path))
 
 
 def fetch_db_report(args: argparse.Namespace) -> dict[str, object]:

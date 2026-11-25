@@ -36,12 +36,12 @@ const LIFE_MINUS_TOUCH_AREA =
   "touch-area [--touch-area-left:calc(100%_-_44px)]";
 const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:0px]";
 // A click handler makes the number a tap target of its own. Without one WebKit moves a tap on it to - or +.
-const ignoreLifeNumberTap = () => {};
+const ignoreLifeNumberTap = (): void => {};
 
 const STATIC_DIVIDER_CALLBACKS = {
-  onDragStart: () => {},
-  onDrag: () => {},
-  onDragEnd: () => {},
+  onDragStart: (): void => {},
+  onDrag: (): void => {},
+  onDragEnd: (): void => {},
 };
 
 const ALL_BATTLE_ZONES: ZoneName[] = [
@@ -76,7 +76,7 @@ export function BattleMobileLifeRail({
   lifeRailRef: (node: HTMLDivElement | null) => void;
   onYourLifeChange: (life: number) => void;
   onOpponentLifeChange: (life: number) => void;
-}) {
+}): ReactNode {
   const canManipulateOpponent = battle.can_manipulate_opponent;
   const oppPeer =
     !canManipulateOpponent && voice.targetsAvailable
@@ -111,12 +111,14 @@ export function BattleMobileLifeRail({
             >
               -
             </button>
-            <span
+            <button
+              type="button"
+              tabIndex={-1}
               onClick={ignoreLifeNumberTap}
-              className="text-white font-bold"
+              className="text-white font-bold cursor-default"
             >
               {battle.opponent_life}
-            </span>
+            </button>
             <button
               onClick={() => onOpponentLifeChange(battle.opponent_life + 1)}
               className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}
@@ -144,12 +146,14 @@ export function BattleMobileLifeRail({
             >
               -
             </button>
-            <span
+            <button
+              type="button"
+              tabIndex={-1}
               onClick={ignoreLifeNumberTap}
-              className="text-white font-bold"
+              className="text-white font-bold cursor-default"
             >
               {battle.your_life}
-            </span>
+            </button>
             <button
               onClick={() => onYourLifeChange(battle.your_life + 1)}
               className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}
@@ -225,33 +229,45 @@ function renderPlayerMicToggle(
   );
 }
 
-export function GameSidebarChrome({
-  gameState,
-  battleViewForDisplay,
+function getOverlaySidebarTitle({
+  scouting,
+  shellMode,
   inFight,
   fightSidebarView,
-  onFightSidebarViewChange,
-  usesOverlaySidebar,
-  shellMode,
-  overlaySidebarOpen,
-  overlaySidebarTopInset,
-  battleSidebarLayout,
-  scouting,
-  onScout,
-  onCloseDrawer,
-  isSpectator,
-  isEndPhase,
-  canSpectate,
-  watchUrl,
-  voice,
-  onYourLifeChange,
-  onOpponentLifeChange,
-  onCreateTreasure,
-  onUntapAll,
-  onPassTurn,
-  onCreateOpponentTreasure,
-  onUntapOpponentAll,
 }: {
+  scouting: Scouting | null;
+  shellMode: GameShellMode;
+  inFight: boolean;
+  fightSidebarView: FightSidebarView;
+}): string {
+  if (scouting && shellMode === "mobile") return "Scouting";
+  if (inFight && fightSidebarView === "fight") return "Fight";
+  return "Players";
+}
+
+function SidebarWatchFooter({
+  micBlocked,
+  showWatchLink,
+  watchUrl,
+}: {
+  micBlocked: boolean;
+  showWatchLink: boolean;
+  watchUrl: string;
+}): ReactNode {
+  if (!micBlocked && !showWatchLink) return undefined;
+  return (
+    <>
+      {micBlocked && (
+        <div className="pt-3">
+          <MicBlockedIndicator />
+        </div>
+      )}
+      {showWatchLink && <CopyWatchLink url={watchUrl} />}
+    </>
+  );
+}
+
+interface GameSidebarChromeProps {
   gameState: GameState;
   battleViewForDisplay: BattleView | null;
   inFight: boolean;
@@ -280,53 +296,81 @@ export function GameSidebarChrome({
   onPassTurn: () => void;
   onCreateOpponentTreasure: () => void;
   onUntapOpponentAll: () => void;
-}) {
+}
+
+function renderBattleSidebarContent(
+  props: GameSidebarChromeProps,
+  viewSwitch: ReactNode,
+): ReactNode {
+  const { battleViewForDisplay, gameState, voice, battleSidebarLayout } = props;
+  if (!battleViewForDisplay) return null;
+  const canManipulateOpponent = battleViewForDisplay.can_manipulate_opponent;
+  const voiceChat =
+    !canManipulateOpponent && voice.targetsAvailable
+      ? {
+          state: voice.state,
+          toggleSelfMute: voice.toggleSelfMute,
+          togglePeerMute: voice.togglePeerMute,
+        }
+      : undefined;
+
+  return (
+    <BattleSidebarContent
+      header={viewSwitch}
+      currentBattle={battleViewForDisplay}
+      selfUpgrades={getRevealedAppliedUpgrades(gameState.self_player.upgrades)}
+      yourLife={battleViewForDisplay.your_life}
+      opponentLife={battleViewForDisplay.opponent_life}
+      onYourLifeChange={props.onYourLifeChange}
+      onOpponentLifeChange={props.onOpponentLifeChange}
+      playerName={gameState.self_player.name}
+      onCreateTreasure={props.onCreateTreasure}
+      onUntapAll={props.onUntapAll}
+      onPassTurn={props.onPassTurn}
+      canManipulateOpponent={canManipulateOpponent}
+      onCreateOpponentTreasure={props.onCreateOpponentTreasure}
+      onUntapOpponentAll={props.onUntapOpponentAll}
+      onPassOpponentTurn={props.onPassTurn}
+      voiceChat={voiceChat}
+      topSectionHeight={battleSidebarLayout?.topSectionHeight ?? null}
+      middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
+      overlayTopInset={props.overlaySidebarTopInset}
+    />
+  );
+}
+
+export function GameSidebarChrome(props: GameSidebarChromeProps): ReactNode {
+  const {
+    gameState,
+    inFight,
+    fightSidebarView,
+    onFightSidebarViewChange,
+    usesOverlaySidebar,
+    shellMode,
+    overlaySidebarOpen,
+    scouting,
+    onScout,
+    onCloseDrawer,
+    isSpectator,
+    isEndPhase,
+    canSpectate,
+    watchUrl,
+    voice,
+  } = props;
   const { self_player } = gameState;
-  const canManipulateOpponent =
-    battleViewForDisplay?.can_manipulate_opponent ?? false;
   const micBlocked = isVoiceMicBlocked(voice.targetsAvailable, voice.state);
   const showWatchLink = !isSpectator && (!isEndPhase || canSpectate);
-
-  const renderFight = (viewSwitch: ReactNode): ReactNode => {
-    if (!battleViewForDisplay) return null;
-    return (
-      <BattleSidebarContent
-        header={viewSwitch}
-        currentBattle={battleViewForDisplay}
-        selfUpgrades={getRevealedAppliedUpgrades(self_player.upgrades)}
-        yourLife={battleViewForDisplay.your_life}
-        opponentLife={battleViewForDisplay.opponent_life}
-        onYourLifeChange={onYourLifeChange}
-        onOpponentLifeChange={onOpponentLifeChange}
-        playerName={self_player.name}
-        onCreateTreasure={onCreateTreasure}
-        onUntapAll={onUntapAll}
-        onPassTurn={onPassTurn}
-        canManipulateOpponent={canManipulateOpponent}
-        onCreateOpponentTreasure={onCreateOpponentTreasure}
-        onUntapOpponentAll={onUntapOpponentAll}
-        onPassOpponentTurn={onPassTurn}
-        voiceChat={
-          !canManipulateOpponent && voice.targetsAvailable
-            ? {
-                state: voice.state,
-                toggleSelfMute: voice.toggleSelfMute,
-                togglePeerMute: voice.togglePeerMute,
-              }
-            : undefined
-        }
-        topSectionHeight={battleSidebarLayout?.topSectionHeight ?? null}
-        middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
-        overlayTopInset={overlaySidebarTopInset}
-      />
-    );
-  };
 
   const sidebar = (
     <Sidebar
       players={gameState.players}
       currentPlayer={self_player}
-      renderFight={inFight ? renderFight : undefined}
+      renderFight={
+        inFight
+          ? (viewSwitch): ReactNode =>
+              renderBattleSidebarContent(props, viewSwitch)
+          : undefined
+      }
       fightView={fightSidebarView}
       onFightViewChange={onFightSidebarViewChange}
       useUpgrades={gameState.use_upgrades}
@@ -339,27 +383,22 @@ export function GameSidebarChrome({
         renderPlayerMicToggle(player, self_player.name, voice)
       }
       watchLink={
-        micBlocked || showWatchLink ? (
-          <>
-            {micBlocked && (
-              <div className="pt-3">
-                <MicBlockedIndicator />
-              </div>
-            )}
-            {showWatchLink && <CopyWatchLink url={watchUrl} />}
-          </>
-        ) : undefined
+        <SidebarWatchFooter
+          micBlocked={micBlocked}
+          showWatchLink={showWatchLink}
+          watchUrl={watchUrl}
+        />
       }
     />
   );
 
   if (!usesOverlaySidebar) return <FrameSidebar>{sidebar}</FrameSidebar>;
-  const overlayTitle =
-    scouting && shellMode === "mobile"
-      ? "Scouting"
-      : inFight && fightSidebarView === "fight"
-        ? "Fight"
-        : "Players";
+  const overlayTitle = getOverlaySidebarTitle({
+    scouting,
+    shellMode,
+    inFight,
+    fightSidebarView,
+  });
   return (
     <SidePanel
       open={overlaySidebarOpen}
@@ -407,7 +446,7 @@ export function BattleSideboardPanels({
   onOpponentCardHover: (cardId: string, zone: ZoneName) => void;
   onCardHoverEnd: () => void;
   onRevealHiddenUpgrades: (upgradeIds: string[]) => void;
-}) {
+}): ReactNode {
   const {
     upgradedCardIds: battleUpgradedCardIds,
     appliedUpgradesByCardId: battleUpgradesByCardId,
@@ -450,7 +489,9 @@ export function BattleSideboardPanels({
                 onSelectCard({ card, zone: "sideboard", owner: "player" })
               }
               onContextMenu={
-                canHover ? (e) => onOpenCardMenu(e, card, "player") : undefined
+                canHover
+                  ? (e): void => onOpenCardMenu(e, card, "player")
+                  : undefined
               }
               upgraded={battleUpgradedCardIds.has(card.id)}
               appliedUpgrades={battleUpgradesByCardId.get(card.id)}
@@ -499,7 +540,7 @@ export function BattleSideboardPanels({
               }
               onContextMenu={
                 canHover
-                  ? (e) => onOpenCardMenu(e, card, "opponent")
+                  ? (e): void => onOpenCardMenu(e, card, "opponent")
                   : undefined
               }
               upgraded={opponentBattleUpgradedCardIds.has(card.id)}

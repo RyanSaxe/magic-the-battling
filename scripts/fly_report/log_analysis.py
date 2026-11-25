@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
 import math
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from scripts.fly_report.fly_client import (
     ReportError,
@@ -16,6 +16,9 @@ from scripts.fly_report.fly_client import (
     run_command,
     run_remote_python,
 )
+
+if TYPE_CHECKING:
+    import argparse
 
 logger = logging.getLogger(__name__)
 
@@ -218,8 +221,9 @@ def summarize_logs(
     for event in log_events:
         _record_log_event(event, acc)
 
+    fly_log_cap = 100
     note = source_note
-    if source == "fly" and len(log_events) == 100:
+    if source == "fly" and len(log_events) == fly_log_cap:
         note += " This fetch returned exactly 100 events, which indicates a practical per-call cap."
 
     return {
@@ -338,7 +342,8 @@ def fetch_file_logs_summary(args: argparse.Namespace) -> dict[str, object]:
     payload = run_remote_python(args, script)
     events = payload.get("events", [])
     if not isinstance(events, list):
-        raise ReportError("Unexpected event list in file log payload.")
+        msg = "Unexpected event list in file log payload."
+        raise ReportError(msg)
     summary = summarize_logs(
         [event for event in events if isinstance(event, dict)],
         source="file",

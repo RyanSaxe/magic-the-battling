@@ -1,4 +1,9 @@
-import type { ComponentProps, CSSProperties, ReactNode } from "react";
+import type {
+  ComponentProps,
+  CSSProperties,
+  ReactElement,
+  ReactNode,
+} from "react";
 import { SearchBox } from "./SearchBox";
 import { SectionTitle } from "./Section";
 
@@ -11,7 +16,7 @@ export function ListHeader({
   title: string;
   counts?: ReactNode;
   search: Omit<ComponentProps<typeof SearchBox>, "className">;
-}) {
+}): ReactElement {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-2">
       <div className="flex items-baseline gap-4">
@@ -30,7 +35,7 @@ export function ResultGrid({
 }: {
   busy: boolean;
   children: ReactNode;
-}) {
+}): ReactElement {
   return (
     <div
       aria-busy={busy}
@@ -55,7 +60,7 @@ export function LoadMoreButton({
   /** Where the button sits in its list. */
   className?: string;
   style?: CSSProperties;
-}) {
+}): ReactElement {
   return (
     <button
       type="button"

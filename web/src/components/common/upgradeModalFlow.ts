@@ -4,7 +4,7 @@ function runModalActionWithClose(options: {
   onClose: () => void;
   flush?: (callback: () => void) => void;
   onRun?: () => void;
-}) {
+}): void {
   const { onClose, flush = flushSync, onRun } = options;
   if (!onRun) return;
 
@@ -20,12 +20,12 @@ export function applyUpgradeWithModalClose(options: {
   onApply?: (upgradeId: string, targetId: string) => void;
   onClose: () => void;
   flush?: (callback: () => void) => void;
-}) {
+}): void {
   const { upgradeId, targetId, onApply, onClose, flush = flushSync } = options;
   runModalActionWithClose({
     onClose,
     flush,
-    onRun: onApply ? () => onApply(upgradeId, targetId) : undefined,
+    onRun: onApply ? (): void => onApply(upgradeId, targetId) : undefined,
   });
 }
 
@@ -34,12 +34,12 @@ export function revealUpgradeWithModalClose(options: {
   onReveal?: (upgradeIds: string[]) => void;
   onClose: () => void;
   flush?: (callback: () => void) => void;
-}) {
+}): void {
   const { upgradeIds, onReveal, onClose, flush = flushSync } = options;
   if (upgradeIds.length === 0) return;
   runModalActionWithClose({
     onClose,
     flush,
-    onRun: onReveal ? () => onReveal(upgradeIds) : undefined,
+    onRun: onReveal ? (): void => onReveal(upgradeIds) : undefined,
   });
 }

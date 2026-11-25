@@ -1,3 +1,4 @@
+import type { Card as GameCard } from "../types";
 import type {
   ConditionalGuideId,
   GuideDefinition,
@@ -43,11 +44,11 @@ function draftGuideOpponentSelector(
   return `[data-guide-player-row="${escapeSelectorValue(ctx.draftGuideOpponentName)}"]`;
 }
 
-function currentPack(ctx: GuidedWalkthroughContext) {
+function currentPack(ctx: GuidedWalkthroughContext): GameCard[] {
   return ctx.selfPlayer?.current_pack ?? [];
 }
 
-function buildPool(ctx: GuidedWalkthroughContext) {
+function buildPool(ctx: GuidedWalkthroughContext): GameCard[] {
   if (!ctx.selfPlayer) return [];
   return [...ctx.selfPlayer.hand, ...ctx.selfPlayer.sideboard];
 }
@@ -316,10 +317,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     {
       id: "hand",
       title: "Your Hand",
-      targetId: "battle-hand" as const,
-      positionTargetId: (ctx) =>
-        ctx.isMobile ? "battle-battlefield" : "battle-hand",
-      placement: "top" as const,
+      targetId: "battle-hand",
+      positionTargetId: (stepCtx) =>
+        stepCtx.isMobile ? "battle-battlefield" : "battle-hand",
+      placement: "top",
       cardPlacement: "top-right",
       mobileCardPlacement: "top-center",
       primaryActionLabel: "Next",
@@ -331,10 +332,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     {
       id: "battlefield",
       title: "The Battlefield",
-      targetId: "battle-battlefield" as const,
-      positionTargetId: (ctx) =>
-        ctx.isMobile ? "battle-hand" : "battle-battlefield",
-      placement: "right" as const,
+      targetId: "battle-battlefield",
+      positionTargetId: (stepCtx) =>
+        stepCtx.isMobile ? "battle-hand" : "battle-battlefield",
+      placement: "right",
       cardPlacement: "bottom-right",
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Next",
@@ -536,7 +537,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         id: "pack",
         title: "Current Pack",
         targetId: "draft-pack",
-        positionTargetId: (ctx) => (ctx.isMobile ? "draft-pool" : "draft-pack"),
+        positionTargetId: (stepCtx) =>
+          stepCtx.isMobile ? "draft-pool" : "draft-pack",
         placement: "right",
         cardPlacement: "bottom-center",
         mobileCardPlacement: "bottom-center",
@@ -549,7 +551,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         id: "pool",
         title: "Your Pool",
         targetId: "draft-pool",
-        positionTargetId: (ctx) => (ctx.isMobile ? "draft-pack" : "draft-pool"),
+        positionTargetId: (stepCtx) =>
+          stepCtx.isMobile ? "draft-pack" : "draft-pool",
         placement: "right",
         cardPlacement: "top-center",
         mobileCardPlacement: "top-center",
@@ -590,15 +593,15 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         id: "revealed-cards",
         title: "Draft Signals",
         targetId: "sidebar-seen-in-battle",
-        waitForLayoutTargetId: (ctx) =>
-          ctx.isMobile ? undefined : "sidebar-detail-drawer",
+        waitForLayoutTargetId: (stepCtx) =>
+          stepCtx.isMobile ? undefined : "sidebar-detail-drawer",
         placement: "left",
         cardPlacement: "middle-left",
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         sidebarState: {
           openOnMobile: true,
-          playerName: (ctx) => ctx.draftGuideOpponentName,
+          playerName: (stepCtx) => stepCtx.draftGuideOpponentName,
           detailTab: "seen",
         },
         content: {
@@ -616,7 +619,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         id: "roll",
         title: "Open a New Pack",
         targetId: "draft-roll",
-        positionTargetId: (ctx) => (ctx.isMobile ? "draft-pool" : "draft-roll"),
+        positionTargetId: (stepCtx) =>
+          stepCtx.isMobile ? "draft-pool" : "draft-roll",
         placement: "top",
         cardPlacement: "top-center",
         primaryActionLabel: "Next",
@@ -651,33 +655,71 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
+const TREASURE_HINT_BY_PHASE: Record<
+  "build" | "draft",
+  {
+    label: string;
+    phase: "build" | "draft";
+    targetId: GuideStepDefinition["targetId"];
+    positionTargetId: GuideStepDefinition["positionTargetId"];
+    placement: GuideStepDefinition["placement"];
+    cardPlacement: GuideStepDefinition["cardPlacement"];
+    mobileCardPlacement: GuideStepDefinition["mobileCardPlacement"];
+    detail: string;
+  }
+> = {
+  build: {
+    label: "Build Tip",
+    phase: "build",
+    targetId: "build-sideboard",
+    positionTargetId: "build-battlefield",
+    placement: "right",
+    cardPlacement: "top-right",
+    mobileCardPlacement: "top-center",
+    detail:
+      "If you can start this card early, it may be something you can turn into an advantage.",
+  },
+  draft: {
+    label: "Draft Tip",
+    phase: "draft",
+    targetId: "draft-pack",
+    positionTargetId: "draft-pool",
+    placement: "top",
+    cardPlacement: "bottom-center",
+    mobileCardPlacement: "bottom-center",
+    detail:
+      "Even a modest treasure producer can be worth prioritizing because economy carries across phases.",
+  },
+};
+
 function buildTreasureProducerHint(
   ctx: GuidedWalkthroughContext,
 ): GuideDefinition {
   const source = findTreasureProducer(ctx);
-  const isBuild = source?.phase === "build";
+  const preset =
+    source?.phase === "build"
+      ? TREASURE_HINT_BY_PHASE.build
+      : TREASURE_HINT_BY_PHASE.draft;
 
   return {
     id: "hint_treasure_producer",
-    label: isBuild ? "Build Tip" : "Draft Tip",
-    phase: isBuild ? "build" : "draft",
+    label: preset.label,
+    phase: preset.phase,
     steps: [
       {
         id: "treasure-producer",
         title: "Treasure Matters Here",
         targetSelector: cardSelector(source?.cardId),
-        targetId: isBuild ? "build-sideboard" : "draft-pack",
-        positionTargetId: isBuild ? "build-battlefield" : "draft-pool",
-        placement: isBuild ? "right" : "top",
-        cardPlacement: isBuild ? "top-right" : "bottom-center",
-        mobileCardPlacement: isBuild ? "top-center" : "bottom-center",
+        targetId: preset.targetId,
+        positionTargetId: preset.positionTargetId,
+        placement: preset.placement,
+        cardPlacement: preset.cardPlacement,
+        mobileCardPlacement: preset.mobileCardPlacement,
         primaryActionLabel: "Got it",
         content: {
           summary:
             "Treasure-producing cards are worth extra attention because they help both in fights and in future drafts.",
-          detail: isBuild
-            ? "If you can start this card early, it may be something you can turn into an advantage."
-            : "Even a modest treasure producer can be worth prioritizing because economy carries across phases.",
+          detail: preset.detail,
         },
       },
     ],
@@ -803,28 +845,30 @@ export function isAlwaysOnConditionalGuide(
 export function isConditionalGuideId(
   guideId: GuidedGuideId,
 ): guideId is ConditionalGuideId {
-  return CONDITIONAL_GUIDE_PRIORITY.includes(guideId as ConditionalGuideId);
+  return CONDITIONAL_GUIDE_PRIORITY.some((id) => id === guideId);
 }
+
+const CONDITIONAL_ELIGIBILITY: Record<
+  ConditionalGuideId,
+  (ctx: GuidedWalkthroughContext) => boolean
+> = {
+  hint_treasure_producer: (ctx) => Boolean(findTreasureProducer(ctx)),
+  hint_build_unapplied_upgrade: (ctx) =>
+    ctx.currentPhase === "build" &&
+    Boolean(
+      ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target),
+    ),
+  hint_battle_unrevealed_upgrade: (ctx) =>
+    ctx.currentPhase === "battle" && ctx.hasBattleRevealUpgrade,
+  hint_treasure_cap: (ctx) =>
+    ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6,
+};
 
 export function isConditionalGuideEligible(
   guideId: ConditionalGuideId,
   ctx: GuidedWalkthroughContext,
 ): boolean {
-  switch (guideId) {
-    case "hint_treasure_producer":
-      return !!findTreasureProducer(ctx);
-    case "hint_build_unapplied_upgrade":
-      return (
-        ctx.currentPhase === "build" &&
-        !!ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target)
-      );
-    case "hint_battle_unrevealed_upgrade":
-      return ctx.currentPhase === "battle" && ctx.hasBattleRevealUpgrade;
-    case "hint_treasure_cap":
-      return (
-        ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6
-      );
-  }
+  return CONDITIONAL_ELIGIBILITY[guideId](ctx);
 }
 
 export function getEligibleConditionalGuides(
@@ -835,34 +879,27 @@ export function getEligibleConditionalGuides(
   );
 }
 
+const GUIDE_BUILDERS: Record<
+  GuidedGuideId,
+  (ctx: GuidedWalkthroughContext) => GuideDefinition
+> = {
+  welcome: buildWelcomeGuide,
+  build: buildBuildGuide,
+  build_play_draw: buildPlayDrawGuide,
+  battle: buildBattleGuide,
+  battle_result_submit: buildBattleResultSubmitGuide,
+  reward: buildRewardGuide,
+  reward_stage_end: buildRewardStageEndGuide,
+  draft: buildDraftGuide,
+  hint_treasure_producer: buildTreasureProducerHint,
+  hint_build_unapplied_upgrade: buildUnappliedUpgradeHint,
+  hint_battle_unrevealed_upgrade: buildBattleRevealUpgradeHint,
+  hint_treasure_cap: buildTreasureCapHint,
+};
+
 export function buildGuideDefinition(
   guideId: GuidedGuideId,
   ctx: GuidedWalkthroughContext,
 ): GuideDefinition {
-  switch (guideId) {
-    case "welcome":
-      return buildWelcomeGuide();
-    case "build":
-      return buildBuildGuide();
-    case "build_play_draw":
-      return buildPlayDrawGuide();
-    case "battle":
-      return buildBattleGuide(ctx);
-    case "battle_result_submit":
-      return buildBattleResultSubmitGuide(ctx);
-    case "reward":
-      return buildRewardGuide(ctx);
-    case "reward_stage_end":
-      return buildRewardStageEndGuide(ctx);
-    case "draft":
-      return buildDraftGuide(ctx);
-    case "hint_treasure_producer":
-      return buildTreasureProducerHint(ctx);
-    case "hint_build_unapplied_upgrade":
-      return buildUnappliedUpgradeHint();
-    case "hint_battle_unrevealed_upgrade":
-      return buildBattleRevealUpgradeHint();
-    case "hint_treasure_cap":
-      return buildTreasureCapHint(ctx);
-  }
+  return GUIDE_BUILDERS[guideId](ctx);
 }

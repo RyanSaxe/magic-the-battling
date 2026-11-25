@@ -1,4 +1,11 @@
-import { useCallback, useState, useRef, type ReactNode, type Ref } from "react";
+import {
+  useCallback,
+  useState,
+  useRef,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts";
 import { useAuth } from "../../contexts/authState";
@@ -19,7 +26,7 @@ interface AppHeaderProps {
 }
 
 /** The top bar on pages outside a game: the brand lockup, then the page's buttons by role. */
-export function AppHeader(props: AppHeaderProps) {
+export function AppHeader(props: AppHeaderProps): ReactElement {
   return <TopBar lead={<BrandLockup />} {...props} />;
 }
 
@@ -29,7 +36,7 @@ export function GuideButton({
 }: {
   onClick: () => void;
   className?: string;
-}) {
+}): ReactElement {
   return (
     <button
       onClick={onClick}
@@ -51,13 +58,13 @@ export function HomeButton({
   to?: string;
   className?: string;
   onHome?: () => void;
-}) {
+}): ReactElement {
   const navigate = useNavigate();
   return (
     <button
       onClick={() => {
         onHome?.();
-        navigate(to);
+        void navigate(to);
       }}
       className={`btn btn-secondary ${className}`}
     >
@@ -67,7 +74,7 @@ export function HomeButton({
 }
 
 /** The account menu: the username on desktop, ☰ on phones. */
-export function UserMenuButton() {
+export function UserMenuButton(): ReactElement {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { addToast } = useToast();
@@ -80,7 +87,7 @@ export function UserMenuButton() {
     () =>
       logout().then(
         () => {
-          navigate("/");
+          void navigate("/");
         },
         () => {
           addToast("Something went wrong.", "error");
@@ -93,8 +100,12 @@ export function UserMenuButton() {
   useDocumentEvent("mousedown", (e) => {
     const target = e.target;
     if (!(target instanceof Node)) return;
-    if (ref.current?.contains(target) || backdropRef.current?.contains(target))
+    if (
+      ref.current?.contains(target) ||
+      backdropRef.current?.contains(target)
+    ) {
       return;
+    }
     setOpen(false);
   });
   useHotkeys({ escape: () => setOpen(false) }, open);
@@ -141,7 +152,7 @@ export function UserMenuButton() {
             <button
               onClick={() => {
                 setOpen(false);
-                navigate("/dashboard");
+                void navigate("/dashboard");
               }}
               className="w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
             >
@@ -150,7 +161,7 @@ export function UserMenuButton() {
             <button
               onClick={() => {
                 setOpen(false);
-                navigate("/dashboard/games");
+                void navigate("/dashboard/games");
               }}
               className="sm:hidden w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
             >
@@ -159,7 +170,7 @@ export function UserMenuButton() {
             <button
               onClick={() => {
                 setOpen(false);
-                navigate("/dashboard/discover");
+                void navigate("/dashboard/discover");
               }}
               className="sm:hidden w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
             >
@@ -168,7 +179,7 @@ export function UserMenuButton() {
             <button
               onClick={() => {
                 setOpen(false);
-                navigate("/play");
+                void navigate("/play");
               }}
               className="w-full text-left px-4 py-2 menu-item text-sm text-[var(--ivory)] transition-colors"
             >

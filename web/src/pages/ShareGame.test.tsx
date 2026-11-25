@@ -7,12 +7,16 @@ import { ShareGame } from "./ShareGame";
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
-  window.matchMedia = ((query: string) => ({
+  window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
     media: query,
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof window.matchMedia;
+    onchange: null,
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  });
 });
 
 function snapshot(
@@ -58,10 +62,17 @@ function sharedGame(): ShareGameResponse {
   };
 }
 
-vi.mock("../api/client", () => ({ getShareGame: async () => sharedGame() }));
-vi.mock("../contexts", () => ({ useToast: () => ({ addToast: () => {} }) }));
+vi.mock("../api/client", () => ({
+  getShareGame: async (): Promise<ShareGameResponse> => sharedGame(),
+}));
+vi.mock("../contexts", () => ({
+  useToast: (): { addToast: () => void } => ({ addToast: (): void => {} }),
+}));
 vi.mock("../contexts/authState", () => ({
-  useAuth: () => ({ user: null, loading: false }),
+  useAuth: (): { user: null; loading: boolean } => ({
+    user: null,
+    loading: false,
+  }),
 }));
 
 beforeEach(() => {
@@ -69,13 +80,13 @@ beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
     },
   );
   // The round list scrolls to the chosen round, and jsdom has no scrollIntoView.
-  Element.prototype.scrollIntoView = () => {};
+  Element.prototype.scrollIntoView = (): void => {};
 });
 
 afterEach(() => {
@@ -83,7 +94,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderShare() {
+function renderShare(): void {
   render(
     <MemoryRouter initialEntries={["/game/game-1/share/Alice"]}>
       <Routes>
@@ -91,6 +102,22 @@ function renderShare() {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function findRoundButton(round: string): Promise<HTMLElement> {
+  return screen.findByText(round, { selector: "button" });
+}
+
+function queryEarlierRound(): HTMLElement | null {
+  return screen.queryByText("Stage 3 - Round 1", { selector: "button" });
+}
+
+async function stepRound(
+  direction: "Prev" | "Next",
+  expectedRound: string,
+): Promise<void> {
+  fireEvent.click(screen.getByText(direction, { selector: "button" }));
+  await findRoundButton(expectedRound);
 }
 
 it("Prev and Next step through every round and Sudden Death build in order", async () => {
@@ -102,18 +129,14 @@ it("Prev and Next step through every round and Sudden Death build in order", asy
     "Stage 3 - Round 3 · Sudden Death",
     "Stage 3 - Round 3 · Sudden Death 2",
   ];
-  const shows = (round: string) =>
-    screen.findByText(round, { selector: "button" });
 
-  await shows(rounds[3]);
-  for (const round of [rounds[2], rounds[1], rounds[0]]) {
-    fireEvent.click(screen.getByText("Prev", { selector: "button" }));
-    await shows(round);
-  }
-  for (const round of [rounds[1], rounds[2], rounds[3]]) {
-    fireEvent.click(screen.getByText("Next", { selector: "button" }));
-    await shows(round);
-  }
+  await findRoundButton(rounds[3]);
+  await stepRound("Prev", rounds[2]);
+  await stepRound("Prev", rounds[1]);
+  await stepRound("Prev", rounds[0]);
+  await stepRound("Next", rounds[1]);
+  await stepRound("Next", rounds[2]);
+  await stepRound("Next", rounds[3]);
 });
 
 it("closes the round list on the click of a tap on the board or on its own button", async () => {
@@ -122,20 +145,18 @@ it("closes the round list on the click of a tap on the board or on its own butto
   const roundButton = await screen.findByText("Stage 3 - Round 2", {
     selector: "button",
   });
-  const earlierRound = () =>
-    screen.queryByText("Stage 3 - Round 1", { selector: "button" });
 
   fireEvent.click(roundButton);
   fireEvent.mouseDown(roundButton);
   fireEvent.click(roundButton);
-  expect(earlierRound()).toBeNull();
+  expect(queryEarlierRound()).toBeNull();
 
   fireEvent.click(roundButton);
   const tapTarget = document.querySelector(".board-backdrop");
-  expect(tapTarget).not.toBeNull();
-  fireEvent.mouseDown(tapTarget!);
-  expect(earlierRound()).not.toBeNull();
+  if (!tapTarget) throw new Error("expected .board-backdrop");
+  fireEvent.mouseDown(tapTarget);
+  expect(queryEarlierRound()).not.toBeNull();
 
-  fireEvent.click(tapTarget!);
-  expect(earlierRound()).toBeNull();
+  fireEvent.click(tapTarget);
+  expect(queryEarlierRound()).toBeNull();
 });

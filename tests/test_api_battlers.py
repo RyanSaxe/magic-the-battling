@@ -3,9 +3,11 @@
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any, Never
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import event
 
 from mtb.utils import json_helpers
@@ -84,8 +86,8 @@ def _add_game(
         db.close()
 
 
-def _add_builds(game_id: str, player_name: str, builds: list[tuple[int | None, str]]) -> None:
-    """Saves one 3-1 build per (sudden_death_build, card) pair, in the order given."""
+def _add_builds(game_id: str, player_name: str, *, builds: list[tuple[int | None, str]]) -> None:
+    """Save one 3-1 build per (sudden_death_build, card) pair, in the order given."""
     db = database.SessionLocal()
     try:
         history = db.query(PlayerGameHistory).filter_by(game_id=game_id, player_name=player_name).one()
@@ -113,7 +115,8 @@ def _day(day: int) -> datetime:
 
 
 @pytest.fixture
-def vintage_cube(client):
+def vintage_cube(client: TestClient) -> None:
+    _ = client
     db = database.SessionLocal()
     try:
         db.add(CubeMetadata(cube_id="vintage", name="Vintage Cube", image_uri="https://img/vintage"))
@@ -123,7 +126,7 @@ def vintage_cube(client):
 
 
 @pytest.fixture
-def kestrel(client) -> str:
+def kestrel(client: TestClient) -> str:
     response = client.post(
         "/api/auth/register",
         json={"username": "kestrel", "password": "password123", "email": "kestrel@test.com"},
@@ -132,7 +135,7 @@ def kestrel(client) -> str:
     return response.json()["user_id"]
 
 
-def _save_preset(client, **settings) -> dict:
+def _save_preset(client: TestClient, **settings: Any) -> dict:  # noqa: ANN401 -- forwards preset JSON fields
     response = client.post("/api/battlers", json={"cube_id": "vintage", **settings})
     assert response.status_code == 200
     return response.json()
@@ -148,7 +151,10 @@ def _my_stats(preset: dict) -> tuple:
 
 
 class TestPresetStats:
-    def test_a_preset_counts_only_your_finished_games_with_its_settings(self, client, vintage_cube, kestrel):
+    def test_a_preset_counts_only_your_finished_games_with_its_settings(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = vintage_cube
         limited = {"play_mode": "limited", "use_upgrades": True}
         _add_game("won", cube_id="vintage", config=limited, played_on=_day(10), seats=[Seat("kestrel", 1, kestrel)])
         _add_game("third", cube_id="vintage", config=limited, played_on=_day(12), seats=[Seat("kestrel", 3, kestrel)])
@@ -191,7 +197,10 @@ class TestPresetStats:
         assert _my_stats(presets["No Upgrades"])[:3] == (1, 1, 1.0)
         assert presets["Friday Vintage"]["game_count"] == 6
 
-    def test_a_preset_with_no_games_has_empty_stats(self, client, vintage_cube, kestrel):
+    def test_a_preset_with_no_games_has_empty_stats(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = (vintage_cube, kestrel)
         _add_game("someone-else", cube_id="vintage", played_on=_day(15), seats=[Seat("rook", 1)])
 
         preset = _save_preset(client)
@@ -199,7 +208,10 @@ class TestPresetStats:
         assert _my_stats(preset) == (0, 0, None, None)
         assert preset["game_count"] == 1
 
-    def test_saving_a_preset_returns_its_stats_and_cube_name(self, client, vintage_cube, kestrel):
+    def test_saving_a_preset_returns_its_stats_and_cube_name(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = vintage_cube
         _add_game("won", cube_id="vintage", played_on=_day(10), seats=[Seat("kestrel", 1, kestrel)])
 
         preset = _save_preset(client, play_mode="limited", use_upgrades=True)
@@ -208,7 +220,10 @@ class TestPresetStats:
         assert preset["my_game_count"] == 1
         assert preset["game_count"] == 1
 
-    def test_changing_a_presets_settings_returns_the_stats_for_its_new_settings(self, client, vintage_cube, kestrel):
+    def test_changing_a_presets_settings_returns_the_stats_for_its_new_settings(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = vintage_cube
         _add_game(
             "constructed",
             cube_id="vintage",
@@ -225,16 +240,20 @@ class TestPresetStats:
         assert updated["cube_name"] == "Vintage Cube"
 
 
-def _cubecobra_answers(monkeypatch, status: int) -> None:
-    def _get_json(url: str):
+def _cubecobra_answers(monkeypatch: pytest.MonkeyPatch, status: int) -> None:
+    def _get_json(url: str) -> Never:
         request = httpx.Request("GET", url)
-        raise httpx.HTTPStatusError("CubeCobra", request=request, response=httpx.Response(status, request=request))
+        msg = "CubeCobra"
+        raise httpx.HTTPStatusError(msg, request=request, response=httpx.Response(status, request=request))
 
     monkeypatch.setattr("mtb.utils.json_helpers.get_json", _get_json)
 
 
 class TestPresetCube:
-    def test_saves_a_pasted_cubecobra_link_as_its_cube_id(self, client, vintage_cube, kestrel):
+    def test_saves_a_pasted_cubecobra_link_as_its_cube_id(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = (vintage_cube, kestrel)
         link = client.post("/api/battlers", json={"cube_id": "https://cubecobra.com/cube/list/vintage?view=table"})
         other_site = client.post("/api/battlers", json={"cube_id": "https://example.com/cube/list/vintage"})
 
@@ -243,7 +262,10 @@ class TestPresetCube:
         assert other_site.status_code == 422
         assert other_site.json()["detail"] == "Enter a CubeCobra cube ID, or paste a link to the cube on CubeCobra."
 
-    def test_refuses_a_cube_cubecobra_has_no_record_of(self, client, kestrel, monkeypatch):
+    def test_refuses_a_cube_cubecobra_has_no_record_of(
+        self, client: TestClient, kestrel: str, *, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _ = kestrel
         _cubecobra_answers(monkeypatch, 404)
 
         response = client.post("/api/battlers", json={"cube_id": "thepaupercueb"})
@@ -255,8 +277,12 @@ class TestPresetCube:
         }
         assert client.get("/api/battlers").json()["battlers"] == []
 
-    def test_refuses_what_start_refuses_until_it_is_fixed_on_cubecobra(self, client, kestrel, monkeypatch):
-        def listed(name: str, card_type: str = "Creature", keywords: tuple[str, ...] = ()) -> dict:
+    def test_refuses_what_start_refuses_until_it_is_fixed_on_cubecobra(
+        self, client: TestClient, kestrel: str, *, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _ = kestrel
+
+        def listed(name: str, card_type: str = "Creature", *, keywords: tuple[str, ...] = ()) -> dict:
             return {"details": {"name": name, "type": card_type, "keywords": keywords}}
 
         cards = [listed(f"Card {n}") for n in range(100)]
@@ -277,8 +303,10 @@ class TestPresetCube:
             ([*cards, cards[0]], "it is not singleton because Card 0 appears more than once."),
             (
                 [*cards, listed("Backup Plan", "Conspiracy")],
-                "its own Conspiracy and Vanguard cards are not supported right now. "
-                "Use the default upgrades and vanguards instead.",
+                (
+                    "its own Conspiracy and Vanguard cards are not supported right now. "
+                    "Use the default upgrades and vanguards instead."
+                ),
             ),
         ]
         site = {}
@@ -292,10 +320,10 @@ class TestPresetCube:
                 return httpx.Response(304, headers=headers)
             return httpx.Response(200, headers=headers, content=body)
 
-        service = json_helpers._JsonService()
+        service = json_helpers._JsonService()  # noqa: SLF001 -- internal state inspected by test
         monkeypatch.setattr(service, "_client", httpx.AsyncClient(transport=httpx.MockTransport(cubecobra)))
         monkeypatch.setattr(json_helpers, "_MIN_INTERVAL", 0)
-        monkeypatch.setattr(json_helpers, "_SERVICE", service)
+        monkeypatch.setattr(json_helpers, "_SERVICE_HOLDER", [service])
         monkeypatch.setattr(json_helpers, "get_json", _GET_JSON)
 
         def save(play_mode: str = "limited") -> httpx.Response:
@@ -323,7 +351,8 @@ class TestPresetCube:
 
 
 class TestPresetOrder:
-    def test_lists_your_newest_preset_first(self, client, vintage_cube, kestrel):
+    def test_lists_your_newest_preset_first(self, client: TestClient, vintage_cube: None, *, kestrel: str) -> None:
+        _ = (vintage_cube, kestrel)
         for name in ("Oldest", "Middle", "Newest"):
             _save_preset(client, display_name=name)
 
@@ -331,7 +360,10 @@ class TestPresetOrder:
 
         assert names == ["Newest", "Middle", "Oldest"]
 
-    def test_pages_from_your_newest_preset_to_your_oldest(self, client, vintage_cube, kestrel):
+    def test_pages_from_your_newest_preset_to_your_oldest(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = (vintage_cube, kestrel)
         for n in range(1, 22):
             _save_preset(client, display_name=f"Preset {n}")
 
@@ -344,7 +376,10 @@ class TestPresetOrder:
 
 
 class TestOnePreset:
-    def test_opens_any_of_your_presets_as_the_list_shows_it(self, client, vintage_cube, kestrel):
+    def test_opens_any_of_your_presets_as_the_list_shows_it(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = (vintage_cube, kestrel)
         presets = [_save_preset(client, display_name=f"Preset {n}") for n in range(1, 22)]
         second_page = client.get("/api/battlers", params={"offset": 20}).json()["battlers"]
 
@@ -353,7 +388,8 @@ class TestOnePreset:
         assert response.status_code == 200
         assert response.json() == second_page[0]
 
-    def test_another_players_preset_is_not_found(self, client, vintage_cube, kestrel):
+    def test_another_players_preset_is_not_found(self, client: TestClient, vintage_cube: None, *, kestrel: str) -> None:
+        _ = (vintage_cube, kestrel)
         preset = _save_preset(client)
         client.post("/api/auth/logout")
         client.post(
@@ -365,16 +401,19 @@ class TestOnePreset:
 
         assert (response.status_code, response.json()["code"]) == (404, "BATTLER_NOT_FOUND")
 
-    def test_a_missing_preset_is_not_found(self, client, kestrel):
+    def test_a_missing_preset_is_not_found(self, client: TestClient, kestrel: str) -> None:
+        _ = kestrel
         response = client.get("/api/battlers/999")
 
         assert (response.status_code, response.json()["code"]) == (404, "BATTLER_NOT_FOUND")
 
-    def test_leaves_following_and_my_games_to_their_own_routes(self, client, kestrel):
+    def test_leaves_following_and_my_games_to_their_own_routes(self, client: TestClient, kestrel: str) -> None:
+        _ = kestrel
         assert client.get("/api/battlers/following").status_code == 200
         assert client.get("/api/battlers/my-games").status_code == 200
 
-    def test_needs_a_signed_in_player(self, client, vintage_cube, kestrel):
+    def test_needs_a_signed_in_player(self, client: TestClient, vintage_cube: None, *, kestrel: str) -> None:
+        _ = (vintage_cube, kestrel)
         preset = _save_preset(client)
         client.post("/api/auth/logout")
 
@@ -382,7 +421,10 @@ class TestOnePreset:
 
 
 class TestMyGamesFilter:
-    def test_mine_only_lists_just_your_games_shown_by_your_seat(self, client, vintage_cube, kestrel):
+    def test_mine_only_lists_just_your_games_shown_by_your_seat(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = vintage_cube
         _add_game(
             "shared",
             cube_id="vintage",
@@ -410,10 +452,13 @@ class TestMyGamesFilter:
         assert [g["game_id"] for g in everyone["games"]] == ["with-a-puppet", "rooks-solo", "shared"]
         assert everyone["games"][2]["best_human_name"] == "rook"
 
-    def test_a_game_decided_in_sudden_death_shows_the_last_sudden_death_hand(self, client, vintage_cube, kestrel):
+    def test_a_game_decided_in_sudden_death_shows_the_last_sudden_death_hand(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = vintage_cube
         _add_game("sudden-death", cube_id="vintage", played_on=_day(10), seats=[Seat("kestrel", 1, kestrel)])
         # Saved out of order, so only the lists' own ordering can put the last Sudden Death build first.
-        _add_builds("sudden-death", "kestrel", [(2, "second-rebuild"), (None, "ordinary"), (1, "first-rebuild")])
+        _add_builds("sudden-death", "kestrel", builds=[(2, "second-rebuild"), (None, "ordinary"), (1, "first-rebuild")])
         preset = _save_preset(client)
 
         cube_games = client.get(f"/api/battlers/{preset['id']}/games").json()["games"]
@@ -422,7 +467,10 @@ class TestMyGamesFilter:
         assert [g["hand_scryfall_ids"] for g in cube_games] == [["second-rebuild"]]
         assert [g["hand_scryfall_ids"] for g in my_games] == [["second-rebuild"]]
 
-    def test_mine_only_combines_with_the_mode_and_upgrades_filters(self, client, vintage_cube, kestrel):
+    def test_mine_only_combines_with_the_mode_and_upgrades_filters(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = vintage_cube
         _add_game("old-format", cube_id="vintage", config={}, played_on=_day(10), seats=[Seat("kestrel", 1, kestrel)])
         _add_game(
             "constructed",
@@ -443,7 +491,8 @@ class TestMyGamesFilter:
 
 
 class TestCubeSummary:
-    def test_summarizes_a_cube_whatever_the_filters(self, client, vintage_cube):
+    def test_summarizes_a_cube_whatever_the_filters(self, client: TestClient, vintage_cube: None) -> None:
+        _ = vintage_cube
         constructed = {"play_mode": "constructed", "use_upgrades": False}
         _add_game(
             "a", cube_id="vintage", config=constructed, played_on=_day(10), seats=[Seat("rook", 1), Seat("wren", 2)]
@@ -466,12 +515,16 @@ class TestCubeSummary:
             "follow_id": None,
         }
 
-    def test_a_cube_with_no_games_has_no_popular_setup(self, client, vintage_cube):
+    def test_a_cube_with_no_games_has_no_popular_setup(self, client: TestClient, vintage_cube: None) -> None:
+        _ = vintage_cube
         summary = client.get("/api/battlers/cube/vintage").json()
 
         assert (summary["cube_name"], summary["game_count"], summary["popular_setup"]) == ("Vintage Cube", 0, None)
 
-    def test_tells_a_follower_which_follow_to_remove(self, client, vintage_cube, kestrel):
+    def test_tells_a_follower_which_follow_to_remove(
+        self, client: TestClient, vintage_cube: None, *, kestrel: str
+    ) -> None:
+        _ = (vintage_cube, kestrel)
         follow = client.post("/api/battlers/follow", json={"cube_id": "vintage"}).json()
 
         summary = client.get("/api/battlers/cube/vintage").json()
@@ -481,7 +534,10 @@ class TestCubeSummary:
         assert (summary["is_following"], summary["follow_id"]) == (True, follow["id"])
         assert (signed_out["is_following"], signed_out["follow_id"]) == (False, None)
 
-    def test_holds_no_database_connection_while_cubecobra_names_a_cube(self, client, kestrel, monkeypatch):
+    def test_holds_no_database_connection_while_cubecobra_names_a_cube(
+        self, client: TestClient, kestrel: str, *, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _ = kestrel
         engine = database.SessionLocal().get_bind()
         held = []
         event.listen(engine, "checkout", lambda *_: held.append(True))
@@ -510,7 +566,9 @@ class TestCubeSummary:
     ],
     ids=["cube-games", "preset-games", "save-preset", "follow"],
 )
-def test_waits_on_cubecobra_without_a_database_connection(client, monkeypatch, method, path, body):
+def test_waits_on_cubecobra_without_a_database_connection(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, *, method: str, path: str, body: dict[str, Any] | None
+) -> None:
     preset = _save_preset(client, cube_id="slow")
     engine = database.SessionLocal().get_bind()
     held = []
@@ -519,6 +577,7 @@ def test_waits_on_cubecobra_without_a_database_connection(client, monkeypatch, m
     held_during_fetch = []
 
     def slow_cubecobra(url: str) -> dict:
+        _ = url
         held_during_fetch.append(len(held))
         return {"name": "Slow Cube"}
 
@@ -538,14 +597,15 @@ def _add_cube_name(cube_id: str, name: str) -> None:
         db.close()
 
 
-def _discover(client, **params) -> dict:
+def _discover(client: TestClient, **params: Any) -> dict:  # noqa: ANN401 -- forwards query params
     response = client.get("/api/discover", params=params)
     assert response.status_code == 200
     return response.json()
 
 
 class TestCubeSearch:
-    def test_finds_cubes_by_name_or_id_ignoring_case(self, client, vintage_cube):
+    def test_finds_cubes_by_name_or_id_ignoring_case(self, client: TestClient, vintage_cube: None) -> None:
+        _ = vintage_cube
         _add_cube_name("thepaupercube", "The Pauper Cube")
         for day, cube_id in enumerate(("vintage", "thepaupercube", "legacy"), start=10):
             _add_game(f"game-{cube_id}", cube_id=cube_id, played_on=_day(day), seats=[Seat("rook", 1)])
@@ -558,7 +618,7 @@ class TestCubeSearch:
         assert found("cube") == ["thepaupercube", "vintage"]
         assert found("  ") == ["legacy", "thepaupercube", "vintage"]
 
-    def test_pages_and_counts_only_the_matches(self, client):
+    def test_pages_and_counts_only_the_matches(self, client: TestClient) -> None:
         for i in range(25):
             _add_game(f"pod-game-{i}", cube_id=f"pod-{i}", played_on=_day(1 + i % 20), seats=[Seat("rook", 1)])
         _add_game("other-game", cube_id="vintage", played_on=_day(1), seats=[Seat("rook", 1)])
@@ -569,7 +629,7 @@ class TestCubeSearch:
         assert (len(first["results"]), first["has_more"], first["total"]) == (20, True, 25)
         assert (len(rest["results"]), rest["has_more"]) == (5, False)
 
-    def test_wildcards_in_the_search_match_only_themselves(self, client):
+    def test_wildcards_in_the_search_match_only_themselves(self, client: TestClient) -> None:
         _add_game("underscore", cube_id="a_b", played_on=_day(1), seats=[Seat("rook", 1)])
         _add_game("letter", cube_id="axb", played_on=_day(2), seats=[Seat("rook", 1)])
 
@@ -579,7 +639,8 @@ class TestCubeSearch:
 
 class TestGameSearch:
     @pytest.fixture
-    def kestrels_games(self, client, vintage_cube, kestrel):
+    def kestrels_games(self, client: TestClient, vintage_cube: None, *, kestrel: str) -> None:
+        _ = vintage_cube
         _add_game(
             "limited",
             cube_id="vintage",
@@ -604,33 +665,41 @@ class TestGameSearch:
         )
         _save_preset(client, display_name="Friday Vintage", play_mode="limited", use_upgrades=True)
 
-    def _search(self, client, q: str) -> tuple[list[str], int, int]:
+    def _search(self, client: TestClient, q: str) -> tuple[list[str], int, int]:
         data = client.get("/api/battlers/my-games", params={"q": q}).json()
         return [g["game_id"] for g in data["games"]], data["total_games"], data["total_wins"]
 
-    def test_finds_games_by_another_players_name(self, client, kestrels_games):
+    def test_finds_games_by_another_players_name(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "ROOK") == (["limited"], 1, 1)
         assert self._search(client, "puppet a") == (["legacy"], 1, 1)
 
-    def test_does_not_match_the_players_own_name(self, client, kestrels_games):
+    def test_does_not_match_the_players_own_name(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "kestrel") == ([], 0, 0)
 
-    def test_finds_games_by_cube_name_or_id(self, client, kestrels_games):
+    def test_finds_games_by_cube_name_or_id(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "vintage cube") == (["constructed", "limited"], 2, 1)
         assert self._search(client, "legacy") == (["legacy"], 1, 1)
 
-    def test_finds_the_games_a_preset_name_stands_for(self, client, kestrels_games):
+    def test_finds_the_games_a_preset_name_stands_for(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "friday") == (["limited"], 1, 1)
 
-    def test_finds_games_by_a_card_in_the_players_hand(self, client, kestrels_games):
+    def test_finds_games_by_a_card_in_the_players_hand(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "LIGHTNING") == (["limited"], 1, 1)
 
-    def test_finds_games_by_a_basic_land_or_an_applied_upgrade(self, client, kestrels_games):
+    def test_finds_games_by_a_basic_land_or_an_applied_upgrade(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "island") == (["legacy"], 1, 1)
         assert self._search(client, "sprouting") == (["legacy"], 1, 1)
 
-    def test_does_not_match_a_card_only_another_player_held(self, client, kestrels_games):
+    def test_does_not_match_a_card_only_another_player_held(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "oko") == ([], 0, 0)
 
-    def test_an_empty_search_lists_every_game(self, client, kestrels_games):
+    def test_an_empty_search_lists_every_game(self, client: TestClient, kestrels_games: None) -> None:
+        _ = kestrels_games
         assert self._search(client, "") == (["legacy", "constructed", "limited"], 3, 2)

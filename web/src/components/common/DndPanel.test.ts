@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { resolveBattlePanelLayout } from "./DndPanelLayout";
 
-function gridSize(
-  width: number,
-  height: number,
-  columns: number,
-  rows: number,
-) {
+function gridSize({
+  width,
+  height,
+  columns,
+  rows,
+}: {
+  width: number;
+  height: number;
+  columns: number;
+  rows: number;
+}): { width: number; height: number } {
   const gap = 6;
   return {
     width: columns * width + gap * Math.max(0, columns - 1),
@@ -24,12 +29,7 @@ describe("resolveBattlePanelLayout", () => {
 
   it("always fits the computed grid inside the available panel box", () => {
     const layout = resolveBattlePanelLayout(8, 239, 420);
-    const size = gridSize(
-      layout.width,
-      layout.height,
-      layout.columns,
-      layout.rows,
-    );
+    const size = gridSize(layout);
 
     expect(size.width).toBeLessThanOrEqual(239);
     expect(size.height).toBeLessThanOrEqual(420);
@@ -37,12 +37,7 @@ describe("resolveBattlePanelLayout", () => {
 
   it("keeps constrained mobile panels inside bounds", () => {
     const layout = resolveBattlePanelLayout(6, 320, 220);
-    const size = gridSize(
-      layout.width,
-      layout.height,
-      layout.columns,
-      layout.rows,
-    );
+    const size = gridSize(layout);
 
     expect(size.width).toBeLessThanOrEqual(320);
     expect(size.height).toBeLessThanOrEqual(220);

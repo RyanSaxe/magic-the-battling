@@ -1,8 +1,12 @@
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from time import monotonic, sleep
+from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
+from httpx import Response
 
 import server.routers.games as games_module
 from mtb.models.game import BattleSnapshotData
@@ -12,7 +16,7 @@ from server.services.preview import preview_service
 from server.services.share import _build_puppet_snapshots
 
 
-def _make_source_snapshot(player_history_id: int, stage: int, round_num: int, treasures: int) -> BattleSnapshot:
+def _make_source_snapshot(player_history_id: int, stage: int, *, round_num: int, treasures: int) -> BattleSnapshot:
     full_state_json = BattleSnapshotData(
         hand=[],
         vanguard=None,
@@ -37,7 +41,8 @@ def _make_source_snapshot(player_history_id: int, stage: int, round_num: int, tr
     )
 
 
-def test_build_puppet_snapshots_reuses_best_prior_source_snapshot(test_db):
+def test_build_puppet_snapshots_reuses_best_prior_source_snapshot(test_db: None) -> None:
+    _ = test_db
     with database.SessionLocal() as db:
         db.add(GameRecord(id="src-game", cube_id="cube", ended_at=datetime.now(UTC)))
         db.add(GameRecord(id="puppet-game", cube_id="cube", ended_at=datetime.now(UTC)))
@@ -52,8 +57,8 @@ def test_build_puppet_snapshots_reuses_best_prior_source_snapshot(test_db):
         db.flush()
         db.add_all(
             [
-                _make_source_snapshot(source_history.id, 3, 1, treasures=1),  # ty: ignore[invalid-argument-type]
-                _make_source_snapshot(source_history.id, 3, 2, treasures=4),  # ty: ignore[invalid-argument-type]
+                _make_source_snapshot(source_history.id, 3, round_num=1, treasures=1),
+                _make_source_snapshot(source_history.id, 3, round_num=2, treasures=4),
             ]
         )
         puppet_history = PlayerGameHistory(
@@ -80,7 +85,7 @@ def test_build_puppet_snapshots_reuses_best_prior_source_snapshot(test_db):
     assert [snapshot.treasures for snapshot in snapshots] == [1, 4, 4]
 
 
-def test_share_game_endpoint_allows_public_access_for_unshared_finished_games(client):
+def test_share_game_endpoint_allows_public_access_for_unshared_finished_games(client: TestClient) -> None:
     db = database.SessionLocal()
     try:
         db.add(
@@ -111,7 +116,7 @@ def test_share_game_endpoint_allows_public_access_for_unshared_finished_games(cl
     assert response.json()["game_id"] == "public-game"
 
 
-def test_battler_games_includes_unshared_finished_games_for_same_cube(client):
+def test_battler_games_includes_unshared_finished_games_for_same_cube(client: TestClient) -> None:
     register = client.post(
         "/api/auth/register",
         json={"username": "battler_user", "password": "password123", "email": "battler@test.com"},
@@ -153,7 +158,7 @@ def test_battler_games_includes_unshared_finished_games_for_same_cube(client):
     assert response.json()["games"][0]["game_id"] == "cube-public-game"
 
 
-def test_battler_games_includes_games_where_human_lost(client):
+def test_battler_games_includes_games_where_human_lost(client: TestClient) -> None:
     """Games where all humans died (winner_player_id=None) should still appear."""
     register = client.post(
         "/api/auth/register",
@@ -197,7 +202,7 @@ def test_battler_games_includes_games_where_human_lost(client):
     assert response.json()["games"][0]["game_id"] == "lost-game"
 
 
-def test_my_games_includes_games_where_human_lost(client):
+def test_my_games_includes_games_where_human_lost(client: TestClient) -> None:
     """The Games tab should show games even when the player lost (winner_player_id=None)."""
     register = client.post(
         "/api/auth/register",
@@ -238,7 +243,7 @@ def test_my_games_includes_games_where_human_lost(client):
     assert response.json()["games"][0]["game_id"] == "my-lost-game"
 
 
-def test_cube_games_endpoint_returns_games_for_any_user(client):
+def test_cube_games_endpoint_returns_games_for_any_user(client: TestClient) -> None:
     """The public cube games endpoint works without owning the cube as a battler."""
     client.post(
         "/api/auth/register",
@@ -278,12 +283,12 @@ def test_cube_games_endpoint_returns_games_for_any_user(client):
 
 
 @pytest.fixture
-def cubecobra_cube_json(monkeypatch):
+def cubecobra_cube_json(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = {
         "https://cubecobra.com/cube/api/cubejson/vintage": {"name": "Vintage Cube", "image": {"uri": "https://img/v"}},
     }
 
-    def _get_json(url: str):
+    def _get_json(url: str) -> dict[str, Any]:
         if url not in responses:
             raise LookupError(url)
         return responses[url]
@@ -291,7 +296,7 @@ def cubecobra_cube_json(monkeypatch):
     monkeypatch.setattr("mtb.utils.json_helpers.get_json", _get_json)
 
 
-def test_cube_games_endpoint_names_a_cube_with_no_games(client):
+def test_cube_games_endpoint_names_a_cube_with_no_games(client: TestClient) -> None:
     db = database.SessionLocal()
     try:
         db.add(CubeMetadata(cube_id="auto", name="Crucible Starter Cube", image_uri="https://img/auto"))
@@ -308,7 +313,10 @@ def test_cube_games_endpoint_names_a_cube_with_no_games(client):
     assert data["cube_image_uri"] == "https://img/auto"
 
 
-def test_cube_games_endpoint_fills_missing_cube_metadata_from_cubecobra(client, cubecobra_cube_json):
+def test_cube_games_endpoint_fills_missing_cube_metadata_from_cubecobra(
+    client: TestClient, cubecobra_cube_json: None
+) -> None:
+    _ = cubecobra_cube_json
     response = client.get("/api/battlers/cube/vintage/games")
 
     assert response.status_code == 200
@@ -316,14 +324,18 @@ def test_cube_games_endpoint_fills_missing_cube_metadata_from_cubecobra(client, 
     assert response.json()["cube_image_uri"] == "https://img/v"
 
 
-def test_cube_games_endpoint_leaves_name_empty_when_cubecobra_has_none(client, cubecobra_cube_json):
+def test_cube_games_endpoint_leaves_name_empty_when_cubecobra_has_none(
+    client: TestClient, cubecobra_cube_json: None
+) -> None:
+    _ = cubecobra_cube_json
     response = client.get("/api/battlers/cube/unknown-cube/games")
 
     assert response.status_code == 200
     assert response.json()["cube_name"] is None
 
 
-def test_battler_games_endpoint_names_the_cube(client, cubecobra_cube_json):
+def test_battler_games_endpoint_names_the_cube(client: TestClient, cubecobra_cube_json: None) -> None:
+    _ = cubecobra_cube_json
     client.post(
         "/api/auth/register",
         json={"username": "vintage_fan", "password": "password123", "email": "vintage@test.com"},
@@ -336,7 +348,12 @@ def test_battler_games_endpoint_names_the_cube(client, cubecobra_cube_json):
     assert response.json()["cube_name"] == "Vintage Cube"
 
 
-def _play_into_first_battle(client, start_lobby, ws_receive_json_until) -> str:
+def _play_into_first_battle(
+    client: TestClient,
+    start_lobby: Callable[[str, str], Response],
+    *,
+    ws_receive_json_until: Callable[..., dict[str, Any]],
+) -> str:
     """Start a two-player game and ready both players, which records each player's first battle snapshot."""
     host = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2}).json()
     guest = client.post("/api/games/join", json={"join_code": host["join_code"], "player_name": "Bob"}).json()
@@ -360,8 +377,13 @@ def _play_into_first_battle(client, start_lobby, ws_receive_json_until) -> str:
     return game_id
 
 
-def test_share_hides_a_game_that_is_still_being_played(client, start_lobby, ws_receive_json_until):
-    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until)
+def test_share_hides_a_game_that_is_still_being_played(
+    client: TestClient,
+    start_lobby: Callable[[str, str], Response],
+    *,
+    ws_receive_json_until: Callable[..., dict[str, Any]],
+) -> None:
+    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until=ws_receive_json_until)
 
     response = client.get(f"/api/games/{game_id}/share/Bob")
 
@@ -370,13 +392,18 @@ def test_share_hides_a_game_that_is_still_being_played(client, start_lobby, ws_r
 
 
 def test_share_preview_image_hides_a_game_that_is_still_being_played(
-    client, start_lobby, ws_receive_json_until, monkeypatch
-):
+    client: TestClient,
+    start_lobby: Callable[[str, str], Response],
+    *,
+    ws_receive_json_until: Callable[..., dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_screenshot(url: str, cache_key: str) -> bytes:
+        _ = (url, cache_key)
         return b"png"
 
     monkeypatch.setattr(preview_service, "screenshot", fake_screenshot)
-    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until)
+    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until=ws_receive_json_until)
 
     response = client.get(f"/game/{game_id}/share/Bob/preview.png")
 
@@ -384,9 +411,13 @@ def test_share_preview_image_hides_a_game_that_is_still_being_played(
 
 
 def test_share_hides_a_game_evicted_from_memory_while_still_being_played(
-    client, start_lobby, ws_receive_json_until, monkeypatch
-):
-    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until)
+    client: TestClient,
+    start_lobby: Callable[[str, str], Response],
+    *,
+    ws_receive_json_until: Callable[..., dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until=ws_receive_json_until)
     monkeypatch.setattr("server.services.game.snapshot_store.IDLE_EVICT_MINUTES", 0)
     # The test client can return before the server has handled the last disconnect, so retry
     # eviction the way the background loop does until the game is idle.

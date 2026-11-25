@@ -111,7 +111,7 @@ export function useLobbySync({
   useEffect(() => {
     if (!gameState) return;
     const state: LoadingRouteState = { loadingSteps: START_STEPS };
-    navigate(`/game/${gameId}/play`, { state });
+    void navigate(`/game/${gameId}/play`, { state });
   }, [gameState, gameId, navigate]);
 
   useEffect(() => {

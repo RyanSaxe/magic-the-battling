@@ -1,10 +1,14 @@
+"""HTTP routes for game creation, joining, status, resumable seats, and spectating."""
+
 import asyncio
 import json
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -134,7 +138,7 @@ async def _claim_create_idempotency(
                 raise api_error(
                     409,
                     ErrorCode.INVALID_REQUEST,
-                    "Idempotency key already used with a different create payload.",
+                    detail="Idempotency key already used with a different create payload.",
                 )
             return cached.response, claim
 
@@ -201,11 +205,11 @@ def _update_retry_after_seconds() -> str:
     return str(max(60, estimate_minutes * 60))
 
 
-def _server_update_http_error(detail: str):
+def _server_update_http_error(detail: str) -> HTTPException:
     return api_error(
         503,
         ErrorCode.SERVER_UPDATING,
-        detail,
+        detail=detail,
         headers={"Retry-After": _update_retry_after_seconds()},
     )
 
@@ -227,7 +231,7 @@ def _create_game_response(request: CreateGameRequest, user_id: str | None = None
     pending.puppet_count = request.puppet_count
     session_manager.update_game_id(session.session_id, pending.game_id)
 
-    async def broadcast_lobby():
+    async def broadcast_lobby() -> None:
         await connection_manager.broadcast_lobby_state(pending.game_id)
 
     if request.play_mode == "limited":
@@ -236,11 +240,13 @@ def _create_game_response(request: CreateGameRequest, user_id: str | None = None
         error = game_manager.start_player_battler_preload(
             pending,
             session.player_id,
-            request.cube_id,
+            battler_id=request.cube_id,
             on_complete=broadcast_lobby,
         )
         if error:
-            game_manager.record_player_battler_error(pending, session.player_id, request.cube_id, error)
+            game_manager.record_player_battler_error(
+                pending, session.player_id, battler_id=request.cube_id, error=error
+            )
     return CreateGameResponse(
         game_id=pending.game_id,
         join_code=pending.join_code,
@@ -250,7 +256,7 @@ def _create_game_response(request: CreateGameRequest, user_id: str | None = None
     )
 
 
-def get_db():
+def get_db() -> Generator[Session]:
     db = database.SessionLocal()
     try:
         yield db
@@ -261,12 +267,13 @@ def get_db():
 router = APIRouter(prefix="/api/games", tags=["games"])
 
 
-@router.post("", response_model=CreateGameResponse)
+@router.post("")
 async def create_game(
     request: CreateGameRequest,
-    x_mtb_idempotency_key: str | None = Header(default=None, alias=IDEMPOTENCY_KEY_HEADER),
-    current_user: "User | None" = Depends(get_optional_user),  # noqa: B008
-):
+    x_mtb_idempotency_key: Annotated[str | None, Header(alias=IDEMPOTENCY_KEY_HEADER)] = None,
+    *,
+    current_user: Annotated[User | None, Depends(get_optional_user)],
+) -> CreateGameResponse:
     cache_key = _normalize_idempotency_key(x_mtb_idempotency_key)
     fingerprint = _request_fingerprint(request)
     cached_response, claim = await _claim_create_idempotency(cache_key, fingerprint)
@@ -281,7 +288,7 @@ async def create_game(
         error = (
             _server_update_http_error(block_reason)
             if ops_manager.blocks_new_games()
-            else api_error(503, ErrorCode.SERVER_CAPACITY, block_reason)
+            else api_error(503, ErrorCode.SERVER_CAPACITY, detail=block_reason)
         )
         await _resolve_claim_error(claim, error)
         raise error
@@ -301,18 +308,18 @@ class WarmCubeRequest(BaseModel):
     cube_id: str
 
 
-@router.post("/resumable", response_model=ResumableResponse)
+@router.post("/resumable")
 def find_resumable_games(
     request: ResumableRequest,
-    current_user: User | None = Depends(get_optional_user),  # noqa: B008
-):
+    current_user: Annotated[User | None, Depends(get_optional_user)],
+) -> ResumableResponse:
     """List the lobbies and games the caller can return to, by their browser's seat tokens or their login."""
     user_id = str(current_user.id) if current_user else None
     return ResumableResponse(games=game_manager.find_resumable_seats(request.seats, user_id=user_id))
 
 
 @router.post("/cubes/warm")
-async def warm_cube_cache(request: WarmCubeRequest):
+async def warm_cube_cache(request: WarmCubeRequest) -> dict[str, str]:
     logger.info("warming cube cache: %s", request.cube_id)
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, get_cube_data, request.cube_id)
@@ -321,49 +328,55 @@ async def warm_cube_cache(request: WarmCubeRequest):
     return {"status": "ok"}
 
 
-@router.post("/join", response_model=JoinGameResponse)
-async def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
+@router.post("/join")
+async def join_game_by_code(
+    request: JoinGameRequest, current_user: Annotated[User | None, Depends(get_optional_user)]
+) -> JoinGameResponse:
     """Join a game using just the join code (no game_id needed)."""
     if ops_manager.blocks_new_games():
-        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
+        msg = "Server is updating. Joining new games is temporarily blocked."
+        raise _server_update_http_error(msg)
 
     game_id = game_manager.get_game_id_by_join_code(request.join_code)
     if not game_id:
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     async with game_manager.get_action_lock(game_id):
         if game_manager.get_game(game_id):
-            raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
+            raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, detail="Game has already started")
         pending = game_manager.get_pending_game(game_id)
         if not pending:
-            raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
-        return _join_lobby(pending, request, current_user)
+            raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
+        return _join_lobby(pending, request, current_user=current_user)
 
 
-@router.post("/{game_id}/join", response_model=JoinGameResponse)
-async def join_game(game_id: str, request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
+@router.post("/{game_id}/join")
+async def join_game(
+    game_id: str, request: JoinGameRequest, *, current_user: Annotated[User | None, Depends(get_optional_user)]
+) -> JoinGameResponse:
     if ops_manager.blocks_new_games():
-        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
+        msg = "Server is updating. Joining new games is temporarily blocked."
+        raise _server_update_http_error(msg)
 
     if not game_manager.get_pending_game(game_id):
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     async with game_manager.get_action_lock(game_id):
         pending = game_manager.get_pending_game(game_id)
         if not pending:
-            raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+            raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
         if pending.join_code.upper() != request.join_code.upper():
-            raise api_error(400, ErrorCode.INVALID_JOIN_CODE, "Invalid join code")
-        return _join_lobby(pending, request, current_user)
+            raise api_error(400, ErrorCode.INVALID_JOIN_CODE, detail="Invalid join code")
+        return _join_lobby(pending, request, current_user=current_user)
 
 
-def _join_lobby(pending: PendingGame, request: JoinGameRequest, current_user: User | None) -> JoinGameResponse:
+def _join_lobby(pending: PendingGame, request: JoinGameRequest, *, current_user: User | None) -> JoinGameResponse:
     if not pending.accepts_changes:
-        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, LOBBY_STARTING_MESSAGE)
+        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, detail=LOBBY_STARTING_MESSAGE)
     if pending.has_player_named(request.player_name):
-        raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
+        raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, detail="Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
-        raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
+        raise api_error(400, ErrorCode.LOBBY_FULL, detail="Lobby is full")
 
     session = session_manager.create_session(pending.game_id)
     user_id = str(current_user.id) if current_user else None
@@ -374,7 +387,7 @@ def _join_lobby(pending: PendingGame, request: JoinGameRequest, current_user: Us
         user_id=user_id,
     )
     if not result:
-        raise api_error(400, ErrorCode.UNKNOWN, "Failed to join game")
+        raise api_error(400, ErrorCode.UNKNOWN, detail="Failed to join game")
 
     return JoinGameResponse(
         game_id=pending.game_id,
@@ -396,18 +409,20 @@ _SEAT_REFUSAL_ERRORS: dict[SeatClaimRefusal, tuple[int, ErrorCode, str]] = {
 }
 
 
-@router.post("/{game_id}/rejoin", response_model=JoinGameResponse)
+@router.post("/{game_id}/rejoin")
 async def rejoin_game(
     game_id: str,
     request: RejoinGameRequest,
-    current_user: User | None = Depends(get_optional_user),  # noqa: B008
-):
+    *,
+    current_user: Annotated[User | None, Depends(get_optional_user)],
+) -> JoinGameResponse:
     """Take a seat back, from a new tab or after the session expired.
 
     The caller must hold the seat's token or be logged in as the account that took it. The new session's
-    socket replaces any socket still open on the seat."""
+    socket replaces any socket still open on the seat.
+    """
     if not game_manager.has_game(game_id):
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     async with game_manager.get_action_lock(game_id):
         try:
@@ -419,7 +434,7 @@ async def rejoin_game(
             )
         except SeatClaimRefusedError as refused:
             status, code, detail = _SEAT_REFUSAL_ERRORS[refused.refusal]
-            raise api_error(status, code, detail) from None
+            raise api_error(status, code, detail=detail) from None
         session = session_manager.create_session(game_id, player_id=claim.player_id)
         connection_manager.reserve_connection(game_id, claim.player_id)
 
@@ -435,15 +450,17 @@ async def rejoin_game(
 async def close_seat(
     game_id: str,
     request: CloseSeatRequest,
-    current_user: User | None = Depends(get_optional_user),  # noqa: B008
+    *,
+    current_user: Annotated[User | None, Depends(get_optional_user)],
 ) -> Response:
     """End the caller's seat for good. The seat's token or the account that took it proves the caller.
 
-    A caller logged in as that account can send an empty token."""
+    A caller logged in as that account can send an empty token.
+    """
     if ops_manager.is_maintenance():
-        raise api_error(503, ErrorCode.SERVER_MAINTENANCE, "Server maintenance in progress. Try again shortly.")
+        raise api_error(503, ErrorCode.SERVER_MAINTENANCE, detail="Server maintenance in progress. Try again shortly.")
     if not game_manager.has_game(game_id):
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     async with game_manager.get_action_lock(game_id):
         try:
@@ -455,9 +472,9 @@ async def close_seat(
             )
         except SeatClaimRefusedError as refused:
             status, code, detail = _SEAT_REFUSAL_ERRORS[refused.refusal]
-            raise api_error(status, code, detail) from None
+            raise api_error(status, code, detail=detail) from None
         except SeatCloseRefusedError as refused:
-            raise api_error(409, ErrorCode.INVALID_REQUEST, str(refused)) from None
+            raise api_error(409, ErrorCode.INVALID_REQUEST, detail=str(refused)) from None
         if player_id is not None:
             connection_manager.end_seat_connection(game_id, player_id)
 
@@ -465,16 +482,16 @@ async def close_seat(
     return Response(status_code=204)
 
 
-@router.get("/{game_id}/lobby", response_model=LobbyStateResponse)
-def get_lobby(game_id: str):
+@router.get("/{game_id}/lobby")
+def get_lobby(game_id: str) -> LobbyStateResponse:
     lobby = game_manager.get_lobby_state(game_id)
     if not lobby:
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
     return lobby
 
 
-@router.get("/{game_id}/cards", response_model=GameCardsResponse)
-def get_game_cards(game_id: str, player_name: str | None = None):
+@router.get("/{game_id}/cards")
+def get_game_cards(game_id: str, player_name: str | None = None) -> GameCardsResponse:
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
 
@@ -493,7 +510,7 @@ def get_game_cards(game_id: str, player_name: str | None = None):
         battler = game.battler
 
     if not battler:
-        raise api_error(404, ErrorCode.CARD_POOL_NOT_AVAILABLE, "Card pool not available")
+        raise api_error(404, ErrorCode.CARD_POOL_NOT_AVAILABLE, detail="Card pool not available")
 
     return GameCardsResponse(
         cards=catalog_entries_for_cards(battler.original_cards or battler.cards),
@@ -501,68 +518,74 @@ def get_game_cards(game_id: str, player_name: str | None = None):
     )
 
 
-@router.post("/{game_id}/start", response_model=StartGameResponse)
-async def start_game(game_id: str, session_id: str | None = None, db: Session = Depends(get_db)):  # noqa: B008
+@router.post("/{game_id}/start")
+async def start_game(
+    game_id: str,
+    *,
+    session_id: str | None = None,
+    db: Annotated[Session, Depends(get_db)],
+) -> StartGameResponse:
     if ops_manager.blocks_new_games():
-        raise _server_update_http_error("Server is updating. New games are temporarily blocked.")
+        msg = "Server is updating. New games are temporarily blocked."
+        raise _server_update_http_error(msg)
 
     pending = game_manager.get_pending_game(game_id)
     if not pending:
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     session = session_manager.get_session(session_id) if session_id else None
     if not session:
-        raise api_error(401, ErrorCode.INVALID_SESSION, "Starting a game needs the host's session_id")
+        raise api_error(401, ErrorCode.INVALID_SESSION, detail="Starting a game needs the host's session_id")
     if session.player_id != pending.host_player_id:
-        raise api_error(403, ErrorCode.INVALID_REQUEST, "Only the host can start the game")
+        raise api_error(403, ErrorCode.INVALID_REQUEST, detail="Only the host can start the game")
 
     try:
         await game_manager.start_lobby(
             game_id,
             session.player_id,
-            db,
+            db=db,
             on_change=lambda: connection_manager.broadcast_lobby_state(game_id),
         )
     except LobbyStartRefusedError as exc:
-        raise api_error(400, ErrorCode.INVALID_REQUEST, str(exc)) from exc
+        raise api_error(400, ErrorCode.INVALID_REQUEST, detail=str(exc)) from exc
     except LobbyStartFailedError as exc:
-        raise api_error(500, ErrorCode.UNKNOWN, str(exc)) from exc
+        raise api_error(500, ErrorCode.UNKNOWN, detail=str(exc)) from exc
 
     await connection_manager.broadcast_game_state(game_id)
     return StartGameResponse(success=True)
 
 
-@router.get("/{game_id}", response_model=GameBootstrapResponse)
-def get_game_state(game_id: str, session_id: str):
+@router.get("/{game_id}")
+def get_game_state(game_id: str, session_id: str) -> GameBootstrapResponse:
     session = session_manager.get_session(session_id)
     if not session:
-        raise api_error(401, ErrorCode.INVALID_SESSION, "Invalid session")
+        raise api_error(401, ErrorCode.INVALID_SESSION, detail="Invalid session")
 
     bootstrap = game_manager.get_game_bootstrap(game_id, session.player_id)
     if not bootstrap:
-        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Game not found or player not in game")
+        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, detail="Game not found or player not in game")
 
     return bootstrap
 
 
-@router.get("/{game_id}/status", response_model=GameStatusResponse)
-def get_game_status(game_id: str):
+@router.get("/{game_id}/status")
+def get_game_status(game_id: str) -> GameStatusResponse:
     status = game_manager.get_game_status(
         game_id,
         connected_player_ids=connection_manager.get_connected_player_ids(game_id),
     )
     if status is None:
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
     return status
 
 
-@router.post("/{game_id}/spectate-request", response_model=SpectateRequestResponse)
-async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
+@router.post("/{game_id}/spectate-request")
+async def create_spectate_request(game_id: str, request: SpectateRequestCreate) -> SpectateRequestResponse:
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
 
     if not pending and not game:
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, detail="Game not found")
 
     target_name = request.target_player_name
     player_exists = False
@@ -574,19 +597,21 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
         player_exists = player_exists or any(f.name == target_name for f in game.puppets)
 
     if not player_exists:
-        raise api_error(404, ErrorCode.SPECTATE_TARGET_NOT_FOUND, "Target player not found")
+        raise api_error(404, ErrorCode.SPECTATE_TARGET_NOT_FOUND, detail="Target player not found")
 
     try:
-        spectate_request = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+        spectate_request = game_manager.create_spectate_request(
+            game_id, target_name, spectator_name=request.spectator_name
+        )
     except TooManySpectateRequestsError as exc:
-        raise api_error(429, ErrorCode.INVALID_REQUEST, str(exc)) from exc
+        raise api_error(429, ErrorCode.INVALID_REQUEST, detail=str(exc)) from exc
 
     return SpectateRequestResponse(request_id=spectate_request.request_id)
 
 
 def _spectate_status(spectate_request: SpectateRequest | None) -> SpectateRequestStatus:
     if spectate_request is None:
-        raise api_error(404, ErrorCode.SPECTATE_REQUEST_NOT_FOUND, "Spectate request not found")
+        raise api_error(404, ErrorCode.SPECTATE_REQUEST_NOT_FOUND, detail="Spectate request not found")
     return SpectateRequestStatus(
         status=spectate_request.status,
         session_id=spectate_request.session_id,
@@ -594,18 +619,20 @@ def _spectate_status(spectate_request: SpectateRequest | None) -> SpectateReques
     )
 
 
-@router.get("/{game_id}/spectate-request/{request_id}", response_model=SpectateRequestStatus)
-def get_spectate_request_status(game_id: str, request_id: str):
+@router.get("/{game_id}/spectate-request/{request_id}")
+def get_spectate_request_status(game_id: str, request_id: str) -> SpectateRequestStatus:
     return _spectate_status(game_manager.get_spectate_request(game_id, request_id))
 
 
-@router.delete("/{game_id}/spectate-request/{request_id}", response_model=SpectateRequestStatus)
-async def cancel_spectate_request(game_id: str, request_id: str):
-    """Withdraw a request still waiting for an answer. Returns the request's status, which is cancelled unless the
-    request was already answered or had expired."""
+@router.delete("/{game_id}/spectate-request/{request_id}")
+async def cancel_spectate_request(game_id: str, request_id: str) -> SpectateRequestStatus:
+    """Withdraw a request still waiting for an answer. Returns the request's status, which is cancelled unless the.
+
+    request was already answered or had expired.
+    """
     return _spectate_status(game_manager.cancel_spectate_request(game_id, request_id))
 
 
-@router.get("/{game_id}/share/{player_name}", response_model=ShareGameResponse)
-def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)):  # noqa: B008
+@router.get("/{game_id}/share/{player_name}")
+def get_share_game(game_id: str, player_name: str, *, db: Annotated[Session, Depends(get_db)]) -> ShareGameResponse:
     return build_share_state(db, game_id, player_name=player_name)

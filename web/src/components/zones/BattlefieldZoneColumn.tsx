@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { Zones, Card as CardType, ZoneName } from "../../types";
 import type { ZoneOwner } from "../../dnd/types";
 import { CompactZoneDisplay } from "./CompactZoneDisplay";
@@ -38,8 +39,8 @@ export function BattlefieldZoneColumn({
   selectedCardId,
   onZoneClick,
   onCardClick,
-}: BattlefieldZoneColumnProps) {
-  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
+}: BattlefieldZoneColumnProps): ReactElement {
+  const zoneOwner: ZoneOwner = isOpponent ? "opponent" : "player";
   return (
     <div
       className={`flex shrink-0 zone-column ${isOpponent ? "flex-col-reverse" : "flex-col"}`}
@@ -59,7 +60,9 @@ export function BattlefieldZoneColumn({
         canPeekFaceDown={canPeekFaceDown}
         selectedCardId={selectedCardId}
         onZoneClick={
-          onZoneClick ? () => onZoneClick("graveyard", zoneOwner) : undefined
+          onZoneClick
+            ? (): void => onZoneClick("graveyard", zoneOwner)
+            : undefined
         }
         onCardClick={onCardClick}
       />
@@ -77,7 +80,7 @@ export function BattlefieldZoneColumn({
         canPeekFaceDown={canPeekFaceDown}
         selectedCardId={selectedCardId}
         onZoneClick={
-          onZoneClick ? () => onZoneClick("exile", zoneOwner) : undefined
+          onZoneClick ? (): void => onZoneClick("exile", zoneOwner) : undefined
         }
         onCardClick={onCardClick}
       />

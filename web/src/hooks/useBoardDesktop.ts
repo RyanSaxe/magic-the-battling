@@ -17,13 +17,14 @@ export function useBoardDesktop(): boolean {
     if (
       typeof window === "undefined" ||
       typeof window.matchMedia !== "function"
-    )
-      return;
+    ) {
+      return undefined;
+    }
     const query = window.matchMedia(BOARD_QUERY);
-    const update = () => setIsBoard(query.matches);
+    const update = (): void => setIsBoard(query.matches);
     update();
     query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
+    return (): void => query.removeEventListener("change", update);
   }, []);
 
   return isBoard;

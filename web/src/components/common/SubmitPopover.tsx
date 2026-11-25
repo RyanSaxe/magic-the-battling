@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type ReactElement } from "react";
 import { useSubmitPopoverDismiss } from "../../hooks/ui/useDialogBehavior";
 import { BoardBackdrop } from "./BoardBackdrop";
 import { POPOVER_CHROME } from "./styles";
@@ -23,7 +23,7 @@ export function SubmitPopover({
   guideTarget,
   closeOnOutsideClick = true,
   ignoreOutsideClickSelector,
-}: SubmitPopoverProps) {
+}: SubmitPopoverProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
 
