@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../contexts/authState";
+import { useAsyncAction } from "../hooks/useAsyncResource";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
 import { SurfaceCard } from "../components/common/SurfaceCard";
@@ -20,20 +21,22 @@ export function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { run: submitLogin, pending: loading } = useAsyncAction(
+    useCallback(async () => {
+      setError("");
+      try {
+        await login(username, password);
+        navigate(returnTo);
+      } catch (err) {
+        setError(unknownToAppError(err, "login", "Login failed").message);
+      }
+    }, [login, username, password, navigate, returnTo]),
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await login(username, password);
-      navigate(returnTo);
-    } catch (err) {
-      setError(unknownToAppError(err, "login", "Login failed").message);
-    } finally {
-      setLoading(false);
-    }
+    void submitLogin();
   };
 
   return (

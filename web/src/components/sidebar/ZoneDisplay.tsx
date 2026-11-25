@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
+import { useObservedElement } from "../../hooks/pages/useObservedElement";
 import type { Card as CardType } from "../../types";
 import { Card } from "../card";
 import { UpgradeStack } from "./UpgradeStack";
@@ -39,64 +40,39 @@ export function ZoneModal({
   onClose: () => void;
 }) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_MODAL_DIMS);
-  const observerRef = useRef<ResizeObserver | null>(null);
 
-  const bodyRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
+  const bodyRef = useObservedElement<HTMLDivElement>(
+    (node) => {
+      const cs = getComputedStyle(node);
+      const width =
+        node.clientWidth -
+        parseFloat(cs.paddingLeft) -
+        parseFloat(cs.paddingRight);
+      const height =
+        node.clientHeight -
+        parseFloat(cs.paddingTop) -
+        parseFloat(cs.paddingBottom);
 
-      if (!node) return;
+      const next = bestFit(
+        cards.length,
+        Math.max(width, 0),
+        Math.max(height, 0),
+        8,
+        220,
+        64,
+      );
 
-      const measure = () => {
-        const cs = getComputedStyle(node);
-        const width =
-          node.clientWidth -
-          parseFloat(cs.paddingLeft) -
-          parseFloat(cs.paddingRight);
-        const height =
-          node.clientHeight -
-          parseFloat(cs.paddingTop) -
-          parseFloat(cs.paddingBottom);
-
-        const next = bestFit(
-          cards.length,
-          Math.max(width, 0),
-          Math.max(height, 0),
-          8,
-          220,
-          64,
-        );
-
-        setDims((prev) =>
-          prev.width === next.width &&
-          prev.height === next.height &&
-          prev.rows === next.rows &&
-          prev.columns === next.columns
-            ? prev
-            : next,
-        );
-      };
-
-      measure();
-
-      const observer = new ResizeObserver(() => {
-        measure();
-      });
-
-      observer.observe(node);
-      observerRef.current = observer;
+      setDims((prev) =>
+        prev.width === next.width &&
+        prev.height === next.height &&
+        prev.rows === next.rows &&
+        prev.columns === next.columns
+          ? prev
+          : next,
+      );
     },
-    [cards.length],
+    { deps: [cards.length] },
   );
-
-  useEffect(() => {
-    return () => {
-      observerRef.current?.disconnect();
-    };
-  }, []);
 
   return (
     <div

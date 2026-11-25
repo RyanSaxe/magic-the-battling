@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { BattleView, Card as CardType } from "../../types";
 import type { VoiceChatState } from "../../hooks/useVoiceChat";
+import { useObservedElement } from "../../hooks/pages/useObservedElement";
 import { UpgradeStack } from "./UpgradeStack";
 import { MicToggle } from "./MicToggle";
 import { getRevealedAppliedUpgrades } from "../../utils/upgrades";
@@ -132,22 +133,11 @@ function PlayerSection({
     width: number;
     height: number;
   } | null>(null);
-  const observerRef = useRef<ResizeObserver | null>(null);
 
   // Callback ref so the observer attaches the moment the gated <div> mounts.
-  // A useEffect with [] deps would run before the early-return gate flips
-  // from null to JSX, see a null ref, and never set up the observer.
-  const containerRef = useCallback((node: HTMLDivElement | null) => {
-    observerRef.current?.disconnect();
-    observerRef.current = null;
-    if (!node) return;
+  const containerRef = useObservedElement<HTMLDivElement>((node) => {
     setContainerDims({ width: node.clientWidth, height: node.clientHeight });
-    const obs = new ResizeObserver(() => {
-      setContainerDims({ width: node.clientWidth, height: node.clientHeight });
-    });
-    obs.observe(node);
-    observerRef.current = obs;
-  }, []);
+  });
 
   const appliedUpgrades = getRevealedAppliedUpgrades(upgrades);
 

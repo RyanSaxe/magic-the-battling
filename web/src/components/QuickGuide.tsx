@@ -1,14 +1,7 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { FaDiscord } from "react-icons/fa6";
 import { DOCS, getPhaseDoc, type DocEntry } from "../docs";
+import { useQuickGuideEffects } from "../hooks/ui/useDialogBehavior";
 import { DocRenderer } from "./DocRenderer";
 import { CardsView } from "./CardsView";
 import {
@@ -551,12 +544,6 @@ export function QuickGuide({
   const pageRef = useRef<HTMLDivElement>(null);
   const [linkJump, setLinkJump] = useState<{ anchor?: string } | null>(null);
 
-  useLayoutEffect(() => {
-    if (linkJump && pageRef.current) {
-      scrollToLinkTarget(pageRef.current, linkJump.anchor);
-    }
-  }, [linkJump]);
-
   const docNav = useMemo(
     () => ({
       navigate: (docId: string, tab?: string) => {
@@ -589,29 +576,22 @@ export function QuickGuide({
     (entry) => entry.slug === faqSlug,
   )?.question;
 
-  useEffect(() => {
-    if (!onLocationChange) {
-      return;
-    }
-    onLocationChange(
-      buildLocationLabel({
-        activeTab,
-        guideSection,
-        controlsSection,
-        tipsSection,
-        faqQuestion,
-        cardType,
-      }),
-    );
-  }, [
+  const locationLabel = buildLocationLabel({
     activeTab,
-    cardType,
-    controlsSection,
-    faqQuestion,
     guideSection,
-    onLocationChange,
+    controlsSection,
     tipsSection,
-  ]);
+    faqQuestion,
+    cardType,
+  });
+
+  useQuickGuideEffects({
+    pageRef,
+    linkJump,
+    scrollToTarget: scrollToLinkTarget,
+    locationLabel,
+    onLocationChange,
+  });
 
   const guidePages = GUIDE_SECTIONS.map((id) => {
     const title = guideSectionLabel(id);

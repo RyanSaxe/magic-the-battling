@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { createBattler } from "../../api/client";
+import { useAsyncAction } from "../../hooks/useAsyncResource";
 import type { PlayMode, UserBattler } from "../../types";
 import { unknownToAppError } from "../../utils/appError";
 import { DefaultOpponentsField } from "./DefaultOpponentsField";
@@ -24,33 +25,40 @@ export function AddCubeModal({
   const [playMode, setPlayMode] = useState<PlayMode>("limited");
   const [useUpgrades, setUseUpgrades] = useState(true);
   const [puppetCount, setPuppetCount] = useState(3);
-  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { run: submitCube, pending: saving } = useAsyncAction(
+    useCallback(
+      async (trimmedCubeId: string) => {
+        try {
+          const b = await createBattler({
+            cube_id: trimmedCubeId,
+            display_name: displayName.trim() || undefined,
+            play_mode: playMode,
+            use_upgrades: useUpgrades,
+            puppet_count: puppetCount,
+            target_player_count: puppetCount + 1,
+          });
+          onCreated(b);
+        } catch (err) {
+          addToast(
+            unknownToAppError(err, "create-battler", "Failed to create")
+              .message,
+            "error",
+          );
+        }
+      },
+      [displayName, playMode, useUpgrades, puppetCount, onCreated, addToast],
+    ),
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cubeId.trim()) {
+    const trimmed = cubeId.trim();
+    if (!trimmed) {
       addToast("Please enter a CubeCobra ID", "error");
       return;
     }
-    setSaving(true);
-    try {
-      const b = await createBattler({
-        cube_id: cubeId.trim(),
-        display_name: displayName.trim() || undefined,
-        play_mode: playMode,
-        use_upgrades: useUpgrades,
-        puppet_count: puppetCount,
-        target_player_count: puppetCount + 1,
-      });
-      onCreated(b);
-    } catch (err) {
-      addToast(
-        unknownToAppError(err, "create-battler", "Failed to create").message,
-        "error",
-      );
-    } finally {
-      setSaving(false);
-    }
+    void submitCube(trimmed);
   };
 
   return (

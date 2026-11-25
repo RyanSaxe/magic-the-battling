@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
@@ -10,36 +10,16 @@ import {
   ResumeGamesDialog,
   ResumeShelf,
 } from "../components/ResumeGame";
-import {
-  useResumableGames,
-  type ResumableSeat,
-} from "../hooks/useResumableGames";
-import { useAuth } from "../contexts/authState";
-import { prefetchLegendaryName } from "../utils/prefetchName";
+import { useHomeSession } from "../hooks/pages/useAuthSession";
+import type { ResumableSeat } from "../hooks/useResumableGames";
 import { LINK } from "../components/common/styles";
 
 export function Home() {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, seats, markSeatClosed } = useHomeSession();
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showAllGames, setShowAllGames] = useState(false);
   const [seatToClose, setSeatToClose] = useState<ResumableSeat | null>(null);
-  const [closedIds, setClosedIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    prefetchLegendaryName();
-  }, []);
-
-  useEffect(() => {
-    if (!loading && user) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [loading, user, navigate]);
-
-  const resumableGames = useResumableGames();
-  const seats = resumableGames.filter(
-    (seat) => !closedIds.includes(seat.gameId),
-  );
 
   if (loading || user) return null;
 
@@ -113,7 +93,7 @@ export function Home() {
           seat={seatToClose}
           onKeep={() => setSeatToClose(null)}
           onClosed={() => {
-            setClosedIds((ids) => [...ids, seatToClose.gameId]);
+            markSeatClosed(seatToClose.gameId);
             setSeatToClose(null);
           }}
         />

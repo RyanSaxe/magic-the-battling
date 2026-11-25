@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
+import { useThreePhaseOverlay } from "../../hooks/ui/useOverlayAnimations";
 import { Card } from "../card";
 import type { Card as CardType } from "../../types";
 
@@ -8,9 +9,7 @@ interface BuildUpgradeOverlayProps {
   onComplete: () => void;
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
+const BUILD_OVERLAY_TIMINGS = { showMs: 520, glowMs: 960, fadeMs: 760 };
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -21,32 +20,7 @@ export function BuildUpgradeOverlay({
   target,
   onComplete,
 }: BuildUpgradeOverlayProps) {
-  const [phase, setPhase] = useState<"show" | "glow" | "fade">("show");
-  const onCompleteRef = useRef(onComplete);
-  useEffect(() => {
-    onCompleteRef.current = onComplete;
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const run = async () => {
-      await wait(520);
-      if (cancelled) return;
-      setPhase("glow");
-      await wait(960);
-      if (cancelled) return;
-      setPhase("fade");
-      await wait(760);
-      if (cancelled) return;
-      onCompleteRef.current();
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const phase = useThreePhaseOverlay(BUILD_OVERLAY_TIMINGS, onComplete);
 
   const dims = useMemo(() => {
     const viewportWidth = window.innerWidth;

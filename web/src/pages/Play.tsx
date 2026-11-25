@@ -1,24 +1,23 @@
-import {
-  startTransition,
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { createGame, warmCubeCache } from "../api/client";
-import { useGame } from "../hooks/useGame";
+/** Play setup route for launching Goldfish or Play with Friends games. */
+import { useState, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
 import { useCubeLook } from "../hooks/useCubeLook";
 import { useBoardDesktop } from "../hooks/useBoardDesktop";
 import { useHotkeys } from "../hooks/useHotkeys";
+import {
+  useGuestName,
+  usePlayCubeWarmup,
+  useRestoreButtonFocus,
+  useStartFlow,
+  type OpponentCount,
+} from "../hooks/useStartFlow";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { LoadingScreen } from "../components/common/LoadingScreen";
 import {
-  type LoadingRouteState,
   goldfishSteps,
   loadStep,
   newLobbySteps,
@@ -50,140 +49,16 @@ import {
 import { CubeBanner } from "../components/setup/CubeBanner";
 import { GuidedSwitch } from "../components/setup/GuidedSwitch";
 import { SegmentedFilter } from "../components/dashboard/SegmentedFilter";
-import { getLegendaryName } from "../utils/prefetchName";
-import { saveTabSession } from "../utils/tabSession";
-import { abandonSeat } from "../utils/endSeat";
 import {
   getDefaultNewPlayerPreference,
-  getRememberedGuestName,
-  getRememberedSeat,
-  rememberGuestName,
-  rememberPlayerForGame,
   setGlobalGuidedModePreference,
-  setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
-import type { LobbyState, PlayMode } from "../types";
-import {
-  type AppError,
-  getAppErrorMessage,
-  unknownToAppError,
-} from "../utils/appError";
+import type { PlayMode } from "../types";
 import { DIALOG_BACKDROP } from "../components/common/styles";
 
-type SoloPhase =
-  | "idle"
-  | "loading"
-  | "not-enough-puppets"
-  | "starting"
-  | "navigating";
-type OpponentCount = 1 | 3 | 5 | 7;
 type ActiveMode = "friends" | "solo";
 type PlayView = "setup" | "options";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
-
-function normalizeCreateGameError(error: unknown): string {
-  return unknownToAppError(error, "create-game", "Failed to create game")
-    .message;
-}
-
-function abandonStart(gameId: string) {
-  const seat = getRememberedSeat(gameId);
-  if (seat?.seatToken) void abandonSeat(gameId, seat.name, seat.seatToken);
-}
-
-function useSoloLobbyWatcher(
-  lobbyState: LobbyState | null,
-  pendingGameId: string | null,
-  soloPhaseRef: React.RefObject<SoloPhase>,
-  autoStartEnabled: boolean,
-  actions: { setReady: (r: boolean) => void; startGame: () => void },
-  onNotEnoughPuppets: (available: number) => void,
-  onStarting: () => void,
-  onNavigating: () => void,
-) {
-  const hasAutoStarted = useRef(false);
-  const prevCubeStatus = useRef<string | null>(null);
-  const prevCanStart = useRef(false);
-
-  const reset = useCallback(() => {
-    hasAutoStarted.current = false;
-    prevCubeStatus.current = null;
-    prevCanStart.current = false;
-  }, []);
-
-  useEffect(() => {
-    if (
-      !autoStartEnabled ||
-      !pendingGameId ||
-      !lobbyState ||
-      lobbyState.game_id !== pendingGameId
-    ) {
-      return;
-    }
-
-    const cubeJustReady =
-      lobbyState.cube_loading_status === "ready" &&
-      prevCubeStatus.current !== "ready";
-    prevCubeStatus.current = lobbyState.cube_loading_status;
-
-    if (soloPhaseRef.current === "loading" && cubeJustReady) {
-      const available = lobbyState.available_puppet_count ?? 0;
-      if (available >= lobbyState.puppet_count) {
-        onStarting();
-        actions.setReady(true);
-      } else {
-        onNotEnoughPuppets(available);
-      }
-    }
-
-    const canStartJustBecameTrue =
-      lobbyState.can_start && !prevCanStart.current;
-    prevCanStart.current = lobbyState.can_start;
-
-    if (
-      soloPhaseRef.current === "starting" &&
-      canStartJustBecameTrue &&
-      !hasAutoStarted.current
-    ) {
-      hasAutoStarted.current = true;
-      onNavigating();
-      actions.startGame();
-    }
-  }, [
-    actions,
-    autoStartEnabled,
-    lobbyState,
-    onNavigating,
-    onNotEnoughPuppets,
-    onStarting,
-    pendingGameId,
-    soloPhaseRef,
-  ]);
-
-  return { reset };
-}
-
-function useGuestName(): [string, (v: string) => void, boolean] {
-  const [rememberedName] = useState(getRememberedGuestName);
-  const [name, setName] = useState(rememberedName ?? "");
-  const [loading, setLoading] = useState(rememberedName === null);
-
-  useEffect(() => {
-    if (rememberedName !== null) return;
-    let cancelled = false;
-    getLegendaryName().then((n) => {
-      if (!cancelled) {
-        setName(n);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [rememberedName]);
-
-  return [name, setName, loading];
-}
 
 function FriendsIcon({ className }: { className: string }) {
   return (
@@ -253,7 +128,6 @@ function ModePitch({ mode }: { mode: ActiveMode }) {
 }
 
 export function Play() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { addToast } = useToast();
   const resumableGames = useResumableGames();
@@ -283,9 +157,7 @@ export function Play() {
   );
   const [opponents, setOpponents] = useState<OpponentCount>(() => {
     const p = Number(searchParams.get("puppetCount"));
-    return OPPONENT_OPTIONS.includes(p as OpponentCount)
-      ? (p as OpponentCount)
-      : 3;
+    return OPPONENT_OPTIONS.find((option) => option === p) ?? 3;
   });
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
@@ -293,333 +165,46 @@ export function Play() {
     getDefaultNewPlayerPreference(),
   );
 
-  const [friendsLoading, setFriendsLoading] = useState(false);
-  // Cancel can't recall a request, so each answer checks that its start is still the one wanted.
-  const startAttemptRef = useRef(0);
-  const unfinishedStartRef = useRef<string | null>(null);
-
-  const [soloPhase, setSoloPhase] = useState<SoloPhase>("idle");
-  const soloPhaseRef = useRef<SoloPhase>("idle");
-  const [pendingGameId, setPendingGameId] = useState<string | null>(null);
-  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
-  const [maxAvailablePuppets, setMaxAvailablePuppets] = useState<number | null>(
-    null,
-  );
-
-  const updateSoloPhase = useCallback((phase: SoloPhase) => {
-    soloPhaseRef.current = phase;
-    setSoloPhase(phase);
-  }, []);
-
-  const [soloStartEnded, setSoloStartEnded] = useState(false);
-  const handleServerError = useCallback(
-    (error: AppError) => {
-      addToast(
-        getAppErrorMessage(error, "play-connection", "Something went wrong."),
-        "error",
-      );
-      if (soloPhaseRef.current === "navigating") setSoloStartEnded(true);
-    },
-    [addToast],
-  );
-
-  const { lobbyState, gameState, actions, connectionError } = useGame(
-    pendingGameId,
-    pendingSessionId,
-    null,
-    handleServerError,
-  );
-  const lastLobbyErrorRef = useRef<string | null>(null);
-
-  const { reset: resetWatcher } = useSoloLobbyWatcher(
-    lobbyState,
-    pendingGameId,
-    soloPhaseRef,
-    true,
-    actions,
-    (available) => {
-      setMaxAvailablePuppets(available);
-      updateSoloPhase("not-enough-puppets");
-    },
-    () => updateSoloPhase("starting"),
-    () => updateSoloPhase("navigating"),
-  );
-
-  useEffect(() => {
-    unfinishedStartRef.current = pendingGameId;
-  }, [pendingGameId]);
-
-  // Leaving Play gives up an unfinished start as Cancel does. A reload or closed tab never unmounts it, so ends nothing.
-  useEffect(
-    () => () => {
-      startAttemptRef.current += 1;
-      if (unfinishedStartRef.current) abandonStart(unfinishedStartRef.current);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (gameState?.game_id === pendingGameId && pendingGameId) {
-      unfinishedStartRef.current = null;
-      const state: LoadingRouteState = {
-        loadingSteps: goldfishSteps(playMode),
-      };
-      navigate(`/game/${pendingGameId}/play`, { state });
-    }
-  }, [gameState?.game_id, navigate, pendingGameId, playMode]);
-
-  useEffect(() => {
-    if (
-      friendsLoading &&
-      pendingGameId &&
-      lobbyState?.game_id === pendingGameId &&
-      lobbyState.cube_loading_status === "ready"
-    ) {
-      unfinishedStartRef.current = null;
-      const state: LoadingRouteState = {
-        loadingSteps: newLobbySteps(playMode),
-      };
-      navigate(`/game/${pendingGameId}/lobby`, { state });
-    }
-  }, [
-    friendsLoading,
-    lobbyState?.cube_loading_status,
-    lobbyState?.game_id,
-    navigate,
-    pendingGameId,
-    playMode,
-  ]);
-
-  useEffect(() => {
-    const nextError =
-      lobbyState?.game_id === pendingGameId &&
-      lobbyState.cube_loading_status === "error"
-        ? lobbyState.cube_loading_error
-        : null;
-    if (!nextError || nextError === lastLobbyErrorRef.current) {
-      if (!nextError) {
-        lastLobbyErrorRef.current = null;
-      }
-      return;
-    }
-    lastLobbyErrorRef.current = nextError;
-    addToast(nextError, "error");
-    startTransition(() => {
-      if (friendsLoading) {
-        setFriendsLoading(false);
-      }
-      if (soloPhase === "loading") {
-        updateSoloPhase("idle");
-        setMaxAvailablePuppets(null);
-        resetWatcher();
-      }
-      if (pendingGameId) abandonStart(pendingGameId);
-      setPendingGameId(null);
-      setPendingSessionId(null);
-    });
-  }, [
-    addToast,
-    friendsLoading,
-    lobbyState?.cube_loading_error,
-    lobbyState?.cube_loading_status,
-    lobbyState?.game_id,
-    pendingGameId,
-    resetWatcher,
-    soloPhase,
-    updateSoloPhase,
-  ]);
-
-  useEffect(() => {
-    if (!pendingGameId) {
-      lastLobbyErrorRef.current = null;
-    }
-  }, [pendingGameId]);
-
-  useEffect(() => {
-    if (connectionError && pendingGameId) {
-      addToast(
-        getAppErrorMessage(
-          connectionError,
-          "play-connection",
-          "That game is no longer available. Please start a new one.",
-        ),
-        "error",
-      );
-      // A seat that moved is still the player's, in the tab or on the device that took it.
-      if (connectionError.code !== "SEAT_MOVED") abandonStart(pendingGameId);
-      unfinishedStartRef.current = null;
-      startTransition(() => {
-        setPendingGameId(null);
-        setPendingSessionId(null);
-        setFriendsLoading(false);
-        updateSoloPhase("idle");
-        resetWatcher();
-      });
-    }
-  }, [connectionError, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
-
-  // The server refused or failed the start, and either way said why.
-  useEffect(() => {
-    if (!soloStartEnded) return;
-    if (pendingGameId) abandonStart(pendingGameId);
-    startTransition(() => {
-      setSoloStartEnded(false);
-      setPendingGameId(null);
-      setPendingSessionId(null);
-      updateSoloPhase("idle");
-      resetWatcher();
-    });
-  }, [pendingGameId, resetWatcher, soloStartEnded, updateSoloPhase]);
-
-  useEffect(() => {
-    if (!cubeId) return;
-    const timer = setTimeout(() => warmCubeCache(cubeId), 2000);
-    return () => clearTimeout(timer);
-  }, [cubeId]);
+  const startFlow = useStartFlow(addToast);
+  usePlayCubeWarmup(cubeId);
 
   const handleGuidedModeToggle = useCallback((nextValue: boolean) => {
     setIsGuidedMode(nextValue);
     setGlobalGuidedModePreference(nextValue);
   }, []);
 
-  const handleCreateLobby = async () => {
-    const name = playerName.trim();
-    if (!name) {
-      addToast("Please enter your name", "error");
-      return;
-    }
-    const submittedCubeId = cubeId.trim();
-    if (playMode === "constructed" && !submittedCubeId) {
-      addToast("Please enter a CubeCobra ID", "error");
-      return;
-    }
-    lastLobbyErrorRef.current = null;
-    setFriendsLoading(true);
-    const attempt = ++startAttemptRef.current;
-    try {
-      const response = await createGame(name, {
-        cubeId: submittedCubeId || "auto",
-        useUpgrades,
-        autoApproveSpectators,
-        guidedModeDefault: isGuidedMode,
-        playMode,
-      });
-      if (attempt !== startAttemptRef.current) {
-        void abandonSeat(response.game_id, name, response.seat_token);
-        return;
-      }
-      saveTabSession(response.game_id, {
-        sessionId: response.session_id,
-        playerId: response.player_id,
-      });
-      if (!user) rememberGuestName(name);
-      rememberPlayerForGame(response.game_id, name, {
-        seatToken: response.seat_token,
-        joinCode: response.join_code,
-      });
-      setNewPlayerPreferenceForGame(
-        response.game_id,
-        isGuidedMode,
-        response.player_id,
-      );
-      setPendingGameId(response.game_id);
-      setPendingSessionId(response.session_id);
-    } catch (err) {
-      if (attempt !== startAttemptRef.current) return;
-      addToast(normalizeCreateGameError(err), "error");
-      setFriendsLoading(false);
-    }
+  const launchMode = (mode: ActiveMode, opponentOverride?: OpponentCount) => {
+    void startFlow.start({
+      mode,
+      playerName,
+      cubeId,
+      playMode,
+      useUpgrades,
+      opponents: opponentOverride ?? opponents,
+      autoApproveSpectators,
+      isGuidedMode,
+      isAuthenticated: !!user,
+    });
   };
 
-  const handleStartSolo = async (opponentOverride?: OpponentCount) => {
-    const count = opponentOverride ?? opponents;
-    const name = playerName.trim();
-    if (!name) {
-      addToast("Please enter your name", "error");
-      return;
-    }
-    const submittedCubeId = cubeId.trim();
-    if (playMode === "constructed" && !submittedCubeId) {
-      addToast("Please enter a CubeCobra ID", "error");
-      return;
-    }
-    lastLobbyErrorRef.current = null;
-    updateSoloPhase("loading");
-    resetWatcher();
-    const attempt = ++startAttemptRef.current;
-    try {
-      const targetCount = count + 1;
-      const response = await createGame(name, {
-        cubeId: submittedCubeId || "auto",
-        useUpgrades,
-        targetPlayerCount: targetCount,
-        puppetCount: count,
-        guidedModeDefault: isGuidedMode,
-        playMode,
-      });
-      if (attempt !== startAttemptRef.current) {
-        void abandonSeat(response.game_id, name, response.seat_token);
-        return;
-      }
-      saveTabSession(response.game_id, {
-        sessionId: response.session_id,
-        playerId: response.player_id,
-      });
-      if (!user) rememberGuestName(name);
-      rememberPlayerForGame(response.game_id, name, {
-        seatToken: response.seat_token,
-        joinCode: response.join_code,
-      });
-      setNewPlayerPreferenceForGame(
-        response.game_id,
-        isGuidedMode,
-        response.player_id,
-      );
-      setPendingGameId(response.game_id);
-      setPendingSessionId(response.session_id);
-    } catch (err) {
-      if (attempt !== startAttemptRef.current) return;
-      addToast(normalizeCreateGameError(err), "error");
-      updateSoloPhase("idle");
-    }
-  };
-
-  const handleCancelFriends = () => {
-    startAttemptRef.current += 1;
-    if (pendingGameId) abandonStart(pendingGameId);
-    setFriendsLoading(false);
-    setPendingGameId(null);
-    setPendingSessionId(null);
-    lastLobbyErrorRef.current = null;
-  };
-
-  const handleCancelSolo = () => {
-    startAttemptRef.current += 1;
-    if (pendingGameId) abandonStart(pendingGameId);
-    updateSoloPhase("idle");
-    setPendingGameId(null);
-    setPendingSessionId(null);
-    setMaxAvailablePuppets(null);
-    resetWatcher();
-    lastLobbyErrorRef.current = null;
-  };
-
+  const notEnoughPuppets =
+    startFlow.state.kind === "failed" &&
+    startFlow.state.reason === "not_enough_puppets"
+      ? startFlow.state
+      : null;
+  const maxAvailablePuppets = notEnoughPuppets?.availablePuppets ?? null;
   const validRecoveryCounts = OPPONENT_OPTIONS.filter(
     (n) => maxAvailablePuppets !== null && n <= maxAvailablePuppets,
   );
 
   const nameValid = playerName.trim().length > 0;
-
-  const soloLoading =
-    soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
+  const isFlowActive =
+    startFlow.state.kind === "creating" ||
+    startFlow.state.kind === "waiting_for_start";
 
   const handleNameEnter = () => {
-    if (!nameValid) return;
-    if (activeMode === "friends") {
-      if (!friendsLoading) void handleCreateLobby();
-    } else if (soloPhase === "idle") {
-      void handleStartSolo();
-    }
+    if (!nameValid || isFlowActive) return;
+    launchMode(activeMode);
   };
 
   const cubeLook = useCubeLook(
@@ -639,11 +224,12 @@ export function Play() {
       stripButtonRef.current?.focus({ preventScroll: true });
     }
   };
-  useEffect(() => {
-    if (!restoreStripFocusRef.current) return;
-    restoreStripFocusRef.current = false;
-    stripButtonRef.current?.focus({ preventScroll: true });
-  }, [view, bannerCubeId]);
+  useRestoreButtonFocus(
+    stripButtonRef,
+    restoreStripFocusRef,
+    view,
+    bannerCubeId,
+  );
   useHotkeys(
     { escape: () => showView("setup", true) },
     view !== "setup" && !showJoinModal && !showAllGames && !seatToClose,
@@ -661,28 +247,34 @@ export function Play() {
     options: activeMode === "solo" ? "Goldfish options" : "Friends options",
   }[view];
 
-  const startNewGame = () => {
-    if (activeMode === "solo") void handleStartSolo();
-    else void handleCreateLobby();
-  };
-
-  if (soloLoading) {
+  if (
+    (startFlow.state.kind === "creating" ||
+      startFlow.state.kind === "waiting_for_start") &&
+    startFlow.state.mode === "solo"
+  ) {
+    const loadingCube =
+      startFlow.state.kind === "creating" ||
+      startFlow.state.step === "loading_cube";
     return (
       <LoadingScreen
         steps={goldfishSteps(playMode)}
-        current={soloPhase === "loading" ? loadStep(playMode) : "Deal cards"}
-        onCancel={handleCancelSolo}
+        current={loadingCube ? loadStep(playMode) : "Deal cards"}
+        onCancel={startFlow.cancel}
       />
     );
   }
 
-  if (friendsLoading) {
+  if (
+    (startFlow.state.kind === "creating" ||
+      startFlow.state.kind === "waiting_for_start") &&
+    startFlow.state.mode === "friends"
+  ) {
     return (
       <LoadingScreen
         title="Opening lobby"
         steps={newLobbySteps(playMode)}
         current={loadStep(playMode)}
-        onCancel={handleCancelFriends}
+        onCancel={startFlow.cancel}
       />
     );
   }
@@ -757,7 +349,7 @@ export function Play() {
 
   const startButton = (
     <button
-      onClick={startNewGame}
+      onClick={() => launchMode(activeMode)}
       disabled={!nameValid}
       className="btn btn-primary setup-next"
     >
@@ -1017,11 +609,11 @@ export function Play() {
         />
       )}
 
-      {soloPhase === "not-enough-puppets" && (
+      {notEnoughPuppets && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className={`absolute inset-0 ${DIALOG_BACKDROP}`}
-            onClick={handleCancelSolo}
+            onClick={startFlow.cancel}
           />
           <SurfaceCard className="relative text-center">
             <h2 className="text-xl font-bold text-white mb-4">
@@ -1039,13 +631,7 @@ export function Play() {
                 </p>
                 <RecoveryOpponentPicker
                   counts={validRecoveryCounts}
-                  onSelect={(count) => {
-                    if (pendingGameId) abandonStart(pendingGameId);
-                    updateSoloPhase("idle");
-                    setPendingGameId(null);
-                    setPendingSessionId(null);
-                    handleStartSolo(count);
-                  }}
+                  onSelect={(count) => launchMode("solo", count)}
                 />
               </>
             ) : (
@@ -1055,7 +641,7 @@ export function Play() {
               </p>
             )}
             <button
-              onClick={handleCancelSolo}
+              onClick={startFlow.cancel}
               className="btn btn-secondary py-2 px-6 mt-4"
             >
               Cancel

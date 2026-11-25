@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useId, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { useEscapeKey, useWindowEvent } from "../../hooks/useDomEffects";
 import { InfoIcon } from "../icons/InfoIcon";
 import { usePanelHoldsEnter } from "../../utils/enterKey";
 import { BoardBackdrop } from "./BoardBackdrop";
@@ -38,34 +39,27 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
     const placement = placeBeside(button.getBoundingClientRect());
     setTip((open) => ({ placement, pinned: pinned || !!open?.pinned }));
   };
-  const hide = () => setTip(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
+  useWindowEvent(
+    "pointerdown",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
       if (
         buttonRef.current?.contains(target) ||
         backdropRef.current?.contains(target)
       )
         return;
-      hide();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") hide();
-    };
-    const follow = () => show(false);
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("resize", follow);
-    window.addEventListener("scroll", follow, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("resize", follow);
-      window.removeEventListener("scroll", follow, true);
-    };
-  }, [isOpen]);
+      setTip(null);
+    },
+    { enabled: isOpen },
+  );
+  useEscapeKey(() => setTip(null), { enabled: isOpen });
+  useWindowEvent("resize", () => show(false), { enabled: isOpen });
+  useWindowEvent("scroll", () => show(false), {
+    enabled: isOpen,
+    capture: true,
+  });
 
   return (
     <>
@@ -75,11 +69,11 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
         aria-label={label}
         aria-expanded={isOpen}
         aria-describedby={isOpen ? id : undefined}
-        onClick={() => (tip?.pinned ? hide() : show(true))}
+        onClick={() => (tip?.pinned ? setTip(null) : show(true))}
         onFocus={() => show(false)}
         // Pressing the backdrop blurs the button to nothing. The backdrop closes the tip on the click that follows.
         onBlur={(event) => {
-          if (!tip?.pinned || event.relatedTarget) hide();
+          if (!tip?.pinned || event.relatedTarget) setTip(null);
         }}
         onPointerEnter={(event) => {
           if (event.pointerType === "mouse") show(false);
@@ -90,14 +84,16 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
             !tip?.pinned &&
             document.activeElement !== buttonRef.current
           )
-            hide();
+            setTip(null);
         }}
         className="icon-target"
       >
         <InfoIcon size="md" className="h-3.5 w-3.5" />
       </button>
       {/* Only a pinned tip covers the felt: over a hovered one, the cover would end the hover */}
-      {tip?.pinned && <BoardBackdrop ref={backdropRef} onTap={hide} />}
+      {tip?.pinned && (
+        <BoardBackdrop ref={backdropRef} onTap={() => setTip(null)} />
+      )}
       {/* Out of the setup screens' scroll and zoom, which would clip and misplace it */}
       {tip &&
         createPortal(

@@ -1,16 +1,10 @@
-import {
-  useState,
-  useRef,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useContext,
-} from "react";
+import { useRef, useCallback, useContext } from "react";
 import { getTimelinePhases, type Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
 import { GuideStateContext } from "../guided/guideState";
 import { useContentOverflows } from "../hooks/useContentOverflows";
+import { usePhaseTimelineSync } from "../hooks/ui/usePhaseTimelineSync";
 
 const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
 
@@ -33,7 +27,6 @@ const PHASE_ACTIVE_STYLE: Record<Phase, string> = {
 const STEP_ARROW =
   "max-[360px]:hidden text-[var(--gold-border-opaque)] text-xs";
 const GUIDED_POPOVER_AUTO_CLOSE_MS = 10_000;
-const PHASE_POPOVER_FADE_OUT_MS = 220;
 
 type EndState = "eliminated" | "winner" | "game_over" | "awaiting_elimination";
 
@@ -83,107 +76,28 @@ export function PhaseTimeline({
 }: PhaseTimelineProps) {
   const guideState = useContext(GuideStateContext);
   const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
-  const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
-  const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(
-    null,
-  );
-  const [isPopoverClosing, setIsPopoverClosing] = useState(false);
-  const autoCloseTimerRef = useRef<number | null>(null);
-  const closeAnimationTimerRef = useRef<number | null>(null);
-  const popoverPhaseRef = useRef<Phase | null>(null);
   const stepsRowRef = useRef<HTMLDivElement | null>(null);
   const stepsRef = useRef<HTMLDivElement | null>(null);
   const stepsOverflow = useContentOverflows(stepsRowRef, stepsRef);
-  const phaseButtonRefs = useRef<Record<Phase, HTMLButtonElement | null>>({
-    draft: null,
-    build: null,
-    battle: null,
-    reward: null,
+
+  const activeGamePhase = isGamePhase(currentPhase) ? currentPhase : null;
+  const {
+    popoverPhase,
+    popoverAnchorRect,
+    isPopoverClosing,
+    openPopoverForPhase,
+    beginClosingPopover,
+    closePopoverImmediately,
+    bindPhaseButtonRef,
+    bindPhaseStepRef,
+  } = usePhaseTimelineSync({
+    activeGamePhase,
+    stepsOverflow,
+    stepsRowRef,
+    autoOpenPhase,
+    autoOpenDurationMs,
+    onAutoOpenHandled,
   });
-  const phaseStepRefs = useRef<Record<Phase, HTMLDivElement | null>>({
-    draft: null,
-    build: null,
-    battle: null,
-    reward: null,
-  });
-
-  useEffect(() => {
-    popoverPhaseRef.current = popoverPhase;
-  }, [popoverPhase]);
-
-  useLayoutEffect(() => {
-    const row = stepsRowRef.current;
-    const step = isGamePhase(currentPhase)
-      ? phaseStepRefs.current[currentPhase]
-      : null;
-    if (!stepsOverflow || !row || !step) return;
-    const fadeWidth = parseFloat(getComputedStyle(row).scrollPaddingRight);
-    const stepEnd =
-      step.getBoundingClientRect().right -
-      row.getBoundingClientRect().left +
-      row.scrollLeft;
-    row.scrollLeft = Math.max(0, stepEnd + fadeWidth - row.clientWidth);
-  }, [currentPhase, stepsOverflow]);
-
-  const clearAutoCloseTimer = useCallback(() => {
-    if (autoCloseTimerRef.current !== null) {
-      window.clearTimeout(autoCloseTimerRef.current);
-      autoCloseTimerRef.current = null;
-    }
-  }, []);
-
-  const clearCloseAnimationTimer = useCallback(() => {
-    if (closeAnimationTimerRef.current !== null) {
-      window.clearTimeout(closeAnimationTimerRef.current);
-      closeAnimationTimerRef.current = null;
-    }
-  }, []);
-
-  const closePopoverImmediately = useCallback(() => {
-    clearAutoCloseTimer();
-    clearCloseAnimationTimer();
-    setIsPopoverClosing(false);
-    setPopoverPhase(null);
-    setPopoverAnchorRect(null);
-  }, [clearAutoCloseTimer, clearCloseAnimationTimer]);
-
-  const beginClosingPopover = useCallback(() => {
-    if (!popoverPhaseRef.current || closeAnimationTimerRef.current !== null) {
-      return;
-    }
-    clearAutoCloseTimer();
-    setIsPopoverClosing(true);
-    closeAnimationTimerRef.current = window.setTimeout(() => {
-      closeAnimationTimerRef.current = null;
-      setIsPopoverClosing(false);
-      setPopoverPhase(null);
-      setPopoverAnchorRect(null);
-    }, PHASE_POPOVER_FADE_OUT_MS);
-  }, [clearAutoCloseTimer]);
-
-  const openPopoverForPhase = useCallback(
-    (phase: Phase, autoCloseAfterMs?: number): boolean => {
-      const btn = phaseButtonRefs.current[phase];
-      if (!btn) {
-        return false;
-      }
-      clearAutoCloseTimer();
-      clearCloseAnimationTimer();
-      setIsPopoverClosing(false);
-      setPopoverAnchorRect(btn.getBoundingClientRect());
-      setPopoverPhase(phase);
-      if (autoCloseAfterMs && autoCloseAfterMs > 0) {
-        autoCloseTimerRef.current = window.setTimeout(() => {
-          if (popoverPhaseRef.current === phase) {
-            beginClosingPopover();
-          }
-          autoCloseTimerRef.current = null;
-        }, autoCloseAfterMs);
-      }
-      return true;
-    },
-    [beginClosingPopover, clearAutoCloseTimer, clearCloseAnimationTimer],
-  );
 
   const handleClosePopover = useCallback(() => {
     beginClosingPopover();
@@ -209,49 +123,6 @@ export function PhaseTimeline({
       welcomeGuideActive,
     ],
   );
-
-  useEffect(() => {
-    if (!autoOpenPhase) return;
-    if (!isGamePhase(currentPhase)) return;
-    if (autoOpenPhase !== currentPhase) return;
-
-    let cancelled = false;
-    let retryId: number | null = null;
-    const openId = window.setTimeout(() => {
-      if (cancelled) return;
-      if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
-        onAutoOpenHandled?.(autoOpenPhase);
-        return;
-      }
-      retryId = window.setTimeout(() => {
-        if (cancelled) return;
-        if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
-          onAutoOpenHandled?.(autoOpenPhase);
-        }
-      }, 0);
-    }, 0);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(openId);
-      if (retryId !== null) {
-        window.clearTimeout(retryId);
-      }
-    };
-  }, [
-    autoOpenDurationMs,
-    autoOpenPhase,
-    currentPhase,
-    onAutoOpenHandled,
-    openPopoverForPhase,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      clearAutoCloseTimer();
-      clearCloseAnimationTimer();
-    };
-  }, [clearAutoCloseTimer, clearCloseAnimationTimer]);
 
   const handleOpenDetailsFromPopover = useCallback(() => {
     const phase = popoverPhase;
@@ -298,9 +169,7 @@ export function PhaseTimeline({
             const isEndReward = isEnd && phase === "reward";
             const phaseButton = (
               <button
-                ref={(el) => {
-                  phaseButtonRefs.current[phase] = el;
-                }}
+                ref={bindPhaseButtonRef(phase)}
                 disabled={welcomeGuideActive || isEnd}
                 onClick={() => handlePhaseClick(phase)}
                 data-guide-target={`timeline-phase-${phase}`}
@@ -318,9 +187,7 @@ export function PhaseTimeline({
               </button>
             );
 
-            const stepRef = (el: HTMLDivElement | null) => {
-              phaseStepRefs.current[phase] = el;
-            };
+            const stepRef = bindPhaseStepRef(phase);
 
             if (phase === "reward") {
               return (

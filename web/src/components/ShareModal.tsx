@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { IconType } from "react-icons";
 import {
   FaXTwitter,
@@ -9,6 +9,7 @@ import {
   FaMessage,
   FaLink,
 } from "react-icons/fa6";
+import { useEscapeKey } from "../hooks/useDomEffects";
 import { copyText } from "../utils/clipboard";
 import { Dialog } from "./common/Dialog";
 
@@ -72,13 +73,7 @@ const SHARE_TILE =
 export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   const handlePlatformClick = useCallback(
     (getUrl: (url: string, text: string) => string) => {

@@ -1,10 +1,5 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useDocumentEvent, useLayoutMeasure } from "../../hooks/useDomEffects";
 import { useHotkeys } from "../../hooks/useHotkeys";
 import { BoardBackdrop } from "../common/BoardBackdrop";
 import { POPOVER_CHROME } from "../common/styles";
@@ -25,25 +20,27 @@ export function FilterMenu({
   const backdropRef = useRef<HTMLDivElement>(null);
 
   // The felt can't scroll under the backdrop, so a panel that opens past its edge has to be brought into view.
-  useLayoutEffect(() => {
-    if (open) panelRef.current?.scrollIntoView({ block: "nearest" });
-  }, [open]);
+  useLayoutMeasure(
+    panelRef,
+    (panel) => panel.scrollIntoView({ block: "nearest" }),
+    [],
+    open,
+  );
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOnPressOutside = (e: PointerEvent) => {
-      const target = e.target as Node;
+  useDocumentEvent(
+    "pointerdown",
+    (e) => {
       if (
-        ref.current?.contains(target) ||
-        backdropRef.current?.contains(target)
-      )
+        e.target instanceof Node &&
+        (ref.current?.contains(e.target) ||
+          backdropRef.current?.contains(e.target))
+      ) {
         return;
+      }
       setOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnPressOutside);
-    return () =>
-      document.removeEventListener("pointerdown", closeOnPressOutside);
-  }, [open]);
+    },
+    { enabled: open },
+  );
 
   useHotkeys(
     {

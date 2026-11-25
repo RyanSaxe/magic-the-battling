@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/authState";
+import { useAsyncAction } from "../../hooks/useAsyncResource";
 import { unknownToAppError } from "../../utils/appError";
 import {
   getRememberedGuestName,
@@ -26,9 +27,32 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
   const playerName = user ? user.username : manualName;
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<JoinFieldError | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
+  const { run: submitJoin, pending: loading } = useAsyncAction(
+    useCallback(
+      async (name: string, code: string) => {
+        setError(null);
+        try {
+          const lobbyPath = await joinLobbyByCode(code, name);
+          if (!user) rememberGuestName(name);
+          navigate(lobbyPath);
+        } catch (err) {
+          const appError = unknownToAppError(
+            err,
+            "join-game",
+            "Failed to join game",
+          );
+          setError({
+            field: appError.code === "PLAYER_NAME_TAKEN" ? "name" : "code",
+            message: appError.message,
+          });
+        }
+      },
+      [user, navigate],
+    ),
+  );
+
+  const handleSubmit = () => {
     const name = playerName.trim();
     const code = joinCode.trim();
     if (!name) {
@@ -39,27 +63,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       setError({ field: "code", message: "Please enter a join code" });
       return;
     }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const lobbyPath = await joinLobbyByCode(code, name);
-      if (!user) rememberGuestName(name);
-      navigate(lobbyPath);
-    } catch (err) {
-      const appError = unknownToAppError(
-        err,
-        "join-game",
-        "Failed to join game",
-      );
-      setError({
-        field: appError.code === "PLAYER_NAME_TAKEN" ? "name" : "code",
-        message: appError.message,
-      });
-    } finally {
-      setLoading(false);
-    }
+    void submitJoin(name, code);
   };
 
   return (

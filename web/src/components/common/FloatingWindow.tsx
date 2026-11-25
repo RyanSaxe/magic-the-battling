@@ -1,6 +1,4 @@
 import {
-  useEffect,
-  useEffectEvent,
   useRef,
   useState,
   type CSSProperties,
@@ -8,6 +6,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
+import { useTimeout } from "../../hooks/useDomEffects";
 import { Tag } from "./Tag";
 
 type ControlIcon = "minimize" | "restore" | "reset" | "close";
@@ -142,13 +141,7 @@ export function FloatingWindow({
     onMinimize();
   };
 
-  const closeOnceFaded = useEffectEvent(() => onClose());
-
-  useEffect(() => {
-    if (!closing) return;
-    const timer = window.setTimeout(() => closeOnceFaded(), CLOSE_FADE_MS);
-    return () => window.clearTimeout(timer);
-  }, [closing]);
+  useTimeout(onClose, closing ? CLOSE_FADE_MS : null);
 
   return (
     <div

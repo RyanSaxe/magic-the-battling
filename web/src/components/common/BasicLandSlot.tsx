@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useDocumentEvent, useEscapeKey } from "../../hooks/useDomEffects";
 import { BasicLandCard } from "./BasicLandCard";
 import { BoardBackdrop } from "./BoardBackdrop";
 import { CardSlot } from "./CardSlot";
@@ -39,10 +40,11 @@ export function BasicLandSlot({
     h: Math.round(dimensions.width * CARD_ASPECT_RATIO),
   });
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
+  useDocumentEvent(
+    "mousedown",
+    (e) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
       if (
         triggerRef.current?.contains(target) ||
         popoverRef.current?.contains(target) ||
@@ -50,23 +52,19 @@ export function BasicLandSlot({
       )
         return;
       setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+    },
+    { enabled: open },
+  );
 
-  useEffect(() => {
-    if (!open) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+  useEscapeKey(
+    (event) => {
       event.preventDefault();
       // The picker is on top, and not everything that can be open under it checks defaultPrevented.
       event.stopImmediatePropagation();
       setOpen(false);
-    };
-    window.addEventListener("keydown", handleEscape, true);
-    return () => window.removeEventListener("keydown", handleEscape, true);
-  }, [open]);
+    },
+    { enabled: open, capture: true },
+  );
 
   const handleOpen = () => {
     if (!triggerRef.current) return;

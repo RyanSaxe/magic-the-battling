@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { getShareGame } from "../api/client";
-import type { ShareGameResponse } from "../types";
 import { GameSummary } from "../components/GameSummary";
 import { FrameBoard } from "../components/common/PageFrame";
+import { useSummaryEmbed } from "../hooks/pages/useShareGame";
 import { buildGameSummaryData } from "../utils/share";
 
 export function SummaryEmbed() {
@@ -11,49 +9,7 @@ export function SummaryEmbed() {
     gameId: string;
     playerName: string;
   }>();
-  const [data, setData] = useState<ShareGameResponse | null>(null);
-  const [error, setError] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!gameId || !playerName) return;
-    getShareGame(gameId, playerName)
-      .then(setData)
-      .catch(() => setError(true));
-  }, [gameId, playerName]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    if (error) {
-      containerRef.current.setAttribute("data-embed-ready", "true");
-      return;
-    }
-    if (!data) return;
-
-    const el = containerRef.current;
-    const images = el.querySelectorAll("img");
-    if (images.length === 0) {
-      el.setAttribute("data-embed-ready", "true");
-      return;
-    }
-
-    let loaded = 0;
-    const total = images.length;
-    const onDone = () => {
-      loaded++;
-      if (loaded >= total) {
-        el.setAttribute("data-embed-ready", "true");
-      }
-    };
-    images.forEach((img) => {
-      if (img.complete) {
-        onDone();
-      } else {
-        img.addEventListener("load", onDone, { once: true });
-        img.addEventListener("error", onDone, { once: true });
-      }
-    });
-  }, [data, error]);
+  const { data, containerRef } = useSummaryEmbed(gameId, playerName);
 
   const summaryData = data ? buildGameSummaryData(data) : null;
 
@@ -63,12 +19,12 @@ export function SummaryEmbed() {
       style={{ width: 1200, height: 630 }}
       className="bg-[var(--chrome)] text-white overflow-hidden"
     >
-      {summaryData ? (
+      {data && summaryData ? (
         <div className="w-full h-full flex flex-col pt-3 px-2 pb-2">
           <FrameBoard>
             <GameSummary
               player={summaryData.selfPlayer}
-              useUpgrades={data!.use_upgrades}
+              useUpgrades={data.use_upgrades}
             />
           </FrameBoard>
         </div>

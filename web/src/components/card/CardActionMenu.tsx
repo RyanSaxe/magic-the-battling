@@ -1,6 +1,7 @@
-import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { useState, useRef } from "react";
 import type { Card as CardType, ZoneName, CardStateAction } from "../../types";
 import { useFaceDown } from "../../contexts/faceDownState";
+import { useEscapeKey, useLayoutMeasure } from "../../hooks/useDomEffects";
 import { useOpenSubmenus } from "../../hooks/useOpenSubmenus";
 import { MenuPrompt } from "../common/MenuPrompt";
 import {
@@ -80,38 +81,38 @@ export function CardActionMenu({
 
   // A submenu opens under the row that was clicked. Moving the menu then would put a different row under the pointer,
   // so the menu is placed once, with room under it for its tallest submenu.
-  useLayoutEffect(() => {
-    const node = menuRef.current;
-    if (!node) return;
-    const rowHeight =
-      node.querySelector<HTMLElement>(".menu-item")?.offsetHeight ?? 0;
-    const tallestSubmenu = Math.max(
-      tallestSubmenuRows * rowHeight,
-      Math.min(attachToRows * rowHeight, ATTACH_TO_MAX_HEIGHT),
-    );
-    const rect = node.getBoundingClientRect();
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
-    const { x, y } = clampMenuToViewport(
-      position,
-      { width: rect.width, height: rect.height + tallestSubmenu },
-      viewport,
-    );
-    node.style.left = `${x}px`;
-    node.style.top = `${y}px`;
-    node.style.maxHeight = `${menuMaxHeight(y, viewport)}px`;
-  }, [position, tallestSubmenuRows, attachToRows]);
+  useLayoutMeasure(
+    menuRef,
+    (node) => {
+      const rowHeight =
+        node.querySelector<HTMLElement>(".menu-item")?.offsetHeight ?? 0;
+      const tallestSubmenu = Math.max(
+        tallestSubmenuRows * rowHeight,
+        Math.min(attachToRows * rowHeight, ATTACH_TO_MAX_HEIGHT),
+      );
+      const rect = node.getBoundingClientRect();
+      const viewport = { width: window.innerWidth, height: window.innerHeight };
+      const { x, y } = clampMenuToViewport(
+        position,
+        { width: rect.width, height: rect.height + tallestSubmenu },
+        viewport,
+      );
+      node.style.left = `${x}px`;
+      node.style.top = `${y}px`;
+      node.style.maxHeight = `${menuMaxHeight(y, viewport)}px`;
+    },
+    [position, tallestSubmenuRows, attachToRows],
+  );
 
   usePanelHoldsEnter();
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+  // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
+  useEscapeKey(
+    (e) => {
       e.preventDefault();
       onClose();
-    };
-    // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
-    window.addEventListener("keydown", handleEscape, true);
-    return () => window.removeEventListener("keydown", handleEscape, true);
-  }, [onClose]);
+    },
+    { capture: true },
+  );
 
   const owner = isOpponent ? "opponent" : "player";
   const canFaceDown = canUseBattleFaceDownAction(owner, canManipulateOpponent);

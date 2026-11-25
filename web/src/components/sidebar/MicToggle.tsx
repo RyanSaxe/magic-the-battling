@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { type VoicePeer, getAudioLevel } from "../../hooks/useVoiceChat";
+import { useAudioMeter } from "../../hooks/pages/useAudioMeter";
+import { type VoicePeer } from "../../hooks/useVoiceChat";
 
 interface MicToggleProps {
   muted: boolean;
@@ -80,23 +80,7 @@ export function MicToggle({
   remoteMuted,
 }: MicToggleProps) {
   const visual = getMicVisual({ muted, connectionState, remoteMuted });
-  const barRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!audioLevelKey) return;
-    let rafId = 0;
-    const tick = () => {
-      rafId = requestAnimationFrame(tick);
-      const el = barRef.current;
-      if (!el) return;
-      el.style.setProperty(
-        "--mic-level",
-        `${(getAudioLevel(audioLevelKey) * 100).toFixed(1)}%`,
-      );
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [audioLevelKey]);
+  const barRef = useAudioMeter(audioLevelKey);
 
   const iconEl =
     visual.icon === "warning" ? (

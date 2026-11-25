@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useObservedElement } from "../../hooks/pages/useObservedElement";
 import type { Card as CardType, PlayerView } from "../../types";
 import type { ScoutingTab } from "../../hooks/useGameSurfaces";
 import {
@@ -239,8 +240,6 @@ function AdaptiveCardSection({
   measureKey?: string;
 }) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_CARD_DIMS);
-  const observerRef = useRef<ResizeObserver | null>(null);
-  const measureRef = useRef<(() => void) | null>(null);
 
   const resolveBestFit = useCallback(
     (width: number, height: number) => {
@@ -280,63 +279,26 @@ function AdaptiveCardSection({
     [cards.length, maxWidth, minColumns, minWidth],
   );
 
-  const bodyRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      observerRef.current?.disconnect();
-      observerRef.current = null;
-      measureRef.current = null;
-
-      if (!node) return;
-
-      const measure = () => {
-        const width = Math.max(node.clientWidth, 0);
-        const height = Math.max(node.clientHeight, 0);
-        const next = resolveBestFit(width, height);
-        setDims((prev) =>
-          prev.width === next.width &&
-          prev.height === next.height &&
-          prev.rows === next.rows &&
-          prev.columns === next.columns
-            ? prev
-            : next,
-        );
-      };
-      measureRef.current = measure;
-
-      measure();
-
-      const observer = new ResizeObserver(() => {
-        measure();
-      });
-
-      observer.observe(node);
-      observerRef.current = observer;
+  const bodyRef = useObservedElement<HTMLDivElement>(
+    (node) => {
+      const width = Math.max(node.clientWidth, 0);
+      const height = Math.max(node.clientHeight, 0);
+      const next = resolveBestFit(width, height);
+      setDims((prev) =>
+        prev.width === next.width &&
+        prev.height === next.height &&
+        prev.rows === next.rows &&
+        prev.columns === next.columns
+          ? prev
+          : next,
+      );
     },
-    [resolveBestFit],
+    {
+      deps: [resolveBestFit],
+      remeasureFrames: true,
+      remeasureKey: measureKey,
+    },
   );
-
-  useEffect(() => {
-    return () => {
-      observerRef.current?.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    let frameOne = 0;
-    let frameTwo = 0;
-
-    frameOne = requestAnimationFrame(() => {
-      measureRef.current?.();
-      frameTwo = requestAnimationFrame(() => {
-        measureRef.current?.();
-      });
-    });
-
-    return () => {
-      cancelAnimationFrame(frameOne);
-      cancelAnimationFrame(frameTwo);
-    };
-  }, [measureKey, resolveBestFit]);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">

@@ -1,14 +1,8 @@
-import {
-  useState,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useMemo,
-} from "react";
+import { useState, useCallback, useContext, useRef, useMemo } from "react";
 import type { Card as CardType } from "../../types";
 import { CardPreviewContext } from "./CardPreviewContext";
 import { useFaceDown } from "../../contexts/faceDownState";
+import { useWindowEvent } from "../../hooks/useDomEffects";
 import { CARD_BACK_IMAGE, BASIC_LANDS } from "../../constants/assets";
 import { canHover } from "../../utils/inputMode";
 import { registerTap } from "../../utils/doubleTap";
@@ -142,24 +136,23 @@ export function Card({
     else previewContext?.setPreviewCard(shown, upgrades);
   }, [previewContext, card, appliedUpgrades, counters]);
 
-  useEffect(() => {
-    if (!isHovered || !previewContext || !showZoom) return;
-    if (effectiveFaceDown && !canPeekFaceDown) return;
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  useWindowEvent(
+    "keydown",
+    (e) => {
+      if (e.target instanceof HTMLElement) {
+        const tag = e.target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      }
       if (e.key === "z" || e.key === "Z") openPreview();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [
-    isHovered,
-    previewContext,
-    openPreview,
-    effectiveFaceDown,
-    canPeekFaceDown,
-    showZoom,
-  ]);
+    },
+    {
+      enabled:
+        isHovered &&
+        Boolean(previewContext) &&
+        showZoom &&
+        (!effectiveFaceDown || canPeekFaceDown),
+    },
+  );
 
   const effectiveFlip = flipped !== showFlip;
   const normalUrl = effectiveFaceDown

@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getLobby, joinGame } from "../../api/client";
+import { joinGame } from "../../api/client";
 import { useAuth } from "../../contexts/authState";
+import { useLobbyJoin } from "../../hooks/pages/useLobbyJoin";
 import type { SeatGrant, SeatState } from "../../hooks/useGameSeat";
-import type { LobbyState } from "../../types";
 import {
   type AppError,
   getAppErrorMessage,
@@ -165,7 +165,7 @@ function JoinLobbyNotice({
   const navigate = useNavigate();
   const { user } = useAuth();
   const rememberedName = getRememberedSeat(gameId)?.name ?? null;
-  const [lobby, setLobby] = useState<LobbyState | "missing" | null>(null);
+  const lobby = useLobbyJoin(gameId);
   const [typedName, setTypedName] = useState<string | null>(null);
   // Derived, as the login check can finish after the first render and an account's name beats a guest's.
   const playerName =
@@ -184,26 +184,6 @@ function JoinLobbyNotice({
         )
       : "",
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    getLobby(gameId)
-      .then((state) => {
-        if (!cancelled) setLobby(state);
-      })
-      .catch(() => {
-        if (!cancelled) setLobby("missing");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId]);
-
-  useEffect(() => {
-    // A link to a lobby whose game has started belongs on the game page, which offers to watch or reconnect.
-    if (lobby === "missing")
-      navigate(`/game/${gameId}/play`, { replace: true });
-  }, [lobby, gameId, navigate]);
 
   if (lobby === null || lobby === "missing") {
     return <BusyNotice label="Loading lobby..." />;

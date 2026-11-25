@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useEscapeKey } from "../../hooks/useDomEffects";
 import type { Card as CardType } from "../../types";
 import { formatCounter } from "../../utils/counters";
 
@@ -20,15 +21,7 @@ export function CardPreviewModal({
   const imageHeight =
     counterEntries.length > 0 ? "max-h-[72vh]" : "max-h-[80vh]";
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   const getImageUrl = (c: CardType, flipped: boolean) => {
     if (flipped && c.flip_image_url) {
