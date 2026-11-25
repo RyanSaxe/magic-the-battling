@@ -32,7 +32,7 @@ class OutgoingWrites:
         return self._unsent.get(websocket, 0) >= MAX_UNSENT_WRITES
 
     async def wait_until_sent(self, websocket: object) -> None:
-        if last := self._last_write.get(websocket):
+        if (last := self._last_write.get(websocket)) and not last.done():
             await asyncio.wait({last})
 
     async def _write_after(
@@ -43,7 +43,7 @@ class OutgoingWrites:
         write: Write,
         on_failure: Callable[[], None] | None,
     ) -> None:
-        if previous is not None:
+        if previous is not None and not previous.done():
             # Waited on rather than awaited, so cancelling one write at shutdown can't cancel through the whole chain.
             await asyncio.wait({previous})
         try:
